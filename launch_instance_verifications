@@ -1,0 +1,26 @@
+#Verifications
+
+#Current AWS Region
+aws configure get region
+
+#Verify Key Pair Exists in This Region
+aws ec2 describe-key-pairs \
+  --query "KeyPairs[*].KeyName" \
+  --output text
+  
+#Verify Security Group Exists
+aws ec2 describe-security-groups \
+  --filters "Name=group-name,Values=devops-training-sg" \
+  --query "SecurityGroups[*].GroupId" \
+  --output text
+  
+#Verify Latest Ubuntu AMI (Region-Specific)
+aws ec2 describe-images \
+  --owners 099720109477 \
+  --filters "Name=name,Values=ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*" \
+            "Name=state,Values=available" \
+  --query "sort_by(Images, &CreationDate)[-1].ImageId" \
+  --output text
+  
+#Verify Local PEM Exists + Permissions
+ls -l ~/.ssh/devops-training-key.pem
