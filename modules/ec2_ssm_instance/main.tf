@@ -1,38 +1,10 @@
-# --- IAM role for SSM ---
-data "aws_iam_policy_document" "ec2_assume_role" {
-  statement {
-    effect  = "Allow"
-    actions = ["sts:AssumeRole"]
-
-    principals {
-      type        = "Service"
-      identifiers = ["ec2.amazonaws.com"]
-    }
-  }
-}
-
-resource "aws_iam_role" "ssm_role" {
-  name               = "devops-training-ssm-role"
-  assume_role_policy = data.aws_iam_policy_document.ec2_assume_role.json
-}
-
-resource "aws_iam_role_policy_attachment" "ssm_core" {
-  role       = aws_iam_role.ssm_role.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
-}
-
-resource "aws_iam_instance_profile" "ssm_profile" {
-  name = "devops-training-ssm-profile"
-  role = aws_iam_role.ssm_role.name
-}
-
 # Use the default VPC in the configured region
 data "aws_vpc" "default" {
   default = true
 }
 
 resource "aws_security_group" "cli_sg" {
-  name                   = "cli-instance-sg"
+  name                   = "cli-sg-${var.environment}"
   description            = "Converged SG for CLI instance"
   vpc_id                 = data.aws_vpc.default.id
   revoke_rules_on_delete = true
@@ -47,10 +19,11 @@ resource "aws_security_group" "cli_sg" {
   }
 
   tags = {
+
     Name        = "cli-instance-sg"
     Project     = "devops-training"
     ManagedBy   = "terraform"
-    Environment = "training"
+    Environment = var.environment
   }
 }
 
@@ -88,7 +61,7 @@ resource "aws_instance" "cli_instance" {
   subnet_id              = data.aws_subnets.default_vpc_subnets.ids[0]
   vpc_security_group_ids = [aws_security_group.cli_sg.id]
 
-  iam_instance_profile = aws_iam_instance_profile.ssm_profile.name
+  iam_instance_profile = var.instance_profile_name
 
   user_data_replace_on_change = true
 
@@ -117,4 +90,5 @@ resource "aws_instance" "cli_instance" {
     Environment = "training"
   }
 }
+
 

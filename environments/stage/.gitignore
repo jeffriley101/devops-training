@@ -1,0 +1,13 @@
+# Terraform local state (we use remote state)
+terraform.tfstate
+terraform.tfstate.backup
+terraform.tfstate.*
+crash.log
+crash.*.log
+.terraform/
+.terraform.lock.hcl
+
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log

@@ -1,7 +1,7 @@
 terraform {
   backend "s3" {
     bucket         = "devops-training-tfstate-31229db4"
-    key            = "training/single-instance/terraform.tfstate"
+    key            = "stage/terraform.tfstate"
     region         = "us-east-1"
     dynamodb_table = "devops-training-terraform-locks"
     encrypt        = true
@@ -24,10 +24,16 @@ provider "aws" {
 }
 
 module "cli" {
-  source = "./modules/ec2_ssm_instance"
+  source = "../../modules/ec2_ssm_instance"
 
-  region        = var.region
-  instance_type = var.instance_type
-  my_ip         = var.my_ip
+  environment           = "stage"
+  region                = var.region
+  instance_type         = var.instance_type
+  my_ip                 = var.my_ip
+  instance_profile_name = "devops-training-ssm-profile"
+
+  #create_iam = false
+  #existing_instance_profile_name = "devops-training-ssm-profile"
+
 }
 
