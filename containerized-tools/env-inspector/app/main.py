@@ -13,10 +13,10 @@ def log(msg: str, quiet: bool) -> None:
         return
     print(f"[INFO] {msg}", file=sys.stderr)
 
-
 def gather_environment_data() -> Dict[str, Any]:
     now = datetime.now(UTC)
-    return {
+
+    data = {
         "timestamp_utc_iso": now.isoformat(),
         "timestamp_utc_human": now.strftime("%Y-%m-%d %H:%M:%S UTC"),
         "hostname": socket.gethostname(),
@@ -26,6 +26,13 @@ def gather_environment_data() -> Dict[str, Any]:
         "python_version": platform.python_version(),
         "environment_variables_count": len(os.environ),
     }
+
+    data["git_sha"] = os.getenv("GIT_SHA", "unknown")
+    data["task_def_arn"] = os.getenv("ECS_TASK_DEFINITION_ARN", "unknown")
+    data["task_arn"] = os.getenv("ECS_TASK_ARN", "unknown")
+    data["run_source"] = os.getenv("RUN_SOURCE", "manual")
+
+    return data
 
 
 def parse_args():
