@@ -102,11 +102,10 @@ jobs:
             --targets file://targets.new.json)
 
           echo "$RESP"
-
           echo "$RESP" | jq -e '.FailedEntryCount == 0' >/dev/null
 
           aws events list-targets-by-rule \
             --rule "${EVENTS_RULE_NAME}" \
             --region "${AWS_REGION}" \
-            --query "Targets[?Id==`env-inspector-ecs-task`].EcsParameters.TaskDefinitionArn" \
+            --query "Targets[?Id=='env-inspector-ecs-task'].EcsParameters.TaskDefinitionArn" \
             --output text
