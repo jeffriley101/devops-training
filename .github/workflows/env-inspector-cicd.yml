@@ -15,9 +15,9 @@ permissions:
 env:
   AWS_REGION: us-east-1
   AWS_ACCOUNT_ID: "646313139147"
-  EVENTS_RULE_NAME: env-inspector-schedule
   ECR_REPO: env-inspector
   ECS_TASK_FAMILY: env-inspector
+  EVENTS_RULE_NAME: env-inspector-schedule
 
 jobs:
   build-push-update-taskdef:
@@ -40,20 +40,11 @@ jobs:
         working-directory: containerized-tools/env-inspector
         run: |
           set -euo pipefail
-
           SHA="${GITHUB_SHA::7}"
           IMAGE_URI="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:git-${SHA}"
-
-          echo "Building image $IMAGE_URI"
-
           docker build -t "$IMAGE_URI" .
           docker push "$IMAGE_URI"
-
           echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
-
-      - name: Ensure jq exists
-        run: |
-          command -v jq || sudo apt-get update && sudo apt-get install -y jq
 
       - name: Register new ECS task definition revision (swap env-inspector image)
         run: |
@@ -87,20 +78,20 @@ jobs:
           echo "NEW_TD_ARN=$NEW_TD_ARN" >> $GITHUB_ENV
           echo "Registered $NEW_TD_ARN"
 
-     - name: Update EventBridge target to new task definition
-       run: |
-         set -euo pipefail
+      - name: Update EventBridge target to new task definition
+        run: |
+          set -euo pipefail
 
-         aws events list-targets-by-rule \
-           --rule "${EVENTS_RULE_NAME}" \
-           --query "Targets" > targets.json
+          aws events list-targets-by-rule \
+            --rule "${EVENTS_RULE_NAME}" \
+            --query "Targets" > targets.json
 
-         jq --arg TD "$NEW_TD_ARN" '
-           .[0].EcsParameters.TaskDefinitionArn = $TD
-         ' targets.json > targets.new.json
+          jq --arg TD "$NEW_TD_ARN" '
+            .[0].EcsParameters.TaskDefinitionArn = $TD
+          ' targets.json > targets.new.json
 
-         aws events put-targets \
-           --rule "${EVENTS_RULE_NAME}" \
-           --targets file://targets.new.json
+          aws events put-targets \
+            --rule "${EVENTS_RULE_NAME}" \
+            --targets file://targets.new.json
 
-         echo "EventBridge target updated to $NEW_TD_ARN"
+          echo "EventBridge target updated to $NEW_TD_ARN"
