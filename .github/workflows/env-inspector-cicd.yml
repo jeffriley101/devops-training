@@ -78,17 +78,35 @@ jobs:
           echo "NEW_TD_ARN=$NEW_TD_ARN" >> $GITHUB_ENV
           echo "Registered $NEW_TD_ARN"
 
-       - name: Update EventBridge target to new task definition
-         run: |
-           set -euo pipefail
+      - name: Update EventBridge target to new task definition
+        run: |
+          set -euo pipefail
 
-           echo "Updating EventBridge target to $NEW_TD_ARN"
+          echo "Updating EventBridge rule ${EVENTS_RULE_NAME} to $NEW_TD_ARN"
 
-           aws events put-targets \
-             --rule "${EVENTS_RULE_NAME}" \
-             --targets "Id=env-inspector-ecs-task,Arn=arn:aws:ecs:us-east-1:646313139147:cluster/env-inspector-cluster,RoleArn=arn:aws:iam::646313139147:role/env-inspector-events-to-ecs-role,EcsParameters={TaskDefinitionArn=${NEW_TD_ARN},TaskCount=1,LaunchType=FARGATE,NetworkConfiguration={awsvpcConfiguration={Subnets=[subnet-0afa828b1fbad3f37,subnet-074fecbe0a8dfd88f,subnet-0f3b35d17496469a4,subnet-04cd90153aba42bb9,subnet-0c62c182b234ae364,subnet-03e914f3722e00002],SecurityGroups=[sg-0de0c1e877a79617d],AssignPublicIp=ENABLED}}}"
+          aws events list-targets-by-rule \
+            --rule "${EVENTS_RULE_NAME}" \
+            --region "${AWS_REGION}" \
+            --query "Targets" > targets.json
 
-           aws events list-targets-by-rule \
-             --rule "${EVENTS_RULE_NAME}" \
-             --query "Targets[?Id=='env-inspector-ecs-task'].EcsParameters.TaskDefinitionArn" \
-             --output text
+          jq --arg TD "$NEW_TD_ARN" '
+            map(if .Id == "env-inspector-ecs-task"
+                then (.EcsParameters.TaskDefinitionArn = $TD)
+                else .
+                end)
+          ' targets.json > targets.new.json
+
+          RESP=$(aws events put-targets \
+            --rule "${EVENTS_RULE_NAME}" \
+            --region "${AWS_REGION}" \
+            --targets file://targets.new.json)
+
+          echo "$RESP"
+
+          echo "$RESP" | jq -e '.FailedEntryCount == 0' >/dev/null
+
+          aws events list-targets-by-rule \
+            --rule "${EVENTS_RULE_NAME}" \
+            --region "${AWS_REGION}" \
+            --query "Targets[?Id==`env-inspector-ecs-task`].EcsParameters.TaskDefinitionArn" \
+            --output text
