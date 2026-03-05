@@ -1,0 +1,73 @@
+name: env-inspector CI/CD
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "containerized-tools/env-inspector/**"
+      - ".github/workflows/env-inspector-cicd.yml"
+  workflow_dispatch: {}
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  AWS_ACCOUNT_ID: "646313139147"
+  ECR_REPO: env-inspector
+  ECS_TASK_FAMILY: env-inspector
+
+jobs:
+  build-push-update-taskdef:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS creds (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::646313139147:role/gha-env-inspector-deploy
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push image (git SHA tag)
+        working-directory: containerized-tools/env-inspector
+        run: |
+          set -euo pipefail
+          SHA="${GITHUB_SHA::7}"
+          IMAGE_URI="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPO}:git-${SHA}"
+          docker build -t "$IMAGE_URI" .
+          docker push "$IMAGE_URI"
+          echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
+
+      - name: Register new ECS task definition revision (swap env-inspector image)
+        run: |
+          set -euo pipefail
+          aws ecs describe-task-definition \
+            --task-definition "${ECS_TASK_FAMILY}" \
+            --query "taskDefinition" > td.json
+
+          jq --arg IMAGE "$IMAGE_URI" '
+            del(
+              .taskDefinitionArn,
+              .revision,
+              .status,
+              .requiresAttributes,
+              .compatibilities,
+              .registeredAt,
+              .registeredBy
+            )
+            | .containerDefinitions = (
+                .containerDefinitions
+                | map(if .name == "env-inspector" then .image = $IMAGE else . end)
+              )
+          ' td.json > td.new.json
+
+          aws ecs register-task-definition \
+            --cli-input-json file://td.new.json \
+            --query "taskDefinition.taskDefinitionArn" \
+            --output text
