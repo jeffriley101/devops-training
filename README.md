@@ -2,35 +2,25 @@
 
 This project demonstrates a production-style DevOps automation pipeline built on AWS.
 
-## Architecture
 
-Developer
-   │
-   │ git push
-   ▼
-GitHub Actions (CI/CD)
-   │
-   │ build container
-   ▼
-Amazon ECR
-   │
-   │ new image tag
-   ▼
-Amazon ECS Task Definition
-   │
-   │ run task (manual or scheduled)
-   ▼
-ECS Fargate Runtime
-   │
-   ├─ env-inspector container
-   │     collects environment metadata
-   │
-   └─ uploader container
-         uploads artifact to S3
-   ▼
-Amazon S3 Artifact Store
-   ├─ timestamped history
-   └─ latest.json pointer
+
+## Architecture (10 lines)
+
+See `docs/architecture.txt` for the full diagram.
+
+- GitHub Actions authenticates to AWS via OIDC
+- CI builds the env-inspector container and pushes to ECR using immutable git-SHA tags
+- CI registers a new ECS task definition revision with the new image
+- CI updates the EventBridge schedule target to the new task definition revision
+- EventBridge triggers the Fargate task on schedule (or manual run)
+- env-inspector writes JSON output to a shared volume
+- uploader copies output to S3 and updates a latest.json pointer
+- CloudWatch Logs capture both containers’ output for audit/debugging
+
+
+
+# --- ---
+
 
 What This System Demonstrates
 

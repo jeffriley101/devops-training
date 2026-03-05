@@ -1,0 +1,26 @@
+Developer
+  |
+  | git push
+  v
+GitHub Actions (OIDC)
+  |
+  | docker build + push
+  v
+Amazon ECR (immutable image tags: git-<sha>)
+  |
+  | register new ECS task definition revision
+  v
+Amazon ECS Task Definition (env-inspector + uploader)
+  |
+  | CI updates EventBridge target to new revision
+  v
+EventBridge Schedule (runs Fargate task)
+  |
+  v
+ECS/Fargate Task Run
+  |-- env-inspector: writes JSON to /shared
+  |-- uploader: uploads to S3 + updates latest.json
+  v
+S3 Artifact Store
+  |-- training/YYYY/MM/DD/env-inspector-<ts>.json
+  `-- training/latest.json
