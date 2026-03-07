@@ -49,6 +49,23 @@ def gather_environment_data() -> Dict[str, Any]:
     data["task_arn"] = os.getenv("ECS_TASK_ARN", "unknown")
     data["run_source"] = os.getenv("RUN_SOURCE", "manual")
 
+    warnings = []
+
+    if data["disk_free_gb"] < 5:
+        warnings.append("Low disk space: less than 5 GB free")
+
+    if data["git_sha"] == "unknown":
+        warnings.append("Missing metadata: git_sha")
+
+    if data["task_def_arn"] == "unknown":
+        warnings.append("Missing metadata: task_def_arn")
+
+    if data["task_arn"] == "unknown":
+        warnings.append("Missing metadata: task_arn")
+
+    data["warnings"] = warnings
+    data["status"] = "WARNING" if warnings else "OK"
+
     return data
 
 
