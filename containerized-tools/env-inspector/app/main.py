@@ -8,6 +8,22 @@ import shutil
 from datetime import UTC, datetime
 from typing import Dict, Any
 
+def supports_color() -> bool:
+    return sys.stdout.isatty()
+
+def color(text: str, code: str) -> str:
+    if not supports_color():
+        return text
+    return f"\033[{code}m{text}\033[0m"
+
+def green(text: str) -> str:
+    return color(text, "32")
+
+def yellow(text: str) -> str:
+    return color(text, "33")
+
+def bold(text: str) -> str:
+    return color(text, "1")
 
 def log(msg: str, quiet: bool) -> None:
     if quiet:
@@ -107,13 +123,13 @@ def parse_args():
 
 
 
-def render_table(data: Dict[str, Any]) -> str:
-    # Simple, dependency-free table
-    key_width = max(len(k) for k in data.keys()) if data else 0
-    lines = []
-    for k in sorted(data.keys()):
-        lines.append(f"{k.ljust(key_width)}  {data[k]}")
-    return "\n".join(lines)
+#def render_table(data: Dict[str, Any]) -> str:
+#    # Simple, dependency-free table
+#    key_width = max(len(k) for k in data.keys()) if data else 0
+#    lines = []
+#    for k in sorted(data.keys()):
+#        lines.append(f"{k.ljust(key_width)}  {data[k]}")
+#    return "\n".join(lines)
 
 
 def main():
@@ -167,6 +183,41 @@ def main():
     else:
         # Table is always human-oriented
         print(render_table(data))
+
+def render_table(data: Dict[str, Any]) -> str:
+    status = data.get("status", "unknown")
+    warnings = data.get("warnings", [])
+
+    lines = []
+    if status == "OK":
+        status_text = green(status)
+    else:
+        status_text = yellow(status)
+
+    lines.append(f"{bold('STATUS:')} {status_text}")
+    #lines.append(f"STATUS: {status}")
+
+    if warnings:
+        lines.append(bold("WARNINGS:"))
+        for warning in warnings:
+            lines.append(f"- {warning}")
+    else:
+        lines.append("WARNINGS: none")
+
+    lines.append("")
+    lines.append("-" * 40)
+
+    visible_items = [(key, value) for key, value in data.items() if key not in {"status", "warnings"}]
+
+    if not visible_items:
+        return "\n".join(lines)
+
+    max_key_len = max(len(key) for key, _ in visible_items)
+
+    for key, value in visible_items:
+        lines.append(f"{key.ljust(max_key_len)}  {value}")
+
+    return "\n".join(lines)
 
 
 if __name__ == "__main__":
