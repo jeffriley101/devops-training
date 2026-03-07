@@ -4,6 +4,7 @@ import os
 import platform
 import socket
 import sys
+import shutil
 from datetime import UTC, datetime
 from typing import Dict, Any
 
@@ -13,8 +14,20 @@ def log(msg: str, quiet: bool) -> None:
         return
     print(f"[INFO] {msg}", file=sys.stderr)
 
+def get_memory_total_mb() -> int:
+    try:
+        with open("/proc/meminfo", "r", encoding="utf-8") as f:
+            for line in f:
+                if line.startswith("MemTotal:"):
+                    kb = int(line.split()[1])
+                    return kb // 1024
+    except Exception:
+        return -1
+    return -1
+
 def gather_environment_data() -> Dict[str, Any]:
     now = datetime.now(UTC)
+    disk = shutil.disk_usage("/")
 
     data = {
         "timestamp_utc_iso": now.isoformat(),
@@ -25,6 +38,10 @@ def gather_environment_data() -> Dict[str, Any]:
         "platform_release": platform.release(),
         "python_version": platform.python_version(),
         "environment_variables_count": len(os.environ),
+        "cpu_count": os.cpu_count(),
+        "memory_total_mb": get_memory_total_mb(),
+        "disk_total_gb": round(disk.total / (1024 ** 3), 2),
+        "disk_free_gb": round(disk.free / (1024 ** 3), 2),
     }
 
     data["git_sha"] = os.getenv("GIT_SHA", "unknown")
