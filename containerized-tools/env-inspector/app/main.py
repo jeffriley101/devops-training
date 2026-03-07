@@ -5,9 +5,14 @@ import platform
 import socket
 import sys
 import shutil
+import itertools
+import threading
+import time
 from datetime import UTC, datetime
 from typing import Dict, Any
 
+
+# --- Colors ---
 def supports_color() -> bool:
     return sys.stdout.isatty()
 
@@ -24,6 +29,45 @@ def yellow(text: str) -> str:
 
 def bold(text: str) -> str:
     return color(text, "1")
+
+
+# --- Spinner ---
+def supports_spinner() -> bool:
+    return sys.stderr.isatty()
+
+def run_with_spinner(message: str, func):
+    if not supports_spinner():
+        return func()
+
+    stop_event = threading.Event()
+    start_time = time.time()
+
+    def spinner():
+        for ch in itertools.cycle("|/-\\"):
+            if stop_event.is_set():
+                break
+            print(f"\r{message} {ch}", end="", file=sys.stderr, flush=True)
+            time.sleep(0.1)
+
+    # Show one frame immediately
+    print(f"\r{message} |", end="", file=sys.stderr, flush=True)
+
+    t = threading.Thread(target=spinner)
+    t.start()
+    try:
+        result = func()
+        return result
+    finally:
+        # Keep spinner visible very briefly so humans can notice it
+        elapsed = time.time() - start_time
+        if elapsed < 0.4:
+            time.sleep(0.4 - elapsed)
+        stop_event.set()
+        t.join()
+        print(f"\r{message} done", file=sys.stderr, flush=True)
+
+
+
 
 def log(msg: str, quiet: bool) -> None:
     if quiet:
@@ -134,7 +178,11 @@ def parse_args():
 
 def main():
     args = parse_args()
-    data = gather_environment_data()
+    #data = gather_environment_data()
+    if args.format == "table" and not args.quiet:
+        data = run_with_spinner("Collecting environment data...", gather_environment_data)
+    else:
+        data = gather_environment_data()
 
     if args.fields.strip():
         requested = [f.strip() for f in args.fields.split(",") if f.strip()]
@@ -165,6 +213,8 @@ def main():
             sys.exit(5)
 
     log("Collected environment data", args.quiet)
+    if args.format == "table" and not args.quiet:
+        print("\n", file=sys.stderr)
 
     # Always produce a canonical JSON string for machine use / file output
     json_text = json.dumps(data, indent=2 if args.pretty else None, sort_keys=True)
@@ -189,6 +239,10 @@ def render_table(data: Dict[str, Any]) -> str:
     warnings = data.get("warnings", [])
 
     lines = []
+    lines.append(bold("ENV INSPECTOR"))
+    lines.append("=" * 41)
+    lines.append("")
+
     if status == "OK":
         status_text = green(status)
     else:
@@ -206,6 +260,9 @@ def render_table(data: Dict[str, Any]) -> str:
 
     lines.append("")
     lines.append("-" * 40)
+    lines.append("")
+    lines.append(bold("DETAILS"))
+    lines.append("-" * 41)
 
     visible_items = [(key, value) for key, value in data.items() if key not in {"status", "warnings"}]
 
