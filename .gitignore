@@ -1,0 +1,32 @@
+# Terraform local directories
+**/.terraform/
+
+# Terraform state
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+**/*.tfstate
+**/*.tfstate.*
+
+# Terraform variable files (may contain secrets)
+*.tfvars
+*.tfvars.json
+
+# Provider lock file (optional to ignore; safe to commit too)
+# .terraform.lock.hcl
+
+# OS junk
+.DS_Store
+
+# Terraform variable files
+**/terraform.tfvars
+
+# Local backups
+backups/
+
+# Generated env-inspector output
+containerized-tools/env-inspector/out/
+
+# Local installer/package artifacts
+tools/*.deb
