@@ -63,4 +63,5 @@ jobs:
         working-directory: ${{ matrix.stack }}
         env:
           TF_VAR_key_name: ${{ vars.TF_VAR_KEY_NAME }}
+          TF_VAR_my_ip: ${{ vars.TF_VAR_MY_IP }}
         run: terraform plan -no-color -input=false
