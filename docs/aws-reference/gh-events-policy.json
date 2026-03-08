@@ -1,0 +1,13 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "events:ListTargetsByRule",
+        "events:PutTargets"
+      ],
+      "Resource": "arn:aws:events:us-east-1:646313139147:rule/env-inspector-schedule"
+    }
+  ]
+}

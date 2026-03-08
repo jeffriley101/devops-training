@@ -1,0 +1,14 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": [
+        "arn:aws:iam::646313139147:role/env-inspector-task-execution-role",
+        "arn:aws:iam::646313139147:role/env-inspector-task-role",
+        "arn:aws:iam::646313139147:role/env-inspector-events-to-ecs-role"
+      ]
+    }
+  ]
+}
