@@ -1,10 +1,32 @@
 # Env Inspector – Containerized Automation Platform
+
 `env-inspector` is a production-style DevOps automation project built on AWS with containerized tooling, CI/CD deployment, scheduled execution, artifact storage, and runtime traceability.
 
 The platform builds a containerized automation tool, deploys it through GitHub Actions, runs it on AWS Fargate, and stores execution artifacts in Amazon S3.
 
 
+
+## Portfolio Summary
+
+This project demonstrates how to build and operate a scheduled container automation platform from source control through deployment, execution, and artifact generation.
+
+It includes:
+
+- a containerized Python automation tool
+- GitHub Actions CI/CD with AWS OIDC authentication
+- immutable image publishing to Amazon ECR
+- ECS task definition revision management
+- automated EventBridge target updates for scheduled rollout
+- structured artifact storage in Amazon S3
+- CloudWatch-based execution visibility
+- runtime metadata traceability for deployed artifacts
+
+The result is a portfolio-grade DevOps project that demonstrates containerized automation, cloud deployment pipelines, scheduled infrastructure execution, artifact persistence, and operational debugging in a real AWS environment.
+
+
+
 ## Overview
+
 This project demonstrates how to build and operate a scheduled container automation platform using:
 
 - Amazon ECS
@@ -19,7 +41,9 @@ This project demonstrates how to build and operate a scheduled container automat
 The system supports both scheduled execution and manual execution of the same containerized automation workflow.
 
 
+
 ## What This Project Does
+
 The `env-inspector` container collects runtime environment data and produces a JSON artifact. A second `uploader` container copies that artifact to S3, where it is stored both as a timestamped record and as a rolling `latest.json`.
 
 The platform also captures deployment and runtime traceability metadata, including:
@@ -32,12 +56,30 @@ The platform also captures deployment and runtime traceability metadata, includi
 This makes each artifact auditable: you can tell what code produced it, what task definition ran it, and which ECS task executed it.
 
 
+
+## What This Project Proves
+
+This project demonstrates the ability to:
+
+- build containerized automation tooling
+- deploy AWS workloads through CI/CD
+- manage scheduled ECS/Fargate execution
+- store and trace runtime artifacts
+- debug platform behavior across local and cloud environments
+- improve developer experience with context-aware output and warnings
+
+
+
 ## Architecture
+
 See `docs/architecture.txt` for the text version of the diagram.
 
 ![Env Inspector architecture](docs/architecture-diagram.svg)
 
+
+
 ### High-level flow
+
 1. GitHub Actions authenticates to AWS using OIDC
 2. CI builds the `env-inspector` container image
 3. CI pushes the image to Amazon ECR using an immutable git-SHA tag
@@ -47,6 +89,7 @@ See `docs/architecture.txt` for the text version of the diagram.
 7. `env-inspector` collects environment data and writes JSON output to a shared volume
 8. `uploader` copies the artifact to Amazon S3
 9. CloudWatch Logs capture execution output for visibility and debugging
+
 
 
 ## Deployment Flow
@@ -66,6 +109,7 @@ Scheduled Fargate task runs container
   ↓
 Automation output stored in S3
 ```
+
 
 
 ## Example Output
@@ -102,6 +146,7 @@ task_def_arn                 unknown
 task_arn                     unknown
 run_source                   manual
 ```
+
 
 
 ### Example ECS Artifact
