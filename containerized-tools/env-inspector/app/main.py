@@ -117,6 +117,8 @@ def gather_environment_data() -> Dict[str, Any]:
     }
 
     ecs_meta = get_ecs_task_metadata()
+    in_ecs = bool(os.getenv("ECS_CONTAINER_METADATA_URI_V4"))
+
 
     task_arn = ecs_meta.get("TaskARN")
     family = ecs_meta.get("Family")
@@ -135,24 +137,20 @@ def gather_environment_data() -> Dict[str, Any]:
     data["task_arn"] = os.getenv("ECS_TASK_ARN", task_arn or "unknown")
     data["run_source"] = os.getenv("RUN_SOURCE", "manual")
 
-    #data["git_sha"] = os.getenv("GIT_SHA", "unknown")
-    #data["task_def_arn"] = os.getenv("ECS_TASK_DEFINITION_ARN", "unknown")
-    #data["task_arn"] = os.getenv("ECS_TASK_ARN", "unknown")
-    #data["run_source"] = os.getenv("RUN_SOURCE", "manual")
-
     warnings = []
 
     if data["disk_free_gb"] < 5:
         warnings.append("Low disk space: less than 5 GB free")
 
-    if data["git_sha"] == "unknown":
+    if in_ecs and data["git_sha"] == "unknown":
         warnings.append("Missing metadata: git_sha")
 
-    if data["task_def_arn"] == "unknown":
+    if in_ecs and data["task_def_arn"] == "unknown":
         warnings.append("Missing metadata: task_def_arn")
 
-    if data["task_arn"] == "unknown":
+    if in_ecs and data["task_arn"] == "unknown":
         warnings.append("Missing metadata: task_arn")
+
 
     data["warnings"] = warnings
     data["status"] = "WARNING" if warnings else "OK"
@@ -195,16 +193,6 @@ def parse_args():
         help="Require VAR=VALUE match (repeatable). Example: --require-eq APP_ENV=production",
     )
     return p.parse_args()
-
-
-
-#def render_table(data: Dict[str, Any]) -> str:
-#    # Simple, dependency-free table
-#    key_width = max(len(k) for k in data.keys()) if data else 0
-#    lines = []
-#    for k in sorted(data.keys()):
-#        lines.append(f"{k.ljust(key_width)}  {data[k]}")
-#    return "\n".join(lines)
 
 
 def main():
