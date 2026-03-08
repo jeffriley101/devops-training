@@ -1,11 +1,10 @@
 # Env Inspector – Containerized Automation Platform
-
 `env-inspector` is a production-style DevOps automation project built on AWS with containerized tooling, CI/CD deployment, scheduled execution, artifact storage, and runtime traceability.
 
 The platform builds a containerized automation tool, deploys it through GitHub Actions, runs it on AWS Fargate, and stores execution artifacts in Amazon S3.
 
-## Overview
 
+## Overview
 This project demonstrates how to build and operate a scheduled container automation platform using:
 
 - Amazon ECS
@@ -19,8 +18,8 @@ This project demonstrates how to build and operate a scheduled container automat
 
 The system supports both scheduled execution and manual execution of the same containerized automation workflow.
 
-## What This Project Does
 
+## What This Project Does
 The `env-inspector` container collects runtime environment data and produces a JSON artifact. A second `uploader` container copies that artifact to S3, where it is stored both as a timestamped record and as a rolling `latest.json`.
 
 The platform also captures deployment and runtime traceability metadata, including:
@@ -32,14 +31,13 @@ The platform also captures deployment and runtime traceability metadata, includi
 
 This makes each artifact auditable: you can tell what code produced it, what task definition ran it, and which ECS task executed it.
 
-## Architecture
 
+## Architecture
 See `docs/architecture.txt` for the text version of the diagram.
 
 ![Env Inspector architecture](docs/architecture-diagram.svg)
 
 ### High-level flow
-
 1. GitHub Actions authenticates to AWS using OIDC
 2. CI builds the `env-inspector` container image
 3. CI pushes the image to Amazon ECR using an immutable git-SHA tag
@@ -50,8 +48,8 @@ See `docs/architecture.txt` for the text version of the diagram.
 8. `uploader` copies the artifact to Amazon S3
 9. CloudWatch Logs capture execution output for visibility and debugging
 
-## Deployment Flow
 
+## Deployment Flow
 ```text
 git push
   ↓
@@ -66,3 +64,38 @@ EventBridge target updated to new revision
 Scheduled Fargate task runs container
   ↓
 Automation output stored in S3
+
+
+## Example Output
+Example human-readable output from a local run:
+
+```text
+Collecting environment data... done
+[INFO] Collected environment data
+
+ENV INSPECTOR
+=========================================
+
+STATUS: OK
+WARNINGS: none
+
+----------------------------------------
+
+DETAILS
+-----------------------------------------
+timestamp_utc_iso            2026-03-08T05:16:07.226529+00:00
+timestamp_utc_human          2026-03-08 05:16:07 UTC
+hostname                     26fb681d74a8
+ip_address                   172.17.0.2
+platform                     Linux
+platform_release             6.17.0-14-generic
+python_version               3.12.13
+environment_variables_count  8
+cpu_count                    4
+memory_total_mb              7648
+disk_total_gb                55.99
+disk_free_gb                 19.61
+git_sha                      unknown
+task_def_arn                 unknown
+task_arn                     unknown
+run_source                   manual
