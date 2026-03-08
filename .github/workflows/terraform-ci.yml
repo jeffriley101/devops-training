@@ -54,6 +54,13 @@ jobs:
         working-directory: ${{ matrix.stack }}
         run: terraform init
 
+          #- name: terraform plan
+          #working-directory: ${{ matrix.stack }}
+          #run: terraform plan -no-color
+
+
       - name: terraform plan
         working-directory: ${{ matrix.stack }}
-        run: terraform plan -no-color
+        env:
+          TF_VAR_key_name: ${{ vars.TF_VAR_KEY_NAME }}
+        run: terraform plan -no-color -input=false
