@@ -8,6 +8,8 @@ import shutil
 import itertools
 import threading
 import time
+import urllib.request
+from urllib.error import URLError
 from datetime import UTC, datetime
 from typing import Dict, Any
 
@@ -67,6 +69,16 @@ def run_with_spinner(message: str, func):
         print(f"\r{message} done", file=sys.stderr, flush=True)
 
 
+def get_ecs_task_metadata() -> Dict[str, Any]:
+    base_uri = os.getenv("ECS_CONTAINER_METADATA_URI_V4")
+    if not base_uri:
+        return {}
+
+    try:
+        with urllib.request.urlopen(f"{base_uri}/task", timeout=2) as response:
+            return json.load(response)
+    except (URLError, TimeoutError, json.JSONDecodeError, OSError):
+        return {}
 
 
 def log(msg: str, quiet: bool) -> None:
@@ -104,10 +116,29 @@ def gather_environment_data() -> Dict[str, Any]:
         "disk_free_gb": round(disk.free / (1024 ** 3), 2),
     }
 
+    ecs_meta = get_ecs_task_metadata()
+
+    task_arn = ecs_meta.get("TaskARN")
+    family = ecs_meta.get("Family")
+    revision = ecs_meta.get("Revision")
+
+    task_def_arn = "unknown"
+    if task_arn and family and revision:
+        arn_parts = task_arn.split(":")
+        if len(arn_parts) >= 5:
+            region = arn_parts[3]
+            account_id = arn_parts[4]
+            task_def_arn = f"arn:aws:ecs:{region}:{account_id}:task-definition/{family}:{revision}"
+
     data["git_sha"] = os.getenv("GIT_SHA", "unknown")
-    data["task_def_arn"] = os.getenv("ECS_TASK_DEFINITION_ARN", "unknown")
-    data["task_arn"] = os.getenv("ECS_TASK_ARN", "unknown")
+    data["task_def_arn"] = os.getenv("ECS_TASK_DEFINITION_ARN", task_def_arn)
+    data["task_arn"] = os.getenv("ECS_TASK_ARN", task_arn or "unknown")
     data["run_source"] = os.getenv("RUN_SOURCE", "manual")
+
+    #data["git_sha"] = os.getenv("GIT_SHA", "unknown")
+    #data["task_def_arn"] = os.getenv("ECS_TASK_DEFINITION_ARN", "unknown")
+    #data["task_arn"] = os.getenv("ECS_TASK_ARN", "unknown")
+    #data["run_source"] = os.getenv("RUN_SOURCE", "manual")
 
     warnings = []
 
