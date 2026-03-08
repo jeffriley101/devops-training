@@ -39,7 +39,7 @@ This makes each artifact auditable: you can tell what code produced it, what tas
 
 See `docs/architecture.txt` for the full diagram.
 
-![Env Inspector architecture](docs/architecture-diagram.png)
+![Env Inspector architecture](docs/architecture-diagram.svg)
 
 ### High-level flow
 
