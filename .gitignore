@@ -4,14 +4,15 @@
 # Terraform state
 *.tfstate
 *.tfstate.*
-crash.log
-crash.*.log
 **/*.tfstate
 **/*.tfstate.*
+crash.log
+crash.*.log
 
 # Terraform variable files (may contain secrets)
 *.tfvars
 *.tfvars.json
+**/terraform.tfvars
 
 # Provider lock file (optional to ignore; safe to commit too)
 # .terraform.lock.hcl
@@ -19,17 +20,8 @@ crash.*.log
 # OS junk
 .DS_Store
 
-# Terraform variable files
-**/terraform.tfvars
-
 # Local backups
 backups/
-
-# Generated env-inspector output
-containerized-tools/env-inspector/out/
-
-# Local installer/package artifacts
-tools/*.deb
 
 # Python cache
 __pycache__/
@@ -37,7 +29,12 @@ __pycache__/
 *.pyo
 *.pyd
 
+# Generated env-inspector output
+containerized-tools/env-inspector/out/
+
 # Market Snapshot Bot local artifacts
 containerized-tools/market-snapshot-bot/dev/
 
+# Local installer/package artifacts
+tools/*.deb
 
