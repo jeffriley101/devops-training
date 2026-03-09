@@ -1,5 +1,10 @@
 #Market Snapshot Bot
 
+RESET='\033[0m'
+AMBER='\033[33m'
+RED='\033[31m'
+
+
 ##Create the repo directory in /tmp and run the demo
 
 mkdir -p /tmp/market-snapshot-bot-demo 
@@ -40,7 +45,6 @@ touch dev/summary/2026/03/09/013045Z/summary.json
 touch dev/latest/latest_snapshot.json
 touch dev/latest/latest_summary.json
 tree -a -I '.git|__pycache__'
-echo break ; sleep 10
 
 cat > app/config.py << 'EOF'
 import os
@@ -416,6 +420,5 @@ export S3_BUCKET=dummy-local-bucket
 export S3_PREFIX=market-snapshot-bot
 export LOG_LEVEL=INFO
 python3 -m app.main
-echo "Verifications: vim $(find /tmp/market-snapshot-bot-demo/dev/normalized -name snapshot.json | sort | tail -n 1)"
-echo "Destroy this test: cd ; rm -rI /tmp/market-snapshot-bot-demo"
-
+printf "%b\n" "${AMBER}Verifications:${RESET} vim \$(find /tmp/market-snapshot-bot-demo/dev/normalized -name snapshot.json | sort | tail -n 1)"
+printf "${RED}Destroy this test:${RESET} cd ; rm -rI /tmp/market-snapshot-bot-demo\n"
