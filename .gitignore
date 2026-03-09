@@ -30,3 +30,9 @@ containerized-tools/env-inspector/out/
 
 # Local installer/package artifacts
 tools/*.deb
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
