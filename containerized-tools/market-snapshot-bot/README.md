@@ -41,10 +41,6 @@ This project demonstrates platform engineering skills applied to financial data 
 
 ## Short example output
 
-People love seeing results without running anything.
-
-Add:
-
 ```markdown
 ### Example Output
 
@@ -121,4 +117,26 @@ Status values:
 
 ## Artifact Layout (S3)
 
+
+Each run publishes artifacts to S3 using a structured prefix layout organized by environment, artifact type, and snapshot timestamp.
+
+Example layout:
+
+```text
+dev/
+├── raw/
+│   └── 20260309T023112Z.json
+├── normalized/
+│   └── 20260309T023112Z.json
+└── summaries/
+    └── 20260309T023112Z.txt
+```
+
+This layout supports:
+
+    traceable historical storage
+
+    separation of raw and normalized data
+
+    easy operator review of human-readable outputs
 
