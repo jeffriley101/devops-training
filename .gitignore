@@ -36,3 +36,8 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+
+# Market Snapshot Bot local artifacts
+containerized-tools/market-snapshot-bot/dev/
+
+
