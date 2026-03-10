@@ -28,6 +28,7 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+.venv/
 
 # Generated env-inspector output
 containerized-tools/env-inspector/out/
@@ -38,3 +39,11 @@ containerized-tools/market-snapshot-bot/dev/
 # Local installer/package artifacts
 tools/*.deb
 
+# Local env files
+.env
+
+# Generated artifacts
+artifacts/output/
+
+containerized-tools/market-snapshot-bot/.env.local
+containerized-tools/market-snapshot-bot/app/.main.py.swp

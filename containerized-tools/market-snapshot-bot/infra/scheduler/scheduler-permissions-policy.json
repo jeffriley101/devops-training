@@ -1,0 +1,20 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "RunMarketSnapshotBotTask",
+      "Effect": "Allow",
+      "Action": "ecs:RunTask",
+      "Resource": "arn:aws:ecs:us-east-1:646313139147:task-definition/market-snapshot-bot:*"
+    },
+    {
+      "Sid": "PassTaskRolesToEcs",
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": [
+        "arn:aws:iam::646313139147:role/env-inspector-task-execution-role",
+        "arn:aws:iam::646313139147:role/env-inspector-task-role"
+      ]
+    }
+  ]
+}

@@ -14,6 +14,11 @@ def parse_args() -> argparse.Namespace:
         choices=["price", "volume"],
         help="Which workflow to run",
     )
+    parser.add_argument(
+        "--allow-outside-window",
+        action="store_true",
+        help="Allow volume workflow to run outside its weekday ET window",
+    )
     return parser.parse_args()
 
 
@@ -23,7 +28,7 @@ def main() -> None:
     if args.mode == "price":
         run_price_workflow()
     elif args.mode == "volume":
-        run_volume_workflow()
+        run_volume_workflow(allow_outside_window=args.allow_outside_window)
     else:
         raise ValueError(f"Unsupported mode: {args.mode}")
 
