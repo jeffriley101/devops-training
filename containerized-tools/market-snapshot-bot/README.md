@@ -1,142 +1,216 @@
 # Market Snapshot Bot
 
-Scheduled financial market data automation platform built on a reusable AWS container automation foundation.
+Market Snapshot Bot is a portfolio-style containerized market monitoring workload built to demonstrate Python automation, ECS/Fargate task execution, AWS EventBridge Scheduler orchestration, artifact generation, and production-style operational workflow.
 
+## Project Purpose
 
+This project demonstrates how to:
 
-## ⚡ Quick Local Demo (30 seconds)
+- package a Python workload in Docker
+- publish the container image to Amazon ECR
+- register and run the workload as an ECS Fargate task
+- schedule recurring executions with EventBridge Scheduler
+- separate workflow modes within one application entrypoint
+- generate structured output artifacts for downstream analysis
 
-Run the full workflow locally:
+## Workflow Modes
+
+The application supports multiple modes from a single entrypoint.
+
+### 1. Price Monitoring
+
+Command:
 
 ```bash
-./bin/run_local_demo.sh
+python3 -m app.main --mode price
 ```
 
-This script will:
+Purpose:
 
-    Prepare local directories
+generate a daily price snapshot
 
-    Set required environment variables
+append structured historical CSV data
 
-    Generate market snapshot artifacts
+produce a multi-day price trend chart
 
-    Print live silver and oil pricing summary
+2. Volume Monitoring
 
+Command:
 
-No AWS setup required.
+python3 -m app.main --mode volume
 
+Purpose:
 
+run during a weekday intraday monitoring window
 
-## Purpose
+collect minute-by-minute sample data
 
-This project demonstrates platform engineering skills applied to financial data workflows:
+generate JSON, CSV, and intraday chart artifacts
 
-- Scheduled container automation (ECS Fargate + EventBridge)
-- External API integration for commodity market data
-- Data normalization into stable internal schemas
-- Versioned artifact publishing to S3
-- Production-style platform reuse across domains
+Local Developer Commands
 
+Shell aliases used during development:
 
+price
+volume
+volume-dev
+price-chart
+volume-chart
+Containerization
 
-## Short example output
+The project is packaged as a Docker image and pushed to Amazon ECR.
 
-```markdown
-### Example Output
+Example image URI:
 
-Market Snapshot [success]
-Snapshot ID: 20260309T023112Z
-Collected At: 2026-03-09T02:31:12Z
-Environment: dev
-Source: twelve_data
+646313139147.dkr.ecr.us-east-1.amazonaws.com/market-snapshot-bot:latest
+AWS Runtime Architecture
 
-    XAG/USD | Silver Spot / US Dollar | price=31.42 USD | status=success
+The workload runs on:
 
-    WTI/USD | WTI Crude Oil / US Dollar | price=67.85 USD | status=success
-```
+Amazon ECR for container image storage
 
+Amazon ECS Fargate for task execution
 
+Amazon EventBridge Scheduler for recurring task scheduling
 
-## Scope (v1)
+Amazon CloudWatch Logs for runtime logging
 
-Instruments:
-- XAG/USD (Silver)
-- WTI/USD (Crude Oil)
+ECS Resources
 
-Cadence:
-- Scheduled batch snapshot
+ECS Cluster: env-inspector-cluster
 
-Artifacts:
-- Raw source payload
-- Normalized snapshot (internal schema)
-- Human-readable summary
+ECS Task Definition Family: market-snapshot-bot
 
+Container Name: market-snapshot-bot
 
+IAM Roles
 
-## Architecture Overview
+Task definition roles in use:
 
-EventBridge Schedule  
-→ ECS Fargate Task  
-→ Containerized Snapshot Engine  
-→ External Market Data API  
-→ Artifact Generation  
-→ S3 Versioned Storage  
-→ CloudWatch Logs
+Execution Role: arn:aws:iam::646313139147:role/env-inspector-task-execution-role
 
+Task Role: arn:aws:iam::646313139147:role/env-inspector-task-role
 
+Scheduler execution role:
 
-## Normalized Data Contract
+arn:aws:iam::646313139147:role/market-monitor-scheduler-role
 
-Each run produces a MarketSnapshot object containing:
+EventBridge Scheduler Setup
 
-- snapshot_id
-- collected_at_utc
-- environment
-- source
-- overall_status
-- instruments[]
+Two schedules are configured.
 
-Each instrument includes:
+Daily Price Schedule
 
-- symbol
-- display_name
-- asset_class
-- price
-- currency
-- as_of_utc
-- source
-- source_symbol
-- status
+Name: market-monitor-price-daily
 
-Status values:
-- success
-- partial_failure
-- failure
+Time: daily at 4:00 PM America/New_York
 
+Cron:
 
+cron(0 16 * * ? *)
+Weekday Volume Schedule
 
-## Artifact Layout (S3)
+Name: market-monitor-volume-weekday
 
+Time: weekdays at 10:08 AM America/New_York
 
-Each run publishes artifacts to S3 using a structured prefix layout organized by environment, artifact type, and snapshot timestamp.
+Cron:
 
-Example layout:
+cron(8 10 ? * MON-FRI *)
+Scheduler Target Files
 
-```text
-dev/
-├── raw/
-│   └── 20260309T023112Z.json
-├── normalized/
-│   └── 20260309T023112Z.json
-└── summaries/
-    └── 20260309T023112Z.txt
-```
+Scheduler target definitions are stored in:
 
-This layout supports:
+infra/scheduler/price-target.json
+infra/scheduler/volume-target.json
 
-    traceable historical storage
+These targets define:
 
-    separation of raw and normalized data
+ECS cluster ARN
 
-    easy operator review of human-readable outputs
+task definition ARN
 
+Fargate launch type
+
+awsvpc subnet and security group settings
+
+container command override for each workflow mode
+
+Useful AWS Environment Variables
+
+Common exported values used for setup and troubleshooting:
+
+export AWS_REGION="us-east-1"
+export AWS_DEFAULT_REGION="us-east-1"
+export CLUSTER_ARN="arn:aws:ecs:us-east-1:646313139147:cluster/env-inspector-cluster"
+export SCHEDULER_ROLE_ARN="arn:aws:iam::646313139147:role/market-monitor-scheduler-role"
+export SUBNET_1="subnet-0c62c182b234ae364"
+export SUBNET_2="subnet-0afa828b1fbad3f37"
+export SECURITY_GROUP_ID="sg-0de0c1e877a79617d"
+export CONTAINER_NAME="market-snapshot-bot"
+Manual ECS Test Command
+
+Example one-off run for the price workflow:
+
+command aws ecs run-task \
+  --region "$AWS_REGION" \
+  --cluster "$CLUSTER_ARN" \
+  --launch-type FARGATE \
+  --task-definition "$TASK_DEFINITION_ARN" \
+  --network-configuration "awsvpcConfiguration={subnets=[$SUBNET_1,$SUBNET_2],securityGroups=[$SECURITY_GROUP_ID],assignPublicIp=ENABLED}" \
+  --overrides '{"containerOverrides":[{"name":"market-snapshot-bot","command":["python3","-m","app.main","--mode","price"]}]}'
+Scheduler Management Commands
+Verify Schedules
+command aws scheduler list-schedules \
+  --region "$AWS_REGION" \
+  --group-name default \
+  --output table
+Inspect One Schedule
+command aws scheduler get-schedule \
+  --region "$AWS_REGION" \
+  --name market-monitor-price-daily \
+  --group-name default
+Disable Volume Schedule
+command aws scheduler update-schedule \
+  --region "$AWS_REGION" \
+  --name market-monitor-volume-weekday \
+  --group-name default \
+  --schedule-expression 'cron(8 10 ? * MON-FRI *)' \
+  --schedule-expression-timezone 'America/New_York' \
+  --flexible-time-window '{"Mode":"OFF"}' \
+  --state DISABLED \
+  --target file://volume-target.json
+Disable Price Schedule
+command aws scheduler update-schedule \
+  --region "$AWS_REGION" \
+  --name market-monitor-price-daily \
+  --group-name default \
+  --schedule-expression 'cron(0 16 * * ? *)' \
+  --schedule-expression-timezone 'America/New_York' \
+  --flexible-time-window '{"Mode":"OFF"}' \
+  --state DISABLED \
+  --target file://price-target.json
+Log Verification
+
+Tail logs from the ECS task:
+
+command aws logs tail /ecs/market-snapshot-bot \
+  --region "$AWS_REGION" \
+  --since 1h
+Current Completion Status
+
+Implementation is complete through:
+
+local workflow support
+
+Docker packaging
+
+ECR image push
+
+ECS task definition registration
+
+manual ECS task execution
+
+EventBridge Scheduler configuration
+
+Final completion requires successful verification of the scheduled run in ECS logs and output artifacts.

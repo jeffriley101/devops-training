@@ -1,0 +1,25 @@
+{
+  "family": "market-snapshot-bot",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "executionRoleArn": "arn:aws:iam::646313139147:role/env-inspector-task-execution-role",
+  "taskRoleArn": "arn:aws:iam::646313139147:role/env-inspector-task-role",
+  "containerDefinitions": [
+    {
+      "name": "market-snapshot-bot",
+      "image": "646313139147.dkr.ecr.us-east-1.amazonaws.com/market-snapshot-bot:latest",
+      "essential": true,
+      "command": ["python3", "-m", "app.main", "--mode", "price"],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/market-snapshot-bot",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ]
+}
