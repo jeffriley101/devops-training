@@ -1,0 +1,16 @@
+#targets:
+#  - name: example
+#    url: https://example.com
+#    method: GET
+#    timeout_seconds: 5
+#    expected_statuses: [200]
+#    latency_threshold_ms: 1500
+#
+
+targets:
+  - name: example-http
+    url: http://example.com
+    method: GET
+    timeout_seconds: 5
+    expected_statuses: [200]
+    latency_threshold_ms: 1500

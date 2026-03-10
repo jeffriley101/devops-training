@@ -1,0 +1,36 @@
+{
+  "run_metadata": {
+    "project": "internet-health-monitor",
+    "environment": "dev",
+    "run_id": "20260310T022013Z",
+    "timestamp_utc": "2026-03-10T02:20:13Z",
+    "execution_duration_ms": 72,
+    "checker_version": "0.1.0",
+    "git_sha": "dev-local"
+  },
+  "summary": {
+    "total_targets": 1,
+    "healthy": 1,
+    "degraded": 0,
+    "unhealthy": 0,
+    "overall_status": "healthy"
+  },
+  "results": [
+    {
+      "name": "example-http",
+      "url": "http://example.com",
+      "method": "GET",
+      "expected_statuses": [
+        200
+      ],
+      "actual_status": 200,
+      "latency_ms": 70,
+      "latency_threshold_ms": 1500,
+      "status": "healthy",
+      "success": true,
+      "error_type": null,
+      "error_message": null,
+      "checked_at_utc": "2026-03-10T02:20:13Z"
+    }
+  ]
+}

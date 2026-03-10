@@ -1,0 +1,16 @@
+{
+  "run_metadata": {
+    "project": "internet-health-monitor",
+    "environment": "dev",
+    "run_id": "example",
+    "timestamp_utc": "2026-01-01T00:00:00Z"
+  },
+  "summary": {
+    "total_targets": 1,
+    "healthy": 1,
+    "degraded": 0,
+    "unhealthy": 0,
+    "overall_status": "healthy"
+  },
+  "results": []
+}
