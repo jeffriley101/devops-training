@@ -10,8 +10,7 @@ import yaml
 from checker import check_target
 from models import build_summary, utc_now_iso
 from report import render_report
-from storage import write_json, write_text
-
+from storage import write_json, write_text, upload_file_to_s3
 
 CONFIG_PATH = Path("config/targets.yaml")
 CHECKER_VERSION = "0.1.0"
@@ -60,6 +59,9 @@ def main() -> None:
 
     json_path = write_json("latest-results.json", payload)
     report_path = write_text("latest-report.txt", report_text)
+
+    upload_file_to_s3(json_path)
+    upload_file_to_s3(report_path)
 
     print("[INFO] Health check run complete")
     print(f"[INFO] JSON artifact written to {json_path}")

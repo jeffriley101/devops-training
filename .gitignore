@@ -47,3 +47,4 @@ artifacts/output/
 
 containerized-tools/market-snapshot-bot/.env.local
 containerized-tools/market-snapshot-bot/app/.main.py.swp
+containerized-tools/*/artifacts/output/
