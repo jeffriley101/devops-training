@@ -33,15 +33,31 @@ def render_report(run_metadata: dict[str, Any], summary: dict[str, Any], results
 
     lines.append("")
     lines.append("Failures")
-    failures = [r for r in results if r["status"] == "unhealthy"]
-    if failures:
-        for result in failures:
-            lines.append(
-                f"- {result['name']}: error_type={result['error_type']} error_message={result['error_message']}"
-            )
-    else:
-        lines.append("- None")
 
+    failures = [r for r in results if r["status"] == "unhealthy"]
+
+    if not failures:
+        lines.append("- None")
+    else:
+        for r in failures:
+            name = r["name"]
+            actual = r.get("actual_status")
+            expected = r.get("expected_statuses", [])
+            error_type = r.get("error_type")
+            error_message = r.get("error_message")
+
+            if error_type:
+                lines.append(
+                    f"- {name}: {error_type}"
+                    + (f" ({error_message})" if error_message else "")
+                )
+            elif actual is not None:
+                exp_str = ",".join(str(x) for x in expected) if expected else "n/a"
+                lines.append(
+                    f"- {name}: unexpected status {actual} (expected: {exp_str})"
+                )
+            else:
+                lines.append(f"- {name}: unknown failure")
     lines.append("")
     lines.append("Slow Targets")
     slow = [

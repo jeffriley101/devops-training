@@ -1,20 +1,23 @@
 Internet Health Monitor
-Execution Time: 2026-03-10T02:20:13Z
+Execution Time: 2026-03-11T09:18:20Z
 Environment: dev
-Run ID: 20260310T022013Z
+Run ID: 20260311T091820Z
 Checker Version: 0.1.0
 Git SHA: dev-local
 
 Summary
-- Total Targets: 1
-- Healthy: 1
+- Total Targets: 4
+- Healthy: 4
 - Degraded: 0
 - Unhealthy: 0
 - Overall Status: healthy
-- Execution Duration: 72 ms
+- Execution Duration: 1781 ms
 
 Target Results
-- example-http | healthy   | status=200 | latency=70 ms
+- google     | healthy   | status=200 | latency=183 ms
+- timeanddate | healthy   | status=200 | latency=434 ms
+- groundnews | healthy   | status=200 | latency=883 ms
+- weathergov | healthy   | status=200 | latency=269 ms
 
 Failures
 - None
