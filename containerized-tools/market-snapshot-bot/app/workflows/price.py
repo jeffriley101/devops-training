@@ -1,11 +1,25 @@
 from datetime import datetime
 from pathlib import Path
 
+from app.clients.market_data import MarketDataError, fetch_yahoo_last_price
 from app.artifacts.builders import build_human_summary, write_market_snapshot
 from app.artifacts.csv_history import append_dict_row
 from app.charts.price_chart import generate_price_chart
 from app.config import load_config
 from app.models.schema import InstrumentSnapshot, MarketSnapshot
+
+PRICE_SOURCE_SYMBOLS = {
+    "XAG/USD": "SI=F",
+    "WTI/USD": "CL=F",
+}
+
+PRICE_DISPLAY_NAMES = {
+    "XAG/USD": "Silver Futures",
+    "WTI/USD": "WTI Crude Oil Futures",
+}
+
+
+
 
 
 def build_mock_instruments(source: str) -> list[InstrumentSnapshot]:
@@ -34,6 +48,45 @@ def build_mock_instruments(source: str) -> list[InstrumentSnapshot]:
         ),
     ]
 
+
+def build_real_instruments(symbols: list[str]) -> list[InstrumentSnapshot]:
+    instruments: list[InstrumentSnapshot] = []
+
+    for symbol in symbols:
+        source_symbol = PRICE_SOURCE_SYMBOLS.get(symbol, symbol)
+        display_name = PRICE_DISPLAY_NAMES.get(symbol, symbol)
+
+        try:
+            quote = fetch_yahoo_last_price(source_symbol)
+            instruments.append(
+                InstrumentSnapshot(
+                    symbol=symbol,
+                    display_name=display_name,
+                    asset_class="commodity",
+                    price=quote.price,
+                    currency=quote.currency,
+                    as_of_utc=quote.as_of_utc,
+                    source=quote.source,
+                    source_symbol=quote.source_symbol,
+                    status="success",
+                )
+            )
+        except MarketDataError as exc:
+            instruments.append(
+                InstrumentSnapshot(
+                    symbol=symbol,
+                    display_name=display_name,
+                    asset_class="commodity",
+                    price=0.0,
+                    currency="USD",
+                    as_of_utc="",
+                    source="yahoo_finance",
+                    source_symbol=source_symbol,
+                    status=f"failure: {exc}",
+                )
+            )
+
+    return instruments
 
 def determine_overall_status(instruments: list[InstrumentSnapshot]) -> str:
     statuses = {instrument.status for instrument in instruments}
@@ -78,7 +131,14 @@ def run_price_workflow() -> None:
     snapshot_id = timestamp.strftime("%Y%m%dT%H%M%SZ")
     collected_at_utc = timestamp.replace(microsecond=0).isoformat() + "Z"
 
-    instruments = build_mock_instruments(config.data_source)
+    if config.data_source == "mock":
+        instruments = build_mock_instruments(config.data_source)
+    elif config.data_source == "real":
+        instruments = build_real_instruments(config.symbols)
+    else:
+        raise ValueError(f"Unsupported DATA_SOURCE: {config.data_source}")
+
+
     overall_status = determine_overall_status(instruments)
 
     snapshot = MarketSnapshot(
