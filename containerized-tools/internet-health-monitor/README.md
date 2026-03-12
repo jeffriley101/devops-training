@@ -1,181 +1,219 @@
-# Internet Health Monitor — Scheduled Reliability & Service Monitoring Platform
+# Internet Health Monitor
 
-Internet Health Monitor is a containerized reliability engineering platform that performs scheduled service health checks, generates structured monitoring artifacts, and produces historical latency trend visualizations.
+A containerized AWS-based monitoring platform that performs scheduled Internet health checks, measures latency, classifies service state, and publishes historical observability artifacts for operator review.
 
-The system demonstrates production-style monitoring automation using AWS container orchestration and infrastructure-as-code.
-
----
-
-## 🎯 Purpose
-
-This project showcases:
-
-- Service availability monitoring
-- Latency measurement and classification
-- Scheduled container workloads
-- Historical reliability artifact generation
-- Operator-facing reporting
-- Platform reuse across monitoring domains
-
-It is designed as a portfolio-grade example of DevOps, Platform Engineering, and Site Reliability Engineering practices.
+This project was built to demonstrate practical **DevOps**, **platform engineering**, and **site reliability engineering** skills through a real scheduled workload running on AWS.
 
 ---
 
-## 🧠 What This Platform Does
+## Overview
 
-On a schedule, the system:
+Internet Health Monitor is a portfolio project focused on operational visibility.
 
-1. Executes HTTP health checks against multiple external services
-2. Measures latency and validates expected status codes
-3. Classifies service state as:
-   - **Healthy**
-   - **Degraded**
-   - **Unhealthy**
-4. Generates operator-readable and machine-readable artifacts
-5. Stores artifacts in Amazon S3
-6. Builds historical latency trend charts from prior runs
+The platform executes scheduled HTTP checks against configured web targets, validates expected responses, measures latency, classifies service condition, and publishes both machine-readable and operator-friendly artifacts to Amazon S3. Historical run data is preserved to support trend analysis and chart generation.
 
----
+Rather than stopping at a simple “website checker,” this project emphasizes the full operational workflow:
 
-## 🌐 Monitored Targets
-
-Example monitored services:
-
-- Google
-- TimeAndDate
-- Ground News
-- Weather.gov
-
-Targets are configurable via YAML.
+* scheduled execution
+* containerized deployment
+* artifact generation
+* cloud storage
+* historical observability
+* operator-readable reporting
 
 ---
 
-## 🏗 Architecture
+## What This Project Demonstrates
 
-**Execution Platform**
-- AWS ECS Fargate scheduled tasks
-- Amazon EventBridge Scheduler
-- AWS CloudWatch Logs
+### Reliability Engineering
 
-**Storage & Artifacts**
-- Amazon S3 (latest + historical artifacts)
-- Structured JSON monitoring results
-- Human-readable text reports
-- Historical latency trend charts (PNG)
+* service availability monitoring
+* latency measurement and classification
+* expected-status validation
+* health state modeling
+* historical performance trend analysis
 
-**Infrastructure as Code**
-- Terraform modular infrastructure
-- IAM least-privilege roles
-- Multi-environment deployment support
+### DevOps / Cloud Engineering
 
-**Container & CI/CD**
-- Docker containerized monitoring workload
-- GitHub Actions build pipelines
-- Amazon ECR image registry
-- Immutable image tagging
+* Dockerized Python workload
+* AWS ECS/Fargate execution
+* EventBridge scheduled automation
+* Amazon S3 artifact publishing
+* CloudWatch logging
+* IAM least-privilege design
+* Terraform-managed infrastructure
 
----
+### Platform Engineering
 
-## 📦 Artifact Outputs
-
-Each monitoring run produces:
-
-### Latest Artifacts
-
-internet-health-monitor/dev/latest-results.json
-internet-health-monitor/dev/latest-report.txt
-internet-health-monitor/dev/charts/latest-latency-trend.png
-
-
-### Historical Artifacts
-
-internet-health-monitor/dev/YYYY/MM/DD/results-<RUN_ID>.json
-internet-health-monitor/dev/YYYY/MM/DD/report-<RUN_ID>.txt
-internet-health-monitor/dev/charts/YYYY/MM/DD/latency-trend-<RUN_ID>.png
-
+* reusable scheduled workload patterns
+* structured artifact pipelines
+* operator-focused output design
+* environment-based configuration
+* modular infrastructure layout
 
 ---
 
-## 📊 Monitoring Outputs
+## Features
 
-### Health Report
-- Target count
-- Healthy / degraded / unhealthy totals
-- Latency measurements
-- Failure classification
-- Execution metadata
+* Multi-target HTTP health checks
+* Per-target latency measurement
+* Expected HTTP status validation
+* Health classification:
 
-### JSON Results
-- Structured monitoring schema
-- Per-target performance data
-- Machine-readable status records
-
-### Latency Trend Charts
-- Historical latency over time
-- One line per monitored service
-- Built from prior run artifacts
+  * Healthy
+  * Degraded
+  * Unhealthy
+* Latest and historical artifact generation
+* Historical latency chart creation
+* S3 artifact publishing
+* YAML-configurable monitoring targets
+* Scheduled execution on AWS
 
 ---
 
-## ⚙️ Operator Commands
+## Architecture Summary
 
-### View Latest Health Report
-```bash
-aws s3 cp s3://<bucket>/internet-health-monitor/dev/latest-report.txt -
-View Latest JSON Results
-aws s3 cp s3://<bucket>/internet-health-monitor/dev/latest-results.json - | jq
+The monitoring workload runs as a containerized task on **AWS ECS Fargate** and is triggered on a schedule by **Amazon EventBridge Scheduler**.
+
+For each run, the application:
+
+1. loads configured monitoring targets
+2. performs HTTP checks
+3. records response timing and status validation
+4. classifies target health
+5. generates JSON and text artifacts
+6. writes historical records
+7. builds a latency trend chart from prior runs
+8. uploads artifacts to Amazon S3
+9. emits execution logs to CloudWatch
+
+This creates a repeatable monitoring workflow with both current-state visibility and historical performance tracking.
+
+---
+
+## Sample Internet Latency Chart
+
+![Sample Internet Latency Chart](images/internet_latency_mock.png)
+
+This chart represents the type of historical artifact generated by the platform from stored monitoring runs. It gives operators a quick visual view of response-time trends across monitored services.
+
+---
+
+## Example Outputs
+
+Each run produces both **latest** and **historical** artifacts.
+
+### Latest artifacts
+
+* `latest-results.json`
+* `latest-report.txt`
+* `latest-latency-chart.png`
+
+### Historical artifacts
+
+* timestamped JSON results
+* timestamped text reports
+* timestamped latency charts
+
+Historical artifacts are organized using a date-based path structure such as:
+
+```text
+YYYY/MM/DD/
 ```
 
-Open Latest Latency Chart
-aws s3 cp s3://<bucket>/internet-health-monitor/dev/charts/latest-latency-trend.png /tmp/chart.png
-xdg-open /tmp/chart.png
+This supports easy retention, review, and trend reconstruction over time.
 
+---
 
+## Monitored Targets
 
+Current targets include:
 
-🚀 Skills Demonstrated
-Reliability Engineering
+* Google
+* TimeAndDate
+* Ground News
+* Weather.gov
 
-Service health monitoring
+Targets are configurable through YAML, making the monitoring set easy to modify without changing application logic.
 
-Latency tracking
+---
 
-Failure classification
+## AWS Services Used
 
-Historical trend analysis
+* **Amazon ECS (Fargate)** for container execution
+* **Amazon EventBridge Scheduler** for scheduled runs
+* **Amazon S3** for artifact storage
+* **Amazon CloudWatch Logs** for runtime logging
+* **Amazon ECR** for container image storage
+* **IAM** for task and execution role permissions
 
-DevOps & Platform Engineering
+---
 
-Containerized workloads
+## Infrastructure as Code
 
-Scheduled cloud execution
+The AWS environment is managed with **Terraform**, using a modular layout to support repeatable deployment and clean separation of infrastructure concerns.
 
-Infrastructure automation
+Infrastructure design includes:
 
-Artifact pipelines
+* scheduled workload resources
+* ECS task execution wiring
+* IAM roles and permissions
+* S3 storage integration
+* environment isolation patterns
 
-Observability workflows
+---
 
-Cloud Architecture
+## Repository Goals
 
-ECS/Fargate orchestration
+This repository is intended to show that I can build and operate more than just scripts.
 
-Event-driven scheduling
+It demonstrates the ability to design a monitoring workflow as a cloud platform component with:
 
-IAM role design
+* deterministic execution
+* operational reporting
+* artifact lifecycle management
+* historical observability
+* infrastructure automation
 
-S3 artifact lifecycle management
+---
 
-CloudWatch operational logging
+## Why This Project Matters
 
-🔮 Future Enhancements
+Many beginner monitoring projects stop at “ping a site and print OK/FAIL.”
 
-Degraded state SLO thresholds
+This project goes further by treating monitoring as an operational system:
 
-Failure anomaly detection
+* it runs on a real cloud schedule
+* it stores structured historical records
+* it produces operator-facing artifacts
+* it supports trend analysis over time
+* it is packaged and deployed like a production-style workload
 
-Scheduled chart-generation task
+That makes it much closer to the way real teams build internal reliability tooling.
 
-Multi-chart reporting dashboards
+---
 
-Alerting integrations
+## Future Enhancements
+
+Planned or possible next steps include:
+
+* degraded-state SLO thresholds
+* anomaly detection for latency spikes
+* alerting integrations
+* dashboard-style reporting
+* expanded target types and classifications
+
+---
+
+## Resume-Level Summary
+
+Built a containerized Internet Health Monitoring platform on AWS using ECS/Fargate, EventBridge, S3, CloudWatch, and Terraform to perform scheduled health checks, classify service state, and generate historical observability artifacts including latency trend charts and operator reports.
+
+---
+
+## Status
+
+Current state: **functional, artifact-complete, and presentation-polish phase**
+
+This project is currently focused on documentation clarity, architecture presentation, and recruiter-facing portfolio quality.
+
