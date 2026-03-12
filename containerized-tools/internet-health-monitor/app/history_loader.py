@@ -7,8 +7,9 @@ from typing import Any
 import boto3
 
 
+ENVIRONMENT = os.getenv("ENVIRONMENT", "dev")
 S3_BUCKET = os.getenv("ARTIFACT_S3_BUCKET")
-S3_PREFIX = os.getenv("ARTIFACT_S3_PREFIX", "internet-health-monitor/dev")
+S3_PREFIX = os.getenv("ARTIFACT_S3_PREFIX", f"internet-health-monitor/{ENVIRONMENT}")
 CHART_LOOKBACK_LIMIT = int(os.getenv("CHART_LOOKBACK_LIMIT", "50"))
 
 
