@@ -5,6 +5,8 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from app.charts.volume_chart import generate_volume_chart
+from app.clients.market_data import MarketDataError, fetch_yahoo_intraday_volume_series
+from app.config import load_config
 
 
 WINDOW_START_ET = time(10, 8)
@@ -49,28 +51,29 @@ def build_mock_volume_samples() -> dict[str, list[dict[str, int | str]]]:
         "10:40",
     ]
 
-    xag_volumes = [
+    qqq_volumes = [
         1180, 1215, 1240, 1285, 1310, 1360, 1425, 1490, 1560, 1635, 1710,
         1680, 1605, 1540, 1495, 1450, 1400, 1380, 1410, 1460, 1525, 1595,
         1660, 1735, 1810, 1765, 1685, 1600, 1520, 1455, 1385, 1305, 1215,
     ]
 
-    wti_volumes = [
-        2010, 2055, 2105, 2160, 2245, 2335, 2480, 2575, 2665, 2750, 2890,
-        2815, 2725, 2650, 2580, 2495, 2410, 2360, 2395, 2460, 2555, 2675,
-        2790, 2910, 3040, 2965, 2855, 2740, 2625, 2495, 2365, 2215, 2055,
-    ]
-
     return {
-        "XAG/USD": [
+        "QQQ": [
             {"timestamp_et": time_value, "volume": volume_value}
-            for time_value, volume_value in zip(times, xag_volumes)
-        ],
-        "WTI/USD": [
-            {"timestamp_et": time_value, "volume": volume_value}
-            for time_value, volume_value in zip(times, wti_volumes)
+            for time_value, volume_value in zip(times, qqq_volumes)
         ],
     }
+
+def build_real_volume_samples(symbol: str) -> dict[str, list[dict[str, int | str]]]:
+    all_samples = fetch_yahoo_intraday_volume_series(symbol)
+
+    filtered_samples = [
+        sample
+        for sample in all_samples
+        if WINDOW_START_ET <= time.fromisoformat(str(sample["timestamp_et"])) <= WINDOW_END_ET
+    ]
+
+    return {symbol: filtered_samples}
 
 
 def summarize_symbol(
@@ -94,22 +97,43 @@ def summarize_symbol(
     }
 
 
-def build_volume_payload() -> dict[str, object]:
+def build_volume_payload(data_source: str, volume_symbol: str) -> dict[str, object]:
     timestamp = datetime.utcnow()
     collected_at_utc = timestamp.replace(microsecond=0).isoformat() + "Z"
 
-    raw_samples = build_mock_volume_samples()
-    symbol_summaries = [
-        summarize_symbol(symbol, samples)
-        for symbol, samples in raw_samples.items()
-    ]
+    if data_source == "mock":
+        raw_samples = build_mock_volume_samples()
+    elif data_source == "real":
+        raw_samples = build_real_volume_samples(volume_symbol)
+    else:
+        raise ValueError(f"Unsupported DATA_SOURCE: {data_source}")
+
+    symbol_summaries = []
+    overall_status = "success"
+
+    for symbol, samples in raw_samples.items():
+        try:
+            symbol_summaries.append(summarize_symbol(symbol, samples))
+        except MarketDataError as exc:
+            overall_status = "failure"
+            symbol_summaries.append(
+                {
+                    "symbol": symbol,
+                    "sample_count": 0,
+                    "max_volume": 0,
+                    "avg_volume": 0,
+                    "peak_timestamp_et": "",
+                    "status": f"failure: {exc}",
+                    "samples": [],
+                }
+            )
 
     return {
         "workflow": "volume",
         "window_start_et": "10:08",
         "window_end_et": "10:40",
         "collected_at_utc": collected_at_utc,
-        "overall_status": "success",
+        "overall_status": overall_status,
         "symbols": symbol_summaries,
     }
 
@@ -139,7 +163,7 @@ def write_daily_csv(payload: dict[str, object], csv_path: Path) -> None:
 
 
 def print_human_summary(payload: dict[str, object]) -> None:
-    print("Volume Window Summary [success]")
+    print(f"Volume Window Summary [{payload['overall_status']}]")
     print(
         f"Window: {payload['window_start_et']} ET - "
         f"{payload['window_end_et']} ET"
@@ -159,9 +183,10 @@ def print_human_summary(payload: dict[str, object]) -> None:
 
 def run_volume_workflow(allow_outside_window: bool = False) -> None:
     validate_volume_run_window(allow_outside_window)
+    config = load_config()
 
     timestamp = datetime.utcnow()
-    payload = build_volume_payload()
+    payload = build_volume_payload(config.data_source, config.volume_symbol)
 
     base_path = Path("dev/volume/daily") / timestamp.strftime("%Y/%m/%d")
 

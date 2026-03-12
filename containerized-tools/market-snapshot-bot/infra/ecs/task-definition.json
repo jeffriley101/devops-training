@@ -11,6 +11,15 @@
       "name": "market-snapshot-bot",
       "image": "646313139147.dkr.ecr.us-east-1.amazonaws.com/market-snapshot-bot:latest",
       "essential": true,
+      "environment": [
+        { "name": "APP_ENV", "value": "dev" },
+        { "name": "DATA_SOURCE", "value": "real" },
+        { "name": "SYMBOLS", "value": "XAG/USD,WTI/USD" },
+	{ "name": "VOLUME_SYMBOL", "value": "QQQ" },
+        { "name": "S3_BUCKET", "value": "env-inspector-artifacts-4e2e3699" },
+        { "name": "S3_PREFIX", "value": "market-snapshot-bot/dev" },
+        { "name": "LOG_LEVEL", "value": "INFO" }
+      ],
       "command": ["python3", "-m", "app.main", "--mode", "price"],
       "logConfiguration": {
         "logDriver": "awslogs",

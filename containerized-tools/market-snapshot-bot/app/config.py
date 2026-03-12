@@ -12,6 +12,7 @@ class AppConfig:
     environment: str
     data_source: str
     symbols: List[str]
+    volume_symbol: str
     s3_bucket: str
     s3_prefix: str
     log_level: str
@@ -35,6 +36,7 @@ def load_config() -> AppConfig:
     environment = _get_env("APP_ENV")
     data_source = _get_env("DATA_SOURCE")
     symbols_raw = _get_env("SYMBOLS")
+    volume_symbol = _get_env("VOLUME_SYMBOL", required=False, default="QQQ")
     s3_bucket = _get_env("S3_BUCKET")
     s3_prefix = _get_env("S3_PREFIX", default="market-snapshot-bot")
     log_level = _get_env("LOG_LEVEL", required=False, default="INFO")
@@ -45,6 +47,7 @@ def load_config() -> AppConfig:
         environment=environment,
         data_source=data_source,
         symbols=symbols,
+        volume_symbol=volume_symbol,
         s3_bucket=s3_bucket,
         s3_prefix=s3_prefix,
         log_level=log_level,
