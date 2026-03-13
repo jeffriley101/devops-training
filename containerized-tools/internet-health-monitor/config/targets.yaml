@@ -1,16 +1,28 @@
-#targets:
-#  - name: example
-#    url: https://example.com
-#    method: GET
-#    timeout_seconds: 5
-#    expected_statuses: [200]
-#    latency_threshold_ms: 1500
-#
-
 targets:
-  - name: example-http
-    url: http://example.com
+  - name: google
+    url: https://www.google.com
     method: GET
     timeout_seconds: 5
     expected_statuses: [200]
-    latency_threshold_ms: 1500
+    latency_threshold_ms: 800
+
+  - name: timeanddate
+    url: https://www.timeanddate.com
+    method: GET
+    timeout_seconds: 5
+    expected_statuses: [200]
+    latency_threshold_ms: 2000
+
+  - name: groundnews
+    url: https://ground.news
+    method: GET
+    timeout_seconds: 5
+    expected_statuses: [200]
+    latency_threshold_ms: 2000
+
+  - name: weathergov
+    url: https://www.weather.gov/
+    method: GET
+    timeout_seconds: 5
+    expected_statuses: [200]
+    latency_threshold_ms: 2000
