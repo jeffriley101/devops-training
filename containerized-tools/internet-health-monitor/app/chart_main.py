@@ -3,9 +3,9 @@ from __future__ import annotations
 import os
 from datetime import datetime, UTC
 
-from charting import build_latency_chart
-from history_loader import extract_latency_points, load_historical_result_files_from_s3
-from storage import upload_file_to_s3
+from app.charting import build_latency_chart
+from app.history_loader import extract_latency_points, load_historical_result_files_from_s3
+from app.storage import upload_file_to_s3
 
 
 OUTPUT_PATH = "artifacts/output/latency-trend.png"
