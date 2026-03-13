@@ -15,13 +15,16 @@ def generate_volume_chart(
         symbol = symbol_data["symbol"]
         samples = symbol_data["samples"]
 
-        times = [sample["timestamp_et"] for sample in samples]
+        times = [
+            sample.get("timestamp_label_et", str(sample["timestamp_et"]))
+            for sample in samples
+        ]
         volumes = [int(sample["volume"]) for sample in samples]
 
         plt.plot(times, volumes, marker="o", label=symbol)
 
     plt.title("Intraday Volume Window")
-    plt.xlabel("Time (ET)")
+    plt.xlabel("Timestamp (ET)")
     plt.ylabel("Volume")
     plt.xticks(rotation=45)
     plt.legend()

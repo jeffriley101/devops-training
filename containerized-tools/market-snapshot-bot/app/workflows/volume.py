@@ -41,8 +41,7 @@ def validate_volume_run_window(allow_outside_window: bool) -> None:
             "Use --allow-outside-window for development."
         )
 
-
-def build_mock_volume_samples() -> dict[str, list[dict[str, int | str]]]:
+def build_mock_volume_samples(run_date_et: str) -> dict[str, list[dict[str, int | str]]]:
     times = [
         "10:08", "10:09", "10:10", "10:11", "10:12", "10:13", "10:14", "10:15",
         "10:16", "10:17", "10:18", "10:19", "10:20", "10:21", "10:22", "10:23",
@@ -59,19 +58,24 @@ def build_mock_volume_samples() -> dict[str, list[dict[str, int | str]]]:
 
     return {
         "QQQ": [
-            {"timestamp_et": time_value, "volume": volume_value}
+            {
+                "timestamp_et": time_value,
+                "timestamp_label_et": f"{run_date_et} {time_value}",
+                "volume": volume_value,
+            }
             for time_value, volume_value in zip(times, qqq_volumes)
         ],
     }
-
-def build_real_volume_samples(symbol: str) -> dict[str, list[dict[str, int | str]]]:
+def build_real_volume_samples(symbol: str, run_date_et: str) -> dict[str, list[dict[str, int | str]]]:
     all_samples = fetch_yahoo_intraday_volume_series(symbol)
 
-    filtered_samples = [
-        sample
-        for sample in all_samples
-        if WINDOW_START_ET <= time.fromisoformat(str(sample["timestamp_et"])) <= WINDOW_END_ET
-    ]
+    filtered_samples = []
+    for sample in all_samples:
+        sample_time = time.fromisoformat(str(sample["timestamp_et"]))
+        if WINDOW_START_ET <= sample_time <= WINDOW_END_ET:
+            sample_copy = dict(sample)
+            sample_copy["timestamp_label_et"] = f"{run_date_et} {sample_copy['timestamp_et']}"
+            filtered_samples.append(sample_copy)
 
     return {symbol: filtered_samples}
 
@@ -100,11 +104,11 @@ def summarize_symbol(
 def build_volume_payload(data_source: str, volume_symbol: str) -> dict[str, object]:
     timestamp = datetime.utcnow()
     collected_at_utc = timestamp.replace(microsecond=0).isoformat() + "Z"
-
+    run_date_et = datetime.now(EASTERN_TZ).date().isoformat()
     if data_source == "mock":
-        raw_samples = build_mock_volume_samples()
+        raw_samples = build_mock_volume_samples(run_date_et)
     elif data_source == "real":
-        raw_samples = build_real_volume_samples(volume_symbol)
+        raw_samples = build_real_volume_samples(volume_symbol, run_date_et)
     else:
         raise ValueError(f"Unsupported DATA_SOURCE: {data_source}")
 
