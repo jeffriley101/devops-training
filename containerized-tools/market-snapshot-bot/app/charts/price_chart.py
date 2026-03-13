@@ -9,7 +9,7 @@ def generate_price_chart(
     csv_path: Path,
     output_path: Path,
 ) -> None:
-    rows_by_symbol: dict[str, list[tuple[str, float]]] = defaultdict(list)
+    rows_by_symbol: dict[str, dict[str, float]] = defaultdict(dict)
 
     with csv_path.open("r", newline="", encoding="utf-8") as csvfile:
         reader = csv.DictReader(csvfile)
@@ -18,14 +18,17 @@ def generate_price_chart(
             symbol = row["symbol"]
             date_utc = row["date_utc"]
             price = float(row["price"])
-            rows_by_symbol[symbol].append((date_utc, price))
+
+            # keep only one value per symbol per day
+            # if duplicates exist, later rows overwrite earlier ones
+            rows_by_symbol[symbol][date_utc] = price
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     plt.figure(figsize=(10, 6))
 
-    for symbol, entries in rows_by_symbol.items():
-        entries.sort(key=lambda item: item[0])
+    for symbol, entries_by_date in rows_by_symbol.items():
+        entries = sorted(entries_by_date.items(), key=lambda item: item[0])
         dates = [item[0] for item in entries]
         prices = [item[1] for item in entries]
         plt.plot(dates, prices, marker="o", label=symbol)
