@@ -10,12 +10,14 @@ import boto3
 ENVIRONMENT = os.getenv("ENVIRONMENT", "dev")
 S3_BUCKET = os.getenv("ARTIFACT_S3_BUCKET")
 S3_PREFIX = os.getenv("ARTIFACT_S3_PREFIX", f"internet-health-monitor/{ENVIRONMENT}")
-CHART_LOOKBACK_LIMIT = int(os.getenv("CHART_LOOKBACK_LIMIT", "50"))
 
 
-def load_historical_result_files_from_s3() -> list[dict[str, Any]]:
+def load_historical_result_files_from_s3(limit: int | None = None) -> list[dict[str, Any]]:
     if not S3_BUCKET:
         raise ValueError("ARTIFACT_S3_BUCKET is required")
+
+    if limit is None:
+        limit = int(os.getenv("CHART_LOOKBACK_LIMIT", "50"))
 
     s3 = boto3.client("s3")
 
@@ -30,7 +32,10 @@ def load_historical_result_files_from_s3() -> list[dict[str, Any]]:
             if "/results-" in key and key.endswith(".json"):
                 result_keys.append(key)
 
-    result_keys = sorted(result_keys)[-CHART_LOOKBACK_LIMIT:]
+    result_keys = sorted(result_keys)
+
+    if limit > 0:
+        result_keys = result_keys[-limit:]
 
     payloads: list[dict[str, Any]] = []
 
@@ -70,3 +75,4 @@ def extract_latency_points(payloads: list[dict[str, Any]]) -> list[dict[str, Any
             )
 
     return points
+
