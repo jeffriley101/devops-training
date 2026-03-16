@@ -41,10 +41,12 @@ def fetch_yahoo_intraday_volume_series(
 
     return rows
 
+
 def fetch_alpha_vantage_global_quote(symbol: str) -> QuoteResult:
     raise MarketDataError(
         "fetch_alpha_vantage_global_quote is temporarily disabled during provider transition"
     )
+
 
 def fetch_yahoo_last_price(symbol: str) -> QuoteResult:
     ticker = yf.Ticker(symbol)
@@ -69,3 +71,4 @@ def fetch_yahoo_last_price(symbol: str) -> QuoteResult:
         source="yahoo_finance",
         source_symbol=symbol,
     )
+

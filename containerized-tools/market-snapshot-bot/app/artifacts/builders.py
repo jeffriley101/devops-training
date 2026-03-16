@@ -4,6 +4,13 @@ from typing import Any
 
 from app.models.schema import MarketSnapshot
 
+RESET = "\033[0m"
+CYAN = "\033[36m"
+GREEN = "\033[32m"
+YELLOW = "\033[33m"
+RED = "\033[31m"
+BOLD = "\033[1m"
+
 
 def ensure_parent_dir(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -18,6 +25,20 @@ def write_market_snapshot(path: Path, snapshot: MarketSnapshot) -> None:
     write_json_file(path, snapshot.to_dict())
 
 
+def colorize_name(name: str) -> str:
+    return f"{YELLOW}{name}{RESET}"
+
+
+def colorize_status(status: str) -> str:
+    if status == "success":
+        return f"{GREEN}{status}{RESET}"
+    if status == "partial_failure":
+        return f"{YELLOW}{status}{RESET}"
+    if status.startswith("failure"):
+        return f"{RED}{status}{RESET}"
+    return status
+
+
 def build_human_summary(snapshot: MarketSnapshot) -> str:
     lines: list[str] = []
     lines.append(f"Market Snapshot [{snapshot.overall_status}]")
@@ -30,8 +51,9 @@ def build_human_summary(snapshot: MarketSnapshot) -> str:
     for instrument in snapshot.instruments:
         price_text = "unavailable" if instrument.price is None else f"{instrument.price:.2f}"
         lines.append(
-            f"- {instrument.symbol} | {instrument.display_name} | "
-            f"price={price_text} {instrument.currency} | status={instrument.status}"
+            f"- {instrument.symbol} | {colorize_name(instrument.display_name)} | "
+            f"price={BOLD}{price_text} {instrument.currency}{RESET} | status={colorize_status(instrument.status)}"
         )
 
     return "\n".join(lines)
+

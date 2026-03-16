@@ -1,10 +1,14 @@
 from datetime import datetime
+import os
 from pathlib import Path
 
 from app.clients.market_data import MarketDataError, fetch_yahoo_last_price
 from app.artifacts.builders import build_human_summary, write_market_snapshot
 from app.artifacts.csv_history import append_dict_row
-from app.charts.price_chart import generate_price_chart
+from app.charts.price_chart import (
+    generate_price_chart_all_runs,
+    generate_price_chart_official_daily,
+)
 from app.config import load_config
 from app.models.schema import InstrumentSnapshot, MarketSnapshot
 
@@ -17,9 +21,6 @@ PRICE_DISPLAY_NAMES = {
     "XAG/USD": "Silver Futures",
     "WTI/USD": "WTI Crude Oil Futures",
 }
-
-
-
 
 
 def build_mock_instruments(source: str) -> list[InstrumentSnapshot]:
@@ -88,6 +89,7 @@ def build_real_instruments(symbols: list[str]) -> list[InstrumentSnapshot]:
 
     return instruments
 
+
 def determine_overall_status(instruments: list[InstrumentSnapshot]) -> str:
     statuses = {instrument.status for instrument in instruments}
     if statuses == {"success"}:
@@ -95,6 +97,10 @@ def determine_overall_status(instruments: list[InstrumentSnapshot]) -> str:
     if "success" in statuses:
         return "partial_failure"
     return "failure"
+
+
+def get_run_context() -> str:
+    return os.getenv("RUN_CONTEXT", "manual").strip() or "manual"
 
 
 def append_price_history(snapshot: MarketSnapshot) -> Path:
@@ -106,18 +112,23 @@ def append_price_history(snapshot: MarketSnapshot) -> Path:
         "currency",
         "collected_at_utc",
         "status",
+        "source",
+        "run_context",
     ]
 
     date_utc = snapshot.collected_at_utc[:10]
+    run_context = get_run_context()
 
     for instrument in snapshot.instruments:
         row = {
             "date_utc": date_utc,
             "symbol": instrument.symbol,
-            "price": instrument.price,
+            "price": round(instrument.price, 2),
             "currency": instrument.currency,
             "collected_at_utc": snapshot.collected_at_utc,
             "status": instrument.status,
+            "source": snapshot.source,
+            "run_context": run_context,
         }
         append_dict_row(history_path, fieldnames, row)
 
@@ -137,7 +148,6 @@ def run_price_workflow() -> None:
         instruments = build_real_instruments(config.symbols)
     else:
         raise ValueError(f"Unsupported DATA_SOURCE: {config.data_source}")
-
 
     overall_status = determine_overall_status(instruments)
 
@@ -159,11 +169,16 @@ def run_price_workflow() -> None:
 
     history_path = append_price_history(snapshot)
 
-    chart_path = Path("dev/price/charts/price_history.png")
-    generate_price_chart(history_path, chart_path)
+    all_runs_chart_path = Path("dev/price/charts/price_history_all_runs.png")
+    official_daily_chart_path = Path("dev/price/charts/price_history_official_daily.png")
+
+    generate_price_chart_all_runs(history_path, all_runs_chart_path)
+    generate_price_chart_official_daily(history_path, official_daily_chart_path)
 
     print(build_human_summary(snapshot))
     print("")
     print(f"Price snapshot written to: {output_path}")
     print(f"Price history updated: {history_path}")
-    print(f"Price chart updated: {chart_path}")
+    print(f"Price all-runs chart updated: {all_runs_chart_path}")
+    print(f"Price official daily chart updated: {official_daily_chart_path}")
+
