@@ -4,7 +4,7 @@ from datetime import datetime, time
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from app.charts.volume_chart import generate_volume_chart
+from app.charts.volume_chart import generate_volume_chart, generate_peak_volume_time_chart
 from app.clients.market_data import MarketDataError, fetch_yahoo_intraday_volume_series
 from app.config import load_config
 
@@ -205,9 +205,12 @@ def run_volume_workflow(allow_outside_window: bool = False) -> None:
     write_json_artifact(json_path, payload)
     write_daily_csv(payload, csv_path)
     generate_volume_chart(payload, chart_path)
+    peak_time_chart_path = Path("dev/volume/charts/peak_volume_time_by_day.png")
+    generate_peak_volume_time_chart(Path("dev/volume/daily"), peak_time_chart_path)
 
     print_human_summary(payload)
     print("")
     print(f"Volume JSON written to: {json_path}")
     print(f"Volume CSV written to: {csv_path}")
     print(f"Volume chart updated: {chart_path}")
+    print(f"Peak volume time chart updated: {peak_time_chart_path}")
