@@ -7,10 +7,10 @@ from typing import Any
 
 import yaml
 
-from checker import check_target
-from models import build_summary, utc_now_iso
-from report import render_report
-from storage import write_json, write_text
+from app.checker import check_target
+from app.models import build_summary, utc_now_iso
+from app.report import render_report
+from app.storage import write_json, write_text
 
 
 CONFIG_PATH = Path("config/targets.yaml")

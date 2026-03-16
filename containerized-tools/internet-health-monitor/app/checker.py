@@ -6,7 +6,7 @@ from typing import Any
 import certifi
 import requests
 
-from models import build_result
+from app.models import build_result
 
 
 def classify_result(
