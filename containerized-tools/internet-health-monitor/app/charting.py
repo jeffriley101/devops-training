@@ -39,6 +39,9 @@ def build_latency_chart(points: list[dict], output_path: str) -> Path:
         y_values = [item[1] for item in series]
         ax.plot(x_values, y_values, marker="o", label=target_name)
 
+    fig.patch.set_facecolor("#E6E6FA")
+    ax.set_facecolor("#E6E6FA")
+
     ax.set_title("Internet Health Monitor Latency Trends")
     ax.set_xlabel("Run Timestamp (UTC)")
     ax.set_ylabel("Latency (ms)")
