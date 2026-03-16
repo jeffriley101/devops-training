@@ -50,7 +50,11 @@ def fetch_alpha_vantage_global_quote(symbol: str) -> QuoteResult:
 
 def fetch_yahoo_last_price(symbol: str) -> QuoteResult:
     ticker = yf.Ticker(symbol)
+
     df = ticker.history(period="1d", interval="1m", auto_adjust=False, prepost=False)
+
+    if df.empty:
+        df = ticker.history(period="5d", interval="1d", auto_adjust=False, prepost=False)
 
     if df.empty:
         raise MarketDataError(f"No Yahoo Finance price data returned for {symbol}")
