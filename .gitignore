@@ -43,7 +43,8 @@ tools/*.deb
 .env
 
 # Generated artifacts
-artifacts/output/
+containerized-tools/internet-health-monitor/artifacts/history/
+containerized-tools/internet-health-monitor/artifacts/output/
 
 containerized-tools/market-snapshot-bot/.env.local
 containerized-tools/market-snapshot-bot/app/.main.py.swp
