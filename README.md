@@ -1,10 +1,15 @@
 # DevOps Training Projects
 
-This repository contains hands-on DevOps, platform engineering, and reliability-focused projects built to support my transition into cloud and automation engineering.
+This repository is my public DevOps and platform engineering portfolio. It contains hands-on AWS projects built to demonstrate containerized automation, scheduled cloud workloads, CI/CD delivery, observability, artifact management, and production-style troubleshooting.
 
-Rather than presenting isolated scripts, this portfolio shows how I build and operate complete AWS-based workloads: containerized applications, scheduled jobs, CI/CD delivery, artifact storage, observability, and production-style troubleshooting.
+Rather than presenting isolated scripts, this portfolio shows how I build and operate complete systems: code, containers, deployment workflows, runtime behavior, stored artifacts, and operational debugging.
 
-The goal is to give recruiters and hiring teams clear evidence that I can apply DevOps and platform engineering skills in real project workflows.
+## Live Dashboard
+
+GitHub Pages Dashboard:
+https://jeffriley101.github.io/devops-training/
+
+The dashboard presents current project artifacts, including preview images, live metadata, and monitoring output from the portfolio projects in this repository.
 
 ---
 
@@ -52,28 +57,31 @@ Across the projects in this repository, the main capabilities include:
 
 ## Portfolio Projects
 
-### Env Inspector  
-`containerized-tools/env-inspector/`
+### Env Inspector
+containerized-tools/env-inspector/
 
 A production-style containerized automation platform that collects runtime environment data, runs on AWS Fargate, and stores structured artifacts in Amazon S3 with deployment traceability metadata.
 
-**What it shows**
+What it shows
 - scheduled container automation on AWS
 - CI/CD-driven deployment workflow
 - ECS task definition revision management
 - artifact persistence and traceability
 - runtime debugging and operator-focused output design
 
+Preview image:
+dashboard/images/env-inspector-preview.png
+
 ---
 
-### Market Snapshot Bot  
-`containerized-tools/market-snapshot-bot/`
+### Market Snapshot Bot
+containerized-tools/market-snapshot-bot/
 
 A containerized AWS market-monitoring workload built to demonstrate scheduled cloud execution, artifact pipelines, real-data workflow integration, and production-style troubleshooting.
 
 This project began with a platform baseline using mock workflows, then evolved into a real-data system while preserving mock mode for safe development and rollback.
 
-**What it shows**
+What it shows
 - reusable scheduled workload architecture
 - external data workflow integration
 - structured JSON, CSV, and PNG artifact generation
@@ -81,14 +89,17 @@ This project began with a platform baseline using mock workflows, then evolved i
 - careful extension of a working platform without destabilizing the baseline
 - debugging across logs, task definitions, scheduler targets, and artifact outputs
 
+Preview image:
+dashboard/images/market-snapshot-preview.png
+
 ---
 
-### Internet Health Monitor  
-`containerized-tools/internet-health-monitor/`
+### Internet Health Monitor
+containerized-tools/internet-health-monitor/
 
 A containerized AWS-based monitoring platform that performs scheduled HTTP health checks, measures latency, classifies service state, and publishes historical observability artifacts for operator review.
 
-**What it shows**
+What it shows
 - reliability-focused automation design
 - service health monitoring and classification
 - historical latency trend generation
@@ -96,28 +107,31 @@ A containerized AWS-based monitoring platform that performs scheduled HTTP healt
 - cloud-scheduled monitoring workflows
 - observability-oriented artifact pipelines
 
+Preview image:
+dashboard/images/internet-health-preview.png
+
 ---
 
 ## What I Learned Building These Projects
 
 These projects helped move me from learning tools individually to operating them as connected systems.
 
-### 1. A working platform is already meaningful engineering value
+1. A working platform is already meaningful engineering value
 I learned that proving container builds, scheduled execution, logging, storage, and artifact flow is itself a substantial outcome.
 
-### 2. Infrastructure and application behavior are tightly connected
+2. Infrastructure and application behavior are tightly connected
 Many issues were not purely code bugs. They involved task definitions, environment variables, scheduler targets, storage paths, deployment wiring, and runtime assumptions.
 
-### 3. Logs and artifacts are the truth
+3. Logs and artifacts are the truth
 I learned to verify behavior through CloudWatch logs, generated files, charts, stored outputs, and runtime metadata rather than assuming the system behaved correctly.
 
-### 4. Safe evolution matters
+4. Safe evolution matters
 Across these projects, I focused on preserving a working baseline, then extending it carefully instead of destabilizing what already worked.
 
-### 5. Operational troubleshooting is a real engineering skill
+5. Operational troubleshooting is a real engineering skill
 A major part of the work involved diagnosing why infrastructure, scheduling, deployment, or runtime behavior did not match expectations.
 
-### 6. Communication matters too
+6. Communication matters too
 README quality, architecture explanation, artifact examples, and project clarity are part of professional engineering value, not extras.
 
 ---
@@ -141,14 +155,13 @@ README quality, architecture explanation, artifact examples, and project clarity
 
 ## Repository Structure
 
-```text
 .
 ├── containerized-tools/
 │   ├── env-inspector/
 │   ├── internet-health-monitor/
 │   └── market-snapshot-bot/
+├── dashboard/
 └── README.md
-```
 
 Each project directory contains its own implementation details, architecture notes, usage instructions, and project-specific documentation.
 
