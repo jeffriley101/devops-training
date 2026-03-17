@@ -1,212 +1,163 @@
-# DevOps Automation & Platform Engineering Portfolio
+# DevOps Training Projects
 
-This repository contains a set of production‑style DevOps projects built
-while pivoting into **DevOps / Automation / Platform Engineering**.
+This repository contains hands-on DevOps, platform engineering, and reliability-focused projects built to support my transition into cloud and automation engineering.
 
-The focus of this portfolio is not just application code, but
-**operational systems**: containerized workloads, cloud execution
-platforms, artifact pipelines, infrastructure‑as‑code, and
-observability.
+Rather than presenting isolated scripts, this portfolio shows how I build and operate complete AWS-based workloads: containerized applications, scheduled jobs, CI/CD delivery, artifact storage, observability, and production-style troubleshooting.
 
-These projects demonstrate the ability to design, build, deploy, and
-operate real workloads on AWS using modern DevOps practices.
+The goal is to give recruiters and hiring teams clear evidence that I can apply DevOps and platform engineering skills in real project workflows.
 
-------------------------------------------------------------------------
+---
 
-# Portfolio Projects
+## Career Pivot Focus
 
-## 1. Env Inspector --- Containerized Automation Platform
+I am using this portfolio to support my transition into roles such as:
 
-A deterministic containerized automation CLI deployed to AWS and
-executed on a schedule using ECS/Fargate.
+- DevOps Engineer
+- Platform Engineer
+- Automation Engineer
+- Cloud / Infrastructure Engineer
+- Site Reliability Engineer
 
-The system demonstrates a full DevOps workflow from source control
-through container build, deployment, scheduled execution, artifact
-generation, and operational traceability.
+The projects here are intentionally aligned with the work I want to do professionally:
 
-### Key Capabilities
+- containerized automation
+- scheduled cloud workloads
+- CI/CD delivery workflows
+- AWS infrastructure
+- monitoring and observability
+- artifact-oriented system design
+- operational troubleshooting across code and infrastructure
 
--   Python automation packaged in Docker
--   GitHub Actions CI/CD with AWS OIDC authentication
--   Immutable container publishing to Amazon ECR
--   ECS/Fargate task execution
--   EventBridge scheduled workloads
--   S3 artifact storage
--   CloudWatch log visibility
--   Runtime traceability metadata
+---
 
-Each execution produces artifacts containing metadata such as:
+## What This Repository Demonstrates
 
--   Git commit SHA
--   ECS task definition ARN
--   ECS task ARN
--   runtime environment data
+Across the projects in this repository, the main capabilities include:
 
-This makes every run **auditable and traceable**.
+- Python-based automation packaged for container execution
+- Docker image build workflows for repeatable deployment
+- Amazon ECR image publishing
+- Amazon ECS Fargate task execution
+- Amazon EventBridge scheduled job orchestration
+- GitHub Actions CI/CD pipelines
+- AWS OIDC-based CI authentication
+- Amazon S3 artifact storage and retention design
+- Amazon CloudWatch logging and runtime visibility
+- Terraform-managed infrastructure
+- environment-aware runtime configuration
+- historical artifact generation for trend analysis
+- operational debugging across application, scheduler, task definition, and storage layers
 
-**Primary Technologies**
+---
 
-Docker • AWS ECS • Fargate • EventBridge • ECR • S3 • CloudWatch •
-GitHub Actions • Terraform
+## Portfolio Projects
 
-------------------------------------------------------------------------
+### Env Inspector  
+`containerized-tools/env-inspector/`
 
-## 2. Market Snapshot Bot --- Containerized Data Monitoring Platform
+A production-style containerized automation platform that collects runtime environment data, runs on AWS Fargate, and stores structured artifacts in Amazon S3 with deployment traceability metadata.
 
-A containerized market monitoring system designed to demonstrate
-**real‑world operational automation** using scheduled cloud workloads.
+**What it shows**
+- scheduled container automation on AWS
+- CI/CD-driven deployment workflow
+- ECS task definition revision management
+- artifact persistence and traceability
+- runtime debugging and operator-focused output design
 
-The project began as an infrastructure platform exercise and evolved
-into a real‑data workflow while preserving mock mode for safe
-development.
+---
 
-### Key Capabilities
+### Market Snapshot Bot  
+`containerized-tools/market-snapshot-bot/`
 
--   Python automation packaged in Docker
--   Scheduled container execution using ECS/Fargate
--   EventBridge Scheduler job orchestration
--   Multi‑mode application design (price + volume workflows)
--   JSON, CSV, and PNG artifact generation
--   Historical dataset construction
--   Production‑style troubleshooting across AWS services
+A containerized AWS market-monitoring workload built to demonstrate scheduled cloud execution, artifact pipelines, real-data workflow integration, and production-style troubleshooting.
 
-### Workflow Modes
+This project began with a platform baseline using mock workflows, then evolved into a real-data system while preserving mock mode for safe development and rollback.
 
-**Price Monitoring** - Generates daily price snapshots - Maintains
-historical CSV dataset - Produces price history charts
+**What it shows**
+- reusable scheduled workload architecture
+- external data workflow integration
+- structured JSON, CSV, and PNG artifact generation
+- environment-aware runtime design
+- careful extension of a working platform without destabilizing the baseline
+- debugging across logs, task definitions, scheduler targets, and artifact outputs
 
-**Volume Monitoring** - Collects minute‑level intraday volume samples -
-Produces structured monitoring artifacts - Generates monitoring charts
-for market activity
+---
 
-The project demonstrates **how to evolve a stable platform from mock
-workflows into real‑data automation** without breaking the underlying
-infrastructure.
+### Internet Health Monitor  
+`containerized-tools/internet-health-monitor/`
 
-**Primary Technologies**
+A containerized AWS-based monitoring platform that performs scheduled HTTP health checks, measures latency, classifies service state, and publishes historical observability artifacts for operator review.
 
-Python • Docker • AWS ECS • EventBridge • ECR • CloudWatch • S3
+**What it shows**
+- reliability-focused automation design
+- service health monitoring and classification
+- historical latency trend generation
+- operator-readable reporting
+- cloud-scheduled monitoring workflows
+- observability-oriented artifact pipelines
 
-------------------------------------------------------------------------
+---
 
-## 3. Internet Health Monitor --- Reliability Monitoring Platform
+## What I Learned Building These Projects
 
-A containerized monitoring system that performs scheduled Internet
-health checks and generates historical observability artifacts.
+These projects helped move me from learning tools individually to operating them as connected systems.
 
-Rather than being a simple "website checker," the project focuses on
-**operational reliability workflows** similar to internal monitoring
-tools used by real engineering teams.
+### 1. A working platform is already meaningful engineering value
+I learned that proving container builds, scheduled execution, logging, storage, and artifact flow is itself a substantial outcome.
 
-### Key Capabilities
+### 2. Infrastructure and application behavior are tightly connected
+Many issues were not purely code bugs. They involved task definitions, environment variables, scheduler targets, storage paths, deployment wiring, and runtime assumptions.
 
--   Scheduled HTTP health checks
--   Latency measurement and classification
--   Health state modeling (Healthy / Degraded / Unhealthy)
--   Structured artifact generation
--   Historical run tracking
--   Latency trend chart generation
--   Operator‑friendly reporting
+### 3. Logs and artifacts are the truth
+I learned to verify behavior through CloudWatch logs, generated files, charts, stored outputs, and runtime metadata rather than assuming the system behaved correctly.
 
-Each monitoring run produces:
+### 4. Safe evolution matters
+Across these projects, I focused on preserving a working baseline, then extending it carefully instead of destabilizing what already worked.
 
--   machine‑readable JSON results
--   human‑readable health reports
--   historical monitoring artifacts
--   latency trend charts
+### 5. Operational troubleshooting is a real engineering skill
+A major part of the work involved diagnosing why infrastructure, scheduling, deployment, or runtime behavior did not match expectations.
 
-The system runs on AWS ECS/Fargate and stores artifacts in Amazon S3 for
-historical analysis.
+### 6. Communication matters too
+README quality, architecture explanation, artifact examples, and project clarity are part of professional engineering value, not extras.
 
-**Primary Technologies**
+---
 
-Python • Docker • AWS ECS • EventBridge • S3 • CloudWatch • Terraform
+## AWS / DevOps Technologies Used
 
-------------------------------------------------------------------------
+- Python
+- Docker
+- GitHub Actions
+- Terraform
+- Amazon ECS
+- AWS Fargate
+- Amazon EventBridge Scheduler
+- Amazon ECR
+- Amazon S3
+- Amazon CloudWatch Logs
+- IAM
+- Git / GitHub
 
-# Core Skills Demonstrated
+---
 
-## DevOps Engineering
+## Repository Structure
 
--   CI/CD pipeline design
--   container build and deployment workflows
--   immutable image publishing
--   scheduled automation workloads
--   artifact lifecycle management
+```text
+.
+├── containerized-tools/
+│   ├── env-inspector/
+│   ├── internet-health-monitor/
+│   └── market-snapshot-bot/
+└── README.md
+```
 
-## Cloud Engineering
+Each project directory contains its own implementation details, architecture notes, usage instructions, and project-specific documentation.
 
--   AWS ECS / Fargate orchestration
--   EventBridge scheduled jobs
--   S3 artifact storage architecture
--   CloudWatch logging and troubleshooting
--   IAM least‑privilege design
+---
 
-## Infrastructure as Code
+## Why This Repository Matters
 
--   Terraform modular infrastructure
--   environment isolation
--   safe infrastructure lifecycle management
+This repository is meant to show more than familiarity with DevOps concepts.
 
-## Platform Engineering
+It demonstrates that I can take a workload from source control to build, deployment, execution, observability, artifact storage, and operational troubleshooting in AWS.
 
--   containerized internal tooling
--   reusable workload execution patterns
--   artifact‑based observability
--   operator‑focused automation design
-
-------------------------------------------------------------------------
-
-# Engineering Philosophy
-
-These projects focus on **building real systems rather than isolated
-scripts**.
-
-Each project demonstrates:
-
--   deterministic execution
--   traceable artifacts
--   operational visibility
--   reproducible infrastructure
--   clean deployment workflows
-
-The goal is to show the ability to design **automation platforms and
-internal engineering tools**, not just write code.
-
-------------------------------------------------------------------------
-
-# Current Direction
-
-Primary areas of interest:
-
--   Automation platforms
--   Platform engineering
--   Developer tooling
--   Infrastructure‑aware CLI tools
--   Reliability engineering systems
-
-------------------------------------------------------------------------
-
-# Repository Structure
-
-Typical layout:
-
-    containerized-tools/
-        env-inspector/
-        market-snapshot-bot/
-        internet-health-monitor/
-
-    modules/
-    environments/
-    shared-infrastructure/
-
-Each project includes its own documentation explaining architecture,
-workflows, and operational behavior.
-
-------------------------------------------------------------------------
-
-# Author
-
-Jeffrey Alan Riley
-
-DevOps / Automation / Platform Engineering Portfolio
+For recruiters and hiring managers, that is the point of this portfolio: practical evidence of hands-on DevOps, platform, and automation engineering work.
