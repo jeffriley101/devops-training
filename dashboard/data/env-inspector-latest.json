@@ -1,0 +1,7 @@
+{
+  "timestamp_utc_human": "Sample local preview",
+  "status": "OK",
+  "run_source": "scheduled",
+  "git_sha": "sample",
+  "task_def_arn": "sample"
+}

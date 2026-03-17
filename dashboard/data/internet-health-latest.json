@@ -1,0 +1,8 @@
+{
+  "timestamp_utc_human": "Sample local preview",
+  "generated_chart": "true",
+  "total_targets": 4,
+  "healthy_count": 4,
+  "degraded_count": 0,
+  "unhealthy_count": 0
+}

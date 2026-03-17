@@ -1,0 +1,74 @@
+name: Sync Portfolio Dashboard
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "15 */4 * * *"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  sync-and-deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      DASHBOARD_DIR: dashboard
+      AWS_REGION: us-east-1
+      ENV_INSPECTOR_LATEST_JSON: s3://env-inspector-artifacts-4e2e3699/env-inspector/training/latest.json
+      INTERNET_HEALTH_LATEST_JSON: s3://internet-health-monitor-artifacts-3545067e/internet-health-monitor/dev/latest-results.json
+      INTERNET_HEALTH_LATEST_CHART: s3://internet-health-monitor-artifacts-3545067e/internet-health-monitor/dev/charts/latest-latency-trend.png
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_GITHUB_DASHBOARD_ROLE_ARN }}
+
+      - name: Prepare dashboard directories
+        run: |
+          mkdir -p "$DASHBOARD_DIR/data"
+          mkdir -p "$DASHBOARD_DIR/images"
+
+      - name: Sync Env Inspector metadata
+        run: |
+          aws s3 cp \
+            "$ENV_INSPECTOR_LATEST_JSON" \
+            "$DASHBOARD_DIR/data/env-inspector-latest.json"
+
+      - name: Sync Internet Health metadata
+        run: |
+          aws s3 cp \
+            "$INTERNET_HEALTH_LATEST_JSON" \
+            "$DASHBOARD_DIR/data/internet-health-latest.json"
+
+      - name: Sync Internet Health chart
+        run: |
+          aws s3 cp \
+            "$INTERNET_HEALTH_LATEST_CHART" \
+            "$DASHBOARD_DIR/images/internet-health-preview.png"
+
+      - name: Write site sync status
+        run: |
+          cat > "$DASHBOARD_DIR/data/site-sync-status.json" <<EOF2
+          {
+            "last_synced_utc": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+          }
+          EOF2
+
+      - name: Set up Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./dashboard
+
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
