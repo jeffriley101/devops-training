@@ -112,6 +112,28 @@ dashboard/images/internet-health-preview.png
 
 ---
 
+## Troubleshooting Highlights
+
+### Debugging Highlight - QQQ Volume Anomalies
+
+During the transition from mock data to real Yahoo Finance minute-volume data, the QQQ volume workflow began showing isolated zero-minute samples and distorted spikes in the generated chart.
+
+I approached the issue as a production-style data pipeline investigation rather than assuming the chart code was wrong. I traced when the real-data path entered the project, then validated the upstream feed independently outside the application workflow. That testing showed the anomaly was present in the Yahoo minute data itself, not just introduced by chart rendering.
+
+Rather than forcing a cosmetic fix, I treated this as a data-quality and observability problem:
+
+- isolated the symptom in generated artifacts
+- traced the change that introduced the real-data path
+- reproduced the issue directly against the upstream dependency
+- avoided hard-coding a misleading normalization rule before gathering more evidence
+- evaluated whether slightly wider aggregation windows would produce more stable operator-facing charts
+
+This is the kind of troubleshooting work I want these projects to demonstrate: not just building automated workflows, but diagnosing unexpected behavior in production-style systems.
+
+For expanded notes and raw validation output, see `/containerized-tools/market-snapshot-bot/doc`.
+
+---
+
 ## What I Learned Building These Projects
 
 These projects helped move me from learning tools individually to operating them as connected systems.
