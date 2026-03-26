@@ -10,6 +10,7 @@ from app.charts.price_chart import (
     generate_price_chart_official_daily,
 )
 from app.config import load_config
+from app.storage.s3_artifacts import download_file_if_exists, upload_file
 from app.models.schema import InstrumentSnapshot, MarketSnapshot
 
 PRICE_SOURCE_SYMBOLS = {
@@ -21,6 +22,17 @@ PRICE_DISPLAY_NAMES = {
     "XAG/USD": "Silver Futures",
     "WTI/USD": "WTI Crude Oil Futures",
 }
+
+
+def build_s3_key(prefix: str, relative_path: Path) -> str:
+    clean_prefix = prefix.strip("/")
+    clean_relative = relative_path.as_posix().lstrip("/")
+
+    if clean_relative.startswith("dev/"):
+        clean_relative = clean_relative[len("dev/"):]
+
+    return f"{clean_prefix}/{clean_relative}" if clean_prefix else clean_relative
+
 
 
 def build_mock_instruments(source: str) -> list[InstrumentSnapshot]:
@@ -142,6 +154,18 @@ def run_price_workflow() -> None:
     snapshot_id = timestamp.strftime("%Y%m%dT%H%M%SZ")
     collected_at_utc = timestamp.replace(microsecond=0).isoformat() + "Z"
 
+    history_path = Path("dev/price/history/price_history.csv")
+    history_s3_key = build_s3_key(config.s3_prefix, history_path)
+
+    downloaded_history = download_file_if_exists(
+        config.s3_bucket,
+        history_s3_key,
+        history_path,
+    )
+
+    if downloaded_history:
+        print(f"Downloaded existing price history from s3://{config.s3_bucket}/{history_s3_key}")
+
     if config.data_source == "mock":
         instruments = build_mock_instruments(config.data_source)
     elif config.data_source == "real":
@@ -174,6 +198,15 @@ def run_price_workflow() -> None:
 
     generate_price_chart_all_runs(history_path, all_runs_chart_path)
     generate_price_chart_official_daily(history_path, official_daily_chart_path)
+
+    upload_file(config.s3_bucket, build_s3_key(config.s3_prefix, output_path), output_path)
+    upload_file(config.s3_bucket, build_s3_key(config.s3_prefix, history_path), history_path)
+    upload_file(config.s3_bucket, build_s3_key(config.s3_prefix, all_runs_chart_path), all_runs_chart_path)
+    upload_file(
+        config.s3_bucket,
+        build_s3_key(config.s3_prefix, official_daily_chart_path),
+        official_daily_chart_path,
+    )
 
     print(build_human_summary(snapshot))
     print("")
