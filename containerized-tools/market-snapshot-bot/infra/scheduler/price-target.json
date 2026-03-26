@@ -3,7 +3,7 @@
   "Arn": "arn:aws:ecs:us-east-1:646313139147:cluster/env-inspector-cluster",
   "EcsParameters": {
     "LaunchType": "FARGATE",
-    "TaskDefinitionArn": "arn:aws:ecs:us-east-1:646313139147:task-definition/market-snapshot-bot:6",
+    "TaskDefinitionArn": "arn:aws:ecs:us-east-1:646313139147:task-definition/market-snapshot-bot:8",
     "NetworkConfiguration": {
       "awsvpcConfiguration": {
         "Subnets": ["subnet-0c62c182b234ae364", "subnet-0afa828b1fbad3f37"],
