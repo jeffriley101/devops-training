@@ -9,7 +9,7 @@
 <body>
   <header class="hero">
     <div class="container">
-      <p class="eyebrow">Jeff Riley • DevOps / Platform Engineering Portfolio</p>
+      <p class="eyebrow">Jeffrey Alan Riley • DevOps / Platform Engineering Portfolio</p>
       <h1>Live Project Dashboard</h1>
       <p class="intro">
         This dashboard presents current artifacts from my AWS-based DevOps portfolio projects,
@@ -25,6 +25,82 @@
 
   <main class="container">
     <section class="cards">
+      <article class="card card-hero">
+        <div class="card-header">
+          <h2>Internet Health Monitor</h2>
+          <a href="https://github.com/jeffriley101/devops-training/tree/main/containerized-tools/internet-health-monitor">Project Repo</a>
+        </div>
+
+        <p class="card-summary">
+          Scheduled monitoring platform that performs HTTP health checks, measures latency,
+          and publishes historical observability artifacts and trend charts.
+        </p>
+
+        <img
+          id="internet-chart"
+          class="chart"
+          src="images/internet-health-preview.png"
+          alt="Latest Internet Health Monitor chart"
+        />
+
+        <div class="metadata" id="internet-health-metadata">
+          <p>Loading latest metadata...</p>
+        </div>
+
+        <hr class="section-divider" />
+
+        <h3 class="subsection-title">Interactive History</h3>
+
+        <p class="card-summary">
+          Select how many timestamps to display in the interactive history view.
+        </p>
+
+        <div class="chart-controls">
+          <label for="internet-health-lookback">Show last</label>
+          <input
+            id="internet-health-lookback"
+            type="number"
+            min="1"
+            step="1"
+            value="50"
+          />
+          <span>points</span>
+          <button type="button" id="internet-health-apply-btn">Apply</button>
+          <button type="button" id="internet-health-all-btn">All</button>
+        </div>
+
+        <div class="chart-chart-wrap">
+          <canvas
+            id="internet-health-history-chart"
+            class="chart-canvas"
+            aria-label="Internet Health Monitor interactive history chart"
+            height="320"
+          ></canvas>
+        </div>
+
+        <p class="chart-status" id="internet-health-history-status">
+          Loading internet health history...
+        </p>
+      </article>
+        <div class="card-header">
+          <h2>Market Snapshot Bot</h2>
+          <a href="https://github.com/jeffriley101/devops-training/tree/main/containerized-tools/market-snapshot-bot">Project Repo</a>
+        </div>
+        <p class="card-summary">
+          This is a sample of a scheduled market-data automation workflow with historical artifacts, charts,
+          and production-style troubleshooting across application and infrastructure layers. I run new tests
+	  everyday to watch QQQ peaks and the price fluctuations of a variety of symbols.
+        </p>
+        <img
+          class="chart"
+          src="images/market-snapshot-preview.png"
+          alt="Latest Market Snapshot Bot volume chart"
+        />
+        <div class="metadata" id="market-snapshot-metadata">
+          <p>Static preview image selected from the project artifacts.</p>
+        </div>
+      </article>
+
       <article class="card">
         <div class="card-header">
           <h2>Env Inspector</h2>
@@ -43,44 +119,6 @@
           <p>Loading latest metadata...</p>
         </div>
       </article>
-
-      <article class="card">
-        <div class="card-header">
-          <h2>Market Snapshot Bot</h2>
-          <a href="https://github.com/jeffriley101/devops-training/tree/main/containerized-tools/market-snapshot-bot">Project Repo</a>
-        </div>
-        <p class="card-summary">
-          Scheduled market-data automation workflow with historical artifacts, charts,
-          and production-style troubleshooting across application and infrastructure layers.
-        </p>
-        <img
-          class="chart"
-          src="images/market-snapshot-preview.png"
-          alt="Latest Market Snapshot Bot volume chart"
-        />
-        <div class="metadata" id="market-snapshot-metadata">
-          <p>Static preview image selected from the project artifacts.</p>
-        </div>
-      </article>
-
-      <article class="card">
-        <div class="card-header">
-          <h2>Internet Health Monitor</h2>
-          <a href="https://github.com/jeffriley101/devops-training/tree/main/containerized-tools/internet-health-monitor">Project Repo</a>
-        </div>
-        <p class="card-summary">
-          Scheduled monitoring platform that performs HTTP health checks, measures latency,
-          and publishes historical observability artifacts and trend charts.
-        </p>
-        <img
-          id="internet-chart"
-          class="chart"
-          src="images/internet-health-preview.png"
-          alt="Latest Internet Health Monitor chart"
-        />
-        <div class="metadata" id="internet-health-metadata">
-          <p>Loading latest metadata...</p>
-        </div>
       </article>
     </section>
   </main>
@@ -91,6 +129,7 @@
     </div>
   </footer>
 
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

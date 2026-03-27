@@ -7,6 +7,16 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 
 
+TARGET_COLORS = {
+    "google": "#1f77b4",
+    "groundnews": "#ff7f0e",
+    "timeanddate": "#2ca02c",
+    "weathergov": "#d62728",
+    "aws": "#9467bd",
+    "homestarrunner": "#17becf",
+}
+
+
 def _parse_timestamp(timestamp_utc: str) -> datetime:
     return datetime.strptime(timestamp_utc, "%Y-%m-%dT%H:%M:%SZ")
 
@@ -37,7 +47,15 @@ def build_latency_chart(points: list[dict], output_path: str) -> Path:
         series.sort(key=lambda item: item[0])
         x_values = [item[0] for item in series]
         y_values = [item[1] for item in series]
-        ax.plot(x_values, y_values, marker="o", label=target_name)
+        ax.plot(
+            x_values,
+            y_values,
+            marker="o",
+            label=target_name,
+            color=TARGET_COLORS.get(target_name),
+            linewidth=1.25,
+            markersize=4,
+        )
 
     fig.patch.set_facecolor("#E6E6FA")
     ax.set_facecolor("#E6E6FA")

@@ -1,8 +1,8 @@
 {
-  "timestamp_utc_human": "Sample local preview",
-  "generated_chart": "true",
-  "total_targets": 4,
-  "healthy_count": 4,
+  "timestamp_utc_human": "2026-03-23T22:16:26Z",
+  "generated_chart": true,
+  "total_targets": 6,
+  "healthy_count": 6,
   "degraded_count": 0,
   "unhealthy_count": 0
 }

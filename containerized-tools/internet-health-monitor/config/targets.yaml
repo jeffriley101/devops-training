@@ -26,3 +26,17 @@ targets:
     timeout_seconds: 5
     expected_statuses: [200]
     latency_threshold_ms: 2000
+
+  - name: aws
+    url: https://aws.amazon.com/
+    method: GET
+    expected_statuses:
+      - 200
+    latency_threshold_ms: 2000
+
+  - name: homestarrunner
+    url: https://homestarrunner.com/
+    method: GET
+    expected_statuses:
+      - 200
+    latency_threshold_ms: 2000

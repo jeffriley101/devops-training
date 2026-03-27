@@ -18,8 +18,11 @@ jobs:
       DASHBOARD_DIR: dashboard
       AWS_REGION: us-east-1
       ENV_INSPECTOR_LATEST_JSON: s3://env-inspector-artifacts-4e2e3699/env-inspector/training/latest.json
+      INTERNET_HEALTH_BUCKET: internet-health-monitor-artifacts-3545067e
+      INTERNET_HEALTH_PREFIX: internet-health-monitor/dev
       INTERNET_HEALTH_LATEST_JSON: s3://internet-health-monitor-artifacts-3545067e/internet-health-monitor/dev/latest-results.json
       INTERNET_HEALTH_LATEST_CHART: s3://internet-health-monitor-artifacts-3545067e/internet-health-monitor/dev/charts/latest-latency-trend.png
+      INTERNET_HEALTH_LOOKBACK: "50"
 
     steps:
       - name: Check out repository
@@ -35,6 +38,7 @@ jobs:
         run: |
           mkdir -p "$DASHBOARD_DIR/data"
           mkdir -p "$DASHBOARD_DIR/images"
+          mkdir -p /tmp/ihm-history-json
 
       - name: Sync Env Inspector metadata
         run: |
@@ -42,17 +46,102 @@ jobs:
             "$ENV_INSPECTOR_LATEST_JSON" \
             "$DASHBOARD_DIR/data/env-inspector-latest.json"
 
-      - name: Sync Internet Health metadata
+      - name: Sync Internet Health latest raw JSON
         run: |
           aws s3 cp \
             "$INTERNET_HEALTH_LATEST_JSON" \
-            "$DASHBOARD_DIR/data/internet-health-latest.json"
+            /tmp/internet-health-latest-raw.json
+
+      - name: Build Internet Health dashboard metadata
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          source = Path("/tmp/internet-health-latest-raw.json")
+          dest = Path("dashboard/data/internet-health-latest.json")
+
+          data = json.loads(source.read_text())
+          run_metadata = data.get("run_metadata", {})
+          summary = data.get("summary", {})
+
+          out = {
+              "timestamp_utc_human": run_metadata.get("timestamp_utc", "unknown"),
+              "generated_chart": True,
+              "total_targets": summary.get("total_targets", 0),
+              "healthy_count": summary.get("healthy", 0),
+              "degraded_count": summary.get("degraded", 0),
+              "unhealthy_count": summary.get("unhealthy", 0)
+          }
+
+          dest.write_text(json.dumps(out, indent=2))
+          print(json.dumps(out, indent=2))
+          PY
 
       - name: Sync Internet Health chart
         run: |
           aws s3 cp \
             "$INTERNET_HEALTH_LATEST_CHART" \
             "$DASHBOARD_DIR/images/internet-health-preview.png"
+
+      - name: Build Internet Health history JSON
+        run: |
+          set -euo pipefail
+
+          aws s3 ls "s3://$INTERNET_HEALTH_BUCKET/$INTERNET_HEALTH_PREFIX/" --recursive \
+            | grep 'results-' \
+            | tail -n "$INTERNET_HEALTH_LOOKBACK" \
+            | awk '{print $4}' > /tmp/ihm-result-keys.txt
+
+          rm -f /tmp/ihm-history-json/*.json || true
+
+          while IFS= read -r key; do
+            [ -n "$key" ] || continue
+            aws s3 cp "s3://$INTERNET_HEALTH_BUCKET/$key" "/tmp/ihm-history-json/$(basename "$key")"
+          done < /tmp/ihm-result-keys.txt
+
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          source_dir = Path("/tmp/ihm-history-json")
+          output_file = Path("dashboard/data/internet-health-history.json")
+
+          rows = []
+
+          for path in sorted(source_dir.glob("*.json")):
+              data = json.loads(path.read_text())
+              timestamp = data.get("run_metadata", {}).get("timestamp_utc")
+              results = data.get("results", [])
+
+              if not timestamp or not isinstance(results, list):
+                  continue
+
+              row = {"timestamp": timestamp}
+
+              for item in results:
+                  name = item.get("name")
+                  latency = item.get("latency_ms")
+                  success = item.get("success")
+
+                  if name and success is True and isinstance(latency, (int, float)):
+                      row[name] = latency
+
+              if len(row) > 1:
+                  rows.append(row)
+
+          deduped = {}
+          for row in rows:
+              deduped[row["timestamp"]] = row
+
+          final_rows = [deduped[timestamp] for timestamp in sorted(deduped)]
+
+          output_file.write_text(json.dumps(final_rows, indent=2))
+          print(f"Wrote {len(final_rows)} rows to {output_file}")
+          if final_rows:
+              print("First row:", final_rows[0])
+              print("Last row:", final_rows[-1])
+          PY
 
       - name: Write site sync status
         run: |
