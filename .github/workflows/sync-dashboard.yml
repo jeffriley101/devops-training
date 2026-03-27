@@ -34,6 +34,31 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
           role-to-assume: ${{ secrets.AWS_GITHUB_DASHBOARD_ROLE_ARN }}
 
+
+
+      - name: Debug AWS caller identity
+        run: |
+          aws sts get-caller-identity
+
+      - name: Debug list recent IHM history objects
+        run: |
+          aws s3 ls "s3://$INTERNET_HEALTH_BUCKET/$INTERNET_HEALTH_PREFIX/" --recursive | grep 'results-' | tail -n 10
+
+      - name: Debug copy one known IHM history object
+        run: |
+          aws s3 cp \
+            "s3://$INTERNET_HEALTH_BUCKET/$INTERNET_HEALTH_PREFIX/2026/03/23/results-20260323T221100Z.json" \
+            /tmp/debug-one-history.json
+          python3 -m json.tool /tmp/debug-one-history.json | grep -n '"name":'
+
+
+
+
+
+
+
+
+
       - name: Prepare dashboard directories
         run: |
           mkdir -p "$DASHBOARD_DIR/data"
