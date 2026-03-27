@@ -125,10 +125,15 @@ body {
 .card-wide {
   grid-column: 1 / -1;
 }
-
+i
 .card-tall {
   grid-column: 1 / 2;
   max-width: 680px;
+}
+
+.card-tall .chart {
+  padding: 10px;
+  background: #2d0b2b; /* subtle match to terminal tone */
 }
 
 .chart {
@@ -136,7 +141,7 @@ body {
   height: auto;
   border-radius: 8px;
   border: 1px solid #e5e7eb;
-  margin: 10px 0 14px;
+  margin: 12px 0 16px;
   background: #fff;
 }
 
@@ -220,6 +225,10 @@ body {
 
 .metadata dd {
   margin: 0;
+}
+
+.metadata {
+  overflow-wrap: anywhere;
 }
 
 .footer {
