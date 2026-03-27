@@ -4,13 +4,18 @@ from datetime import datetime, time
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from app.charts.volume_chart import generate_volume_chart, generate_peak_volume_time_chart
+from app.charts.volume_chart import (
+    generate_peak_volume_time_chart,
+    generate_peak_volume_time_chart_2min,
+    generate_volume_chart,
+    generate_volume_chart_2min,
+)
 from app.clients.market_data import MarketDataError, fetch_yahoo_intraday_volume_series
 from app.config import load_config
 
 
-WINDOW_START_ET = time(10, 8)
-WINDOW_END_ET = time(10, 40)
+WINDOW_START_ET = time(10, 10)
+WINDOW_END_ET = time(10, 50)
 EASTERN_TZ = ZoneInfo("America/New_York")
 
 
@@ -37,23 +42,27 @@ def validate_volume_run_window(allow_outside_window: bool) -> None:
 
     if not is_within_volume_window(now_et):
         raise RuntimeError(
-            "Volume workflow is only allowed between 10:08 ET and 10:40 ET. "
+            "Volume workflow is only allowed between 10:10 ET and 10:50 ET. "
             "Use --allow-outside-window for development."
         )
 
+
 def build_mock_volume_samples(run_date_et: str) -> dict[str, list[dict[str, int | str]]]:
     times = [
-        "10:08", "10:09", "10:10", "10:11", "10:12", "10:13", "10:14", "10:15",
+        "10:10", "10:11", "10:12", "10:13", "10:14", "10:15",
         "10:16", "10:17", "10:18", "10:19", "10:20", "10:21", "10:22", "10:23",
         "10:24", "10:25", "10:26", "10:27", "10:28", "10:29", "10:30", "10:31",
         "10:32", "10:33", "10:34", "10:35", "10:36", "10:37", "10:38", "10:39",
-        "10:40",
+        "10:40", "10:41", "10:42", "10:43", "10:44", "10:45", "10:46", "10:47",
+        "10:48", "10:49", "10:50",
     ]
 
     qqq_volumes = [
-        1180, 1215, 1240, 1285, 1310, 1360, 1425, 1490, 1560, 1635, 1710,
-        1680, 1605, 1540, 1495, 1450, 1400, 1380, 1410, 1460, 1525, 1595,
-        1660, 1735, 1810, 1765, 1685, 1600, 1520, 1455, 1385, 1305, 1215,
+        1240, 1285, 1310, 1360, 1425, 1490, 1560, 1635, 1710, 1680,
+        1605, 1540, 1495, 1450, 1400, 1380, 1410, 1460, 1525, 1595,
+        1660, 1735, 1810, 1765, 1685, 1600, 1520, 1455, 1385, 1305,
+        1215, 1185, 1160, 1135, 1110, 1090, 1075, 1055, 1035, 1015,
+        995,
     ]
 
     return {
@@ -66,6 +75,8 @@ def build_mock_volume_samples(run_date_et: str) -> dict[str, list[dict[str, int 
             for time_value, volume_value in zip(times, qqq_volumes)
         ],
     }
+
+
 def build_real_volume_samples(symbol: str, run_date_et: str) -> dict[str, list[dict[str, int | str]]]:
     all_samples = fetch_yahoo_intraday_volume_series(symbol)
 
@@ -105,6 +116,7 @@ def build_volume_payload(data_source: str, volume_symbol: str) -> dict[str, obje
     timestamp = datetime.utcnow()
     collected_at_utc = timestamp.replace(microsecond=0).isoformat() + "Z"
     run_date_et = datetime.now(EASTERN_TZ).date().isoformat()
+
     if data_source == "mock":
         raw_samples = build_mock_volume_samples(run_date_et)
     elif data_source == "real":
@@ -134,8 +146,8 @@ def build_volume_payload(data_source: str, volume_symbol: str) -> dict[str, obje
 
     return {
         "workflow": "volume",
-        "window_start_et": "10:08",
-        "window_end_et": "10:40",
+        "window_start_et": "10:10",
+        "window_end_et": "10:50",
         "collected_at_utc": collected_at_utc,
         "overall_status": overall_status,
         "symbols": symbol_summaries,
@@ -201,16 +213,29 @@ def run_volume_workflow(allow_outside_window: bool = False) -> None:
         / timestamp.strftime("%Y/%m/%d")
         / "volume_window.png"
     )
+    chart_2min_path = (
+        Path("dev/volume/charts")
+        / timestamp.strftime("%Y/%m/%d")
+        / "volume_window_2min.png"
+    )
 
     write_json_artifact(json_path, payload)
     write_daily_csv(payload, csv_path)
+
     generate_volume_chart(payload, chart_path)
+    generate_volume_chart_2min(payload, chart_2min_path)
+
     peak_time_chart_path = Path("dev/volume/charts/peak_volume_time_by_day.png")
+    peak_time_chart_2min_path = Path("dev/volume/charts/peak_volume_time_by_day_2min.png")
+
     generate_peak_volume_time_chart(Path("dev/volume/daily"), peak_time_chart_path)
+    generate_peak_volume_time_chart_2min(Path("dev/volume/daily"), peak_time_chart_2min_path)
 
     print_human_summary(payload)
     print("")
     print(f"Volume JSON written to: {json_path}")
     print(f"Volume CSV written to: {csv_path}")
     print(f"Volume chart updated: {chart_path}")
+    print(f"Volume 2-minute chart updated: {chart_2min_path}")
     print(f"Peak volume time chart updated: {peak_time_chart_path}")
+    print(f"Peak 2-minute volume time chart updated: {peak_time_chart_2min_path}")
