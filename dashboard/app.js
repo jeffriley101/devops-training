@@ -123,7 +123,7 @@ function renderInternetHealthChart(rows) {
     borderWidth: 1,
     pointRadius: 1,
     pointHoverRadius: 3,
-    tension: 0.2,
+    tension: 0,
     spanGaps: true
   }));
 
