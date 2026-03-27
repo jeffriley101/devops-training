@@ -1,57 +1,76 @@
 # Market Snapshot Bot
 
-Market Snapshot Bot is a containerized AWS market-monitoring project built to demonstrate Python automation, scheduled cloud execution, artifact pipelines, and production-style operational troubleshooting.
+Market Snapshot Bot is a containerized AWS market-monitoring project built to demonstrate Python automation, scheduled cloud execution, artifact pipelines, and production-style troubleshooting.
 
-This project began as a platform and infrastructure exercise to prove Docker packaging, ECS/Fargate task execution, EventBridge scheduling, CloudWatch visibility, and artifact generation. It then evolved into a real-data workflow project while deliberately preserving mock mode for safe development, testing, and rollback.
+Built as part of my DevOps and cloud engineering transition, this project shows that I can take a Python workload from local development into a repeatable AWS scheduled system with container packaging, task execution, artifact generation, and runtime validation.
 
-For a recruiter or hiring manager, the value of this project is not just that it produces charts and CSVs. The value is that it demonstrates the full lifecycle of a scheduled cloud workload: local development, containerization, task definition management, scheduler wiring, environment-aware behavior, artifact generation, and troubleshooting when runtime behavior does not match expectations.
-
----
-
-## What This Project Demonstrates
-
-- Python automation packaged for container execution
-- Docker build workflow for repeatable deployment
-- Amazon ECR image publishing
-- Amazon ECS Fargate task execution
-- Amazon EventBridge Scheduler recurring job orchestration
-- Amazon CloudWatch log-based troubleshooting
-- multi-mode application design behind a single application entrypoint
-- structured JSON, CSV, and PNG artifact generation
-- historical data retention for trend analysis
-- safe separation of mock and real-data workflows
-- environment-aware pathing and runtime configuration
-- production-style debugging across code, infrastructure, scheduler targets, and runtime outputs
+It began as a platform and infrastructure exercise using mock data to prove the deployment path end to end. It then evolved into a real-data workflow project while deliberately preserving mock mode for safe development, testing, and rollback.
 
 ---
 
-## Quick Project Highlights
+## Portfolio Summary
 
-- Scheduled AWS container workload running through ECS Fargate and EventBridge Scheduler
-- Historical artifact generation including JSON snapshots, CSV history, and PNG charts
-- Real-data extension added without discarding the original mock workflow baseline
+This project demonstrates hands-on work with:
 
----
+- Python
+- Docker
+- AWS ECS Fargate
+- Amazon EventBridge Scheduler
+- Amazon ECR
+- Amazon CloudWatch Logs
+- Amazon S3
+- GitHub Actions
+- Terraform-aware deployment workflow thinking
 
-## Professional Relevance for My DevOps Pivot
-
-This project reflects the kind of work I want recruiters and hiring teams to see:
-
-- I can take a Python workload and make it deployable and schedulable in AWS.
-- I can work across application and infrastructure boundaries instead of treating them as separate worlds.
-- I can debug issues methodically using logs, task definitions, scheduler targets, environment variables, and output artifacts.
-- I understand that reliable delivery matters as much as writing the code itself.
-- I can extend a working platform carefully instead of destabilizing the original baseline.
-
-This project helped move me from learning tools in isolation toward operating them as a system.
+The project is not just a script that prints market data. It is a scheduled cloud workload that runs in AWS, generates structured artifacts, preserves history, and requires real troubleshooting across code, configuration, task definitions, and scheduler behavior.
 
 ---
 
-## Project Phases
+## What This Project Does
+
+Market Snapshot Bot supports multiple workflows behind a single application entrypoint.
+
+For each run, the application can:
+
+1. load runtime configuration from environment variables
+2. execute the selected workflow mode
+3. collect price or volume data
+4. generate structured JSON and CSV artifacts
+5. preserve historical records for later review
+6. build PNG chart artifacts
+7. write outputs locally and/or publish them to S3
+8. emit logs that support runtime troubleshooting in CloudWatch
+
+This gives the project both current-state output and historical trend visibility.
+
+---
+
+## Why This Project Matters
+
+The real value of this project is not just that it produces charts and CSV files.
+
+The value is that it demonstrates the full lifecycle of a scheduled cloud workload:
+
+- local development and testing
+- containerization with Docker
+- ECS task execution on Fargate
+- EventBridge schedule orchestration
+- artifact generation and retention
+- environment-aware behavior
+- troubleshooting when deployed runtime behavior does not match expectations
+- extending a stable baseline without discarding it
+
+That is much closer to real DevOps and cloud operations work than a one-off local script.
+
+---
+
+## Project Evolution
 
 ### Phase 1: Platform / Infrastructure Baseline
 
-The first phase established the cloud execution platform using mock data and proved the operational foundation:
+The first phase proved the operational foundation using mock data.
+
+That baseline included:
 
 - Docker image build workflow
 - Amazon ECR image publishing
@@ -61,7 +80,7 @@ The first phase established the cloud execution platform using mock data and pro
 - CloudWatch log verification
 - scheduled JSON, CSV, and chart artifact generation
 
-Even before live market data was introduced, this phase already demonstrated real DevOps value because the platform itself was functioning end to end.
+Even before real market data was introduced, this phase already demonstrated practical DevOps value because the platform itself was functioning end to end.
 
 ### Phase 2: Real-Data Extension
 
@@ -71,11 +90,11 @@ That phase included:
 
 - keeping `DATA_SOURCE=mock` for controlled development and demos
 - adding `DATA_SOURCE=real` for external market data integration
-- moving price and volume workflows away from purely mock-driven behavior
-- validating runtime behavior through artifacts and logs rather than assumptions
-- troubleshooting issues caused by environment variables, task definitions, scheduler targets, and run context behavior
+- moving price and volume workflows beyond purely mock-driven behavior
+- validating runtime behavior through artifacts and logs instead of assumptions
+- troubleshooting issues involving environment variables, task definitions, scheduler targets, and run-context behavior
 
-This phase mattered because it showed practical engineering restraint: preserve what already works, then extend it carefully.
+This phase mattered because it showed controlled change rather than reckless rewriting.
 
 ---
 
@@ -91,10 +110,11 @@ python3 -m app.main --mode price
 
 The price workflow:
 
-- generates a daily price snapshot
+- generates a price snapshot
+- preserves historical price records
 - appends a historical CSV dataset
-- produces a price history chart
-- supports ongoing day-over-day trend visibility
+- produces price history chart artifacts
+- supports day-over-day trend visibility
 
 Current real-data behavior:
 
@@ -102,6 +122,7 @@ Current real-data behavior:
 - `WTI/USD` maps to `CL=F`
 - real mode uses Yahoo Finance data
 - futures proxies are currently used for silver and crude oil pricing
+- price history persistence allows charting and historical review across runs
 
 ### Volume Workflow
 
@@ -112,9 +133,9 @@ python3 -m app.main --mode volume
 The volume workflow:
 
 - monitors intraday market activity during a controlled time window
-- collects minute-by-minute volume samples
+- collects volume samples during the defined market window
 - generates JSON, CSV, and chart artifacts
-- supports daily history accumulation for comparison across runs
+- supports history accumulation for later comparison and troubleshooting
 
 Current real-data behavior:
 
@@ -178,20 +199,21 @@ python3 -m app.main --mode volume --allow-outside-window
 
 ## Core AWS Architecture
 
-The project is built around a practical AWS scheduled-workload pattern:
+The project uses a practical AWS scheduled-workload pattern:
 
 - **Amazon ECR** stores versioned container images
 - **Amazon ECS Fargate** runs the workload as scheduled tasks
 - **Amazon EventBridge Scheduler** triggers recurring executions
 - **Amazon CloudWatch Logs** provides runtime visibility and troubleshooting data
+- **Amazon S3** stores structured output artifacts when configured for cloud publishing
 
-This architecture is intentionally simple enough to understand but real enough to demonstrate production-style operations.
+This architecture is intentionally simple enough to explain clearly while still reflecting real operational patterns.
 
 ---
 
 ## Artifacts and Output Design
 
-The project generates structured outputs for both workflows, including:
+The project generates structured outputs across both workflows, including:
 
 - JSON snapshots
 - daily CSV outputs
@@ -203,7 +225,8 @@ Representative paths include:
 ```text
 dev/price/daily/YYYY/MM/DD/price_snapshot.json
 dev/price/history/price_history.csv
-dev/price/charts/price_history.png
+dev/price/charts/price_history_all_runs.png
+dev/price/charts/price_history_official_daily.png
 
 dev/volume/daily/YYYY/MM/DD/volume_samples.json
 dev/volume/daily/YYYY/MM/DD/volume_samples.csv
@@ -211,7 +234,7 @@ dev/volume/charts/YYYY/MM/DD/volume_window.png
 dev/volume/history/volume_history.csv
 ```
 
-This matters because the system is not just running a script. It is producing outputs that can be inspected, compared, and validated over time.
+This matters because the system is not just executing code. It is producing outputs that can be inspected, validated, and compared over time.
 
 ---
 
@@ -251,55 +274,40 @@ export LOG_LEVEL="INFO"
 
 ## What I Learned Building This Project
 
-This project taught me lessons that are directly relevant to DevOps and cloud operations work:
+This project taught me lessons that are directly relevant to DevOps and cloud operations work.
 
 ### 1. A working platform is a real milestone
-A project does not need live production data on day one to have professional value. Proving the container build, ECS execution, schedule orchestration, logging, and artifact flow was already a meaningful engineering achievement.
+
+A project does not need live production data on day one to have professional value. Proving container build, ECS execution, schedule orchestration, logging, and artifact flow was already a meaningful engineering milestone.
 
 ### 2. Environment handling can make or break a deployment
-Small configuration differences between local runs, scheduled runs, and task definitions can cause real failures. I learned to treat environment variables, runtime context, and scheduler targets as first-class parts of the system.
+
+Small differences between local runs, scheduled runs, and task definitions can create real failures. I learned to treat environment variables, runtime context, and scheduler targets as first-class parts of the system.
 
 ### 3. Logs and artifacts are the truth
-Instead of assuming the code behaved correctly, I learned to verify outcomes through CloudWatch logs, generated files, charts, and S3 paths. That shift in mindset is critical for production work.
+
+Instead of assuming the code behaved correctly, I learned to verify outcomes through CloudWatch logs, generated files, charts, and S3 paths. That mindset matters in production work.
 
 ### 4. Safe evolution beats reckless rewriting
-Rather than throwing away mock mode, I preserved it and layered in real-data behavior carefully. That is closer to how real systems should be changed in professional environments.
+
+Rather than throwing away mock mode, I preserved it and layered in real-data behavior carefully. That is much closer to how real systems should be changed in professional environments.
 
 ### 5. Infrastructure and application behavior are tightly connected
-Many issues were not purely code bugs. They involved task definitions, scheduler updates, cloud configuration, run windows, and output destinations. I learned to debug across the full stack instead of staying in one lane.
 
-### 6. Operational troubleshooting is a skill of its own
-A major part of the work was diagnosing why the latest code, the latest task definition, or the scheduler target was not producing the expected outcome. That kind of troubleshooting is central to DevOps work.
+Many issues were not just code bugs. They involved task definitions, scheduler wiring, cloud configuration, run windows, and output destinations. I learned to debug across the full stack instead of staying in one lane.
 
----
+### 6. Persistence makes the workflow more meaningful
 
-## Why This Project Matters
-
-Market Snapshot Bot demonstrates more than programming. It demonstrates operational ownership.
-
-I used this project to practice the work of turning a script into a scheduled cloud workload that can be built, deployed, run, observed, and improved. That is exactly the direction of my DevOps career pivot.
-
-For recruiters and hiring managers, this project shows hands-on experience with:
-
-- AWS container operations
-- deployment workflow thinking
-- scheduled automation design
-- runtime troubleshooting
-- artifact-oriented observability
-- controlled migration from mock behavior to real-data integration
-
-That combination is the real point of the project.
+Adding price-history persistence strengthened the project by turning it from a simple snapshot generator into a more useful historical-monitoring workflow with ongoing trend visibility.
 
 ---
 
-## Future Improvement Ideas
+## Resume-Level Summary
 
-Planned or natural next-step improvements include:
+Built a containerized AWS market-monitoring project using Python, Docker, ECS Fargate, EventBridge Scheduler, CloudWatch, S3, and artifact-based workflows to collect market data, preserve price history, generate charts, and troubleshoot scheduled runtime behavior across code and cloud configuration.
 
-- stronger automated test coverage
-- clearer production vs. development configuration separation
-- dashboard-style visualization across generated charts
-- additional market instruments or workflow types
-- more formal CI/CD automation around image build and deployment updates
+---
 
-These are future enhancements, not claims of current implementation.
+## Status
+
+Current state: **working, evolving, and portfolio-ready**
