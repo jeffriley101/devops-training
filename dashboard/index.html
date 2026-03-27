@@ -9,12 +9,20 @@
 <body>
   <header class="hero">
     <div class="container">
-      <p class="eyebrow">Jeffrey Alan Riley • DevOps / Platform Engineering Portfolio</p>
-      <h1>Live Project Dashboard</h1>
+      <p class="eyebrow">Jeffrey Alan Riley • DevOps / Cloud / Automation Portfolio</p>
+      <h1>AWS Project Dashboard</h1>
       <p class="intro">
-        This dashboard presents current artifacts from my AWS-based DevOps portfolio projects,
-        including scheduled automation, external-data workflows, and monitoring systems.
+        Live portfolio view of my AWS-based automation, monitoring, and artifact publishing projects,
+        including scheduled container workloads, observability outputs, and external-data workflows.
       </p>
+      <div class="tech-stack" aria-label="Core technologies used in this portfolio">
+        <span class="tech-chip">AWS</span>
+        <span class="tech-chip">Docker</span>
+        <span class="tech-chip">Python</span>
+        <span class="tech-chip">Terraform</span>
+        <span class="tech-chip">GitHub Actions</span>
+        <span class="tech-chip">Linux</span>
+      </div>
       <div class="hero-links">
         <a class="button" href="../README.md">View Root README</a>
         <a class="button secondary" href="https://github.com/jeffriley101/devops-training">View Repository</a>
@@ -27,15 +35,22 @@
     <section class="cards">
       <article class="card card-hero">
         <div class="card-header">
-          <h2>Internet Health Monitor</h2>
+          <div class="card-title-group">
+            <span class="project-pill">Monitoring</span>
+            <h2>Internet Health Monitor</h2>
+          </div>
           <a href="https://github.com/jeffriley101/devops-training/tree/main/containerized-tools/internet-health-monitor">Project Repo</a>
         </div>
-
         <p class="card-summary">
           Scheduled monitoring platform that performs HTTP health checks, measures latency,
           and publishes historical observability artifacts and trend charts.
         </p>
-
+        <div class="badge-row">
+          <span class="badge badge-blue">AWS</span>
+          <span class="badge badge-neutral">Docker</span>
+          <span class="badge badge-green">Observability</span>
+          <span class="badge badge-neutral">ECS / Fargate</span>
+        </div>
         <img
           id="internet-chart"
           class="chart"
@@ -85,7 +100,10 @@
 
       <article class="card card-wide card-divider">
         <div class="card-header">
-          <h2>Market Snapshot Bot</h2>
+          <div class="card-title-group">
+            <span class="project-pill">Data Automation</span>
+            <h2>Market Snapshot Bot</h2>
+          </div>
           <a href="https://github.com/jeffriley101/devops-training/tree/main/containerized-tools/market-snapshot-bot">Project Repo</a>
         </div>
 
@@ -93,7 +111,12 @@
           Scheduled market-data automation project that collects price and volume data,
           stores historical artifacts, and publishes chart-based outputs through AWS infrastructure.
         </p>
-
+        <div class="badge-row">
+          <span class="badge badge-blue">AWS</span>
+          <span class="badge badge-neutral">Python</span>
+          <span class="badge badge-green">Data Pipeline</span>
+          <span class="badge badge-neutral">Charts</span>
+        </div>
         <img
           class="chart"
           src="images/market-snapshot-preview.png"
@@ -107,7 +130,10 @@
 
       <article class="card card-tall card-divider">
         <div class="card-header">
-          <h2>Env Inspector</h2>
+          <div class="card-title-group">
+            <span class="project-pill">Runtime Metadata</span>
+            <h2>Env Inspector</h2>
+          </div>
           <a href="https://github.com/jeffriley101/devops-training/tree/main/containerized-tools/env-inspector">Project Repo</a>
         </div>
 
@@ -115,7 +141,12 @@
           Containerized automation project demonstrating ECS/Fargate execution,
           artifact persistence, and runtime traceability.
         </p>
-
+        <div class="badge-row">
+          <span class="badge badge-blue">AWS</span>
+          <span class="badge badge-neutral">Containers</span>
+          <span class="badge badge-green">Artifact Traceability</span>
+          <span class="badge badge-neutral">Runtime Metadata</span>
+        </div>
         <img
           class="chart"
           src="images/env-inspector-preview.png"
