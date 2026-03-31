@@ -6,9 +6,7 @@ from zoneinfo import ZoneInfo
 
 from app.charts.volume_chart import (
     generate_peak_volume_time_chart,
-    generate_peak_volume_time_chart_2min,
     generate_volume_chart,
-    generate_volume_chart_2min,
 )
 from app.clients.market_data import MarketDataError, fetch_yahoo_intraday_volume_series
 from app.config import load_config
@@ -223,19 +221,14 @@ def run_volume_workflow(allow_outside_window: bool = False) -> None:
     write_daily_csv(payload, csv_path)
 
     generate_volume_chart(payload, chart_path)
-    generate_volume_chart_2min(payload, chart_2min_path)
 
     peak_time_chart_path = Path("dev/volume/charts/peak_volume_time_by_day.png")
-    peak_time_chart_2min_path = Path("dev/volume/charts/peak_volume_time_by_day_2min.png")
 
     generate_peak_volume_time_chart(Path("dev/volume/daily"), peak_time_chart_path)
-    generate_peak_volume_time_chart_2min(Path("dev/volume/daily"), peak_time_chart_2min_path)
 
     print_human_summary(payload)
     print("")
     print(f"Volume JSON written to: {json_path}")
     print(f"Volume CSV written to: {csv_path}")
     print(f"Volume chart updated: {chart_path}")
-    print(f"Volume 2-minute chart updated: {chart_2min_path}")
     print(f"Peak volume time chart updated: {peak_time_chart_path}")
-    print(f"Peak 2-minute volume time chart updated: {peak_time_chart_2min_path}")
