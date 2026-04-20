@@ -6,7 +6,7 @@ from app.config import MARKET_TIMEZONE, SYMBOL
 from app.db import get_connection
 
 
-def main() -> None:
+def main() -> dict:
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(f"SET TIME ZONE '{MARKET_TIMEZONE}';")
@@ -28,7 +28,11 @@ def main() -> None:
 
     if not rows:
         print("No summary data found. Chart not created.")
-        return
+        return {
+            "chart_created": False,
+            "output_path": None,
+            "bucket_count": 0,
+        }
 
     bucket_labels = [str(row[0]) for row in rows]
     counts = [row[1] for row in rows]
@@ -49,6 +53,12 @@ def main() -> None:
     plt.close()
 
     print(f"Chart saved to: {output_path}")
+
+    return {
+        "chart_created": True,
+        "output_path": str(output_path),
+        "bucket_count": len(rows),
+    }
 
 
 if __name__ == "__main__":

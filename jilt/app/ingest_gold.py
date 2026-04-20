@@ -1,35 +1,10 @@
-import yfinance as yf
-
-from app.config import HISTORY_PERIOD, INTERVAL, MARKET_TIMEZONE, SYMBOL, YFINANCE_TICKER
+from app.config import SYMBOL
 from app.db import get_connection
+from app.market_data import fetch_and_normalize_history
 
 
-def main() -> None:
-    ticker = yf.Ticker(YFINANCE_TICKER)
-    df = ticker.history(period=HISTORY_PERIOD, interval=INTERVAL)
-
-    df = df.reset_index()
-    df["Datetime"] = df["Datetime"].dt.tz_convert(MARKET_TIMEZONE)
-    df["trade_date"] = df["Datetime"].dt.date
-
-    normalized = df.rename(
-        columns={
-            "Datetime": "bar_timestamp",
-            "Open": "open_value",
-            "High": "high_value",
-            "Low": "low_value",
-            "Close": "close_value",
-        }
-    )[
-        [
-            "bar_timestamp",
-            "trade_date",
-            "open_value",
-            "high_value",
-            "low_value",
-            "close_value",
-        ]
-    ]
+def main() -> dict:
+    normalized = fetch_and_normalize_history()
 
     with get_connection() as conn:
         with conn.cursor() as cur:
@@ -48,7 +23,7 @@ def main() -> None:
 
             symbol_id = result[0]
 
-            inserted_attempts = 0
+            inserted_rows = 0
 
             for row in normalized.itertuples(index=False):
                 cur.execute(
@@ -77,9 +52,20 @@ def main() -> None:
                         "yfinance",
                     ),
                 )
-                inserted_attempts += 1
+                if cur.rowcount == 1:
+                    inserted_rows += 1
 
-    print(f"Ingest completed. Rows processed: {inserted_attempts}")
+    processed_rows = len(normalized)
+
+    print(
+        f"Ingest completed. Rows processed: {processed_rows}, "
+        f"rows inserted: {inserted_rows}"
+    )
+
+    return {
+        "processed_rows": processed_rows,
+        "inserted_rows": inserted_rows,
+    }
 
 
 if __name__ == "__main__":

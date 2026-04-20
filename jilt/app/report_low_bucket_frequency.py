@@ -2,7 +2,7 @@ from app.config import MARKET_TIMEZONE, SYMBOL
 from app.db import get_connection
 
 
-def main() -> None:
+def main() -> dict:
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(f"SET TIME ZONE '{MARKET_TIMEZONE}';")
@@ -44,7 +44,12 @@ def main() -> None:
 
     if not rows:
         print("No summary data found.")
-        return
+        return {
+            "total_days": total_days,
+            "bucket_count": 0,
+            "top_bucket_time": None,
+            "top_bucket_days": 0,
+        }
 
     for low_bucket_time, count in rows:
         print(f"{low_bucket_time} | {count}")
@@ -52,6 +57,13 @@ def main() -> None:
     top_bucket_time, top_count = rows[0]
     print()
     print(f"Most common low bucket so far: {top_bucket_time} ({top_count} days)")
+
+    return {
+        "total_days": total_days,
+        "bucket_count": len(rows),
+        "top_bucket_time": str(top_bucket_time),
+        "top_bucket_days": top_count,
+    }
 
 
 if __name__ == "__main__":
