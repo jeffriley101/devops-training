@@ -127,6 +127,30 @@ A containerized AWS monitoring platform that performs scheduled HTTP health chec
 
 ---
 
+### JILT — Jeff’s Intraday Low Toolkit
+
+`jilt/`
+
+A local-first Python and PostgreSQL analytics project built to analyze historical intraday market data and determine which 5-minute bucket most often contains a symbol’s daily low.
+
+This project was designed to strengthen practical SQL, relational schema design, market-data normalization, derived-summary workflows, operator-readable reporting, and chart artifact generation through a real system instead of isolated exercises.
+
+**What it shows**
+
+- Python and PostgreSQL integration
+- practical SQL schema design and query development
+- historical intraday market-data ingestion
+- derived summary-table workflows
+- time-zone-aware data normalization
+- CLI-based local analytics workflow design
+- operator-readable terminal reporting and saved chart artifacts
+
+**Project README**
+
+`jilt/README.md`
+
+---
+
 ## Troubleshooting Highlight
 
 ### QQQ Volume Anomalies
