@@ -1,6 +1,8 @@
 import argparse
 
 from app.chart_low_bucket_frequency import main as chart_low_bucket_frequency_main
+from app.chart_daily_low_by_date import main as chart_daily_low_by_date_main
+from app.chart_daily_low_hour_heatmap import main as chart_daily_low_hour_heatmap_main
 from app.ingest_gold import main as ingest_gold_main
 from app.refresh_daily_low_summary import main as refresh_daily_low_summary_main
 from app.report_daily_lows import main as report_daily_lows_main
@@ -14,24 +16,32 @@ def run_full_pipeline() -> None:
     print("=================")
 
     print()
-    print("[1/5] Ingesting raw intraday bars...")
+    print("[1/7] Ingesting raw intraday bars...")
     ingest_result = ingest_gold_main()
 
     print()
-    print("[2/5] Refreshing daily low summary...")
+    print("[2/7] Refreshing daily low summary...")
     summary_result = refresh_daily_low_summary_main()
 
     print()
-    print("[3/5] Printing daily low report...")
+    print("[3/7] Printing daily low report...")
     daily_report_result = report_daily_lows_main()
 
     print()
-    print("[4/5] Printing low-bucket frequency report...")
+    print("[4/7] Printing low-bucket frequency report...")
     frequency_result = report_low_bucket_frequency_main()
 
     print()
-    print("[5/5] Saving low-bucket frequency chart...")
-    chart_result = chart_low_bucket_frequency_main()
+    print("[5/7] Saving low-bucket frequency chart...")
+    frequency_chart_result = chart_low_bucket_frequency_main()
+
+    print()
+    print("[6/7] Saving daily-low-by-date chart...")
+    date_chart_result = chart_daily_low_by_date_main()
+
+    print()
+    print("[7/7] Saving daily-low-hour heatmap...")
+    heatmap_result = chart_daily_low_hour_heatmap_main()
 
     print()
     print("JILT Run Summary")
@@ -47,8 +57,16 @@ def run_full_pipeline() -> None:
         f"days analyzed: {frequency_result['total_days']}"
     )
     print(
-        f"Chart created: {chart_result['chart_created']} | "
-        f"path: {chart_result['output_path']}"
+        f"Frequency chart created: {frequency_chart_result['chart_created']} | "
+        f"path: {frequency_chart_result['output_path']}"
+    )
+    print(
+        f"Date chart created: {date_chart_result['chart_created']} | "
+        f"path: {date_chart_result['output_path']}"
+    )
+    print(
+        f"Hour heatmap created: {heatmap_result['chart_created']} | "
+        f"path: {heatmap_result['output_path']}"
     )
 
     print()
@@ -71,7 +89,9 @@ def parse_args() -> argparse.Namespace:
             "retention",
             "report-daily",
             "report-frequency",
-            "chart",
+            "chart-frequency",
+            "chart-date",
+            "chart-heatmap",
         ],
         help="Which JILT action to run.",
     )
@@ -94,8 +114,12 @@ def main() -> None:
         report_daily_lows_main()
     elif args.mode == "report-frequency":
         report_low_bucket_frequency_main()
-    elif args.mode == "chart":
+    elif args.mode == "chart-frequency":
         chart_low_bucket_frequency_main()
+    elif args.mode == "chart-date":
+        chart_daily_low_by_date_main()
+    elif args.mode == "chart-heatmap":
+        chart_daily_low_hour_heatmap_main()
 
 
 if __name__ == "__main__":

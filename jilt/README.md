@@ -14,6 +14,14 @@ Instead of treating SQL as an abstract lesson, JILT uses an end-to-end pipeline:
 
 ![JILT low bucket frequency chart](images/low-bucket-frequency-example.png)
 
+### Daily low by date chart
+
+![JILT daily low by date chart](images/daily-low-by-date-example.png)
+
+### Daily low hour heatmap
+
+![JILT daily low hour heatmap](images/daily-low-hour-heatmap-example.png)
+
 ---
 
 ## Project Goals
@@ -43,7 +51,7 @@ JILT v1 is intentionally focused and local-first.
 - mode: historical only
 - granularity: 5-minute bars
 - raw retention: 30 days
-- outputs: terminal reports and saved chart
+- outputs: terminal reports and saved chart artifacts
 - database: PostgreSQL
 - environment: local Linux
 - execution style: CLI / one-command workflow
@@ -63,8 +71,9 @@ At a high level, JILT performs the following pipeline:
 5. Derive one daily-low result per trading day
 6. Store daily-low summaries in a separate summary table
 7. Produce terminal reports showing daily low results and low-bucket frequency
-8. Save a chart showing which 5-minute buckets most often contain the daily low
-9. Apply raw-data retention to keep the raw bar table bounded
+8. Save a low-bucket frequency chart
+9. Save a daily-low-by-date chart
+10. Save a daily-low hour heatmap
 
 ---
 
@@ -151,6 +160,8 @@ This produces the core analytical output of the project: which 5-minute bucket m
 ```text
 jilt/
 ├── app/
+│   ├── chart_daily_low_by_date.py
+│   ├── chart_daily_low_hour_heatmap.py
 │   ├── chart_low_bucket_frequency.py
 │   ├── config.py
 │   ├── db.py
@@ -188,10 +199,11 @@ This performs the full JILT pipeline:
 
 - ingest raw intraday bars
 - refresh daily low summary
-- apply raw retention
 - print the daily low report
 - print the low-bucket frequency report
-- save the chart artifact
+- save the low-bucket frequency chart
+- save the daily-low-by-date chart
+- save the daily-low hour heatmap
 
 ---
 
@@ -213,7 +225,9 @@ python -m app.main --mode refresh-summary
 python -m app.main --mode retention
 python -m app.main --mode report-daily
 python -m app.main --mode report-frequency
-python -m app.main --mode chart
+python -m app.main --mode chart-frequency
+python -m app.main --mode chart-date
+python -m app.main --mode chart-heatmap
 ```
 
 This makes the project easier to test, debug, and operate as a real tool rather than a single monolithic script.
@@ -247,12 +261,14 @@ JILT currently produces:
 
 - terminal daily low report
 - terminal low-bucket frequency report
-- saved chart artifact
+- saved chart artifacts
 
-**Current chart output**
+**Current chart outputs**
 
 ```text
 charts/low_bucket_frequency.png
+charts/daily_low_by_date.png
+charts/daily_low_hour_heatmap.png
 ```
 
 This chart shows how often each 5-minute bucket contained the daily low across the currently analyzed days.
