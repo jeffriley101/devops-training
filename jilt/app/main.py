@@ -14,27 +14,23 @@ def run_full_pipeline() -> None:
     print("=================")
 
     print()
-    print("[1/6] Ingesting raw intraday bars...")
+    print("[1/5] Ingesting raw intraday bars...")
     ingest_result = ingest_gold_main()
 
     print()
-    print("[2/6] Refreshing daily low summary...")
+    print("[2/5] Refreshing daily low summary...")
     summary_result = refresh_daily_low_summary_main()
 
     print()
-    print("[3/6] Applying raw retention...")
-    retention_result = retention_main()
-
-    print()
-    print("[4/6] Printing daily low report...")
+    print("[3/5] Printing daily low report...")
     daily_report_result = report_daily_lows_main()
 
     print()
-    print("[5/6] Printing low-bucket frequency report...")
+    print("[4/5] Printing low-bucket frequency report...")
     frequency_result = report_low_bucket_frequency_main()
 
     print()
-    print("[6/6] Saving low-bucket frequency chart...")
+    print("[5/5] Saving low-bucket frequency chart...")
     chart_result = chart_low_bucket_frequency_main()
 
     print()
@@ -45,7 +41,6 @@ def run_full_pipeline() -> None:
         f"inserted: {ingest_result['inserted_rows']}"
     )
     print(f"Daily summary rows affected: {summary_result['refreshed_rows']}")
-    print(f"Raw rows deleted by retention: {retention_result['deleted_rows']}")
     print(f"Daily report rows printed: {daily_report_result['row_count']}")
     print(
         f"Frequency buckets: {frequency_result['bucket_count']} | "

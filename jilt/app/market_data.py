@@ -14,7 +14,19 @@ def fetch_raw_history(
 
 
 def normalize_bars(df: pd.DataFrame, market_timezone: str = MARKET_TIMEZONE) -> pd.DataFrame:
+    if df.empty:
+        raise ValueError(
+            "No market data returned from yfinance for the requested "
+            "ticker/period/interval combination."
+        )
+
     normalized_df = df.reset_index().copy()
+
+    if "Datetime" not in normalized_df.columns:
+        raise ValueError(
+            "Expected 'Datetime' column was not returned by yfinance. "
+            "Check the requested interval and source response."
+        )
 
     normalized_df["Datetime"] = normalized_df["Datetime"].dt.tz_convert(market_timezone)
     normalized_df["trade_date"] = normalized_df["Datetime"].dt.date
