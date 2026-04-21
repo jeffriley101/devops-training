@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{ page_title }}</title>
+    <link rel="stylesheet" href="{{ request.url_for('static', path='css/styles.css') }}" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="container">
+        <h1>JILT GAME</h1>
+        <p class="subtitle">Predict the 5-minute bucket containing the daily low.</p>
+        <nav class="site-nav">
+          <a href="/">Home</a>
+          <a href="/history">History</a>
+	  <a href="/charts">Charts</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="container">
+      {% block content %}{% endblock %}
+    </main>
+
+    <script>
+      if (window.location.search) {
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    </script>
+  </body>
+</html>

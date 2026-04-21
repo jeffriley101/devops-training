@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="card">
+  <h2>Bet Now</h2>
+  <p><strong>Symbol:</strong> {{ symbol }}</p>
+  <p><strong>Game Date (ET):</strong> {{ today_et }}</p>
+  <p>Pick the 5-minute bucket that will contain today’s GOLD daily low.</p>
+
+  {% if error_message %}
+  <div class="message message-error">{{ error_message }}</div>
+  {% endif %}
+
+  {% if success_message %}
+  <div class="message message-success">{{ success_message }}</div>
+  {% endif %}
+
+  <form class="guess-form" method="post" action="/guess">
+    <label for="nickname">Nickname</label>
+    <input
+      id="nickname"
+      name="nickname"
+      type="text"
+      placeholder="Enter nickname"
+    />
+
+    <label for="bucket_choice">Choose 5-minute bucket</label>
+    <select id="bucket_choice" name="bucket_choice">
+      {% for bucket in bucket_choices %}
+      <option value="{{ bucket }}">{{ bucket }}</option>
+      {% endfor %}
+    </select>
+
+    <button type="submit">Place Bet</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Current Bets</h2>
+  <p>Today’s submitted bets for {{ today_et }} ET.</p>
+
+  {% if todays_guesses %}
+  <div class="table-wrap">
+    <table class="guess-table">
+      <thead>
+        <tr>
+          <th>Nickname</th>
+          <th>Bucket</th>
+          <th>Submitted</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for guess in todays_guesses %}
+        <tr>
+          <td>{{ guess.nickname }}</td>
+          <td>{{ guess.bucket_choice }}</td>
+          <td>{{ guess.submitted_at_display }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p>No bets submitted yet for today.</p>
+  {% endif %}
+</section>
+
+<section class="card">
+  <h2>Yesterday’s Final Result</h2>
+
+  {% if latest_result %}
+  <p><strong>Game Date (ET):</strong> {{ latest_result.game_date_et }}</p>
+  <p><strong>Symbol:</strong> {{ latest_result.symbol }}</p>
+  <p><strong>Winning Bucket:</strong> {{ latest_result.winning_bucket }}</p>
+  <p><strong>Resolved At:</strong> {{ latest_result.resolved_at_display }}</p>
+  {% else %}
+  <p>No completed result available yet.</p>
+  {% endif %}
+
+  {% if latest_result_outcome %}
+    {% if latest_result_outcome.has_winners %}
+    <div class="message message-success">
+      Winner{{ "s" if latest_result_outcome.winner_count != 1 else "" }} found for
+      {{ latest_result_outcome.game_date_et }}.
+    </div>
+
+    <p><strong>Winner Count:</strong> {{ latest_result_outcome.winner_count }}</p>
+
+    <div class="table-wrap">
+      <table class="guess-table">
+        <thead>
+          <tr>
+            <th>Nickname</th>
+            <th>Bucket</th>
+            <th>Submitted</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for winner in latest_result_outcome.winners %}
+          <tr>
+            <td>{{ winner.nickname }}</td>
+            <td>{{ winner.bucket_choice }}</td>
+            <td>{{ winner.submitted_at_display }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="message message-error">
+      No winners for {{ latest_result_outcome.game_date_et }} ET.
+    </div>
+    <p><strong>Official Winning Bucket:</strong> {{ latest_result_outcome.winning_bucket }}</p>
+    {% endif %}
+  {% else %}
+  <p>No resolved outcome available yet.</p>
+  {% endif %}
+</section>
+<section class="card">
+  <h2>Recent Results</h2>
+
+  {% if recent_results %}
+  <div class="table-wrap">
+    <table class="guess-table">
+      <thead>
+        <tr>
+          <th>Game Date (ET)</th>
+          <th>Winning Bucket</th>
+          <th>Winner Count</th>
+          <th>Result State</th>
+          <th>Resolved At</th>
+          <th>Detail</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in recent_results %}
+        <tr>
+          <td>{{ row.game_date_et }}</td>
+          <td>{{ row.winning_bucket }}</td>
+          <td>{{ row.winner_count }}</td>
+          <td>{{ row.result_state }}</td>
+          <td>{{ row.resolved_at_display }}</td>
+          <td><a href="{{ row.detail_url }}">View</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p>No recent resolved results yet.</p>
+  {% endif %}
+</section>
+{% endblock %}

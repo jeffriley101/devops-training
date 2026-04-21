@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="card">
+  <h2>History Detail</h2>
+
+  {% if error_message %}
+  <div class="message message-error">{{ error_message }}</div>
+  {% endif %}
+
+  {% if result_row %}
+  <p><strong>Game Date (ET):</strong> {{ result_row.game_date_et }}</p>
+  <p><strong>Symbol:</strong> {{ result_row.symbol }}</p>
+  <p><strong>Winning Bucket:</strong> {{ result_row.winning_bucket }}</p>
+  <p><strong>Resolved At:</strong> {{ result_row.resolved_at_display }}</p>
+  <p><strong>Source:</strong> {{ result_row.source_name }} v{{ result_row.source_version }}</p>
+  <p><strong>Winner Count:</strong> {{ result_row.winner_count }}</p>
+  {% endif %}
+</section>
+
+<section class="card">
+  <h2>Winning Guesses</h2>
+
+  {% if winning_guesses %}
+  <div class="table-wrap">
+    <table class="guess-table">
+      <thead>
+        <tr>
+          <th>Nickname</th>
+          <th>Bucket</th>
+          <th>Submitted</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for guess in winning_guesses %}
+        <tr>
+          <td>{{ guess.nickname }}</td>
+          <td>{{ guess.bucket_choice }}</td>
+          <td>{{ guess.submitted_at_display }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p>No winning guesses for this date.</p>
+  {% endif %}
+</section>
+
+<section class="card">
+  <h2>All Guesses For This Date</h2>
+
+  {% if all_guesses %}
+  <div class="table-wrap">
+    <table class="guess-table">
+      <thead>
+        <tr>
+          <th>Nickname</th>
+          <th>Bucket</th>
+          <th>Submitted</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for guess in all_guesses %}
+        <tr>
+          <td>{{ guess.nickname }}</td>
+          <td>{{ guess.bucket_choice }}</td>
+          <td>{{ guess.submitted_at_display }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p>No guesses found for this date.</p>
+  {% endif %}
+</section>
+{% endblock %}

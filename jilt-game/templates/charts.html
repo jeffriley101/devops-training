@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="card">
+  <h2>JILT Charts</h2>
+  <p><strong>Symbol:</strong> {{ symbol }}</p>
+  <p>These charts are produced by JILT and displayed by JILT GAME.</p>
+</section>
+
+{% for chart in charts %}
+<section class="card">
+  <h2>{{ chart.title }}</h2>
+  <p>{{ chart.description }}</p>
+
+  {% if chart.exists %}
+  <img class="chart-image" src="{{ chart.url_path }}" alt="{{ chart.title }}" />
+  {% else %}
+  <p>Chart file not found: {{ chart.filename }}</p>
+  {% endif %}
+</section>
+{% endfor %}
+{% endblock %}

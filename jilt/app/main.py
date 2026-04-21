@@ -1,5 +1,6 @@
 import argparse
 
+from app.publish_result_artifact import publish_latest_result_artifact
 from app.chart_low_bucket_frequency import main as chart_low_bucket_frequency_main
 from app.chart_daily_low_by_date import main as chart_daily_low_by_date_main
 from app.chart_daily_low_hour_heatmap import main as chart_daily_low_hour_heatmap_main
@@ -16,32 +17,36 @@ def run_full_pipeline() -> None:
     print("=================")
 
     print()
-    print("[1/7] Ingesting raw intraday bars...")
+    print("[1/8] Ingesting raw intraday bars...")
     ingest_result = ingest_gold_main()
 
     print()
-    print("[2/7] Refreshing daily low summary...")
+    print("[2/8] Refreshing daily low summary...")
     summary_result = refresh_daily_low_summary_main()
 
     print()
-    print("[3/7] Printing daily low report...")
+    print("[3/8] Printing daily low report...")
     daily_report_result = report_daily_lows_main()
 
     print()
-    print("[4/7] Printing low-bucket frequency report...")
+    print("[4/8] Printing low-bucket frequency report...")
     frequency_result = report_low_bucket_frequency_main()
 
     print()
-    print("[5/7] Saving low-bucket frequency chart...")
+    print("[5/8] Saving low-bucket frequency chart...")
     frequency_chart_result = chart_low_bucket_frequency_main()
 
     print()
-    print("[6/7] Saving daily-low-by-date chart...")
+    print("[6/8] Saving daily-low-by-date chart...")
     date_chart_result = chart_daily_low_by_date_main()
 
     print()
-    print("[7/7] Saving daily-low-hour heatmap...")
+    print("[7/8] Saving daily-low-hour heatmap...")
     heatmap_result = chart_daily_low_hour_heatmap_main()
+
+    print()
+    print("[8/8] Publishing latest result artifact...")
+    result_artifact = publish_latest_result_artifact()
 
     print()
     print("JILT Run Summary")
@@ -68,6 +73,16 @@ def run_full_pipeline() -> None:
         f"Hour heatmap created: {heatmap_result['chart_created']} | "
         f"path: {heatmap_result['output_path']}"
     )
+    if result_artifact is None:
+        print("Latest result artifact created: False | no daily low result found")
+    else:
+        print(
+            f"Latest result artifact created: {result_artifact['artifact_written']} | "
+            f"path: {result_artifact['output_path']} | "
+            f"game_date_et: {result_artifact['game_date_et']} | "
+            f"winning_bucket: {result_artifact['winning_bucket']}"
+        )
+
 
     print()
     print("JILT Run Complete")
