@@ -1,68 +1,37 @@
 {% extends "base.html" %}
 
 {% block content %}
+
 <section class="card">
-  <h2>Bet Now</h2>
+  <h2>Big Green Button</h2>
   <p><strong>Symbol:</strong> {{ symbol }}</p>
   <p><strong>Game Date (ET):</strong> {{ today_et }}</p>
-  <p>Pick the 5-minute bucket that will contain today’s GOLD daily low.</p>
+  <p>
+    Click the big green button to lock in the current live bucket for today and
+    tomorrow (F).
+  </p>
 
-  {% if error_message %}
-  <div class="message message-error">{{ error_message }}</div>
+  {% if green_button_error %}
+  <div class="message message-error">{{ green_button_error }}</div>
   {% endif %}
 
-  {% if success_message %}
-  <div class="message message-success">{{ success_message }}</div>
+  {% if green_button_success %}
+  <div class="message message-success">{{ green_button_success }}</div>
   {% endif %}
 
-  <form class="guess-form" method="post" action="/guess">
-    <label for="nickname">Nickname</label>
+  <form class="guess-form" method="post" action="/guess/current">
+    <label for="current_nickname">Nickname</label>
     <input
-      id="nickname"
+      id="current_nickname"
       name="nickname"
       type="text"
       placeholder="Enter nickname"
     />
 
-    <label for="bucket_choice">Choose 5-minute bucket</label>
-    <select id="bucket_choice" name="bucket_choice">
-      {% for bucket in bucket_choices %}
-      <option value="{{ bucket }}">{{ bucket }}</option>
-      {% endfor %}
-    </select>
-
-    <button type="submit">Place Bet</button>
+    <button type="submit" class="current-bucket-button">
+      GO
+    </button>
   </form>
-</section>
-
-<section class="card">
-  <h2>Current Bets</h2>
-  <p>Today’s submitted bets for {{ today_et }} ET.</p>
-
-  {% if todays_guesses %}
-  <div class="table-wrap">
-    <table class="guess-table">
-      <thead>
-        <tr>
-          <th>Nickname</th>
-          <th>Bucket</th>
-          <th>Submitted</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for guess in todays_guesses %}
-        <tr>
-          <td>{{ guess.nickname }}</td>
-          <td>{{ guess.bucket_choice }}</td>
-          <td>{{ guess.submitted_at_display }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% else %}
-  <p>No bets submitted yet for today.</p>
-  {% endif %}
 </section>
 
 <section class="card">
@@ -116,38 +85,173 @@
   <p>No resolved outcome available yet.</p>
   {% endif %}
 </section>
-<section class="card">
-  <h2>Recent Results</h2>
 
-  {% if recent_results %}
+<section class="card">
+  <h2>Past Daily Winners (closest)</h2>
+  <p>Closest to choosing the winning bucket; winners every day.</p>
+
+  {% if closest_winners %}
   <div class="table-wrap">
     <table class="guess-table">
       <thead>
         <tr>
           <th>Game Date (ET)</th>
-          <th>Winning Bucket</th>
-          <th>Winner Count</th>
-          <th>Result State</th>
-          <th>Resolved At</th>
-          <th>Detail</th>
+          <th>Nickname</th>
+          <th>Bucket</th>
+          <th>Chaperone</th>
+          <th>Buckets Away</th>
         </tr>
       </thead>
       <tbody>
-        {% for row in recent_results %}
+        {% for row in closest_winners %}
         <tr>
           <td>{{ row.game_date_et }}</td>
-          <td>{{ row.winning_bucket }}</td>
-          <td>{{ row.winner_count }}</td>
-          <td>{{ row.result_state }}</td>
-          <td>{{ row.resolved_at_display }}</td>
-          <td><a href="{{ row.detail_url }}">View</a></td>
+          <td>{{ row.nickname }}</td>
+          <td>{{ row.bucket_choice }}</td>
+          <td>{{ row.chaperone or "" }}</td>
+          <td>{{ row.distance_buckets }}</td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
   {% else %}
-  <p>No recent resolved results yet.</p>
+  <p>No closest winners recorded yet.</p>
   {% endif %}
 </section>
+
+<section class="card">
+  <h2>Winning Bucket Hall-of-Famers</h2>
+  <p>Predicted correct bucket, 1/288 odds.</p>
+
+  {% if hall_of_famers %}
+  <div class="table-wrap">
+    <table class="guess-table">
+      <thead>
+        <tr>
+          <th>Game Date (ET)</th>
+          <th>Nickname</th>
+          <th>Winning Bucket</th>
+          <th>Submitted</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in hall_of_famers %}
+        <tr>
+          <td>{{ row.game_date_et }}</td>
+          <td>{{ row.nickname }}</td>
+          <td>{{ row.bucket_choice }}</td>
+          <td>{{ row.submitted_at_display }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p>No Hall-of-Famers recorded yet.</p>
+  {% endif %}
+</section>
+
+<section class="card">
+  <h2>Current Bets</h2>
+  <p>Today’s submitted bets for {{ today_et }} ET.</p>
+
+  {% if todays_guesses %}
+  <div class="table-wrap">
+    <table class="guess-table">
+      <thead>
+        <tr>
+          <th>Nickname</th>
+          <th>Bucket</th>
+          <th>Submitted</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for guess in todays_guesses %}
+        <tr>
+          <td>{{ guess.nickname }}</td>
+          <td>{{ guess.bucket_choice }}</td>
+          <td>{{ guess.submitted_at_display }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p>No bets submitted yet for today.</p>
+  {% endif %}
+</section>
+
+<section class="card">
+  <h2>Bet Now</h2>
+  <p><strong>Symbol:</strong> {{ symbol }}</p>
+  <p><strong>Game Date (ET):</strong> {{ today_et }}</p>
+  <p>
+    Choose any 5-minute bucket. This pick counts for today and also becomes your
+    Future pick for tomorrow.
+  </p>
+
+  {% if error_message %}
+  <div class="message message-error">{{ error_message }}</div>
+  {% endif %}
+
+  {% if success_message %}
+  <div class="message message-success">{{ success_message }}</div>
+  {% endif %}
+
+  <form class="guess-form" method="post" action="/guess">
+    <label for="nickname">Nickname</label>
+    <input
+      id="nickname"
+      name="nickname"
+      type="text"
+      placeholder="Enter nickname"
+    />
+
+    <label for="bucket_choice">Choose 5-minute bucket</label>
+    <select id="bucket_choice" name="bucket_choice">
+      {% for bucket in bucket_definitions %}
+        <option value="{{ bucket.bucket_time }}">
+          {{ bucket.bucket_time }}{% if bucket.chaperone %} — {{ bucket.chaperone }}{% endif %}
+        </option>
+      {% endfor %}
+    </select>
+
+    <div class="bucket-board">
+      <h3>Playing Board</h3>
+
+      {% for hour_group in buckets_by_hour %}
+      <div class="bucket-board-hour">
+        <div class="bucket-board-hour-label">{{ hour_group.hour_label }}</div>
+
+        <div class="bucket-board-grid">
+          {% for bucket in hour_group.buckets %}
+          <div class="bucket-cell">
+            <div class="bucket-circle">
+              <div class="bucket-time">{{ bucket.bucket_time }}</div>
+
+              {% if bucket.chaperone %}
+              <div class="bucket-chaperone">{{ bucket.chaperone }}</div>
+              {% endif %}
+
+              {% if bucket.nicknames %}
+              <div class="bucket-nicknames">
+                {% for nickname in bucket.nicknames %}
+                <div class="bucket-nickname">{{ nickname }}</div>
+                {% endfor %}
+              </div>
+              {% endif %}
+
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <button type="submit">Place Bet</button>
+  </form>
+</section>
+
 {% endblock %}

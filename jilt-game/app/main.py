@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
@@ -9,20 +9,32 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from psycopg.errors import UniqueViolation
 
+from app.buckets import (
+    get_bucket_choices,
+    get_bucket_definitions,
+    get_buckets_grouped_by_hour,
+)
 from app.charts import get_chart_definitions
 from app.config import JILT_CHARTS_DIR
 from app.db import (
     get_daily_result,
+    get_daily_result_outcome,
     get_latest_daily_result,
-    insert_daily_guess,
+    insert_two_day_guess,
+    list_closest_winners,
     list_daily_guesses,
+    list_hall_of_famers,
     list_recent_daily_results,
     list_winning_guesses,
+    count_bucket_guesses,
 )
 from app.result_ingest import ingest_latest_result_file_to_db
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 ET_TZ = ZoneInfo("America/New_York")
+MIN_NICKNAME_LENGTH = 2
+MAX_NICKNAME_LENGTH = 20
+MAX_USERS_PER_BUCKET = 10
 
 app = FastAPI(title="JILT GAME")
 
@@ -32,15 +44,38 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 
 def build_bucket_choices() -> list[str]:
-    buckets: list[str] = []
-    for hour in range(24):
-        for minute in range(0, 60, 5):
-            buckets.append(f"{hour:02d}:{minute:02d}")
-    return buckets
+    return get_bucket_choices()
 
 
 def current_et_date() -> date:
     return datetime.now(ET_TZ).date()
+
+
+def validate_nickname_length(nickname: str) -> str:
+    if len(nickname) < MIN_NICKNAME_LENGTH or len(nickname) > MAX_NICKNAME_LENGTH:
+        return (
+            f"Nickname must be between {MIN_NICKNAME_LENGTH} "
+            f"and {MAX_NICKNAME_LENGTH} characters."
+        )
+    return ""
+
+
+BLOCKED_NICKNAMES = {
+    "admin",
+    "administrator",
+    "moderator",
+    "system",
+    "support",
+    "null",
+    "undefined",
+}
+
+
+def validate_nickname_allowed(nickname: str) -> str:
+    normalized = nickname.strip().lower()
+    if normalized in BLOCKED_NICKNAMES:
+        return "That nickname is not allowed."
+    return ""
 
 
 def format_timestamp_et(value: datetime) -> str:
@@ -48,52 +83,12 @@ def format_timestamp_et(value: datetime) -> str:
     return et_value.strftime("%Y-%m-%d %I:%M:%S %p ET")
 
 
-def build_latest_result_outcome(latest_result: dict | None) -> dict | None:
-    if latest_result is None:
-        return None
-
-    game_date_value = latest_result["game_date_et"]
-    if isinstance(game_date_value, str):
-        try:
-            result_date = date.fromisoformat(game_date_value)
-        except ValueError:
-            return None
-    else:
-        result_date = game_date_value
-
-    symbol_code = latest_result["symbol"]
-    winning_bucket = latest_result["winning_bucket"]
-
-    winning_rows = list_winning_guesses(
-        symbol_code=symbol_code,
-        game_date_et=result_date,
-        winning_bucket=winning_bucket,
-    )
-
-    winners = []
-    for row in winning_rows:
-        winners.append(
-            {
-                "nickname": row["nickname"],
-                "bucket_choice": row["bucket_choice"],
-                "submitted_at_display": format_timestamp_et(row["submitted_at"]),
-            }
-        )
-
-    return {
-        "game_date_et": result_date.isoformat(),
-        "symbol": symbol_code,
-        "winning_bucket": winning_bucket,
-        "winner_count": len(winners),
-        "winners": winners,
-        "has_winners": len(winners) > 0,
-    }
-
-
 def build_redirect_url(
     *,
     error_message: str = "",
     success_message: str = "",
+    green_button_error: str = "",
+    green_button_success: str = "",
 ) -> str:
     params: dict[str, str] = {}
 
@@ -102,6 +97,12 @@ def build_redirect_url(
 
     if success_message:
         params["success"] = success_message
+
+    if green_button_error:
+        params["green_error"] = green_button_error
+
+    if green_button_success:
+        params["green_success"] = green_button_success
 
     if not params:
         return "/"
@@ -124,24 +125,47 @@ def normalize_latest_result(latest_result: dict | None) -> dict | None:
     }
 
 
+def build_buckets_by_hour_with_today_guesses(todays_guesses_raw: list[dict]) -> list[dict]:
+    buckets_by_hour = get_buckets_grouped_by_hour()
+
+    guesses_by_bucket: dict[str, list[str]] = {}
+    for guess in todays_guesses_raw:
+        bucket_choice = guess["bucket_choice"]
+        nickname = guess["nickname"]
+        guesses_by_bucket.setdefault(bucket_choice, []).append(nickname)
+
+    for hour_group in buckets_by_hour:
+        for bucket in hour_group["buckets"]:
+            bucket["nicknames"] = guesses_by_bucket.get(bucket["bucket_time"], [])
+
+    return buckets_by_hour
+
+
 def render_homepage(
     request: Request,
     *,
     error_message: str = "",
     success_message: str = "",
+    green_button_error: str = "",
+    green_button_success: str = "",
 ) -> HTMLResponse:
     symbol_code = "GOLD"
     game_date_et = current_et_date()
 
     ingest_latest_result_file_to_db()
 
-    latest_result = normalize_latest_result(
-        get_latest_daily_result(
-            symbol_code,
-            before_game_date_et=game_date_et,
-        )
+    latest_result_raw = get_latest_daily_result(
+        symbol_code,
+        before_game_date_et=game_date_et,
     )
-    latest_result_outcome = build_latest_result_outcome(latest_result)
+    latest_result = normalize_latest_result(latest_result_raw)
+
+    latest_result_outcome = None
+    if latest_result_raw is not None:
+        latest_result_outcome = get_daily_result_outcome(
+            symbol_code=symbol_code,
+            game_date_et=latest_result_raw["game_date_et"],
+        )
 
     todays_guesses_raw = list_daily_guesses(
         symbol_code=symbol_code,
@@ -158,23 +182,35 @@ def render_homepage(
             }
         )
 
-    recent_results_raw = list_recent_daily_results(
+    closest_winners_raw = list_closest_winners(
         symbol_code=symbol_code,
-        limit=10,
+        limit=100,
     )
-
-    recent_results = []
-    for row in recent_results_raw:
-        winner_count = int(row["winner_count"] or 0)
-        recent_results.append(
+    closest_winners = []
+    for row in closest_winners_raw:
+        closest_winners.append(
             {
                 "game_date_et": row["game_date_et"].isoformat(),
-                "symbol": row["symbol"],
-                "winning_bucket": row["winning_bucket"],
-                "resolved_at_display": format_timestamp_et(row["resolved_at"]),
-                "winner_count": winner_count,
-                "result_state": "Winners" if winner_count > 0 else "No winners",
-                "detail_url": f"/history/{row['game_date_et'].isoformat()}",
+                "nickname": row["nickname"],
+                "bucket_choice": row["bucket_choice"],
+                "chaperone": row.get("chaperone", ""),
+                "distance_buckets": row["distance_buckets"],
+                "submitted_at_display": format_timestamp_et(row["submitted_at"]),
+            }
+        )
+
+    hall_of_famers_raw = list_hall_of_famers(
+        symbol_code=symbol_code,
+        limit=100,
+    )
+    hall_of_famers = []
+    for row in hall_of_famers_raw:
+        hall_of_famers.append(
+            {
+                "game_date_et": row["game_date_et"].isoformat(),
+                "nickname": row["nickname"],
+                "bucket_choice": row["bucket_choice"],
+                "submitted_at_display": format_timestamp_et(row["submitted_at"]),
             }
         )
 
@@ -182,14 +218,19 @@ def render_homepage(
         "request": request,
         "page_title": "JILT GAME",
         "symbol": symbol_code,
-        "bucket_choices": build_bucket_choices(),
         "today_et": game_date_et.isoformat(),
         "error_message": error_message,
         "success_message": success_message,
+        "green_button_error": green_button_error,
+        "green_button_success": green_button_success,
         "latest_result": latest_result,
         "latest_result_outcome": latest_result_outcome,
-        "recent_results": recent_results,
         "todays_guesses": todays_guesses,
+        "bucket_choices": build_bucket_choices(),
+        "bucket_definitions": get_bucket_definitions(),
+        "buckets_by_hour": build_buckets_by_hour_with_today_guesses(todays_guesses_raw),
+        "closest_winners": closest_winners,
+        "hall_of_famers": hall_of_famers,
     }
     return templates.TemplateResponse(
         request=request,
@@ -197,15 +238,20 @@ def render_homepage(
         context=context,
     )
 
+
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request) -> HTMLResponse:
     error_message = request.query_params.get("error", "")
     success_message = request.query_params.get("success", "")
+    green_button_error = request.query_params.get("green_error", "")
+    green_button_success = request.query_params.get("green_success", "")
 
     return render_homepage(
         request,
         error_message=error_message,
         success_message=success_message,
+        green_button_error=green_button_error,
+        green_button_success=green_button_success,
     )
 
 
@@ -374,9 +420,24 @@ def submit_guess(
     bucket_choice: str = Form(...),
 ):
     nickname = nickname.strip()
+    nickname_error = validate_nickname_length(nickname)
+    if nickname_error:
+        return RedirectResponse(
+            url=build_redirect_url(error_message=nickname_error),
+            status_code=303,
+        )
+
+    nickname_block_error = validate_nickname_allowed(nickname)
+    if nickname_block_error:
+        return RedirectResponse(
+            url=build_redirect_url(error_message=nickname_block_error),
+            status_code=303,
+        )
+
     valid_buckets = build_bucket_choices()
     symbol_code = "GOLD"
-    game_date_et = current_et_date()
+    today_et = current_et_date()
+    tomorrow_et = today_et + timedelta(days=1)
 
     if not nickname:
         return RedirectResponse(
@@ -392,10 +453,36 @@ def submit_guess(
             status_code=303,
         )
 
+    today_bucket_guess_count = count_bucket_guesses(
+        symbol_code=symbol_code,
+        game_date_et=today_et,
+        bucket_choice=bucket_choice,
+    )
+    if today_bucket_guess_count >= MAX_USERS_PER_BUCKET:
+        return RedirectResponse(
+            url=build_redirect_url(
+                error_message="That bucket is full for today."
+            ),
+            status_code=303,
+        )
+
+    tomorrow_bucket_guess_count = count_bucket_guesses(
+        symbol_code=symbol_code,
+        game_date_et=tomorrow_et,
+        bucket_choice=bucket_choice,
+    )
+    if tomorrow_bucket_guess_count >= MAX_USERS_PER_BUCKET:
+        return RedirectResponse(
+            url=build_redirect_url(
+                error_message="That bucket is full for tomorrow."
+            ),
+            status_code=303,
+        )
+
     try:
-        insert_daily_guess(
+        insert_two_day_guess(
             symbol_code=symbol_code,
-            game_date_et=game_date_et,
+            game_date_et=today_et,
             nickname=nickname,
             bucket_choice=bucket_choice,
         )
@@ -404,7 +491,7 @@ def submit_guess(
             url=build_redirect_url(
                 error_message=(
                     f"{nickname} already submitted a guess for "
-                    f"{symbol_code} on {game_date_et.isoformat()} ET."
+                    f"{symbol_code} for today and tomorrow ET."
                 )
             ),
             status_code=303,
@@ -416,7 +503,8 @@ def submit_guess(
         )
 
     success_message = (
-        f"Guess saved for {game_date_et.isoformat()} ET: "
+        f"Guess saved for {today_et.isoformat()} ET and "
+        f"{tomorrow_et.isoformat()} ET: "
         f"{nickname} selected {bucket_choice} for {symbol_code}."
     )
 
@@ -424,3 +512,99 @@ def submit_guess(
         url=build_redirect_url(success_message=success_message),
         status_code=303,
     )
+
+
+@app.post("/guess/current")
+def submit_current_bucket_guess(
+    nickname: str = Form(...),
+):
+    nickname = nickname.strip()
+
+    nickname_error = validate_nickname_length(nickname)
+    if nickname_error:
+        return RedirectResponse(
+            url=build_redirect_url(green_button_error=nickname_error),
+            status_code=303,
+        )
+
+    nickname_block_error = validate_nickname_allowed(nickname)
+    if nickname_block_error:
+        return RedirectResponse(
+            url=build_redirect_url(green_button_error=nickname_block_error),
+            status_code=303,
+        )
+
+    symbol_code = "GOLD"
+    today_et = current_et_date()
+    tomorrow_et = today_et + timedelta(days=1)
+    current_time_et = datetime.now(ET_TZ)
+    current_minute_bucket = (current_time_et.minute // 5) * 5
+    bucket_choice = f"{current_time_et.hour:02d}:{current_minute_bucket:02d}"
+
+    if not nickname:
+        return RedirectResponse(
+            url=build_redirect_url(green_button_error="Nickname is required."),
+            status_code=303,
+        )
+
+    today_bucket_guess_count = count_bucket_guesses(
+        symbol_code=symbol_code,
+        game_date_et=today_et,
+        bucket_choice=bucket_choice,
+    )
+    if today_bucket_guess_count >= MAX_USERS_PER_BUCKET:
+        return RedirectResponse(
+            url=build_redirect_url(
+                green_button_error="That bucket is full for today."
+            ),
+            status_code=303,
+        )
+
+    tomorrow_bucket_guess_count = count_bucket_guesses(
+        symbol_code=symbol_code,
+        game_date_et=tomorrow_et,
+        bucket_choice=bucket_choice,
+    )
+    if tomorrow_bucket_guess_count >= MAX_USERS_PER_BUCKET:
+        return RedirectResponse(
+            url=build_redirect_url(
+                green_button_error="That bucket is full for tomorrow."
+            ),
+            status_code=303,
+        )
+
+    try:
+        insert_two_day_guess(
+            symbol_code=symbol_code,
+            game_date_et=today_et,
+            nickname=nickname,
+            bucket_choice=bucket_choice,
+        )
+    except UniqueViolation:
+        return RedirectResponse(
+            url=build_redirect_url(
+                green_button_error=(
+                    f"{nickname} already submitted a guess for "
+                    f"{symbol_code} for today and tomorrow ET."
+                )
+            ),
+            status_code=303,
+        )
+    except ValueError as exc:
+        return RedirectResponse(
+            url=build_redirect_url(green_button_error=str(exc)),
+            status_code=303,
+        )
+
+    success_message = (
+        f"Current bucket locked in for {today_et.isoformat()} ET and "
+        f"{tomorrow_et.isoformat()} ET: "
+        f"{nickname} selected {bucket_choice} for {symbol_code}."
+    )
+
+    return RedirectResponse(
+        url=build_redirect_url(green_button_success=success_message),
+        status_code=303,
+    )
+
+
