@@ -1,10 +1,18 @@
 :root {
-  --bg: #f5f7fb;
+  --bg: #111827;
   --panel: #ffffff;
   --text: #18202a;
   --muted: #5b6573;
   --border: #d7deea;
   --accent: #1f5fbf;
+  --board-bg: #e5e7eb;
+  --board-cell: #f3f4f6;
+  --selected-ring: #2563eb;
+  --selected-glow: rgba(37, 99, 235, 0.25);
+  --locked-red: #b91c1c;
+  --locked-red-hover: #991b1b;
+  --green: #16a34a;
+  --green-hover: #15803d;
 }
 
 * {
@@ -22,10 +30,11 @@ body {
   background: #0f1724;
   color: white;
   padding: 32px 0 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .container {
-  width: min(900px, calc(100% - 32px));
+  width: min(980px, calc(100% - 32px));
   margin: 0 auto;
 }
 
@@ -40,6 +49,7 @@ body {
   border-radius: 12px;
   padding: 24px;
   margin: 24px 0;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.16);
 }
 
 .guess-form {
@@ -55,12 +65,26 @@ body {
   padding: 10px 12px;
 }
 
-.guess-form button {
+.guess-form input,
+.guess-form select {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.guess-form button,
+.submit-button {
   background: var(--accent);
   color: white;
   border: none;
   border-radius: 8px;
   cursor: pointer;
+}
+
+.guess-form button:hover,
+.submit-button:hover {
+  filter: brightness(0.96);
 }
 
 .message {
@@ -122,14 +146,21 @@ body {
 .bucket-board {
   margin-top: 1.5rem;
   padding: 1rem;
-  background: #d1d5db;
+  background: var(--board-bg);
   border-radius: 12px;
+  border: 1px solid #cfd5dd;
 }
 
 .bucket-board h3 {
   margin-top: 0;
+  margin-bottom: 0.65rem;
+  color: #1f2937;
+}
+
+.selection-status {
   margin-bottom: 1rem;
-  color: #ffffff;
+  font-size: 0.95rem;
+  color: #374151;
 }
 
 .bucket-board-hour {
@@ -139,7 +170,7 @@ body {
 .bucket-board-hour-label {
   margin-bottom: 0.5rem;
   font-weight: 700;
-  color: #f3e7d3;
+  color: #374151;
 }
 
 .bucket-board-grid {
@@ -148,19 +179,46 @@ body {
   gap: 0.75rem;
 }
 
-.bucket-cell {
+.bucket-cell-button {
+  appearance: none;
+  border: 0;
+  background: var(--board-cell);
+  border-radius: 10px;
+  min-height: 112px;
+  padding: 0.5rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 110px;
-  padding: 0.5rem;
-  background: #d9d9d9;
-  border-radius: 8px;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+}
+
+.bucket-cell-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.12);
+}
+
+.bucket-cell-button:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.35);
+  outline-offset: 2px;
+}
+
+.bucket-cell-button.has-heatmap-color {
+  background: color-mix(in srgb, var(--bucket-heat) 22%, #ffffff);
+}
+
+.bucket-cell-button.is-selected {
+  background: color-mix(in srgb, var(--bucket-heat, #dbeafe) 35%, #ffffff);
+  box-shadow: 0 0 0 3px var(--selected-ring), 0 8px 18px var(--selected-glow);
+}
+
+.bucket-cell-button.is-selected .bucket-circle {
+  border-color: var(--selected-ring);
 }
 
 .bucket-circle {
-  width: 78px;
-  height: 78px;
+  width: 92px;
+  height: 92px;
   border-radius: 999px;
   background: radial-gradient(circle at 30% 30%, #f5f5f5, #a9a9a9 70%, #7d7d7d 100%);
   border: 2px solid #6f6f6f;
@@ -169,60 +227,22 @@ body {
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: 0.35rem;
+  padding: 0.45rem;
   box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.35), 0 2px 6px rgba(0, 0, 0, 0.2);
 }
 
 .bucket-time {
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: #1f2937;
-}
-
-.bucket-chaperone {
-  margin-top: 0.2rem;
-  font-size: 0.65rem;
-  color: #374151;
-}
-
-.guess-form .current-bucket-button {
-  width: 140px;
-  height: 140px;
-  border-radius: 999px;
-  border: none;
-  background: #16a34a;
-  color: white;
-  font-size: 2rem;
-  font-weight: 800;
-  cursor: pointer;
-  justify-self: center;
-  align-self: center;
-  padding: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
-}
-
-.guess-form .current-bucket-button:hover {
-  background: #15803d;
-}
-
-.bucket-circle {
-  width: 92px;
-  height: 92px;
-  padding: 0.45rem;
-}
-
-.bucket-time {
   font-size: 0.78rem;
+  font-weight: 700;
   line-height: 1.1;
+  color: #1f2937;
 }
 
 .bucket-chaperone {
   margin-top: 0.15rem;
   font-size: 0.58rem;
   line-height: 1.05;
+  color: #374151;
 }
 
 .bucket-nicknames {
@@ -237,4 +257,105 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.guess-form .current-bucket-button {
+  width: 140px;
+  height: 140px;
+  min-width: 140px;
+  min-height: 140px;
+  border-radius: 999px;
+  border: none;
+  background: #16a34a;
+  color: white;
+  font-size: 2rem;
+  font-weight: 800;
+  cursor: pointer;
+  justify-self: center;
+  align-self: center;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1 / 1;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
+}
+
+.current-bucket-button:hover {
+  background: var(--green-hover);
+}
+
+.current-bucket-button-locked {
+  background: var(--locked-red);
+}
+
+.current-bucket-button-locked:hover {
+  background: var(--locked-red-hover);
+}
+
+.submit-button {
+  justify-self: start;
+}
+
+.confetti-layer {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  z-index: 999;
+}
+
+.confetti-piece {
+  position: absolute;
+  top: -30px;
+  width: 10px;
+  height: 18px;
+  border-radius: 2px;
+  opacity: 0;
+}
+
+.confetti-piece:nth-child(4n + 1) { background: #ef4444; }
+.confetti-piece:nth-child(4n + 2) { background: #22c55e; }
+.confetti-piece:nth-child(4n + 3) { background: #3b82f6; }
+.confetti-piece:nth-child(4n + 4) { background: #f59e0b; }
+
+.confetti-layer.is-active .confetti-piece {
+  animation: confetti-fall linear forwards;
+}
+
+@keyframes confetti-fall {
+  0% {
+    opacity: 1;
+    transform: translateY(0) rotate(0deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(100vh) rotate(540deg);
+  }
+}
+
+@media (max-width: 860px) {
+  .bucket-board-grid {
+    grid-template-columns: repeat(4, minmax(90px, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .container {
+    width: min(100%, calc(100% - 20px));
+  }
+
+  .card {
+    padding: 18px;
+  }
+
+  .bucket-board-grid {
+    grid-template-columns: repeat(3, minmax(88px, 1fr));
+  }
+
+  .current-bucket-button {
+    width: 120px;
+    height: 120px;
+    font-size: 1.7rem;
+  }
 }

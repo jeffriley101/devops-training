@@ -43,7 +43,7 @@ def main() -> dict:
     output_path = output_dir / "daily_low_by_date.png"
 
     plt.figure(figsize=(14, 6))
-    plt.plot(trade_dates, bucket_minutes, marker="o", linewidth=1.5, markersize=4)
+    plt.scatter(trade_dates, bucket_minutes, s=20)
 
     ytick_minutes = list(range(0, 24 * 60, 60))
     ytick_labels = [f"{minutes // 60:02d}:{minutes % 60:02d}" for minutes in ytick_minutes]

@@ -17,16 +17,18 @@ from app.buckets import (
 from app.charts import get_chart_definitions
 from app.config import JILT_CHARTS_DIR
 from app.db import (
+    count_bucket_guesses,
     get_daily_result,
     get_daily_result_outcome,
     get_latest_daily_result,
+    get_result_bucket_frequency_map,
     insert_two_day_guess,
     list_closest_winners,
     list_daily_guesses,
+    list_guesses_for_dates,
     list_hall_of_famers,
     list_recent_daily_results,
     list_winning_guesses,
-    count_bucket_guesses,
 )
 from app.result_ingest import ingest_latest_result_file_to_db
 
@@ -125,10 +127,14 @@ def normalize_latest_result(latest_result: dict | None) -> dict | None:
     }
 
 
-def build_buckets_by_hour_with_today_guesses(todays_guesses_raw: list[dict]) -> list[dict]:
-    buckets_by_hour = get_buckets_grouped_by_hour()
-
+def build_buckets_by_hour_with_today_guesses(
+    todays_guesses_raw: list[dict],
+    *,
+    frequency_map: dict[str, int] | None = None,
+) -> list[dict]:
+    buckets_by_hour = get_buckets_grouped_by_hour(frequency_map=frequency_map)
     guesses_by_bucket: dict[str, list[str]] = {}
+
     for guess in todays_guesses_raw:
         bucket_choice = guess["bucket_choice"]
         nickname = guess["nickname"]
@@ -151,8 +157,13 @@ def render_homepage(
 ) -> HTMLResponse:
     symbol_code = "GOLD"
     game_date_et = current_et_date()
+    tomorrow_et = game_date_et + timedelta(days=1)
 
     ingest_latest_result_file_to_db()
+
+    bucket_frequency_map = get_result_bucket_frequency_map(
+        symbol_code=symbol_code,
+    )
 
     latest_result_raw = get_latest_daily_result(
         symbol_code,
@@ -176,6 +187,22 @@ def render_homepage(
     for guess in todays_guesses_raw:
         todays_guesses.append(
             {
+                "nickname": guess["nickname"],
+                "bucket_choice": guess["bucket_choice"],
+                "submitted_at_display": format_timestamp_et(guess["submitted_at"]),
+            }
+        )
+
+    current_and_future_guesses_raw = list_guesses_for_dates(
+        symbol_code=symbol_code,
+        game_dates_et=[game_date_et, tomorrow_et],
+    )
+
+    current_and_future_guesses = []
+    for guess in current_and_future_guesses_raw:
+        current_and_future_guesses.append(
+            {
+                "game_date_et": guess["game_date_et"].isoformat(),
                 "nickname": guess["nickname"],
                 "bucket_choice": guess["bucket_choice"],
                 "submitted_at_display": format_timestamp_et(guess["submitted_at"]),
@@ -219,6 +246,7 @@ def render_homepage(
         "page_title": "JILT GAME",
         "symbol": symbol_code,
         "today_et": game_date_et.isoformat(),
+        "tomorrow_et": tomorrow_et.isoformat(),
         "error_message": error_message,
         "success_message": success_message,
         "green_button_error": green_button_error,
@@ -226,9 +254,15 @@ def render_homepage(
         "latest_result": latest_result,
         "latest_result_outcome": latest_result_outcome,
         "todays_guesses": todays_guesses,
+        "current_and_future_guesses": current_and_future_guesses,
         "bucket_choices": build_bucket_choices(),
-        "bucket_definitions": get_bucket_definitions(),
-        "buckets_by_hour": build_buckets_by_hour_with_today_guesses(todays_guesses_raw),
+        "bucket_definitions": get_bucket_definitions(
+            frequency_map=bucket_frequency_map,
+        ),
+        "buckets_by_hour": build_buckets_by_hour_with_today_guesses(
+            todays_guesses_raw,
+            frequency_map=bucket_frequency_map,
+        ),
         "closest_winners": closest_winners,
         "hall_of_famers": hall_of_famers,
     }

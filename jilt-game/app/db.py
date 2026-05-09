@@ -122,6 +122,36 @@ def list_daily_guesses(
     return list(rows)
 
 
+def list_guesses_for_dates(
+    *,
+    symbol_code: str,
+    game_dates_et: list[date],
+) -> list[dict]:
+    symbol_id = get_symbol_id(symbol_code)
+    if symbol_id is None or not game_dates_et:
+        return []
+
+    query = """
+        SELECT
+            guess_id,
+            game_date_et,
+            nickname,
+            bucket_choice,
+            submitted_at
+        FROM jilt_game_daily_guesses
+        WHERE symbol_id = %s
+          AND game_date_et = ANY(%s)
+        ORDER BY game_date_et ASC, submitted_at DESC, guess_id DESC
+    """
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, (symbol_id, game_dates_et))
+            rows = cur.fetchall()
+
+    return list(rows)
+
+
 def count_bucket_guesses(
     *,
     symbol_code: str,
@@ -604,4 +634,30 @@ def insert_two_day_guess(
 
     return game_date_et, tomorrow_et
 
+def get_result_bucket_frequency_map(
+    *,
+    symbol_code: str,
+) -> dict[str, int]:
+    symbol_id = get_symbol_id(symbol_code)
+    if symbol_id is None:
+        return {}
 
+    query = """
+        SELECT
+            winning_bucket,
+            COUNT(*) AS hit_count
+        FROM jilt_game_daily_results
+        WHERE symbol_id = %s
+        GROUP BY winning_bucket
+    """
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, (symbol_id,))
+            rows = cur.fetchall()
+
+    frequency_map: dict[str, int] = {}
+    for row in rows:
+        frequency_map[str(row["winning_bucket"])] = int(row["hit_count"] or 0)
+
+    return frequency_map

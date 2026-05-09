@@ -28,8 +28,11 @@
       placeholder="Enter nickname"
     />
 
-    <button type="submit" class="current-bucket-button">
-      GO
+    <button
+      type="submit"
+      class="current-bucket-button{% if green_button_success %} current-bucket-button-locked{% endif %}"
+    >
+      {% if green_button_success %}LOCKED{% else %}GO{% endif %}
     </button>
   </form>
 </section>
@@ -87,8 +90,8 @@
 </section>
 
 <section class="card">
-  <h2>Past Daily Winners (closest)</h2>
-  <p>Closest to choosing the winning bucket; winners every day.</p>
+  <h2>Past Daily Winners</h2>
+  <p>Closest daily winners based on the official winning bucket.</p>
 
   {% if closest_winners %}
   <div class="table-wrap">
@@ -153,22 +156,24 @@
 </section>
 
 <section class="card">
-  <h2>Current Bets</h2>
-  <p>Today’s submitted bets for {{ today_et }} ET.</p>
+  <h2>Today and Tomorrow Bets</h2>
+  <p>Submitted bets for {{ today_et }} ET and {{ tomorrow_et }} ET, sorted by game date.</p>
 
-  {% if todays_guesses %}
+  {% if current_and_future_guesses %}
   <div class="table-wrap">
     <table class="guess-table">
       <thead>
         <tr>
+          <th>Game Date (ET)</th>
           <th>Nickname</th>
           <th>Bucket</th>
           <th>Submitted</th>
         </tr>
       </thead>
       <tbody>
-        {% for guess in todays_guesses %}
+        {% for guess in current_and_future_guesses %}
         <tr>
+          <td>{{ guess.game_date_et }}</td>
           <td>{{ guess.nickname }}</td>
           <td>{{ guess.bucket_choice }}</td>
           <td>{{ guess.submitted_at_display }}</td>
@@ -178,7 +183,7 @@
     </table>
   </div>
   {% else %}
-  <p>No bets submitted yet for today.</p>
+  <p>No bets submitted yet for today or tomorrow.</p>
   {% endif %}
 </section>
 
@@ -199,7 +204,7 @@
   <div class="message message-success">{{ success_message }}</div>
   {% endif %}
 
-  <form class="guess-form" method="post" action="/guess">
+  <form class="guess-form" method="post" action="/guess" id="bet-form">
     <label for="nickname">Nickname</label>
     <input
       id="nickname"
@@ -217,8 +222,13 @@
       {% endfor %}
     </select>
 
-    <div class="bucket-board">
+    <button type="submit" class="submit-button submit-button-top">Place Your Bet</button>
+
+    <div class="bucket-board" id="bucket-board">
       <h3>Playing Board</h3>
+      <div class="selection-status">
+        Selected bucket: <strong id="selected-bucket-label">{{ bucket_definitions[0].bucket_time if bucket_definitions else "--:--" }}</strong>
+      </div>
 
       {% for hour_group in buckets_by_hour %}
       <div class="bucket-board-hour">
@@ -226,7 +236,13 @@
 
         <div class="bucket-board-grid">
           {% for bucket in hour_group.buckets %}
-          <div class="bucket-cell">
+          <button
+            type="button"
+            class="bucket-cell-button"
+            data-bucket-time="{{ bucket.bucket_time }}"
+            data-heatmap-color="{{ bucket.heatmap_color if bucket.heatmap_color is defined else '' }}"
+            aria-pressed="false"
+          >
             <div class="bucket-circle">
               <div class="bucket-time">{{ bucket.bucket_time }}</div>
 
@@ -241,17 +257,91 @@
                 {% endfor %}
               </div>
               {% endif %}
-
             </div>
-          </div>
+          </button>
           {% endfor %}
         </div>
       </div>
       {% endfor %}
     </div>
 
-    <button type="submit">Place Bet</button>
+    <button type="submit" class="submit-button submit-button-bottom">Place Your Bet</button>
   </form>
 </section>
+
+<div class="confetti-layer" id="confetti-layer" aria-hidden="true"></div>
+
+<script>
+  (function () {
+    const select = document.getElementById("bucket_choice");
+    const board = document.getElementById("bucket-board");
+    const selectedBucketLabel = document.getElementById("selected-bucket-label");
+    const confettiLayer = document.getElementById("confetti-layer");
+
+    if (!select || !board || !selectedBucketLabel || !confettiLayer) {
+      return;
+    }
+
+    const buttons = Array.from(board.querySelectorAll(".bucket-cell-button"));
+    const heatmapColors = {};
+
+    function buildConfetti() {
+      confettiLayer.innerHTML = "";
+      for (let i = 0; i < 16; i += 1) {
+        const piece = document.createElement("span");
+        piece.className = "confetti-piece";
+        piece.style.left = `${8 + Math.random() * 84}%`;
+        piece.style.animationDelay = `${Math.random() * 0.2}s`;
+        piece.style.animationDuration = `${0.7 + Math.random() * 0.7}s`;
+        piece.style.transform = `translateY(0) rotate(${Math.random() * 360}deg)`;
+        confettiLayer.appendChild(piece);
+      }
+      confettiLayer.classList.remove("is-active");
+      void confettiLayer.offsetWidth;
+      confettiLayer.classList.add("is-active");
+      window.setTimeout(() => confettiLayer.classList.remove("is-active"), 1300);
+    }
+
+    function applyHeatmapColors() {
+      buttons.forEach((button) => {
+        const bucketTime = button.dataset.bucketTime;
+        const explicitColor = button.dataset.heatmapColor;
+        const color = explicitColor || heatmapColors[bucketTime] || "";
+        if (color) {
+          button.style.setProperty("--bucket-heat", color);
+          button.classList.add("has-heatmap-color");
+        }
+      });
+    }
+
+    function syncSelection(selectedValue, celebrate = false) {
+      select.value = selectedValue;
+      selectedBucketLabel.textContent = selectedValue;
+
+      buttons.forEach((button) => {
+        const isSelected = button.dataset.bucketTime === selectedValue;
+        button.classList.toggle("is-selected", isSelected);
+        button.setAttribute("aria-pressed", isSelected ? "true" : "false");
+      });
+
+      if (celebrate) {
+        buildConfetti();
+      }
+    }
+
+    buttons.forEach((button) => {
+      button.addEventListener("click", () => {
+        syncSelection(button.dataset.bucketTime, true);
+      });
+    });
+
+    select.addEventListener("change", () => {
+      syncSelection(select.value, false);
+    });
+
+    applyHeatmapColors();
+    syncSelection(select.value, false);
+  })();
+</script>
 
 {% endblock %}

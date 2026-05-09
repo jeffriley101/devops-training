@@ -11,3 +11,4 @@ def get_connection():
         user=DB_USER,
         password=os.environ["JILT_DB_PASSWORD"],
     )
+

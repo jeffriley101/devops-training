@@ -22,11 +22,13 @@ def generate_all_buckets() -> list[dict]:
                     "hour": hour,
                     "minute": minute,
                     "chaperone": "",
+                    "heatmap_color": "",
                 }
             )
             index += 1
 
     return buckets
+
 
 def is_valid_bucket_time(bucket_time: str) -> bool:
     if len(bucket_time) != 5 or bucket_time[2] != ":":
@@ -63,21 +65,83 @@ def load_chaperone_map() -> dict[str, str]:
     return chaperone_map
 
 
-def get_bucket_definitions() -> list[dict]:
+def hex_to_rgb(hex_color: str) -> tuple[int, int, int]:
+    hex_color = hex_color.lstrip("#")
+    return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+
+
+def rgb_to_hex(rgb: tuple[int, int, int]) -> str:
+    return "#{:02x}{:02x}{:02x}".format(*rgb)
+
+
+def interpolate_color(
+    start_hex: str,
+    end_hex: str,
+    fraction: float,
+) -> str:
+    fraction = max(0.0, min(1.0, fraction))
+    start = hex_to_rgb(start_hex)
+    end = hex_to_rgb(end_hex)
+
+    mixed = tuple(
+        round(start[i] + (end[i] - start[i]) * fraction)
+        for i in range(3)
+    )
+    return rgb_to_hex(mixed)
+
+
+def build_heatmap_color_map(
+    frequency_map: dict[str, int],
+) -> dict[str, str]:
+    all_buckets = generate_all_buckets()
+    all_bucket_times = [bucket["bucket_time"] for bucket in all_buckets]
+
+    counts = [frequency_map.get(bucket_time, 0) for bucket_time in all_bucket_times]
+    min_count = min(counts) if counts else 0
+    max_count = max(counts) if counts else 0
+
+    cool_color = "#e5e7eb"
+    hot_color = "#2563eb"
+
+    color_map: dict[str, str] = {}
+
+    for bucket_time in all_bucket_times:
+        count = frequency_map.get(bucket_time, 0)
+
+        if max_count == min_count:
+            fraction = 0.0
+        else:
+            fraction = (count - min_count) / (max_count - min_count)
+
+        color_map[bucket_time] = interpolate_color(cool_color, hot_color, fraction)
+
+    return color_map
+
+
+def get_bucket_definitions(
+    *,
+    frequency_map: dict[str, int] | None = None,
+) -> list[dict]:
     buckets = generate_all_buckets()
     chaperone_map = load_chaperone_map()
+    heatmap_map = build_heatmap_color_map(frequency_map or {})
 
     for bucket in buckets:
         bucket["chaperone"] = chaperone_map.get(bucket["bucket_time"], "")
+        bucket["heatmap_color"] = heatmap_map.get(bucket["bucket_time"], "")
 
     return buckets
 
 
 def get_bucket_choices() -> list[str]:
-    return [bucket["bucket_time"] for bucket in get_bucket_definitions()]
+    return [bucket["bucket_time"] for bucket in generate_all_buckets()]
 
-def get_buckets_grouped_by_hour() -> list[dict]:
-    buckets = get_bucket_definitions()
+
+def get_buckets_grouped_by_hour(
+    *,
+    frequency_map: dict[str, int] | None = None,
+) -> list[dict]:
+    buckets = get_bucket_definitions(frequency_map=frequency_map)
     grouped: list[dict] = []
 
     for hour in range(24):
