@@ -1,3 +1,5 @@
+# Windows environment test.
+
 # DevOps Training Projects
 
 This repository is my public DevOps, cloud, and platform engineering portfolio. It contains hands-on AWS projects built to demonstrate containerized automation, scheduled cloud workloads, CI/CD delivery, observability, artifact management, and production-style troubleshooting.
