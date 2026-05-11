@@ -32,6 +32,13 @@ Use the standard Render/FastAPI startup command:
 uvicorn app.main:app --host 0.0.0.0 --port $PORT
 ```
 
+## Visual asset hooks (Phase 1)
+
+The UI contains placeholder hooks ready for promo-art crops:
+- `/static/img/woodchuck-hero.png`
+- `/static/img/woodchuck-home.png`
+- `/static/img/sax-viking-portrait.png`
+
 ## Notes
 
 - Persistence currently uses browser localStorage only.

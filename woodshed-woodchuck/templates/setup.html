@@ -2,36 +2,47 @@
 
 {% block content %}
 <section class="card">
-  <h2>Musician Setup</h2>
-  <p class="body-copy">Set your starting path so Sax Viking can guide your first quests.</p>
+  <div class="section-head">
+    <h2>Musician Setup</h2>
+    <p class="body-copy">Set your starting path so Sax Viking can guide your first quests.</p>
+  </div>
 
-  <form id="setup-form" action="/setup" method="post" class="stack-form" novalidate>
-    <label for="instrument">Instrument</label>
-    <select id="instrument" name="instrument" required>
-      <option value="">Choose an instrument</option>
-      {% for item in instruments %}
-      <option value="{{ item }}">{{ item }}</option>
-      {% endfor %}
-    </select>
+  <div class="setup-layout">
+    <form id="setup-form" action="/setup" method="post" class="stack-form" novalidate>
+      <label for="instrument">Instrument</label>
+      <select id="instrument" name="instrument" required>
+        <option value="">Choose an instrument</option>
+        {% for item in instruments %}
+        <option value="{{ item }}">{{ item }}</option>
+        {% endfor %}
+      </select>
 
-    <label for="level">Level</label>
-    <select id="level" name="level" required>
-      <option value="">Choose your level</option>
-      {% for item in levels %}
-      <option value="{{ item }}">{{ item }}</option>
-      {% endfor %}
-    </select>
+      <label for="level">Level</label>
+      <select id="level" name="level" required>
+        <option value="">Choose your level</option>
+        {% for item in levels %}
+        <option value="{{ item }}">{{ item }}</option>
+        {% endfor %}
+      </select>
 
-    <label for="goal">Practice goal</label>
-    <select id="goal" name="goal" required>
-      <option value="">Choose a goal</option>
-      {% for item in goals %}
-      <option value="{{ item }}">{{ item }}</option>
-      {% endfor %}
-    </select>
+      <label for="goal">Practice goal</label>
+      <select id="goal" name="goal" required>
+        <option value="">Choose a goal</option>
+        {% for item in goals %}
+        <option value="{{ item }}">{{ item }}</option>
+        {% endfor %}
+      </select>
 
-    <p id="setup-error" class="error-text" aria-live="polite"></p>
-    <button class="btn btn-primary" type="submit">Save Setup</button>
-  </form>
+      <p id="setup-error" class="error-text" aria-live="polite"></p>
+      <button class="btn btn-primary" type="submit">Save Setup</button>
+    </form>
+
+    <aside class="mentor-card" aria-label="Sax Viking art placeholder">
+      <p class="chip">Mentor</p>
+      <h3>Sax Viking</h3>
+      <p>“Ahoy, musician! Start where you are. Legends are built one honest session at a time.”</p>
+      <small>Asset hook: <code>/static/img/sax-viking-portrait.png</code></small>
+    </aside>
+  </div>
 </section>
 {% endblock %}
