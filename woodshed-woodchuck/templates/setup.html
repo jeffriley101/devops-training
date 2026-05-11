@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="card">
+  <h2>Musician Setup</h2>
+  <p class="body-copy">Set your starting path so Sax Viking can guide your first quests.</p>
+
+  <form id="setup-form" action="/setup" method="post" class="stack-form" novalidate>
+    <label for="instrument">Instrument</label>
+    <select id="instrument" name="instrument" required>
+      <option value="">Choose an instrument</option>
+      {% for item in instruments %}
+      <option value="{{ item }}">{{ item }}</option>
+      {% endfor %}
+    </select>
+
+    <label for="level">Level</label>
+    <select id="level" name="level" required>
+      <option value="">Choose your level</option>
+      {% for item in levels %}
+      <option value="{{ item }}">{{ item }}</option>
+      {% endfor %}
+    </select>
+
+    <label for="goal">Practice goal</label>
+    <select id="goal" name="goal" required>
+      <option value="">Choose a goal</option>
+      {% for item in goals %}
+      <option value="{{ item }}">{{ item }}</option>
+      {% endfor %}
+    </select>
+
+    <p id="setup-error" class="error-text" aria-live="polite"></p>
+    <button class="btn btn-primary" type="submit">Save Setup</button>
+  </form>
+</section>
+{% endblock %}

@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{ title }} · Woodshed Woodchuck</title>
+  <link rel="stylesheet" href="/static/css/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="site-header">
+      <p class="eyebrow">Practice. Grow. Play. Repeat.</p>
+      <h1 class="logo">The Woodshed Woodchuck</h1>
+      <p class="mentor-line">{{ sax_viking_welcome }}</p>
+    </header>
+
+    <main class="content-wrap">
+      {% block content %}{% endblock %}
+    </main>
+
+    {% if nav_items and active_nav %}
+    <nav class="main-nav" aria-label="Primary navigation">
+      {% for item in nav_items %}
+      <a class="nav-pill {% if item.key == active_nav %}active{% endif %}" href="{{ item.href }}">{{ item.label }}</a>
+      {% endfor %}
+    </nav>
+    {% endif %}
+  </div>
+
+  <script src="/static/js/state.js"></script>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

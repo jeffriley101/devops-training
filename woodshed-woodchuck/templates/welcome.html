@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="card hero-card">
+  <div>
+    <p class="chip">Music companion game demo</p>
+    <h2 class="hero-title">Help your Woodchuck build a musical world.</h2>
+    <p class="body-copy">
+      You practice in real life. Your Woodchuck grows with every step.
+      Sax Viking guides the journey with quests and encouragement.
+    </p>
+    <div class="button-row">
+      <a class="btn btn-primary" href="/setup">Start Your Woodshed</a>
+      <a class="btn btn-secondary" href="/home" data-requires-profile="true">Continue</a>
+    </div>
+  </div>
+  <div class="art-frame" aria-hidden="true">
+    <div class="woodchuck-placeholder">🪵🎷🐿️</div>
+  </div>
+</section>
+{% endblock %}
