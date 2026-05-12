@@ -1,8 +1,8 @@
 {
-  "game_date_et": "2026-04-21",
+  "game_date_et": "2026-05-10",
   "symbol": "GOLD",
-  "winning_bucket": "09:30",
-  "resolved_at": "2026-04-22T00:15:00-04:00",
+  "winning_bucket": "20:20",
+  "resolved_at": "2026-05-11T01:39:53.219485-04:00",
   "source_name": "jilt",
   "source_version": "1.0"
 }
