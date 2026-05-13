@@ -1,8 +1,10 @@
 # Internet Health Monitor
 
-Internet Health Monitor is a containerized AWS monitoring platform that performs scheduled HTTP health checks, measures latency, classifies service condition, and publishes historical observability artifacts for operator review.
+Internet Health Monitor is a containerized AWS monitoring platform that performs HTTP health checks, measures latency, classifies service condition, and publishes historical observability artifacts for operator review.
 
-Built as part of my transition into DevOps and cloud engineering, this project demonstrates that I can design, deploy, troubleshoot, and improve a real scheduled workload on AWS rather than only write local scripts.
+Built as part of my transition into DevOps and cloud engineering, this project demonstrates that I can design, deploy, troubleshoot, operate, and lifecycle-manage a real scheduled workload on AWS rather than only write local scripts.
+
+> **Lifecycle note:** This project successfully demonstrated scheduled AWS execution and artifact publishing. Scheduled cloud runs are currently paused as part of cost-governance cleanup, while screenshots, sample artifacts, source code, and documentation are preserved for portfolio review.
 
 ---
 
@@ -18,8 +20,32 @@ This project demonstrates hands-on work with:
 * Amazon CloudWatch Logs
 * Amazon ECR
 * Terraform
+* AWS cost-governance / lifecycle cleanup
 
-The platform runs on a schedule, checks configured web targets, records latency and response-validation results, generates operator-friendly artifacts, preserves historical run data, and publishes outputs for later review.
+During active operation, the platform ran on a schedule, checked configured web targets, recorded latency and response-validation results, generated operator-friendly artifacts, preserved historical run data, and published outputs for later review.
+
+The scheduled run has since been intentionally paused after preserving final project evidence.
+
+---
+
+## Current Status
+
+Current state: **working, artifact-complete, scheduled runs paused, and portfolio-ready**
+
+The scheduled AWS rule for this project has been disabled to avoid unnecessary ongoing cloud usage. The project remains valuable as a portfolio artifact because it preserves:
+
+* source code
+* infrastructure patterns
+* sample artifacts
+* final screenshots
+* README documentation
+* architecture and troubleshooting lessons
+
+Final proof screenshots are stored under:
+
+```text
+final-screenshots/
+```
 
 ---
 
@@ -56,6 +82,7 @@ This project goes further by treating monitoring as an operational platform work
 * operator-readable reporting
 * infrastructure managed with Terraform
 * iterative debugging of real deployment issues
+* lifecycle cleanup once the demo had served its portfolio purpose
 
 That makes it much closer to the way internal monitoring and automation tooling is handled in real engineering environments.
 
@@ -67,7 +94,7 @@ The workload is packaged as a Docker container and deployed to AWS.
 
 * **Amazon ECR** stores the container image
 * **Amazon ECS Fargate** runs the monitoring task
-* **Amazon EventBridge Scheduler** triggers recurring executions
+* **Amazon EventBridge Scheduler** triggered recurring executions during the active demo period
 * **Amazon S3** stores latest and historical artifacts
 * **Amazon CloudWatch Logs** provides runtime visibility
 * **Terraform** manages the infrastructure configuration
@@ -95,7 +122,21 @@ The application itself is organized around a simple monitoring pipeline:
 * latency trend chart generation
 * S3 artifact publishing
 * YAML-based target configuration
-* scheduled AWS execution
+* scheduled AWS execution during active demo period
+* scheduled-run pause as part of cost-governance cleanup
+
+---
+
+## Final Screenshots
+
+The final preserved dashboard proof is stored in:
+
+```text
+final-screenshots/IHM_dashboard.png
+final-screenshots/IHM_chart.png
+```
+
+These screenshots preserve the project’s dashboard presentation and latency trend visualization after scheduled cloud runs were paused.
 
 ---
 
@@ -116,7 +157,7 @@ The repository includes curated sample artifacts to show the reporting format wi
 * `artifacts/examples/sample-results.json`
 * `artifacts/examples/sample-report.txt`
 
-In deployed operation, the platform also produces:
+During deployed operation, the platform also produced:
 
 * latest result artifacts
 * latest text reports
@@ -142,6 +183,7 @@ In deployed operation, the platform also produces:
 │   └── examples/
 ├── config/
 │   └── targets.yaml
+├── final-screenshots/
 ├── images/
 ├── infra/
 │   └── environments/dev/
@@ -164,6 +206,7 @@ This project became more valuable because of the troubleshooting and iteration, 
 * designing artifact paths so history and chart generation work reliably
 * separating local behavior from deployed behavior through environment-aware configuration
 * preserving a working baseline while adding new features like chart generation
+* applying cost-governance by pausing nonessential scheduled cloud runs after preserving proof
 
 ---
 
@@ -171,7 +214,7 @@ This project became more valuable because of the troubleshooting and iteration, 
 
 Targets are defined in `config/targets.yaml` and can be changed without modifying application logic.
 
-Example monitored services in the current project include public web endpoints such as:
+Example monitored services in the project include public web endpoints such as:
 
 * Google
 * TimeAndDate
@@ -182,11 +225,10 @@ Example monitored services in the current project include public web endpoints s
 
 ## Resume-Level Summary
 
-Built a containerized Internet Health Monitor on AWS using Python, Docker, ECS Fargate, EventBridge Scheduler, S3, CloudWatch, ECR, and Terraform to perform scheduled HTTP checks, classify service health, preserve historical monitoring data, and generate latency trend artifacts for operational review.
+Built and operated a containerized Internet Health Monitor on AWS using Python, Docker, ECS Fargate, EventBridge Scheduler, S3, CloudWatch, ECR, and Terraform to perform scheduled HTTP checks, classify service health, preserve historical monitoring data, and generate latency trend artifacts for operational review. After validating and preserving the project, paused scheduled cloud execution as part of AWS cost-governance cleanup.
 
 ---
 
 ## Status
 
-Current state: **working, deployed, artifact-complete, and recruiter-ready**
-
+Current state: **working, deployed, artifact-complete, paused for cost governance, and recruiter-ready**

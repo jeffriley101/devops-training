@@ -2,9 +2,11 @@
 
 Market Snapshot Bot is a containerized AWS market-monitoring project built to demonstrate Python automation, scheduled cloud execution, artifact pipelines, and production-style troubleshooting.
 
-Built as part of my DevOps and cloud engineering transition, this project shows that I can take a Python workload from local development into a repeatable AWS scheduled system with container packaging, task execution, artifact generation, and runtime validation.
+Built as part of my DevOps and cloud engineering transition, this project shows that I can take a Python workload from local development into a repeatable AWS scheduled system with container packaging, task execution, artifact generation, runtime validation, and lifecycle cost governance.
 
 It began as a platform and infrastructure exercise using mock data to prove the deployment path end to end. It then evolved into a real-data workflow project while deliberately preserving mock mode for safe development, testing, and rollback.
+
+> **Lifecycle note:** This project successfully demonstrated scheduled AWS execution for both price and volume workflows. Scheduled cloud runs are currently paused as part of cost-governance cleanup, while final charts, screenshots, source code, and documentation are preserved for portfolio review.
 
 ---
 
@@ -21,8 +23,34 @@ This project demonstrates hands-on work with:
 - Amazon S3
 - GitHub Actions
 - Terraform-aware deployment workflow thinking
+- AWS cost-governance / lifecycle cleanup
 
-The project is not just a script that prints market data. It is a scheduled cloud workload that runs in AWS, generates structured artifacts, preserves history, and requires real troubleshooting across code, configuration, task definitions, and scheduler behavior.
+The project is not just a script that prints market data. It was built as a scheduled cloud workload that ran in AWS, generated structured artifacts, preserved history, and required real troubleshooting across code, configuration, task definitions, and scheduler behavior.
+
+The scheduled price and volume runs have now been intentionally paused after preserving final project evidence.
+
+---
+
+## Current Status
+
+Current state: **working, artifact-complete, scheduled runs paused, and portfolio-ready**
+
+The EventBridge Scheduler jobs for this project have been disabled to avoid unnecessary ongoing cloud usage. The project remains valuable as a portfolio artifact because it preserves:
+
+- source code
+- AWS scheduling patterns
+- local and cloud execution paths
+- S3 artifact design
+- final chart outputs
+- dashboard screenshots
+- README documentation
+- troubleshooting and lifecycle-management lessons
+
+Final proof screenshots and charts are stored under:
+
+```text
+final-screenshots/
+```
 
 ---
 
@@ -59,6 +87,7 @@ The value is that it demonstrates the full lifecycle of a scheduled cloud worklo
 - environment-aware behavior
 - troubleshooting when deployed runtime behavior does not match expectations
 - extending a stable baseline without discarding it
+- pausing scheduled cloud execution after preserving portfolio evidence
 
 That is much closer to real DevOps and cloud operations work than a one-off local script.
 
@@ -95,6 +124,12 @@ That phase included:
 - troubleshooting issues involving environment variables, task definitions, scheduler targets, and run-context behavior
 
 This phase mattered because it showed controlled change rather than reckless rewriting.
+
+### Phase 3: Lifecycle / Cost Governance
+
+After the project had demonstrated its cloud architecture and artifact pipeline, final charts and dashboard screenshots were preserved and the scheduled AWS runs were paused.
+
+This phase demonstrates an important operational lesson: cloud demos should not run forever without a reason. A good portfolio project can preserve proof while also reducing unnecessary cost.
 
 ---
 
@@ -141,13 +176,34 @@ Current real-data behavior:
 
 - tracks `QQQ` as the volume symbol
 - uses Yahoo Finance intraday data
-- filters to the intended ET monitoring window of `10:08–10:40 ET`
+- filters to the intended ET monitoring window of `10:10–10:50 ET`
 
 Development override for manual testing:
 
 ```bash
 python3 -m app.main --mode volume --allow-outside-window
 ```
+
+---
+
+## Final Screenshots and Charts
+
+Final preserved evidence is stored in:
+
+```text
+final-screenshots/
+```
+
+Key preserved files include:
+
+```text
+final-screenshots/market_price_official_daily_final.png
+final-screenshots/market_price_all_runs_final.png
+final-screenshots/market_snapshot_dashboard_volume.png
+final-screenshots/market_volume_window_final.png
+```
+
+The official daily price chart is the clearest final price artifact. The dashboard volume screenshot is the preferred volume proof because it shows the chart in the context of the broader portfolio dashboard.
 
 ---
 
@@ -166,6 +222,7 @@ python3 -m app.main --mode volume --allow-outside-window
 │   └── main.py             # single application entrypoint
 ├── bin/run_local_demo.sh   # simple local demo runner
 ├── dev/                    # local artifact output examples
+├── final-screenshots/      # preserved final portfolio proof
 ├── images/                 # sample images for documentation
 ├── infra/
 │   ├── ecs/                # ECS task definition assets
@@ -203,7 +260,7 @@ The project uses a practical AWS scheduled-workload pattern:
 
 - **Amazon ECR** stores versioned container images
 - **Amazon ECS Fargate** runs the workload as scheduled tasks
-- **Amazon EventBridge Scheduler** triggers recurring executions
+- **Amazon EventBridge Scheduler** triggered recurring executions during the active demo period
 - **Amazon CloudWatch Logs** provides runtime visibility and troubleshooting data
 - **Amazon S3** stores structured output artifacts when configured for cloud publishing
 
@@ -300,14 +357,18 @@ Many issues were not just code bugs. They involved task definitions, scheduler w
 
 Adding price-history persistence strengthened the project by turning it from a simple snapshot generator into a more useful historical-monitoring workflow with ongoing trend visibility.
 
+### 7. Cost governance is part of the lifecycle
+
+After final artifacts and screenshots were preserved, the scheduled AWS runs were intentionally paused. This keeps the portfolio value while avoiding unnecessary ongoing cloud cost.
+
 ---
 
 ## Resume-Level Summary
 
-Built a containerized AWS market-monitoring project using Python, Docker, ECS Fargate, EventBridge Scheduler, CloudWatch, S3, and artifact-based workflows to collect market data, preserve price history, generate charts, and troubleshoot scheduled runtime behavior across code and cloud configuration.
+Built and operated a containerized AWS market-monitoring project using Python, Docker, ECS Fargate, EventBridge Scheduler, CloudWatch, S3, and artifact-based workflows to collect market data, preserve price history, generate charts, and troubleshoot scheduled runtime behavior across code and cloud configuration. After validating and preserving the project, paused scheduled cloud execution as part of AWS cost-governance cleanup.
 
 ---
 
 ## Status
 
-Current state: **working, evolving, and portfolio-ready**
+Current state: **working, artifact-complete, scheduled runs paused, and portfolio-ready**
