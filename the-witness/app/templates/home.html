@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="hero">
+  <div>
+    <p class="eyebrow">Private achievement game</p>
+    <h1>Become who you want to become.</h1>
+    <p class="subtitle">The Witness remembers what mattered to you.</p>
+    <a class="button primary" href="/log-win">Log a Win</a>
+  </div>
+
+  <div class="curator-card">
+    <div class="curator">●</div>
+    <h2>The Curator</h2>
+    <p>You did all these.</p>
+  </div>
+</section>
+
+<section class="grid two">
+  <div class="panel">
+    <h2>Active Profiles</h2>
+
+    {% for profile in profiles %}
+    <div class="progress-row">
+      <div class="progress-header">
+        <span>{{ profile.name }}</span>
+        <span>{{ profile.xp }} / {{ profile.goal }} XP</span>
+      </div>
+      <div class="bar">
+        <div class="fill" style="width: {{ (profile.xp / profile.goal) * 100 }}%"></div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="panel">
+    <h2>Recent Wins</h2>
+    {% for win in recent_wins %}
+      <div class="win-card">{{ win }}</div>
+    {% endfor %}
+
+    <a class="button secondary" href="/trophy-case">Open Trophy Case</a>
+  </div>
+</section>
+{% endblock %}

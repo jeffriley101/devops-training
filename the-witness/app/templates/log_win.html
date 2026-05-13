@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="page-header">
+  <h1>Log a Win</h1>
+  <p>Tell The Witness what counted today.</p>
+</section>
+
+<section class="panel">
+  <label for="win">What happened?</label>
+  <textarea id="win" rows="4">Practiced sax for 30 minutes.</textarea>
+
+  <h2>Suggested XP</h2>
+  <div class="xp-list">
+    {% for item in suggested_xp %}
+      <div class="xp-pill">
+        <span>{{ item.profile }}</span>
+        <strong>+{{ item.xp }} XP</strong>
+      </div>
+    {% endfor %}
+  </div>
+
+  <div class="mock-note">
+    Static prototype only: this button does not save yet.
+  </div>
+
+  <a class="button primary" href="/">Confirm Win</a>
+</section>
+{% endblock %}

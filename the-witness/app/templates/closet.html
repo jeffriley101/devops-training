@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="page-header">
+  <h1>Avatar Closet</h1>
+  <p>The Curator can wear items unlocked by your completed profiles.</p>
+</section>
+
+<section class="grid two">
+  <div class="curator-card large">
+    <div class="curator">●</div>
+    <h2>The Curator</h2>
+    <p>Currently wearing: Heart patch</p>
+  </div>
+
+  <div class="panel">
+    <h2>Unlocked Items</h2>
+
+    {% for item in avatar_items %}
+      <div class="closet-item {% if item.equipped %}equipped{% endif %}">
+        <div>
+          <strong>{{ item.name }}</strong>
+          <p>Unlocked by {{ item.source }}</p>
+        </div>
+
+        {% if item.equipped %}
+          <span class="status">Equipped</span>
+        {% else %}
+          <span class="status muted">Available</span>
+        {% endif %}
+      </div>
+    {% endfor %}
+
+    <div class="mock-note">
+      Static prototype only: outfit persistence comes in a later phase.
+    </div>
+  </div>
+</section>
+{% endblock %}

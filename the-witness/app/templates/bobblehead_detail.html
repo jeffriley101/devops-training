@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% if profile %}
+<section class="bobble-detail">
+  <div class="big-bobble" id="wobbleTarget">
+    <div class="big-head">☺</div>
+    <div class="bobble-base">{{ profile.name }}</div>
+  </div>
+
+  <div class="panel">
+    <p class="eyebrow">Journey Complete</p>
+    <h1>{{ profile.name }}</h1>
+    <p>{{ profile.summary }}</p>
+
+    <div class="detail-line">
+      <strong>Completed:</strong> Demo Mode
+    </div>
+
+    <div class="detail-line">
+      <strong>Unlocked:</strong> {{ profile.reward }}
+    </div>
+
+    <button class="button primary" onclick="wobble()">Wobble</button>
+    <a class="button secondary" href="/trophy-case">Back to Trophy Case</a>
+  </div>
+</section>
+{% else %}
+<section class="panel">
+  <h1>Bobblehead not found</h1>
+  <a class="button secondary" href="/trophy-case">Back to Trophy Case</a>
+</section>
+{% endif %}
+{% endblock %}

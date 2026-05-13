@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="page-header">
+  <h1>Trophy Case</h1>
+  <p>The private museum of things you cared about.</p>
+</section>
+
+<section class="trophy-case">
+  {% for profile in profiles %}
+    {% if profile.unlocked %}
+      <a class="bobble unlocked" href="/bobblehead/{{ profile.id }}">
+        <div class="bobble-head">☺</div>
+        <span>{{ profile.name }}</span>
+      </a>
+    {% else %}
+      <div class="bobble locked">
+        <div class="bobble-head">?</div>
+        <span>{{ profile.name }}</span>
+      </div>
+    {% endif %}
+  {% endfor %}
+</section>
+{% endblock %}
