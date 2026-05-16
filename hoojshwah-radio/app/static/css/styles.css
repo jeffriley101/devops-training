@@ -170,3 +170,25 @@ button:hover {
     grid-template-columns: 1fr;
   }
 }
+
+
+.station-details {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(248, 242, 223, 0.18);
+  color: #cfc2e9;
+  font-size: 0.95rem;
+}
+
+.station-details p {
+  margin: 8px 0;
+}
+
+.station-details strong {
+  color: #ffd25e;
+}
+
+.warning {
+  color: #f3dfaa;
+  font-style: italic;
+}

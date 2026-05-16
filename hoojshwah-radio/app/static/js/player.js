@@ -6,6 +6,7 @@ const nowArtist = document.querySelector("#now-artist");
 const upNext = document.querySelector("#up-next");
 const trackType = document.querySelector("#track-type");
 const signalStatus = document.querySelector("#signal-status");
+const loopCount = document.querySelector("#loop-count");
 
 let station = null;
 let currentTrack = null;
@@ -74,6 +75,7 @@ function tuneStation() {
 async function loadStation() {
   const response = await fetch("/api/station");
   station = await response.json();
+  loopCount.textContent = station.tracks.length;
 
   tuneStation();
 }
