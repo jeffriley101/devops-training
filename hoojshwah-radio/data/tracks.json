@@ -1,34 +1,10 @@
 [
   {
-    "id": "bumper-001",
-    "type": "bumper",
-    "title": "You Are Listening to Hoojshwah Radio",
-    "artist": "Hoojshwah",
-    "duration_seconds": 15,
-    "audio_url": "https://example.com/bumper-001.mp3"
-  },
-  {
     "id": "track-001",
     "type": "song",
-    "title": "First Signal",
+    "title": "HW Numbers",
     "artist": "Hoojshwah",
-    "duration_seconds": 240,
-    "audio_url": "https://example.com/first-signal.mp3"
-  },
-  {
-    "id": "interruption-001",
-    "type": "interruption",
-    "title": "Ho’Ojshwah Interference",
-    "artist": "Ho’Ojshwah",
-    "duration_seconds": 20,
-    "audio_url": "https://example.com/hoojshwah-interference.mp3"
-  },
-  {
-    "id": "track-002",
-    "type": "song",
-    "title": "Second Signal",
-    "artist": "Hoojshwah",
-    "duration_seconds": 300,
-    "audio_url": "https://example.com/second-signal.mp3"
+    "duration_seconds": 126,
+    "audio_url": "/static/audio/first-signal.mp3"
   }
 ]
