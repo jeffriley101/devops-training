@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+.env.local
+.DS_Store
+
+# Do not commit large audio files to GitHub
+*.mp3
+*.wav
+*.flac
+*.aiff
