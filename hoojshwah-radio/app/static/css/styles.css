@@ -141,3 +141,32 @@ button:hover {
     grid-template-columns: 1fr;
   }
 }
+
+.track-type {
+  margin: 0 0 8px;
+  color: #cfc2e9;
+  font-size: 0.9rem;
+  text-transform: capitalize;
+}
+
+.signal-status {
+  margin: 8px 0 22px;
+  color: #f3dfaa;
+  font-size: 0.95rem;
+}
+
+.button-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+#resync-button {
+  background: #f3dfaa;
+}
+
+@media (max-width: 560px) {
+  .button-row {
+    grid-template-columns: 1fr;
+  }
+}
