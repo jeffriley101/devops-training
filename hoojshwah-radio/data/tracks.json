@@ -6,5 +6,37 @@
     "artist": "Hoojshwah",
     "duration_seconds": 126,
     "audio_url": "/static/audio/first-signal.mp3"
+  },
+  {
+    "id": "track-002",
+    "type": "song",
+    "title": "The Journey",
+    "artist": "Hoojshwah",
+    "duration_seconds": 507,
+    "audio_url": "/static/audio/the-journey.mp3"
+  },
+  {
+    "id": "track-003",
+    "type": "song",
+    "title": "The Lounge",
+    "artist": "Hoojshwah",
+    "duration_seconds": 83,
+    "audio_url": "/static/audio/the-lounge.mp3"
+  },
+  {
+    "id": "track-004",
+    "type": "song",
+    "title": "Like Boom",
+    "artist": "Hoojshwah",
+    "duration_seconds": 456,
+    "audio_url": "/static/audio/like-boom.mp3"
+  },
+  {
+    "id": "track-005",
+    "type": "song",
+    "title": "The Conqueror",
+    "artist": "Hoojshwah",
+    "duration_seconds": 558,
+    "audio_url": "/static/audio/the-conqueror.mp3"
   }
 ]
