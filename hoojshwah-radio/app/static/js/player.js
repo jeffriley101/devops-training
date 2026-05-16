@@ -6,6 +6,9 @@ const nowArtist = document.querySelector("#now-artist");
 const upNext = document.querySelector("#up-next");
 const trackType = document.querySelector("#track-type");
 const signalStatus = document.querySelector("#signal-status");
+const trackList = document.querySelector("#track-list");
+const shareButton = document.querySelector("#share-button");
+const shareStatus = document.querySelector("#share-status");
 const loopCount = document.querySelector("#loop-count");
 
 let station = null;
@@ -44,6 +47,16 @@ function findCurrentTrack(tracks, loopPositionSeconds) {
   };
 }
 
+function renderTrackList(tracks) {
+  trackList.innerHTML = "";
+
+  tracks.forEach((track) => {
+    const item = document.createElement("li");
+    item.textContent = `${track.title} — ${track.artist}`;
+    trackList.appendChild(item);
+  });
+}
+
 function renderTrackInfo(result) {
   currentTrack = result.track;
   nowTitle.textContent = result.track.title;
@@ -77,6 +90,7 @@ async function loadStation() {
   station = await response.json();
   loopCount.textContent = station.tracks.length;
 
+  renderTrackList(station.tracks);
   tuneStation();
 }
 
@@ -85,6 +99,7 @@ resyncButton.addEventListener("click", () => {
     return;
   }
 
+  renderTrackList(station.tracks);
   tuneStation();
   resyncButton.textContent = "Signal Resynced";
 
@@ -93,11 +108,24 @@ resyncButton.addEventListener("click", () => {
   }, 1400);
 });
 
+shareButton.addEventListener("click", async () => {
+  const stationUrl = "https://hoojshwah-radio-live.onrender.com/";
+
+  try {
+    await navigator.clipboard.writeText(stationUrl);
+    shareStatus.textContent = "Station link copied.";
+  } catch (error) {
+    console.error("Could not copy station link:", error);
+    shareStatus.textContent = stationUrl;
+  }
+});
+
 playButton.addEventListener("click", async () => {
   if (!station) {
     return;
   }
 
+  renderTrackList(station.tracks);
   tuneStation();
 
   try {
@@ -112,6 +140,7 @@ playButton.addEventListener("click", async () => {
 });
 
 audio.addEventListener("ended", () => {
+  renderTrackList(station.tracks);
   tuneStation();
   audio.play();
 });

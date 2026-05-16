@@ -192,3 +192,39 @@ button:hover {
   color: #f3dfaa;
   font-style: italic;
 }
+
+.station-note {
+  max-width: 42rem;
+  margin: 18px 0 28px;
+  padding: 14px 16px;
+  border-left: 4px solid #ffd25e;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #f3dfaa;
+}
+
+.share-card,
+.track-list-card {
+  margin-top: 26px;
+}
+
+.share-url {
+  overflow-wrap: anywhere;
+  color: #f8f2df;
+  font-size: 1.05rem;
+}
+
+#track-list {
+  display: grid;
+  gap: 10px;
+  padding: 0;
+  margin: 14px 0 0;
+  list-style: none;
+}
+
+#track-list li {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #f8f2df;
+}
