@@ -38,5 +38,37 @@
     "artist": "Hoojshwah",
     "duration_seconds": 558,
     "audio_url": "/static/audio/the-conqueror.mp3"
+  },
+  {
+    "id": "track-006",
+    "type": "song",
+    "title": "Late Easy",
+    "artist": "Hoojshwah",
+    "duration_seconds": 181,
+    "audio_url": "/static/audio/late-easy.mp3"
+  },
+  {
+    "id": "track-007",
+    "type": "song",
+    "title": "The Happy Song",
+    "artist": "Hoojshwah",
+    "duration_seconds": 533,
+    "audio_url": "/static/audio/the-happy-song.mp3"
+  },
+  {
+    "id": "track-008",
+    "type": "song",
+    "title": "Your Door Into Improvisation",
+    "artist": "Hoojshwah",
+    "duration_seconds": 973,
+    "audio_url": "/static/audio/your-door-into-improvisation.mp3"
+  },
+  {
+    "id": "track-009",
+    "type": "song",
+    "title": "Swimmin Shallow",
+    "artist": "Hoojshwah",
+    "duration_seconds": 2182,
+    "audio_url": "/static/audio/swimmin-shallow.mp3"
   }
 ]
