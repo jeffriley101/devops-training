@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ station_name }}</title>
+  <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+  <main class="radio-shell">
+    <section class="hero-card">
+      <p class="eyebrow">Signal locked</p>
+      <h1>{{ station_name }}</h1>
+
+      <p class="tagline">
+        An unlisted simulated-live station broadcasting original Hoojshwah music.
+      </p>
+
+      <p class="lore">
+        Click Play to tune in. The signal may drift. Ho’Ojshwah may interfere.
+      </p>
+
+      <div class="player-card">
+        <p class="label">Now Airing</p>
+        <h2 id="now-title">Station warming up...</h2>
+        <p id="now-artist">Hoojshwah</p>
+
+        <div class="button-row">
+          <button id="play-button" type="button">Play Signal</button>
+          <button id="resync-button" type="button">Resync Signal</button>
+        </div>
+
+        <p class="next">
+          Up Next: <span id="up-next">Calculating transmission...</span>
+        </p>
+
+        <audio id="radio-audio" preload="metadata"></audio>
+      </div>
+    </section>
+  </main>
+
+  <script src="/static/js/player.js"></script>
+</body>
+</html>
