@@ -4,6 +4,8 @@ const resyncButton = document.querySelector("#resync-button");
 const nowTitle = document.querySelector("#now-title");
 const nowArtist = document.querySelector("#now-artist");
 const upNext = document.querySelector("#up-next");
+const trackType = document.querySelector("#track-type");
+const signalStatus = document.querySelector("#signal-status");
 
 let station = null;
 let currentTrack = null;
@@ -45,6 +47,8 @@ function renderTrackInfo(result) {
   currentTrack = result.track;
   nowTitle.textContent = result.track.title;
   nowArtist.textContent = result.track.artist;
+  trackType.textContent = `Signal type: ${result.track.type}`;
+  signalStatus.textContent = "Signal locked. Click Play to tune in.";
   upNext.textContent = result.nextTrack.title;
 }
 
@@ -97,9 +101,11 @@ playButton.addEventListener("click", async () => {
   try {
     await audio.play();
     playButton.textContent = "Signal Playing";
+    signalStatus.textContent = "Broadcasting simulated-live from the Hoojshwah tower.";
   } catch (error) {
     console.error("Could not play audio:", error);
     playButton.textContent = "Signal Blocked";
+    signalStatus.textContent = "The signal was blocked by the browser. Try pressing Play again.";
   }
 });
 
