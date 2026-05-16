@@ -66,21 +66,13 @@
   {
     "id": "track-009",
     "type": "song",
-    "title": "Swimmin Shallow",
-    "artist": "Hoojshwah",
-    "duration_seconds": 2182,
-    "audio_url": "/static/audio/swimmin-shallow.mp3"
-  },
-  {
-    "id": "track-010",
-    "type": "song",
     "title": "Large Wit It",
     "artist": "Hoojshwah",
     "duration_seconds": 842,
     "audio_url": "/static/audio/large-wit-it.mp3"
   },
   {
-    "id": "track-011",
+    "id": "track-010",
     "type": "song",
     "title": "Dope",
     "artist": "Hoojshwah",
@@ -88,7 +80,7 @@
     "audio_url": "/static/audio/dope.mp3"
   },
   {
-    "id": "track-012",
+    "id": "track-011",
     "type": "song",
     "title": "Arrive",
     "artist": "Hoojshwah",
@@ -96,7 +88,7 @@
     "audio_url": "/static/audio/arrive.mp3"
   },
   {
-    "id": "track-013",
+    "id": "track-012",
     "type": "song",
     "title": "Chasin Falls",
     "artist": "Hoojshwah",
