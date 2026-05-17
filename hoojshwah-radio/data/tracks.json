@@ -94,5 +94,60 @@
     "artist": "Hoojshwah",
     "duration_seconds": 558,
     "audio_url": "/static/audio/chasin-falls.mp3"
-  }
-]
+  },
+  {
+    "id": "track-013",
+    "type": "song",
+    "title": "Double Ocee",
+    "artist": "Hoojshwah",
+    "duration_seconds": 444,
+    "audio_url": "/static/audio/double-ocee.mp3"
+  },
+  {
+    "id": "track-014",
+    "type": "song",
+    "title": "Creation",
+    "artist": "Hoojshwah",
+    "duration_seconds": 444,
+    "audio_url": "/static/audio/creation.mp3"
+  },
+  {
+    "id": "track-015",
+    "type": "song",
+    "title": "Badass",
+    "artist": "Hoojshwah",
+    "duration_seconds": 491,
+    "audio_url": "/static/audio/badass.mp3"
+  },
+  {
+    "id": "track-016",
+    "type": "song",
+    "title": "Get It Going",
+    "artist": "Hoojshwah",
+    "duration_seconds": 343,
+    "audio_url": "/static/audio/get-it-going.mp3"
+  },
+  {
+    "id": "track-017",
+    "type": "song",
+    "title": "Jungle Thump",
+    "artist": "Hoojshwah",
+    "duration_seconds": 312,
+    "audio_url": "/static/audio/jungle-thump.mp3"
+  },
+  {
+    "id": "track-018",
+    "type": "song",
+    "title": "Better Everyone",
+    "artist": "Hoojshwah",
+    "duration_seconds": 315,
+    "audio_url": "/static/audio/better-everyone.mp3"
+  },
+  {
+    "id": "track-019",
+    "type": "song",
+    "title": "Falling Island",
+    "artist": "Hoojshwah",
+    "duration_seconds": 272,
+    "audio_url": "/static/audio/falling-island.mp3"
+  }]
