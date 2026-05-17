@@ -4,12 +4,9 @@ const resyncButton = document.querySelector("#resync-button");
 const nowTitle = document.querySelector("#now-title");
 const nowArtist = document.querySelector("#now-artist");
 const upNext = document.querySelector("#up-next");
-const trackType = document.querySelector("#track-type");
-const signalStatus = document.querySelector("#signal-status");
 const trackList = document.querySelector("#track-list");
 const shareButton = document.querySelector("#share-button");
 const shareStatus = document.querySelector("#share-status");
-const loopCount = document.querySelector("#loop-count");
 
 let station = null;
 let currentTrack = null;
@@ -61,8 +58,6 @@ function renderTrackInfo(result) {
   currentTrack = result.track;
   nowTitle.textContent = result.track.title;
   nowArtist.textContent = result.track.artist;
-  trackType.textContent = `Signal type: ${result.track.type}`;
-  signalStatus.textContent = "Signal locked. Click Play to tune in.";
   upNext.textContent = result.nextTrack.title;
 }
 
@@ -86,12 +81,17 @@ function tuneStation() {
 }
 
 async function loadStation() {
-  const response = await fetch("/api/station");
-  station = await response.json();
-  loopCount.textContent = station.tracks.length;
+  try {
+    const response = await fetch("/api/station");
+    station = await response.json();
 
-  renderTrackList(station.tracks);
-  tuneStation();
+    renderTrackList(station.tracks);
+    tuneStation();
+  } catch (error) {
+    console.error("Could not load station:", error);
+    nowTitle.textContent = "Station temporarily unavailable";
+    upNext.textContent = "try refreshing";
+  }
 }
 
 resyncButton.addEventListener("click", () => {
@@ -131,11 +131,9 @@ playButton.addEventListener("click", async () => {
   try {
     await audio.play();
     playButton.textContent = "Signal Playing";
-    signalStatus.textContent = "Broadcasting simulated-live from the Hoojshwah tower.";
   } catch (error) {
     console.error("Could not play audio:", error);
     playButton.textContent = "Signal Blocked";
-    signalStatus.textContent = "The signal was blocked by the browser. Try pressing Play again.";
   }
 });
 

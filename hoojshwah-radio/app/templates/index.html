@@ -12,20 +12,20 @@
       <p class="eyebrow">Signal locked</p>
       <h1>{{ station_name }}</h1>
 
+      <img
+        class="band-photo"
+        src="/static/images/hooj01.jpeg"
+        alt="Hoojshwah band photo"
+      >
+
       <p class="tagline">
         An unlisted simulated-live station broadcasting original Hoojshwah music.
       </p>
 
-      <p class="lore">
-        Click Play to tune in. The signal may drift. Ho’Ojshwah may interfere.
-      </p>
-
       <div class="player-card">
         <p class="label">Now Airing</p>
-        <p id="track-type" class="track-type">Signal type: loading...</p>
-        <h2 id="now-title">Station warming up...</h2>
+        <h2 id="now-title">Tuning station...</h2>
         <p id="now-artist">Hoojshwah</p>
-        <p id="signal-status" class="signal-status">Signal waiting for listener...</p>
 
         <div class="button-row">
           <button id="play-button" type="button">Play Signal</button>
@@ -33,14 +33,10 @@
         </div>
 
         <p class="next">
-          Up Next: <span id="up-next">Calculating transmission...</span>
+          Up Next: <span id="up-next">...</span>
         </p>
 
         <div class="station-details">
-          <p><strong>Station mode:</strong> simulated-live loop</p>
-          <p><strong>Current loop:</strong> <span id="loop-count">calculating...</span> transmissions</p>
-          <p><strong>Share signal:</strong> send this link to tune in.</p>
-          <p class="warning">Ho’Ojshwah interference may occur without warning.</p>
         </div>
 
         <audio id="radio-audio" preload="metadata"></audio>

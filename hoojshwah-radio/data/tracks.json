@@ -2,7 +2,7 @@
   {
     "id": "track-001",
     "type": "song",
-    "title": "HW Numbers",
+    "title": "Numbers short version",
     "artist": "Hoojshwah",
     "duration_seconds": 126,
     "audio_url": "/static/audio/first-signal.mp3"
@@ -10,133 +10,21 @@
   {
     "id": "track-002",
     "type": "song",
-    "title": "The Journey",
-    "artist": "Hoojshwah",
-    "duration_seconds": 507,
-    "audio_url": "/static/audio/the-journey.mp3"
-  },
-  {
-    "id": "track-003",
-    "type": "song",
-    "title": "The Lounge",
-    "artist": "Hoojshwah",
-    "duration_seconds": 83,
-    "audio_url": "/static/audio/the-lounge.mp3"
-  },
-  {
-    "id": "track-004",
-    "type": "song",
-    "title": "Like Boom",
-    "artist": "Hoojshwah",
-    "duration_seconds": 456,
-    "audio_url": "/static/audio/like-boom.mp3"
-  },
-  {
-    "id": "track-005",
-    "type": "song",
-    "title": "The Conqueror",
-    "artist": "Hoojshwah",
-    "duration_seconds": 558,
-    "audio_url": "/static/audio/the-conqueror.mp3"
-  },
-  {
-    "id": "track-006",
-    "type": "song",
-    "title": "Late Easy",
-    "artist": "Hoojshwah",
-    "duration_seconds": 181,
-    "audio_url": "/static/audio/late-easy.mp3"
-  },
-  {
-    "id": "track-007",
-    "type": "song",
-    "title": "The Happy Song",
-    "artist": "Hoojshwah",
-    "duration_seconds": 533,
-    "audio_url": "/static/audio/the-happy-song.mp3"
-  },
-  {
-    "id": "track-008",
-    "type": "song",
-    "title": "Your Door Into Improvisation",
-    "artist": "Hoojshwah",
-    "duration_seconds": 973,
-    "audio_url": "/static/audio/your-door-into-improvisation.mp3"
-  },
-  {
-    "id": "track-009",
-    "type": "song",
-    "title": "Large Wit It",
-    "artist": "Hoojshwah",
-    "duration_seconds": 842,
-    "audio_url": "/static/audio/large-wit-it.mp3"
-  },
-  {
-    "id": "track-010",
-    "type": "song",
-    "title": "Dope",
-    "artist": "Hoojshwah",
-    "duration_seconds": 425,
-    "audio_url": "/static/audio/dope.mp3"
-  },
-  {
-    "id": "track-011",
-    "type": "song",
-    "title": "Arrive",
-    "artist": "Hoojshwah",
-    "duration_seconds": 508,
-    "audio_url": "/static/audio/arrive.mp3"
-  },
-  {
-    "id": "track-012",
-    "type": "song",
-    "title": "Chasin Falls",
-    "artist": "Hoojshwah",
-    "duration_seconds": 558,
-    "audio_url": "/static/audio/chasin-falls.mp3"
-  },
-  {
-    "id": "track-013",
-    "type": "song",
-    "title": "Double Ocee",
-    "artist": "Hoojshwah",
-    "duration_seconds": 444,
-    "audio_url": "/static/audio/double-ocee.mp3"
-  },
-  {
-    "id": "track-014",
-    "type": "song",
-    "title": "Creation",
-    "artist": "Hoojshwah",
-    "duration_seconds": 444,
-    "audio_url": "/static/audio/creation.mp3"
-  },
-  {
-    "id": "track-015",
-    "type": "song",
-    "title": "Badass",
-    "artist": "Hoojshwah",
-    "duration_seconds": 491,
-    "audio_url": "/static/audio/badass.mp3"
-  },
-  {
-    "id": "track-016",
-    "type": "song",
     "title": "Get It Going",
     "artist": "Hoojshwah",
     "duration_seconds": 343,
     "audio_url": "/static/audio/get-it-going.mp3"
   },
   {
-    "id": "track-017",
     "type": "song",
-    "title": "Jungle Thump",
+    "title": "Limited Tape",
     "artist": "Hoojshwah",
-    "duration_seconds": 312,
-    "audio_url": "/static/audio/jungle-thump.mp3"
+    "duration_seconds": 599,
+    "audio_url": "/static/audio/limited-tape.mp3",
+    "id": "track-003"
   },
   {
-    "id": "track-018",
+    "id": "track-004",
     "type": "song",
     "title": "Better Everyone",
     "artist": "Hoojshwah",
@@ -144,10 +32,227 @@
     "audio_url": "/static/audio/better-everyone.mp3"
   },
   {
-    "id": "track-019",
+    "id": "track-005",
     "type": "song",
     "title": "Falling Island",
     "artist": "Hoojshwah",
     "duration_seconds": 272,
     "audio_url": "/static/audio/falling-island.mp3"
-  }]
+  },
+  {
+    "type": "song",
+    "title": "Bwannndon Hahaha",
+    "artist": "Hoojshwah",
+    "duration_seconds": 576,
+    "audio_url": "/static/audio/bwannndon-hahaha.mp3",
+    "id": "track-006"
+  },
+  {
+    "type": "song",
+    "title": "Twisted McKeys",
+    "artist": "Hoojshwah",
+    "duration_seconds": 182,
+    "audio_url": "/static/audio/twisted-mckeys.mp3",
+    "id": "track-007"
+  },
+  {
+    "id": "track-008",
+    "type": "song",
+    "title": "Jungle Thump",
+    "artist": "Hoojshwah",
+    "duration_seconds": 312,
+    "audio_url": "/static/audio/jungle-thump.mp3"
+  },
+  {
+    "type": "song",
+    "title": "Oh It's Time",
+    "artist": "Hoojshwah",
+    "duration_seconds": 304,
+    "audio_url": "/static/audio/oh-its-time.mp3",
+    "id": "track-009"
+  },
+  {
+    "type": "song",
+    "title": "Spelt H O O Shjwah",
+    "artist": "Hoojshwah",
+    "duration_seconds": 631,
+    "audio_url": "/static/audio/spelt-h-o-o-shjwah.mp3",
+    "id": "track-010"
+  },
+  {
+    "type": "song",
+    "title": "He's Tryin",
+    "artist": "Hoojshwah",
+    "duration_seconds": 342,
+    "audio_url": "/static/audio/hes-tryin.mp3",
+    "id": "track-011"
+  },
+  {
+    "type": "song",
+    "title": "Dew Dew Dew",
+    "artist": "Hoojshwah",
+    "duration_seconds": 731,
+    "audio_url": "/static/audio/dew-dew-dew.mp3",
+    "id": "track-012"
+  },
+  {
+    "type": "song",
+    "title": "Wyley Wyrk",
+    "artist": "Hoojshwah",
+    "duration_seconds": 436,
+    "audio_url": "/static/audio/wyley-wyrk-beefcut.mp3",
+    "id": "track-013"
+  },
+  {
+    "id": "track-014",
+    "type": "song",
+    "title": "Double Ocee",
+    "artist": "Hoojshwah",
+    "duration_seconds": 444,
+    "audio_url": "/static/audio/double-ocee.mp3"
+  },
+  {
+    "id": "track-015",
+    "type": "song",
+    "title": "Creation",
+    "artist": "Hoojshwah",
+    "duration_seconds": 444,
+    "audio_url": "/static/audio/creation.mp3"
+  },
+  {
+    "id": "track-016",
+    "type": "song",
+    "title": "Badass",
+    "artist": "Hoojshwah",
+    "duration_seconds": 491,
+    "audio_url": "/static/audio/badass.mp3"
+  },
+  {
+    "type": "song",
+    "title": "Most Proved",
+    "artist": "Hoojshwah",
+    "duration_seconds": 751,
+    "audio_url": "/static/audio/most-proved.mp3",
+    "id": "track-017"
+  },
+  {
+    "id": "track-018",
+    "type": "song",
+    "title": "Dope",
+    "artist": "Hoojshwah",
+    "duration_seconds": 425,
+    "audio_url": "/static/audio/dope.mp3"
+  },
+  {
+    "type": "song",
+    "title": "Fire Arms",
+    "artist": "Hoojshwah",
+    "duration_seconds": 1302,
+    "audio_url": "/static/audio/fire-arms.mp3",
+    "id": "track-019"
+  },
+  {
+    "id": "track-020",
+    "type": "song",
+    "title": "Arrive",
+    "artist": "Hoojshwah",
+    "duration_seconds": 508,
+    "audio_url": "/static/audio/arrive.mp3"
+  },
+  {
+    "id": "track-021",
+    "type": "song",
+    "title": "Chasin Falls",
+    "artist": "Hoojshwah",
+    "duration_seconds": 558,
+    "audio_url": "/static/audio/chasin-falls.mp3"
+  },
+  {
+    "type": "song",
+    "title": "Rockstar Life Chooses You",
+    "artist": "Hoojshwah",
+    "duration_seconds": 449,
+    "audio_url": "/static/audio/rockstar-life-chooses-you.mp3",
+    "id": "track-022"
+  },
+  {
+    "type": "song",
+    "title": "Half a Wine",
+    "artist": "Hoojshwah",
+    "duration_seconds": 487,
+    "audio_url": "/static/audio/half-a-wine.mp3",
+    "id": "track-023"
+  },
+  {
+    "id": "track-024",
+    "type": "song",
+    "title": "The Journey",
+    "artist": "Hoojshwah",
+    "duration_seconds": 507,
+    "audio_url": "/static/audio/the-journey.mp3"
+  },
+  {
+    "id": "track-025",
+    "type": "song",
+    "title": "The Lounge",
+    "artist": "Hoojshwah",
+    "duration_seconds": 83,
+    "audio_url": "/static/audio/the-lounge.mp3"
+  },
+  {
+    "id": "track-026",
+    "type": "song",
+    "title": "Like Boom",
+    "artist": "Hoojshwah",
+    "duration_seconds": 456,
+    "audio_url": "/static/audio/like-boom.mp3"
+  },
+  {
+    "id": "track-027",
+    "type": "song",
+    "title": "The Conqueror",
+    "artist": "Hoojshwah",
+    "duration_seconds": 558,
+    "audio_url": "/static/audio/the-conqueror.mp3"
+  },
+  {
+    "id": "track-028",
+    "type": "song",
+    "title": "Late Easy",
+    "artist": "Hoojshwah",
+    "duration_seconds": 181,
+    "audio_url": "/static/audio/late-easy.mp3"
+  },
+  {
+    "id": "track-029",
+    "type": "song",
+    "title": "The Happy Song",
+    "artist": "Hoojshwah",
+    "duration_seconds": 533,
+    "audio_url": "/static/audio/the-happy-song.mp3"
+  },
+  {
+    "id": "track-030",
+    "type": "song",
+    "title": "Your Door",
+    "artist": "Hoojshwah",
+    "duration_seconds": 973,
+    "audio_url": "/static/audio/your-door-into-improvisation.mp3"
+  },
+  {
+    "id": "track-031",
+    "type": "song",
+    "title": "Large Wit It",
+    "artist": "Hoojshwah",
+    "duration_seconds": 842,
+    "audio_url": "/static/audio/large-wit-it.mp3"
+  },
+  {
+    "type": "song",
+    "title": "Numbers",
+    "artist": "Hoojshwah",
+    "duration_seconds": 386,
+    "audio_url": "/static/audio/numbers-2026.mp3",
+    "id": "track-032"
+  }
+]

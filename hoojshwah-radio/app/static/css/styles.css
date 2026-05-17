@@ -228,3 +228,13 @@ button:hover {
   background: rgba(255, 255, 255, 0.08);
   color: #f8f2df;
 }
+
+.band-photo {
+  width: 100%;
+  max-height: 360px;
+  margin: 24px 0 0;
+  border-radius: 22px;
+  object-fit: cover;
+  border: 1px solid rgba(248, 242, 223, 0.18);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.32);
+}
