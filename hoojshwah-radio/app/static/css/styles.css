@@ -296,3 +296,20 @@ button:hover {
     width: 100%;
   }
 }
+
+.track-recording-info {
+  margin: -2px 0 12px;
+  color: #cfc2e9;
+  font-size: 0.95rem;
+}
+
+.playlist-title,
+.playlist-meta {
+  display: block;
+}
+
+.playlist-meta {
+  margin-top: 4px;
+  color: #cfc2e9;
+  font-size: 0.9rem;
+}

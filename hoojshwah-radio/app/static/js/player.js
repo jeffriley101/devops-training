@@ -8,6 +8,7 @@ const trackList = document.querySelector("#track-list");
 const shareButton = document.querySelector("#share-button");
 const shareStatus = document.querySelector("#share-status");
 const trackProgress = document.querySelector("#track-progress");
+const trackRecordingInfo = document.querySelector("#track-recording-info");
 const loopLength = document.querySelector("#loop-length");
 const trackListToggle = document.querySelector("#track-list-toggle");
 
@@ -73,6 +74,18 @@ function renderLoopLength(totalSeconds) {
   }
 }
 
+function getRecordingInfo(track) {
+  if (track.recorded_date && track.recorded_location) {
+    return `Recorded: ${track.recorded_date} · ${track.recorded_location}`;
+  }
+
+  if (track.recording_context) {
+    return track.recording_context;
+  }
+
+  return "";
+}
+
 function renderTrackList(tracks) {
   if (!trackList) {
     return;
@@ -83,7 +96,13 @@ function renderTrackList(tracks) {
   tracks.forEach((track) => {
     const item = document.createElement("li");
     const typeLabel = track.type === "bumper" ? "Station ID" : "Track";
-    item.textContent = `${track.title} — ${track.artist} (${typeLabel})`;
+    const recordingInfo = getRecordingInfo(track);
+
+    item.innerHTML = `
+      <span class="playlist-title">${track.title} — ${track.artist} (${typeLabel})</span>
+      ${recordingInfo ? `<span class="playlist-meta">${recordingInfo}</span>` : ""}
+    `;
+
     trackList.appendChild(item);
   });
 }
@@ -92,6 +111,10 @@ function renderTrackInfo(result) {
   nowTitle.textContent = result.track.title;
   nowArtist.textContent = result.track.artist;
   upNext.textContent = result.nextTrack.title;
+
+  if (trackRecordingInfo) {
+    trackRecordingInfo.textContent = getRecordingInfo(result.track);
+  }
 
   if (trackProgress) {
     trackProgress.textContent = `Tuned in at ${formatDuration(result.offsetSeconds)} of ${formatDuration(result.track.duration_seconds)}`;

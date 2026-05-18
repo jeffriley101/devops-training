@@ -5,7 +5,10 @@
     "title": "Numbers short version",
     "artist": "Hoojshwah",
     "duration_seconds": 126,
-    "audio_url": "/static/audio/first-signal.mp3"
+    "audio_url": "/static/audio/first-signal.mp3",
+    "recorded_date": "2026-05-07",
+    "recorded_location": "The Spacement",
+    "recording_context": "Live, original, unrehearsed, ad-lib performance"
   },
   {
     "type": "song",
@@ -13,7 +16,10 @@
     "artist": "Hoojshwah",
     "duration_seconds": 599,
     "audio_url": "/static/audio/limited-tape.mp3",
-    "id": "track-002"
+    "id": "track-002",
+    "recorded_date": "2026-05-14",
+    "recorded_location": "The Spacement",
+    "recording_context": "Live, original, unrehearsed, ad-lib performance"
   },
   {
     "type": "bumper",
@@ -21,7 +27,10 @@
     "artist": "Hoojshwah Radio",
     "duration_seconds": 100,
     "audio_url": "/static/audio/bumpers/bumper-sm.mp3",
-    "id": "track-003"
+    "id": "track-003",
+    "recorded_date": null,
+    "recorded_location": null,
+    "recording_context": "Station bumper with voice-over and Hoojshwah music bed"
   },
   {
     "type": "song",
@@ -29,7 +38,10 @@
     "artist": "Hoojshwah",
     "duration_seconds": 182,
     "audio_url": "/static/audio/twisted-mckeys.mp3",
-    "id": "track-004"
+    "id": "track-004",
+    "recorded_date": "2026-05-14",
+    "recorded_location": "The Spacement",
+    "recording_context": "Live, original, unrehearsed, ad-lib performance"
   },
   {
     "id": "track-005",
@@ -37,7 +49,10 @@
     "title": "Get It Going",
     "artist": "Hoojshwah",
     "duration_seconds": 343,
-    "audio_url": "/static/audio/get-it-going.mp3"
+    "audio_url": "/static/audio/get-it-going.mp3",
+    "recorded_date": "2023-04-13",
+    "recorded_location": "The Spacement",
+    "recording_context": "Live, original, unrehearsed, ad-lib performance"
   },
   {
     "id": "track-006",
@@ -45,15 +60,10 @@
     "title": "Jungle Thump",
     "artist": "Hoojshwah",
     "duration_seconds": 312,
-    "audio_url": "/static/audio/jungle-thump.mp3"
-  },
-  {
-    "type": "song",
-    "title": "Jungle Thump 2",
-    "artist": "Hoojshwah",
-    "duration_seconds": 581,
-    "audio_url": "/static/audio/jungle-thump-2.mp3",
-    "id": "track-007"
+    "audio_url": "/static/audio/jungle-thump.mp3",
+    "recorded_date": "2023-04-13",
+    "recorded_location": "The Spacement",
+    "recording_context": "Live, original, unrehearsed, ad-lib performance"
   },
   {
     "type": "song",
@@ -61,15 +71,21 @@
     "artist": "Hoojshwah",
     "duration_seconds": 378,
     "audio_url": "/static/audio/better-everyone.mp3",
-    "id": "track-008"
+    "id": "track-007",
+    "recorded_date": "2024-03-26",
+    "recorded_location": "Kokomo Joe's",
+    "recording_context": "Live, original, unrehearsed, ad-lib performance"
   },
   {
-    "id": "track-009",
+    "id": "track-008",
     "type": "song",
     "title": "Falling Island",
     "artist": "Hoojshwah",
     "duration_seconds": 272,
-    "audio_url": "/static/audio/falling-island.mp3"
+    "audio_url": "/static/audio/falling-island.mp3",
+    "recorded_date": "2023-04-13",
+    "recorded_location": "The Spacement",
+    "recording_context": "Live, original, unrehearsed, ad-lib performance"
   },
   {
     "type": "bumper",
@@ -77,7 +93,10 @@
     "artist": "Hoojshwah Radio",
     "duration_seconds": 45,
     "audio_url": "/static/audio/bumpers/bumper-spacement.mp3",
-    "id": "track-010"
+    "id": "track-009",
+    "recorded_date": null,
+    "recorded_location": null,
+    "recording_context": "Station bumper with voice-over and Hoojshwah music bed"
   },
   {
     "type": "song",
@@ -85,7 +104,10 @@
     "artist": "Hoojshwah",
     "duration_seconds": 576,
     "audio_url": "/static/audio/bwannndon-hahaha.mp3",
-    "id": "track-011"
+    "id": "track-010",
+    "recorded_date": "2026-05-07",
+    "recorded_location": "The Spacement",
+    "recording_context": "Live, original, unrehearsed, ad-lib performance"
   },
   {
     "type": "song",
@@ -93,7 +115,10 @@
     "artist": "Hoojshwah",
     "duration_seconds": 304,
     "audio_url": "/static/audio/oh-its-time.mp3",
-    "id": "track-012"
+    "id": "track-011",
+    "recorded_date": "2026-04-23",
+    "recorded_location": "The Spacement",
+    "recording_context": "Live, original, unrehearsed, ad-lib performance"
   },
   {
     "type": "bumper",
@@ -101,7 +126,10 @@
     "artist": "Hoojshwah Radio",
     "duration_seconds": 56,
     "audio_url": "/static/audio/bumpers/bumper-spaceradio.mp3",
-    "id": "track-013"
+    "id": "track-012",
+    "recorded_date": null,
+    "recorded_location": null,
+    "recording_context": "Station bumper with voice-over and Hoojshwah music bed"
   },
   {
     "type": "song",
@@ -109,7 +137,10 @@
     "artist": "Hoojshwah",
     "duration_seconds": 631,
     "audio_url": "/static/audio/spelt-h-o-o-shjwah.mp3",
-    "id": "track-014"
+    "id": "track-013",
+    "recorded_date": "2026-05-07",
+    "recorded_location": "The Spacement",
+    "recording_context": "Live, original, unrehearsed, ad-lib performance"
   },
   {
     "type": "bumper",
@@ -117,7 +148,10 @@
     "artist": "Hoojshwah Radio",
     "duration_seconds": 89,
     "audio_url": "/static/audio/bumpers/bumper-ty.mp3",
-    "id": "track-015"
+    "id": "track-014",
+    "recorded_date": null,
+    "recorded_location": null,
+    "recording_context": "Station bumper with voice-over and Hoojshwah music bed"
   },
   {
     "type": "song",
@@ -125,7 +159,10 @@
     "artist": "Hoojshwah",
     "duration_seconds": 342,
     "audio_url": "/static/audio/hes-tryin.mp3",
-    "id": "track-016"
+    "id": "track-015",
+    "recorded_date": "2026-04-30",
+    "recorded_location": "The Spacement",
+    "recording_context": "Live, original, unrehearsed, ad-lib performance"
   },
   {
     "type": "song",
@@ -133,7 +170,10 @@
     "artist": "Hoojshwah",
     "duration_seconds": 731,
     "audio_url": "/static/audio/dew-dew-dew.mp3",
-    "id": "track-017"
+    "id": "track-016",
+    "recorded_date": "2026-04-30",
+    "recorded_location": "The Spacement",
+    "recording_context": "Live, original, unrehearsed, ad-lib performance"
   },
   {
     "type": "bumper",
@@ -141,7 +181,10 @@
     "artist": "Hoojshwah Radio",
     "duration_seconds": 46,
     "audio_url": "/static/audio/bumpers/bumper-use.mp3",
-    "id": "track-018"
+    "id": "track-017",
+    "recorded_date": null,
+    "recorded_location": null,
+    "recording_context": "Station bumper with voice-over and Hoojshwah music bed"
   },
   {
     "type": "song",
@@ -149,7 +192,21 @@
     "artist": "Hoojshwah",
     "duration_seconds": 436,
     "audio_url": "/static/audio/wyley-wyrk-beefcut.mp3",
-    "id": "track-019"
+    "id": "track-018",
+    "recorded_date": "2023-08-29",
+    "recorded_location": "The Spacement",
+    "recording_context": "Live, original, unrehearsed, ad-lib performance"
+  },
+  {
+    "type": "song",
+    "title": "Jungle Thump 2",
+    "artist": "Hoojshwah",
+    "duration_seconds": 581,
+    "audio_url": "/static/audio/jungle-thump-2.mp3",
+    "id": "track-019",
+    "recorded_date": "2020-07-25",
+    "recorded_location": "The Spacement",
+    "recording_context": "Live, original, unrehearsed, ad-lib performance"
   },
   {
     "id": "track-020",
@@ -157,7 +214,10 @@
     "title": "Double Ocee",
     "artist": "Hoojshwah",
     "duration_seconds": 444,
-    "audio_url": "/static/audio/double-ocee.mp3"
+    "audio_url": "/static/audio/double-ocee.mp3",
+    "recorded_date": "2023-04-27",
+    "recorded_location": "The Spacement",
+    "recording_context": "Live, original, unrehearsed, ad-lib performance"
   },
   {
     "id": "track-021",
@@ -165,7 +225,10 @@
     "title": "Creation",
     "artist": "Hoojshwah",
     "duration_seconds": 444,
-    "audio_url": "/static/audio/creation.mp3"
+    "audio_url": "/static/audio/creation.mp3",
+    "recorded_date": "2023-04-27",
+    "recorded_location": "The Spacement",
+    "recording_context": "Live, original, unrehearsed, ad-lib performance"
   },
   {
     "id": "track-022",
@@ -173,7 +236,10 @@
     "title": "Badass",
     "artist": "Hoojshwah",
     "duration_seconds": 491,
-    "audio_url": "/static/audio/badass.mp3"
+    "audio_url": "/static/audio/badass.mp3",
+    "recorded_date": "2023-04-27",
+    "recorded_location": "The Spacement",
+    "recording_context": "Live, original, unrehearsed, ad-lib performance"
   },
   {
     "type": "bumper",
@@ -181,7 +247,10 @@
     "artist": "Hoojshwah Radio",
     "duration_seconds": 45,
     "audio_url": "/static/audio/bumpers/bumper-vs.mp3",
-    "id": "track-023"
+    "id": "track-023",
+    "recorded_date": null,
+    "recorded_location": null,
+    "recording_context": "Station bumper with voice-over and Hoojshwah music bed"
   },
   {
     "type": "song",
@@ -189,7 +258,10 @@
     "artist": "Hoojshwah",
     "duration_seconds": 449,
     "audio_url": "/static/audio/blows-me-away.mp3",
-    "id": "track-024"
+    "id": "track-024",
+    "recorded_date": "2026-03-28",
+    "recorded_location": "The Spacement",
+    "recording_context": "Live, original, unrehearsed, ad-lib performance"
   },
   {
     "type": "song",
@@ -197,7 +269,10 @@
     "artist": "Hoojshwah",
     "duration_seconds": 751,
     "audio_url": "/static/audio/most-proved.mp3",
-    "id": "track-025"
+    "id": "track-025",
+    "recorded_date": "2026-04-30",
+    "recorded_location": "The Spacement",
+    "recording_context": "Live, original, unrehearsed, ad-lib performance"
   },
   {
     "type": "bumper",
@@ -205,7 +280,10 @@
     "artist": "Hoojshwah Radio",
     "duration_seconds": 14,
     "audio_url": "/static/audio/bumpers/bumper-yac.mp3",
-    "id": "track-026"
+    "id": "track-026",
+    "recorded_date": null,
+    "recorded_location": null,
+    "recording_context": "Station bumper with voice-over and Hoojshwah music bed"
   },
   {
     "id": "track-027",
@@ -213,7 +291,10 @@
     "title": "Dope",
     "artist": "Hoojshwah",
     "duration_seconds": 425,
-    "audio_url": "/static/audio/dope.mp3"
+    "audio_url": "/static/audio/dope.mp3",
+    "recorded_date": "2024-11-15",
+    "recorded_location": "The Spacement",
+    "recording_context": "Live, original, unrehearsed, ad-lib performance"
   },
   {
     "type": "song",
@@ -221,7 +302,10 @@
     "artist": "Hoojshwah",
     "duration_seconds": 1302,
     "audio_url": "/static/audio/fire-arms.mp3",
-    "id": "track-028"
+    "id": "track-028",
+    "recorded_date": "2026-05-14",
+    "recorded_location": "The Spacement",
+    "recording_context": "Live, original, unrehearsed, ad-lib performance"
   },
   {
     "type": "bumper",
@@ -229,7 +313,10 @@
     "artist": "Hoojshwah Radio",
     "duration_seconds": 100,
     "audio_url": "/static/audio/bumpers/bumper-sm.mp3",
-    "id": "track-029"
+    "id": "track-029",
+    "recorded_date": null,
+    "recorded_location": null,
+    "recording_context": "Station bumper with voice-over and Hoojshwah music bed"
   },
   {
     "id": "track-030",
@@ -237,7 +324,10 @@
     "title": "Arrive",
     "artist": "Hoojshwah",
     "duration_seconds": 508,
-    "audio_url": "/static/audio/arrive.mp3"
+    "audio_url": "/static/audio/arrive.mp3",
+    "recorded_date": "2025-02-06",
+    "recorded_location": "The Spacement",
+    "recording_context": "Live, original, unrehearsed, ad-lib performance"
   },
   {
     "id": "track-031",
@@ -245,7 +335,10 @@
     "title": "Chasin Falls",
     "artist": "Hoojshwah",
     "duration_seconds": 558,
-    "audio_url": "/static/audio/chasin-falls.mp3"
+    "audio_url": "/static/audio/chasin-falls.mp3",
+    "recorded_date": "2024-07-18",
+    "recorded_location": "The Spacement",
+    "recording_context": "Live, original, unrehearsed, ad-lib performance"
   },
   {
     "type": "bumper",
@@ -253,7 +346,10 @@
     "artist": "Hoojshwah Radio",
     "duration_seconds": 45,
     "audio_url": "/static/audio/bumpers/bumper-spacement.mp3",
-    "id": "track-032"
+    "id": "track-032",
+    "recorded_date": null,
+    "recorded_location": null,
+    "recording_context": "Station bumper with voice-over and Hoojshwah music bed"
   },
   {
     "type": "song",
@@ -261,7 +357,10 @@
     "artist": "Hoojshwah",
     "duration_seconds": 449,
     "audio_url": "/static/audio/rockstar-life-chooses-you.mp3",
-    "id": "track-033"
+    "id": "track-033",
+    "recorded_date": "2026-05-07",
+    "recorded_location": "The Spacement",
+    "recording_context": "Live, original, unrehearsed, ad-lib performance"
   },
   {
     "id": "track-034",
@@ -269,7 +368,10 @@
     "title": "The Journey",
     "artist": "Hoojshwah",
     "duration_seconds": 507,
-    "audio_url": "/static/audio/the-journey.mp3"
+    "audio_url": "/static/audio/the-journey.mp3",
+    "recorded_date": "2023-04-06",
+    "recorded_location": "The Spacement",
+    "recording_context": "Live, original, unrehearsed, ad-lib performance"
   },
   {
     "id": "track-035",
@@ -277,7 +379,10 @@
     "title": "The Lounge",
     "artist": "Hoojshwah",
     "duration_seconds": 83,
-    "audio_url": "/static/audio/the-lounge.mp3"
+    "audio_url": "/static/audio/the-lounge.mp3",
+    "recorded_date": "2023-04-06",
+    "recorded_location": "The Spacement",
+    "recording_context": "Live, original, unrehearsed, ad-lib performance"
   },
   {
     "type": "song",
@@ -285,7 +390,10 @@
     "artist": "Hoojshwah",
     "duration_seconds": 753,
     "audio_url": "/static/audio/like-boom.mp3",
-    "id": "track-036"
+    "id": "track-036",
+    "recorded_date": "2024-09-27",
+    "recorded_location": "The Spacement",
+    "recording_context": "Live, original, unrehearsed, ad-lib performance"
   },
   {
     "id": "track-037",
@@ -293,7 +401,10 @@
     "title": "The Conqueror",
     "artist": "Hoojshwah",
     "duration_seconds": 558,
-    "audio_url": "/static/audio/the-conqueror.mp3"
+    "audio_url": "/static/audio/the-conqueror.mp3",
+    "recorded_date": "2023-04-06",
+    "recorded_location": "The Spacement",
+    "recording_context": "Live, original, unrehearsed, ad-lib performance"
   },
   {
     "type": "bumper",
@@ -301,7 +412,10 @@
     "artist": "Hoojshwah Radio",
     "duration_seconds": 56,
     "audio_url": "/static/audio/bumpers/bumper-spaceradio.mp3",
-    "id": "track-038"
+    "id": "track-038",
+    "recorded_date": null,
+    "recorded_location": null,
+    "recording_context": "Station bumper with voice-over and Hoojshwah music bed"
   },
   {
     "id": "track-039",
@@ -309,7 +423,10 @@
     "title": "Late Easy",
     "artist": "Hoojshwah",
     "duration_seconds": 181,
-    "audio_url": "/static/audio/late-easy.mp3"
+    "audio_url": "/static/audio/late-easy.mp3",
+    "recorded_date": "2024-06-08",
+    "recorded_location": "The Spacement",
+    "recording_context": "Live, original, unrehearsed, ad-lib performance"
   },
   {
     "id": "track-040",
@@ -317,7 +434,10 @@
     "title": "The Happy Song",
     "artist": "Hoojshwah",
     "duration_seconds": 533,
-    "audio_url": "/static/audio/the-happy-song.mp3"
+    "audio_url": "/static/audio/the-happy-song.mp3",
+    "recorded_date": "2022-08-30",
+    "recorded_location": "The Deck Party",
+    "recording_context": "Live, original, unrehearsed, ad-lib performance"
   },
   {
     "type": "bumper",
@@ -325,7 +445,10 @@
     "artist": "Hoojshwah Radio",
     "duration_seconds": 89,
     "audio_url": "/static/audio/bumpers/bumper-ty.mp3",
-    "id": "track-041"
+    "id": "track-041",
+    "recorded_date": null,
+    "recorded_location": null,
+    "recording_context": "Station bumper with voice-over and Hoojshwah music bed"
   },
   {
     "id": "track-042",
@@ -333,7 +456,10 @@
     "title": "Your Door",
     "artist": "Hoojshwah",
     "duration_seconds": 973,
-    "audio_url": "/static/audio/your-door-into-improvisation.mp3"
+    "audio_url": "/static/audio/your-door-into-improvisation.mp3",
+    "recorded_date": "2024-08-23",
+    "recorded_location": "The Spacement",
+    "recording_context": "Live, original, unrehearsed, ad-lib performance"
   },
   {
     "type": "bumper",
@@ -341,7 +467,10 @@
     "artist": "Hoojshwah Radio",
     "duration_seconds": 46,
     "audio_url": "/static/audio/bumpers/bumper-use.mp3",
-    "id": "track-043"
+    "id": "track-043",
+    "recorded_date": null,
+    "recorded_location": null,
+    "recording_context": "Station bumper with voice-over and Hoojshwah music bed"
   },
   {
     "id": "track-044",
@@ -349,7 +478,10 @@
     "title": "Large Wit It",
     "artist": "Hoojshwah",
     "duration_seconds": 842,
-    "audio_url": "/static/audio/large-wit-it.mp3"
+    "audio_url": "/static/audio/large-wit-it.mp3",
+    "recorded_date": "2024-11-07",
+    "recorded_location": "The Spacement",
+    "recording_context": "Live, original, unrehearsed, ad-lib performance"
   },
   {
     "type": "bumper",
@@ -357,7 +489,10 @@
     "artist": "Hoojshwah Radio",
     "duration_seconds": 45,
     "audio_url": "/static/audio/bumpers/bumper-vs.mp3",
-    "id": "track-045"
+    "id": "track-045",
+    "recorded_date": null,
+    "recorded_location": null,
+    "recording_context": "Station bumper with voice-over and Hoojshwah music bed"
   },
   {
     "type": "song",
@@ -365,6 +500,53 @@
     "artist": "Hoojshwah",
     "duration_seconds": 386,
     "audio_url": "/static/audio/numbers-2026.mp3",
-    "id": "track-046"
+    "id": "track-046",
+    "recorded_date": "2026-05-07",
+    "recorded_location": "The Spacement",
+    "recording_context": "Live, original, unrehearsed, ad-lib performance"
+  },
+  {
+    "type": "song",
+    "title": "Brush It Off",
+    "artist": "Hoojshwah",
+    "duration_seconds": 276,
+    "audio_url": "/static/audio/brush-it-off.mp3",
+    "recorded_date": null,
+    "recorded_location": null,
+    "recording_context": "Live, original, unrehearsed, ad-lib performance",
+    "id": "track-047"
+  },
+  {
+    "type": "bumper",
+    "title": "Drummer Signal",
+    "artist": "Hoojshwah Radio",
+    "duration_seconds": 9,
+    "audio_url": "/static/audio/bumpers/bumper-b.mp3",
+    "recorded_date": null,
+    "recorded_location": null,
+    "recording_context": "Station bumper with voice-over and Hoojshwah music bed",
+    "id": "track-048"
+  },
+  {
+    "type": "song",
+    "title": "Runnin Groves",
+    "artist": "Hoojshwah",
+    "duration_seconds": 315,
+    "audio_url": "/static/audio/runnin-groves.mp3",
+    "recorded_date": null,
+    "recorded_location": null,
+    "recording_context": "Live, original, unrehearsed, ad-lib performance",
+    "id": "track-049"
+  },
+  {
+    "type": "song",
+    "title": "Gravity Prone into Supubad",
+    "artist": "Hoojshwah",
+    "duration_seconds": 876,
+    "audio_url": "/static/audio/gravity-prone-into-supubad.mp3",
+    "recorded_date": null,
+    "recorded_location": null,
+    "recording_context": "Live, original, unrehearsed, ad-lib performance",
+    "id": "track-050"
   }
 ]
