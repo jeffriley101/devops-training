@@ -26,6 +26,7 @@
         <p class="label">Now Airing</p>
         <h2 id="now-title">Tuning station...</h2>
         <p id="now-artist">Hoojshwah</p>
+        <p id="track-progress" class="track-progress">Tuning position...</p>
 
         <div class="button-row">
           <button id="play-button" type="button">Play Signal</button>
@@ -68,8 +69,16 @@
       </section>
 
       <section class="track-list-card">
-        <p class="label">On the Station</p>
-        <ul id="track-list"></ul>
+        <div class="track-list-header">
+          <div>
+            <p class="label">On the Station</p>
+            <p id="loop-length" class="loop-length">Calculating broadcast loop...</p>
+          </div>
+          <button id="track-list-toggle" class="secondary-button" type="button">
+            Show Playlist
+          </button>
+        </div>
+        <ul id="track-list" class="collapsed"></ul>
       </section>
     </section>
   </main>

@@ -7,6 +7,9 @@ const upNext = document.querySelector("#up-next");
 const trackList = document.querySelector("#track-list");
 const shareButton = document.querySelector("#share-button");
 const shareStatus = document.querySelector("#share-status");
+const trackProgress = document.querySelector("#track-progress");
+const loopLength = document.querySelector("#loop-length");
+const trackListToggle = document.querySelector("#track-list-toggle");
 
 let station = null;
 let currentTrack = null;
@@ -59,6 +62,10 @@ function renderTrackInfo(result) {
   nowTitle.textContent = result.track.title;
   nowArtist.textContent = result.track.artist;
   upNext.textContent = result.nextTrack.title;
+
+  if (trackProgress) {
+    trackProgress.textContent = `Tuned in at ${formatDuration(result.offsetSeconds)} of ${formatDuration(result.track.duration_seconds)}`;
+  }
 }
 
 function tuneStation() {
@@ -86,6 +93,7 @@ async function loadStation() {
     station = await response.json();
 
     renderTrackList(station.tracks);
+    renderLoopLength(station.total_duration_seconds);
     tuneStation();
   } catch (error) {
     console.error("Could not load station:", error);

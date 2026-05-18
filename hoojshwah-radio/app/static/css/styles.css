@@ -255,3 +255,44 @@ button:hover {
   color: #ffd25e;
   font-weight: 800;
 }
+
+.track-progress {
+  margin: -8px 0 22px;
+  color: #f3dfaa;
+  font-size: 0.95rem;
+}
+
+.track-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.loop-length {
+  margin: 6px 0 0;
+  color: #cfc2e9;
+  font-size: 0.95rem;
+}
+
+.secondary-button {
+  width: auto;
+  min-width: 150px;
+  padding: 12px 16px;
+  background: #f3dfaa;
+}
+
+#track-list.collapsed {
+  display: none;
+}
+
+@media (max-width: 560px) {
+  .track-list-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .secondary-button {
+    width: 100%;
+  }
+}
