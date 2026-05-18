@@ -1,14 +1,18 @@
-# Woodshed Woodchuck (Phase 1)
+# Woodshed Woodchuck (Phase 2)
 
 Woodshed Woodchuck is a music-practice companion demo project.
 
-Phase 1 includes:
-- app scaffold
-- promo-art-aligned design tokens/components
-- welcome screen
-- setup flow
-- localStorage state initialization
-- navigation with setup gating
+Phase 2 includes:
+
+- instrument-based daily quest pool
+- local-date quest selection
+- practice logging on the Quest page
+- partial practice logs that accumulate toward the daily target
+- once-per-day quest completion
+- credits + streak updates when target minutes are met
+- supportive Sax Viking messaging for below-target logs
+- Home page reflection for quest status, credits, and streak
+- browser localStorage migration from Phase 1 state
 
 ## Local run
 
@@ -32,14 +36,25 @@ Use the standard Render/FastAPI startup command:
 uvicorn app.main:app --host 0.0.0.0 --port $PORT
 ```
 
-## Visual asset hooks (Phase 1)
+## Quest and streak rules
 
-The UI contains placeholder hooks ready for promo-art crops:
+- Quest is selected from the musician's instrument pool per local calendar day.
+- Logs with minutes below target are saved and receive supportive feedback.
+- Quest completion requires cumulative daily logs meeting `targetMinutes`.
+- Credits and streak update only on the first completed quest of the day.
+- Extra same-day practice logs are allowed, but do not award duplicate credits.
+- Completion is limited to once per local day.
+
+## Visual asset hooks
+
+The UI uses these project art assets:
+
 - `/static/img/woodchuck-hero.png`
 - `/static/img/woodchuck-home.png`
 - `/static/img/sax-viking-portrait.png`
 
 ## Notes
 
-- Persistence currently uses browser localStorage only.
-- Quest completion loop, reward economy logic, and store transactions are intentionally deferred to the next phase.
+- Persistence uses browser localStorage only.
+- Backend database, auth, store purchases, account logic, and payment logic are intentionally deferred.
+- Store purchase/equip logic is a future phase.

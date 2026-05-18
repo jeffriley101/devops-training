@@ -5,7 +5,14 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from .content import GOAL_OPTIONS, INSTRUMENT_OPTIONS, LEVEL_OPTIONS, SAX_VIKING_WELCOME
+from .content import (
+    GOAL_OPTIONS,
+    INSTRUMENT_OPTIONS,
+    LEVEL_OPTIONS,
+    QUEST_POOL,
+    SAX_VIKING_MESSAGES,
+    SAX_VIKING_WELCOME,
+)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -29,6 +36,8 @@ def _render(request: Request, template_name: str, **context: object):
             "nav_items": NAV_ITEMS,
             "active_nav": context.pop("active_nav", None),
             "sax_viking_welcome": SAX_VIKING_WELCOME,
+            "quest_pool": QUEST_POOL,
+            "sax_viking_messages": SAX_VIKING_MESSAGES,
             **context,
         },
     )

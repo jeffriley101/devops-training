@@ -4,12 +4,35 @@
 <section class="card">
   <div class="section-head">
     <h2>Quest Deck</h2>
-    <p class="body-copy">Phase 1 shell complete. Practice tasks and completion rewards are next.</p>
+    <p class="body-copy">Complete today’s target to earn credits and keep your streak alive.</p>
   </div>
 
   <article class="mentor-card">
-    <p class="chip">Preview</p>
-    <p>“Scales today, legends tomorrow. Your next quest board will appear here in Phase 2.”</p>
+    <p class="chip">Today’s Quest</p>
+    <h3 id="quest-text">Loading quest...</h3>
+    <p><strong>Target:</strong> <span id="quest-target">0</span> minutes</p>
+    <p><strong>Status:</strong> <span id="quest-status">Not started</span></p>
+    <p><strong>Progress:</strong> <span id="quest-progress">0/0 minutes logged</span></p>
+  </article>
+
+  <form id="practice-form" class="stack-form mt-md" novalidate>
+    <label for="practice-minutes">Practice minutes</label>
+    <input id="practice-minutes" name="practice-minutes" type="number" min="1" step="1" required />
+
+    <label for="practice-note">Practice note (optional)</label>
+    <textarea id="practice-note" name="practice-note" rows="3" placeholder="What improved today?"></textarea>
+
+    <p id="practice-error" class="error-text" aria-live="polite"></p>
+
+    <button id="complete-quest-btn" class="btn btn-primary" type="submit">I played it!</button>
+  </form>
+
+  <article id="quest-feedback" class="mentor-card mt-md" aria-live="polite">
+    <p class="chip">Sax Viking says</p>
+    <p>“Scales today, legends tomorrow.”</p>
   </article>
 </section>
+
+<script id="quest-pool-data" type="application/json">{{ quest_pool | tojson }}</script>
+<script id="sax-viking-messages-data" type="application/json">{{ sax_viking_messages | tojson }}</script>
 {% endblock %}
