@@ -12,7 +12,19 @@ const loopLength = document.querySelector("#loop-length");
 const trackListToggle = document.querySelector("#track-list-toggle");
 
 let station = null;
-let currentTrack = null;
+
+function formatDuration(totalSeconds) {
+  const seconds = Math.max(0, Math.floor(totalSeconds || 0));
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const remainingSeconds = seconds % 60;
+
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
+  }
+
+  return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
+}
 
 function getLoopPosition(totalDurationSeconds) {
   const nowSeconds = Math.floor(Date.now() / 1000);
@@ -27,13 +39,10 @@ function findCurrentTrack(tracks, loopPositionSeconds) {
     const nextElapsed = elapsed + track.duration_seconds;
 
     if (loopPositionSeconds < nextElapsed) {
-      const offsetSeconds = loopPositionSeconds - elapsed;
-      const nextTrack = tracks[(index + 1) % tracks.length];
-
       return {
         track,
-        nextTrack,
-        offsetSeconds
+        nextTrack: tracks[(index + 1) % tracks.length],
+        offsetSeconds: loopPositionSeconds - elapsed
       };
     }
 
@@ -47,18 +56,39 @@ function findCurrentTrack(tracks, loopPositionSeconds) {
   };
 }
 
+function renderLoopLength(totalSeconds) {
+  if (!loopLength) {
+    return;
+  }
+
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.round((totalSeconds % 3600) / 60);
+
+  if (hours > 0 && minutes > 0) {
+    loopLength.textContent = `Current broadcast loop: about ${hours} hr ${minutes} min`;
+  } else if (hours > 0) {
+    loopLength.textContent = `Current broadcast loop: about ${hours} hr`;
+  } else {
+    loopLength.textContent = `Current broadcast loop: about ${minutes} min`;
+  }
+}
+
 function renderTrackList(tracks) {
+  if (!trackList) {
+    return;
+  }
+
   trackList.innerHTML = "";
 
   tracks.forEach((track) => {
     const item = document.createElement("li");
-    item.textContent = `${track.title} — ${track.artist}`;
+    const typeLabel = track.type === "bumper" ? "Station ID" : "Track";
+    item.textContent = `${track.title} — ${track.artist} (${typeLabel})`;
     trackList.appendChild(item);
   });
 }
 
 function renderTrackInfo(result) {
-  currentTrack = result.track;
   nowTitle.textContent = result.track.title;
   nowArtist.textContent = result.track.artist;
   upNext.textContent = result.nextTrack.title;
@@ -69,6 +99,10 @@ function renderTrackInfo(result) {
 }
 
 function tuneStation() {
+  if (!station || !station.tracks || station.tracks.length === 0) {
+    return;
+  }
+
   const loopPosition = getLoopPosition(station.total_duration_seconds);
   const result = findCurrentTrack(station.tracks, loopPosition);
 
@@ -89,7 +123,12 @@ function tuneStation() {
 
 async function loadStation() {
   try {
-    const response = await fetch("/api/station");
+    const response = await fetch("/api/station", { cache: "no-store" });
+
+    if (!response.ok) {
+      throw new Error(`Station API returned ${response.status}`);
+    }
+
     station = await response.json();
 
     renderTrackList(station.tracks);
@@ -102,12 +141,36 @@ async function loadStation() {
   }
 }
 
+if (trackListToggle && trackList) {
+  trackListToggle.addEventListener("click", () => {
+    const isCollapsed = trackList.classList.toggle("collapsed");
+    trackListToggle.textContent = isCollapsed ? "Show Playlist" : "Hide Playlist";
+  });
+}
+
+if (shareButton) {
+  shareButton.addEventListener("click", async () => {
+    const stationUrl = "https://hoojshwah-radio-live.onrender.com/";
+
+    try {
+      await navigator.clipboard.writeText(stationUrl);
+      if (shareStatus) {
+        shareStatus.textContent = "Station link copied.";
+      }
+    } catch (error) {
+      console.error("Could not copy station link:", error);
+      if (shareStatus) {
+        shareStatus.textContent = stationUrl;
+      }
+    }
+  });
+}
+
 resyncButton.addEventListener("click", () => {
   if (!station) {
     return;
   }
 
-  renderTrackList(station.tracks);
   tuneStation();
   resyncButton.textContent = "Signal Resynced";
 
@@ -116,24 +179,11 @@ resyncButton.addEventListener("click", () => {
   }, 1400);
 });
 
-shareButton.addEventListener("click", async () => {
-  const stationUrl = "https://hoojshwah-radio-live.onrender.com/";
-
-  try {
-    await navigator.clipboard.writeText(stationUrl);
-    shareStatus.textContent = "Station link copied.";
-  } catch (error) {
-    console.error("Could not copy station link:", error);
-    shareStatus.textContent = stationUrl;
-  }
-});
-
 playButton.addEventListener("click", async () => {
   if (!station) {
     return;
   }
 
-  renderTrackList(station.tracks);
   tuneStation();
 
   try {
@@ -146,7 +196,10 @@ playButton.addEventListener("click", async () => {
 });
 
 audio.addEventListener("ended", () => {
-  renderTrackList(station.tracks);
+  if (!station) {
+    return;
+  }
+
   tuneStation();
   audio.play();
 });
