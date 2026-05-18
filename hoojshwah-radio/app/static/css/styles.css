@@ -238,3 +238,20 @@ button:hover {
   border: 1px solid rgba(248, 242, 223, 0.18);
   box-shadow: 0 18px 48px rgba(0, 0, 0, 0.32);
 }
+
+.bio-card {
+  margin-top: 26px;
+  padding: 24px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.bio-card p {
+  color: #f3dfaa;
+  line-height: 1.6;
+}
+
+.bio-card a {
+  color: #ffd25e;
+  font-weight: 800;
+}

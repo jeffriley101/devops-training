@@ -8,44 +8,20 @@
     "audio_url": "/static/audio/first-signal.mp3"
   },
   {
-    "id": "track-002",
-    "type": "song",
-    "title": "Get It Going",
-    "artist": "Hoojshwah",
-    "duration_seconds": 343,
-    "audio_url": "/static/audio/get-it-going.mp3"
-  },
-  {
     "type": "song",
     "title": "Limited Tape",
     "artist": "Hoojshwah",
     "duration_seconds": 599,
     "audio_url": "/static/audio/limited-tape.mp3",
+    "id": "track-002"
+  },
+  {
+    "type": "bumper",
+    "title": "Spacement Signal",
+    "artist": "Hoojshwah Radio",
+    "duration_seconds": 100,
+    "audio_url": "/static/audio/bumpers/bumper-sm.mp3",
     "id": "track-003"
-  },
-  {
-    "id": "track-004",
-    "type": "song",
-    "title": "Better Everyone",
-    "artist": "Hoojshwah",
-    "duration_seconds": 315,
-    "audio_url": "/static/audio/better-everyone.mp3"
-  },
-  {
-    "id": "track-005",
-    "type": "song",
-    "title": "Falling Island",
-    "artist": "Hoojshwah",
-    "duration_seconds": 272,
-    "audio_url": "/static/audio/falling-island.mp3"
-  },
-  {
-    "type": "song",
-    "title": "Bwannndon Hahaha",
-    "artist": "Hoojshwah",
-    "duration_seconds": 576,
-    "audio_url": "/static/audio/bwannndon-hahaha.mp3",
-    "id": "track-006"
   },
   {
     "type": "song",
@@ -53,10 +29,18 @@
     "artist": "Hoojshwah",
     "duration_seconds": 182,
     "audio_url": "/static/audio/twisted-mckeys.mp3",
-    "id": "track-007"
+    "id": "track-004"
   },
   {
-    "id": "track-008",
+    "id": "track-005",
+    "type": "song",
+    "title": "Get It Going",
+    "artist": "Hoojshwah",
+    "duration_seconds": 343,
+    "audio_url": "/static/audio/get-it-going.mp3"
+  },
+  {
+    "id": "track-006",
     "type": "song",
     "title": "Jungle Thump",
     "artist": "Hoojshwah",
@@ -65,11 +49,59 @@
   },
   {
     "type": "song",
+    "title": "Jungle Thump 2",
+    "artist": "Hoojshwah",
+    "duration_seconds": 581,
+    "audio_url": "/static/audio/jungle-thump-2.mp3",
+    "id": "track-007"
+  },
+  {
+    "type": "song",
+    "title": "Better Everyone",
+    "artist": "Hoojshwah",
+    "duration_seconds": 378,
+    "audio_url": "/static/audio/better-everyone.mp3",
+    "id": "track-008"
+  },
+  {
+    "id": "track-009",
+    "type": "song",
+    "title": "Falling Island",
+    "artist": "Hoojshwah",
+    "duration_seconds": 272,
+    "audio_url": "/static/audio/falling-island.mp3"
+  },
+  {
+    "type": "bumper",
+    "title": "Live from the Spacement",
+    "artist": "Hoojshwah Radio",
+    "duration_seconds": 45,
+    "audio_url": "/static/audio/bumpers/bumper-spacement.mp3",
+    "id": "track-010"
+  },
+  {
+    "type": "song",
+    "title": "Bwannndon Hahaha",
+    "artist": "Hoojshwah",
+    "duration_seconds": 576,
+    "audio_url": "/static/audio/bwannndon-hahaha.mp3",
+    "id": "track-011"
+  },
+  {
+    "type": "song",
     "title": "Oh It's Time",
     "artist": "Hoojshwah",
     "duration_seconds": 304,
     "audio_url": "/static/audio/oh-its-time.mp3",
-    "id": "track-009"
+    "id": "track-012"
+  },
+  {
+    "type": "bumper",
+    "title": "Hoojshwah Radio ID",
+    "artist": "Hoojshwah Radio",
+    "duration_seconds": 56,
+    "audio_url": "/static/audio/bumpers/bumper-spaceradio.mp3",
+    "id": "track-013"
   },
   {
     "type": "song",
@@ -77,7 +109,15 @@
     "artist": "Hoojshwah",
     "duration_seconds": 631,
     "audio_url": "/static/audio/spelt-h-o-o-shjwah.mp3",
-    "id": "track-010"
+    "id": "track-014"
+  },
+  {
+    "type": "bumper",
+    "title": "Thanks for Tuning In",
+    "artist": "Hoojshwah Radio",
+    "duration_seconds": 89,
+    "audio_url": "/static/audio/bumpers/bumper-ty.mp3",
+    "id": "track-015"
   },
   {
     "type": "song",
@@ -85,7 +125,7 @@
     "artist": "Hoojshwah",
     "duration_seconds": 342,
     "audio_url": "/static/audio/hes-tryin.mp3",
-    "id": "track-011"
+    "id": "track-016"
   },
   {
     "type": "song",
@@ -93,7 +133,15 @@
     "artist": "Hoojshwah",
     "duration_seconds": 731,
     "audio_url": "/static/audio/dew-dew-dew.mp3",
-    "id": "track-012"
+    "id": "track-017"
+  },
+  {
+    "type": "bumper",
+    "title": "Use the Signal",
+    "artist": "Hoojshwah Radio",
+    "duration_seconds": 46,
+    "audio_url": "/static/audio/bumpers/bumper-use.mp3",
+    "id": "track-018"
   },
   {
     "type": "song",
@@ -101,10 +149,10 @@
     "artist": "Hoojshwah",
     "duration_seconds": 436,
     "audio_url": "/static/audio/wyley-wyrk-beefcut.mp3",
-    "id": "track-013"
+    "id": "track-019"
   },
   {
-    "id": "track-014",
+    "id": "track-020",
     "type": "song",
     "title": "Double Ocee",
     "artist": "Hoojshwah",
@@ -112,7 +160,7 @@
     "audio_url": "/static/audio/double-ocee.mp3"
   },
   {
-    "id": "track-015",
+    "id": "track-021",
     "type": "song",
     "title": "Creation",
     "artist": "Hoojshwah",
@@ -120,7 +168,7 @@
     "audio_url": "/static/audio/creation.mp3"
   },
   {
-    "id": "track-016",
+    "id": "track-022",
     "type": "song",
     "title": "Badass",
     "artist": "Hoojshwah",
@@ -128,15 +176,39 @@
     "audio_url": "/static/audio/badass.mp3"
   },
   {
+    "type": "bumper",
+    "title": "The Viking Sax",
+    "artist": "Hoojshwah Radio",
+    "duration_seconds": 45,
+    "audio_url": "/static/audio/bumpers/bumper-vs.mp3",
+    "id": "track-023"
+  },
+  {
+    "type": "song",
+    "title": "Blows Me Away",
+    "artist": "Hoojshwah",
+    "duration_seconds": 449,
+    "audio_url": "/static/audio/blows-me-away.mp3",
+    "id": "track-024"
+  },
+  {
     "type": "song",
     "title": "Most Proved",
     "artist": "Hoojshwah",
     "duration_seconds": 751,
     "audio_url": "/static/audio/most-proved.mp3",
-    "id": "track-017"
+    "id": "track-025"
   },
   {
-    "id": "track-018",
+    "type": "bumper",
+    "title": "You Are Connected",
+    "artist": "Hoojshwah Radio",
+    "duration_seconds": 14,
+    "audio_url": "/static/audio/bumpers/bumper-yac.mp3",
+    "id": "track-026"
+  },
+  {
+    "id": "track-027",
     "type": "song",
     "title": "Dope",
     "artist": "Hoojshwah",
@@ -149,10 +221,18 @@
     "artist": "Hoojshwah",
     "duration_seconds": 1302,
     "audio_url": "/static/audio/fire-arms.mp3",
-    "id": "track-019"
+    "id": "track-028"
   },
   {
-    "id": "track-020",
+    "type": "bumper",
+    "title": "Spacement Signal",
+    "artist": "Hoojshwah Radio",
+    "duration_seconds": 100,
+    "audio_url": "/static/audio/bumpers/bumper-sm.mp3",
+    "id": "track-029"
+  },
+  {
+    "id": "track-030",
     "type": "song",
     "title": "Arrive",
     "artist": "Hoojshwah",
@@ -160,7 +240,7 @@
     "audio_url": "/static/audio/arrive.mp3"
   },
   {
-    "id": "track-021",
+    "id": "track-031",
     "type": "song",
     "title": "Chasin Falls",
     "artist": "Hoojshwah",
@@ -168,23 +248,23 @@
     "audio_url": "/static/audio/chasin-falls.mp3"
   },
   {
+    "type": "bumper",
+    "title": "Live from the Spacement",
+    "artist": "Hoojshwah Radio",
+    "duration_seconds": 45,
+    "audio_url": "/static/audio/bumpers/bumper-spacement.mp3",
+    "id": "track-032"
+  },
+  {
     "type": "song",
     "title": "Rockstar Life Chooses You",
     "artist": "Hoojshwah",
     "duration_seconds": 449,
     "audio_url": "/static/audio/rockstar-life-chooses-you.mp3",
-    "id": "track-022"
+    "id": "track-033"
   },
   {
-    "type": "song",
-    "title": "Half a Wine",
-    "artist": "Hoojshwah",
-    "duration_seconds": 487,
-    "audio_url": "/static/audio/half-a-wine.mp3",
-    "id": "track-023"
-  },
-  {
-    "id": "track-024",
+    "id": "track-034",
     "type": "song",
     "title": "The Journey",
     "artist": "Hoojshwah",
@@ -192,7 +272,7 @@
     "audio_url": "/static/audio/the-journey.mp3"
   },
   {
-    "id": "track-025",
+    "id": "track-035",
     "type": "song",
     "title": "The Lounge",
     "artist": "Hoojshwah",
@@ -200,15 +280,15 @@
     "audio_url": "/static/audio/the-lounge.mp3"
   },
   {
-    "id": "track-026",
     "type": "song",
     "title": "Like Boom",
     "artist": "Hoojshwah",
-    "duration_seconds": 456,
-    "audio_url": "/static/audio/like-boom.mp3"
+    "duration_seconds": 753,
+    "audio_url": "/static/audio/like-boom.mp3",
+    "id": "track-036"
   },
   {
-    "id": "track-027",
+    "id": "track-037",
     "type": "song",
     "title": "The Conqueror",
     "artist": "Hoojshwah",
@@ -216,7 +296,15 @@
     "audio_url": "/static/audio/the-conqueror.mp3"
   },
   {
-    "id": "track-028",
+    "type": "bumper",
+    "title": "Hoojshwah Radio ID",
+    "artist": "Hoojshwah Radio",
+    "duration_seconds": 56,
+    "audio_url": "/static/audio/bumpers/bumper-spaceradio.mp3",
+    "id": "track-038"
+  },
+  {
+    "id": "track-039",
     "type": "song",
     "title": "Late Easy",
     "artist": "Hoojshwah",
@@ -224,7 +312,7 @@
     "audio_url": "/static/audio/late-easy.mp3"
   },
   {
-    "id": "track-029",
+    "id": "track-040",
     "type": "song",
     "title": "The Happy Song",
     "artist": "Hoojshwah",
@@ -232,7 +320,15 @@
     "audio_url": "/static/audio/the-happy-song.mp3"
   },
   {
-    "id": "track-030",
+    "type": "bumper",
+    "title": "Thanks for Tuning In",
+    "artist": "Hoojshwah Radio",
+    "duration_seconds": 89,
+    "audio_url": "/static/audio/bumpers/bumper-ty.mp3",
+    "id": "track-041"
+  },
+  {
+    "id": "track-042",
     "type": "song",
     "title": "Your Door",
     "artist": "Hoojshwah",
@@ -240,7 +336,15 @@
     "audio_url": "/static/audio/your-door-into-improvisation.mp3"
   },
   {
-    "id": "track-031",
+    "type": "bumper",
+    "title": "Use the Signal",
+    "artist": "Hoojshwah Radio",
+    "duration_seconds": 46,
+    "audio_url": "/static/audio/bumpers/bumper-use.mp3",
+    "id": "track-043"
+  },
+  {
+    "id": "track-044",
     "type": "song",
     "title": "Large Wit It",
     "artist": "Hoojshwah",
@@ -248,11 +352,19 @@
     "audio_url": "/static/audio/large-wit-it.mp3"
   },
   {
+    "type": "bumper",
+    "title": "The Viking Sax",
+    "artist": "Hoojshwah Radio",
+    "duration_seconds": 45,
+    "audio_url": "/static/audio/bumpers/bumper-vs.mp3",
+    "id": "track-045"
+  },
+  {
     "type": "song",
     "title": "Numbers",
     "artist": "Hoojshwah",
     "duration_seconds": 386,
     "audio_url": "/static/audio/numbers-2026.mp3",
-    "id": "track-032"
+    "id": "track-046"
   }
 ]
