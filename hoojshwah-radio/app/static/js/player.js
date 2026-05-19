@@ -8,6 +8,7 @@ const trackList = document.querySelector("#track-list");
 const shareButton = document.querySelector("#share-button");
 const shareStatus = document.querySelector("#share-status");
 const trackProgress = document.querySelector("#track-progress");
+const stationClock = document.querySelector("#station-clock");
 const trackRecordingInfo = document.querySelector("#track-recording-info");
 const loopLength = document.querySelector("#loop-length");
 const trackListToggle = document.querySelector("#track-list-toggle");
@@ -25,6 +26,22 @@ function formatDuration(totalSeconds) {
   }
 
   return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
+}
+
+function renderStationClock() {
+  if (!stationClock) {
+    return;
+  }
+
+  const now = new Date();
+  const time = new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+    timeZoneName: "short"
+  }).format(now);
+
+  stationClock.textContent = `Station Time: ${time}`;
 }
 
 function getLoopPosition(totalDurationSeconds) {
@@ -226,5 +243,8 @@ audio.addEventListener("ended", () => {
   tuneStation();
   audio.play();
 });
+
+renderStationClock();
+window.setInterval(renderStationClock, 1000);
 
 loadStation();
