@@ -1345,3 +1345,28 @@ button:hover {
     }
   }
 }
+
+/* Strong mobile spacing override */
+@media (max-width: 560px) {
+  .next {
+    display: block;
+    margin-top: 18px;
+    margin-bottom: 28px;
+    line-height: 1.65;
+  }
+
+  .track-progress {
+    display: block;
+    margin-top: 24px;
+    margin-bottom: 24px;
+    line-height: 1.65;
+  }
+
+  .button-row {
+    margin-top: 18px;
+  }
+
+  .station-clock {
+    margin-top: 24px;
+  }
+}
