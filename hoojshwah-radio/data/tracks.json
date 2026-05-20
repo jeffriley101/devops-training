@@ -198,17 +198,6 @@
     "recording_context": "Live, original, unrehearsed, ad-lib performance"
   },
   {
-    "type": "song",
-    "title": "Jungle Thump 2",
-    "artist": "Hoojshwah",
-    "duration_seconds": 581,
-    "audio_url": "/static/audio/jungle-thump-2.mp3",
-    "id": "track-019",
-    "recorded_date": "2020-07-25",
-    "recorded_location": "The Spacement",
-    "recording_context": "Live, original, unrehearsed, ad-lib performance"
-  },
-  {
     "id": "track-020",
     "type": "song",
     "title": "Double Ocee",
@@ -680,5 +669,104 @@
     "recorded_date": "2025-05-03",
     "recorded_location": "Between the Trees Festival",
     "recording_context": "Live, original, unrehearsed, ad-lib performance"
+  },
+  {
+    "id": "track-pops-sb-001",
+    "type": "bumper",
+    "title": "Pop's Blue Moon Signal",
+    "artist": "Hoojshwah Radio",
+    "duration_seconds": 4,
+    "audio_url": "/static/audio/bumpers/phase1c/sb-17pbm.mp3",
+    "recorded_date": null,
+    "recorded_location": null,
+    "recording_context": "Sound bite for The Residency at Pop's block"
+  },
+  {
+    "id": "track-pops-001",
+    "type": "song",
+    "title": "Mountain & Valley \u2014 Pop's Blue Moon",
+    "artist": "Hoojshwah",
+    "duration_seconds": 438,
+    "audio_url": "/static/audio/mountain-and-valley-pops-blue-moon-20240203-b.mp3",
+    "recorded_date": "2024-02-03",
+    "recorded_location": "Pop's Blue Moon",
+    "recording_context": "Live, original, unrehearsed, ad-lib performance; part of The Residency at Pop's block"
+  },
+  {
+    "id": "track-pops-002",
+    "type": "song",
+    "title": "Hellbot Gardens",
+    "artist": "Hoojshwah",
+    "duration_seconds": 275,
+    "audio_url": "/static/audio/hellbot-gardens-pops-blue-moon-20240720.mp3",
+    "recorded_date": "2024-07-20",
+    "recorded_location": "Pop's Blue Moon",
+    "recording_context": "Live, original, unrehearsed, ad-lib performance; part of The Residency at Pop's block"
+  },
+  {
+    "id": "track-pops-sb-002",
+    "type": "bumper",
+    "title": "Pop's Blue Moon Signal",
+    "artist": "Hoojshwah Radio",
+    "duration_seconds": 4,
+    "audio_url": "/static/audio/bumpers/phase1c/sb-17pbm.mp3",
+    "recorded_date": null,
+    "recorded_location": null,
+    "recording_context": "Sound bite for The Residency at Pop's block"
+  },
+  {
+    "id": "track-pops-003",
+    "type": "song",
+    "title": "Teleprompter",
+    "artist": "Hoojshwah",
+    "duration_seconds": 494,
+    "audio_url": "/static/audio/teleprompter-pops-blue-moon-20240720.mp3",
+    "recorded_date": "2024-07-20",
+    "recorded_location": "Pop's Blue Moon",
+    "recording_context": "Live, original, unrehearsed, ad-lib performance; part of The Residency at Pop's block"
+  },
+  {
+    "id": "track-pops-004",
+    "type": "song",
+    "title": "TAF",
+    "artist": "Hoojshwah",
+    "duration_seconds": 460,
+    "audio_url": "/static/audio/taf-pops-blue-moon-20240817.mp3",
+    "recorded_date": "2024-08-17",
+    "recorded_location": "Pop's Blue Moon",
+    "recording_context": "Live, original, unrehearsed, ad-lib performance; part of The Residency at Pop's block"
+  },
+  {
+    "id": "track-pops-sb-003",
+    "type": "bumper",
+    "title": "Pop's Blue Moon Signal",
+    "artist": "Hoojshwah Radio",
+    "duration_seconds": 4,
+    "audio_url": "/static/audio/bumpers/phase1c/sb-17pbm.mp3",
+    "recorded_date": null,
+    "recorded_location": null,
+    "recording_context": "Sound bite for The Residency at Pop's block"
+  },
+  {
+    "id": "track-pops-005",
+    "type": "song",
+    "title": "Medicine \u2014 Pop's Blue Moon",
+    "artist": "Hoojshwah",
+    "duration_seconds": 564,
+    "audio_url": "/static/audio/medicine-pops-blue-moon-20240817-b.mp3",
+    "recorded_date": "2024-08-17",
+    "recorded_location": "Pop's Blue Moon",
+    "recording_context": "Live, original, unrehearsed, ad-lib performance; part of The Residency at Pop's block"
+  },
+  {
+    "id": "track-pops-006",
+    "type": "song",
+    "title": "nameless_improv_jam",
+    "artist": "Hoojshwah",
+    "duration_seconds": 631,
+    "audio_url": "/static/audio/nameless-improv-jam-pops-blue-moon-20240921.mp3",
+    "recorded_date": "2024-09-21",
+    "recorded_location": "Pop's Blue Moon",
+    "recording_context": "Live, original, unrehearsed, ad-lib performance; part of The Residency at Pop's block"
   }
 ]

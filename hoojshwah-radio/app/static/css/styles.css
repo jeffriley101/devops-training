@@ -313,3 +313,770 @@ button:hover {
   color: #cfc2e9;
   font-size: 0.9rem;
 }
+
+.top-actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.top-action-button,
+.top-action-link {
+  width: auto;
+  min-width: 118px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 210, 94, 0.55);
+  background: rgba(255, 210, 94, 0.13);
+  color: #ffd25e;
+  font-size: 0.8rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-align: center;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.donation-menu {
+  position: relative;
+}
+
+.donation-panel {
+  position: absolute;
+  z-index: 5;
+  top: 46px;
+  left: 0;
+  width: min(280px, 78vw);
+  padding: 16px;
+  border: 1px solid rgba(248, 242, 223, 0.18);
+  border-radius: 18px;
+  background: rgba(22, 19, 29, 0.96);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.42);
+}
+
+.donation-title {
+  margin: 0 0 6px;
+  color: #ffd25e;
+  font-weight: 900;
+}
+
+.donation-copy {
+  margin: 0 0 12px;
+  color: #f3dfaa;
+  font-size: 0.92rem;
+}
+
+.donation-links {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.donation-links a {
+  padding: 10px 12px;
+  border-radius: 999px;
+  background: #ffd25e;
+  color: #16131d;
+  font-weight: 900;
+  text-align: center;
+  text-decoration: none;
+}
+
+.station-clock {
+  margin: 14px 0 0;
+  color: #cfc2e9;
+  font-size: 0.95rem;
+  text-align: center;
+}
+
+.bar-card {
+  margin-top: 26px;
+  padding: 24px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.bar-content {
+  margin-top: 18px;
+}
+
+.bottle-form {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.bottle-form label {
+  display: grid;
+  gap: 6px;
+  color: #f3dfaa;
+  font-size: 0.92rem;
+  font-weight: 800;
+}
+
+.bottle-form input,
+.bottle-form select {
+  width: 100%;
+  border: 1px solid rgba(248, 242, 223, 0.18);
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: rgba(22, 19, 29, 0.72);
+  color: #f8f2df;
+  font: inherit;
+}
+
+.bottle-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.bottle {
+  min-height: 138px;
+  display: grid;
+  align-content: end;
+  justify-items: center;
+  gap: 8px;
+  padding: 14px 10px;
+  border: 1px solid rgba(248, 242, 223, 0.18);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.bottle-shape {
+  width: 42px;
+  height: 78px;
+  border-radius: 14px 14px 10px 10px;
+  border: 2px solid rgba(248, 242, 223, 0.35);
+  position: relative;
+}
+
+.bottle-shape::before {
+  content: "";
+  position: absolute;
+  top: -20px;
+  left: 12px;
+  width: 14px;
+  height: 22px;
+  border-radius: 6px 6px 2px 2px;
+  background: inherit;
+  border: 2px solid rgba(248, 242, 223, 0.35);
+  border-bottom: 0;
+}
+
+.bottle-shape.green { background: rgba(80, 180, 110, 0.65); }
+.bottle-shape.brown { background: rgba(146, 92, 45, 0.72); }
+.bottle-shape.clear { background: rgba(200, 230, 255, 0.32); }
+.bottle-shape.fancy { background: rgba(180, 100, 255, 0.55); }
+.bottle-shape.jug { background: rgba(255, 210, 94, 0.55); border-radius: 22px 22px 14px 14px; }
+
+.bottle-label {
+  color: #ffd25e;
+  font-weight: 900;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.bottle-stamp {
+  color: #cfc2e9;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.collapsed {
+  display: none !important;
+}
+
+.next {
+  margin-bottom: 12px;
+}
+
+.track-progress {
+  margin-top: 10px;
+}
+
+#track-list li.current-track {
+  border: 1px solid rgba(255, 210, 94, 0.75);
+  background: rgba(255, 156, 51, 0.22);
+  box-shadow: 0 0 0 2px rgba(255, 156, 51, 0.14);
+}
+
+#track-list li.current-track .playlist-title {
+  color: #ffd25e;
+}
+
+.bottle-shape {
+  box-shadow:
+    inset 0 10px 18px rgba(255, 255, 255, 0.12),
+    inset 0 -14px 18px rgba(0, 0, 0, 0.22),
+    0 10px 20px rgba(0, 0, 0, 0.25);
+}
+
+.bottle-shape.green {
+  width: 38px;
+  height: 88px;
+  border-radius: 12px 12px 9px 9px;
+}
+
+.bottle-shape.brown {
+  width: 46px;
+  height: 76px;
+  border-radius: 18px 18px 10px 10px;
+}
+
+.bottle-shape.clear {
+  width: 34px;
+  height: 92px;
+  border-radius: 18px 18px 8px 8px;
+  background:
+    linear-gradient(90deg, rgba(255,255,255,0.22), rgba(200,230,255,0.28), rgba(255,255,255,0.08));
+}
+
+.bottle-shape.fancy {
+  width: 52px;
+  height: 82px;
+  border-radius: 26px 26px 12px 12px;
+  background:
+    radial-gradient(circle at 35% 20%, rgba(255,255,255,0.28), transparent 24px),
+    rgba(180, 100, 255, 0.55);
+}
+
+.bottle-shape.jug {
+  width: 58px;
+  height: 70px;
+  border-radius: 28px 28px 18px 18px;
+}
+
+.bottle-shape.jug::after {
+  content: "";
+  position: absolute;
+  right: -18px;
+  top: 22px;
+  width: 22px;
+  height: 28px;
+  border: 3px solid rgba(248, 242, 223, 0.35);
+  border-left: 0;
+  border-radius: 0 18px 18px 0;
+}
+
+.bottle::before {
+  content: "";
+  width: 76px;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.28);
+  order: 3;
+}
+
+.bottle-shape.can {
+  width: 52px;
+  height: 74px;
+  border-radius: 10px;
+  background:
+    linear-gradient(90deg, rgba(255,255,255,0.32), rgba(170,180,190,0.42), rgba(255,255,255,0.12)),
+    rgba(190, 200, 210, 0.7);
+}
+
+.bottle-shape.can::before {
+  content: "";
+  position: absolute;
+  top: -6px;
+  left: 4px;
+  width: 40px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(220, 225, 230, 0.85);
+  border: 2px solid rgba(248, 242, 223, 0.28);
+}
+
+.bottle-shape.can::after {
+  content: "";
+  position: absolute;
+  top: 6px;
+  left: 17px;
+  width: 18px;
+  height: 6px;
+  border-radius: 999px;
+  border: 2px solid rgba(22, 19, 29, 0.45);
+  background: rgba(255, 255, 255, 0.24);
+}
+
+.bottle {
+  position: relative;
+  padding-top: 24px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.04)),
+    rgba(255, 255, 255, 0.07);
+}
+
+.bottle::after {
+  content: "";
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(255, 210, 94, 0.18);
+  box-shadow: 0 0 18px rgba(255, 210, 94, 0.12);
+}
+
+.bottle-shape {
+  overflow: visible;
+}
+
+.bottle-shape::marker {
+  display: none;
+}
+
+.bottle-shape.green::after,
+.bottle-shape.brown::after,
+.bottle-shape.clear::after,
+.bottle-shape.fancy::after {
+  content: "";
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: 18px;
+  height: 18px;
+  border-radius: 5px;
+  background:
+    linear-gradient(90deg, rgba(22, 19, 29, 0.55), rgba(255, 210, 94, 0.34));
+  border: 1px solid rgba(248, 242, 223, 0.24);
+}
+
+.bottle-shape.green::before,
+.bottle-shape.brown::before,
+.bottle-shape.clear::before,
+.bottle-shape.fancy::before {
+  box-shadow: inset 0 5px 8px rgba(255, 255, 255, 0.14);
+}
+
+.bottle-shape.green {
+  background:
+    linear-gradient(90deg, rgba(255,255,255,0.18), transparent 28%),
+    rgba(45, 150, 90, 0.78);
+}
+
+.bottle-shape.brown {
+  background:
+    linear-gradient(90deg, rgba(255,255,255,0.14), transparent 28%),
+    rgba(130, 73, 34, 0.82);
+}
+
+.bottle-shape.clear {
+  border-color: rgba(220, 240, 255, 0.52);
+  backdrop-filter: blur(1px);
+}
+
+.bottle-shape.fancy {
+  transform: rotate(-2deg);
+}
+
+.bottle-shape.jug {
+  background:
+    radial-gradient(circle at 35% 25%, rgba(255,255,255,0.2), transparent 24px),
+    rgba(210, 153, 62, 0.72);
+}
+
+.bottle-shape.jug::before {
+  left: 18px;
+  top: -18px;
+  width: 18px;
+  height: 20px;
+}
+
+.bottle-shape.can {
+  overflow: hidden;
+}
+
+.bottle-shape.can .fake {
+  display: none;
+}
+
+.bottle-shape.can {
+  background:
+    linear-gradient(90deg, rgba(255,255,255,0.45), rgba(170,180,190,0.48), rgba(255,255,255,0.1)),
+    repeating-linear-gradient(
+      180deg,
+      rgba(255,255,255,0.08) 0,
+      rgba(255,255,255,0.08) 3px,
+      transparent 3px,
+      transparent 11px
+    ),
+    rgba(190, 200, 210, 0.78);
+}
+
+.bottle-shape.can::before {
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.22);
+}
+
+.bottle-label {
+  max-width: 100%;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(22, 19, 29, 0.44);
+}
+
+.bottle-stamp {
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: rgba(22, 19, 29, 0.38);
+}
+
+.bottle-list {
+  align-items: end;
+}
+
+.bottle {
+  isolation: isolate;
+}
+
+.bottle-shape {
+  margin-top: 16px;
+  transition: transform 160ms ease, filter 160ms ease;
+}
+
+.bottle:hover .bottle-shape {
+  transform: translateY(-3px) rotate(1deg);
+  filter: brightness(1.12);
+}
+
+.bottle-shape::before {
+  z-index: 2;
+}
+
+.bottle-shape.green::before,
+.bottle-shape.brown::before,
+.bottle-shape.clear::before,
+.bottle-shape.fancy::before {
+  content: "";
+  position: absolute;
+  top: -22px;
+  left: 50%;
+  width: 16px;
+  height: 24px;
+  transform: translateX(-50%);
+  border-radius: 6px 6px 2px 2px;
+  background: inherit;
+  border: 2px solid rgba(248, 242, 223, 0.35);
+  border-bottom: 0;
+}
+
+.bottle-shape.green::after,
+.bottle-shape.brown::after,
+.bottle-shape.clear::after,
+.bottle-shape.fancy::after {
+  box-shadow:
+    inset 0 2px 3px rgba(255, 255, 255, 0.16),
+    0 2px 6px rgba(0, 0, 0, 0.18);
+}
+
+.bottle-shape.green {
+  border-radius: 10px 10px 8px 8px;
+}
+
+.bottle-shape.green::after {
+  bottom: 24px;
+}
+
+.bottle-shape.brown::after {
+  bottom: 20px;
+  height: 20px;
+}
+
+.bottle-shape.clear::after {
+  bottom: 26px;
+  height: 16px;
+  background:
+    linear-gradient(90deg, rgba(248, 242, 223, 0.55), rgba(255, 210, 94, 0.2));
+}
+
+.bottle-shape.fancy::before {
+  width: 20px;
+  height: 18px;
+  top: -15px;
+  border-radius: 10px 10px 4px 4px;
+}
+
+.bottle-shape.fancy::after {
+  left: 8px;
+  right: 8px;
+  bottom: 22px;
+  height: 22px;
+  border-radius: 999px;
+}
+
+.bottle-shape.jug {
+  overflow: visible;
+}
+
+.bottle-shape.jug::before {
+  content: "";
+  position: absolute;
+  top: -18px;
+  left: 20px;
+  width: 16px;
+  height: 20px;
+  border-radius: 8px 8px 2px 2px;
+  background: rgba(210, 153, 62, 0.72);
+  border: 2px solid rgba(248, 242, 223, 0.35);
+  border-bottom: 0;
+}
+
+.bottle-shape.jug::after {
+  box-shadow: 4px 0 8px rgba(0, 0, 0, 0.18);
+}
+
+.bottle-shape.can {
+  border-radius: 8px 8px 10px 10px;
+}
+
+.bottle-shape.can::before {
+  top: -5px;
+  left: 3px;
+  width: 42px;
+  height: 11px;
+}
+
+.bottle-shape.can::after {
+  top: 8px;
+}
+
+.bottle-shape.can {
+  box-shadow:
+    inset 8px 0 14px rgba(255, 255, 255, 0.18),
+    inset -10px 0 16px rgba(0, 0, 0, 0.18),
+    0 10px 20px rgba(0, 0, 0, 0.25);
+}
+
+.bottle-label {
+  position: relative;
+  z-index: 2;
+}
+
+.bottle-stamp {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.bottle::before {
+  width: 86px;
+  height: 10px;
+  background:
+    radial-gradient(ellipse, rgba(0, 0, 0, 0.36), rgba(0, 0, 0, 0.08) 70%, transparent);
+}
+
+.bar-card {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.045)),
+    rgba(255, 255, 255, 0.08);
+}
+
+.bar-content::after {
+  content: "";
+  display: block;
+  height: 12px;
+  margin-top: 18px;
+  border-radius: 999px;
+  background:
+    linear-gradient(90deg, rgba(92, 52, 27, 0.2), rgba(255, 210, 94, 0.26), rgba(92, 52, 27, 0.2));
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.25);
+}
+
+/* Bottle-on-the-Bar visual polish pass */
+.bottle {
+  min-height: 170px;
+  align-content: center;
+  gap: 10px;
+  background:
+    radial-gradient(circle at 50% 18%, rgba(255, 255, 255, 0.12), transparent 42%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.035)),
+    rgba(255, 255, 255, 0.07);
+}
+
+.bottle-shape {
+  transform-origin: bottom center;
+  margin-top: 26px;
+  margin-bottom: 2px;
+}
+
+.bottle:hover .bottle-shape {
+  transform: translateY(-4px) scale(1.04) rotate(1deg);
+}
+
+/* Put a clearer paper label on regular bottles */
+.bottle-shape.green::after,
+.bottle-shape.brown::after,
+.bottle-shape.clear::after,
+.bottle-shape.fancy::after {
+  left: 8px;
+  right: 8px;
+  height: 20px;
+  bottom: 22px;
+  border-radius: 6px;
+  background:
+    linear-gradient(90deg, rgba(248, 242, 223, 0.72), rgba(255, 210, 94, 0.38));
+  border: 1px solid rgba(22, 19, 29, 0.28);
+}
+
+/* More distinct bottle silhouettes */
+.bottle-shape.green {
+  width: 42px;
+  height: 96px;
+  border-radius: 13px 13px 9px 9px;
+}
+
+.bottle-shape.brown {
+  width: 54px;
+  height: 84px;
+  border-radius: 24px 24px 12px 12px;
+}
+
+.bottle-shape.clear {
+  width: 36px;
+  height: 104px;
+  border-radius: 20px 20px 8px 8px;
+  background:
+    linear-gradient(90deg, rgba(255,255,255,0.38), rgba(190,215,235,0.28), rgba(255,255,255,0.08)),
+    rgba(160, 190, 215, 0.22);
+}
+
+.bottle-shape.fancy {
+  width: 58px;
+  height: 88px;
+  border-radius: 30px 30px 15px 15px;
+}
+
+/* Jug: make it chunkier and lower */
+.bottle-shape.jug {
+  width: 66px;
+  height: 76px;
+  border-radius: 32px 32px 19px 19px;
+}
+
+/* Can: add top/bottom rims */
+.bottle-shape.can {
+  width: 56px;
+  height: 82px;
+  border-radius: 9px;
+}
+
+.bottle-shape.can {
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.22), transparent 12%, transparent 88%, rgba(0,0,0,0.16)),
+    linear-gradient(90deg, rgba(255,255,255,0.48), rgba(170,180,190,0.50), rgba(255,255,255,0.12)),
+    repeating-linear-gradient(
+      180deg,
+      rgba(255,255,255,0.08) 0,
+      rgba(255,255,255,0.08) 3px,
+      transparent 3px,
+      transparent 11px
+    ),
+    rgba(190, 200, 210, 0.82);
+}
+
+/* Text polish */
+.bottle-label {
+  font-size: 1rem;
+  line-height: 1.1;
+  padding: 4px 10px;
+}
+
+.bottle-stamp {
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+}
+
+/* Make the bar shelf more visible */
+.bottle::after {
+  left: 18px;
+  right: 18px;
+  bottom: 12px;
+  height: 12px;
+  background:
+    linear-gradient(90deg, rgba(77, 43, 24, 0.55), rgba(170, 118, 62, 0.55), rgba(77, 43, 24, 0.55));
+  box-shadow:
+    0 5px 12px rgba(0, 0, 0, 0.34),
+    inset 0 1px 2px rgba(255, 255, 255, 0.16);
+}
+
+/* Bottle neck personality pass — keep body shapes, vary necks only */
+.bottle-shape.green::before {
+  width: 18px;
+  height: 28px;
+  top: -26px;
+  border-radius: 8px 8px 3px 3px;
+}
+
+.bottle-shape.brown::before {
+  width: 22px;
+  height: 22px;
+  top: -20px;
+  border-radius: 9px 9px 4px 4px;
+}
+
+.bottle-shape.clear::before {
+  width: 15px;
+  height: 34px;
+  top: -31px;
+  border-radius: 7px 7px 2px 2px;
+  opacity: 0.85;
+}
+
+.bottle-shape.fancy::before {
+  width: 30px;
+  height: 16px;
+  top: -14px;
+  border-radius: 999px 999px 5px 5px;
+}
+
+.bottle-shape.jug::before {
+  width: 24px;
+  height: 16px;
+  top: -14px;
+  left: 20px;
+  border-radius: 12px 12px 4px 4px;
+}
+
+.bottle-shape.can::before {
+  top: -5px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+/* Date Night / Fancy Bottle: purple wine-bottle shape */
+.bottle-shape.fancy {
+  width: 42px;
+  height: 96px;
+  border-radius: 13px 13px 9px 9px;
+  transform: none;
+  background:
+    linear-gradient(90deg, rgba(255,255,255,0.18), transparent 28%),
+    rgba(158, 91, 216, 0.78);
+}
+
+.bottle-shape.fancy::before {
+  width: 18px;
+  height: 28px;
+  top: -26px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-radius: 8px 8px 3px 3px;
+  background:
+    linear-gradient(90deg, rgba(255,255,255,0.18), transparent 28%),
+    rgba(158, 91, 216, 0.78);
+}
+
+.bottle-shape.fancy::after {
+  left: 8px;
+  right: 8px;
+  height: 20px;
+  bottom: 22px;
+  border-radius: 6px;
+}

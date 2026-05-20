@@ -9,6 +9,24 @@
 <body>
   <main class="radio-shell">
     <section class="hero-card">
+      <nav class="top-actions" aria-label="Station actions">
+        <div class="donation-menu">
+          <button id="donation-toggle" class="top-action-button" type="button">
+            DONATIONS
+          </button>
+          <div id="donation-panel" class="donation-panel" hidden>
+            <p class="donation-title">Support the Signal</p>
+            <p class="donation-copy">Help keep Hoojshwah Radio broadcasting weird original music.</p>
+            <div class="donation-links">
+              <a href="#" target="_blank" rel="noopener">Venmo</a>
+              <a href="#" target="_blank" rel="noopener">PayPal</a>
+            </div>
+          </div>
+        </div>
+
+        <a class="top-action-link" href="#bar-tab">GUESTBOOK</a>
+      </nav>
+
       <p class="eyebrow">Signal locked</p>
       <h1>{{ station_name }}</h1>
 
@@ -17,17 +35,19 @@
         <h2 id="now-title">Tuning station...</h2>
         <p id="now-artist">Hoojshwah</p>
         <p id="track-recording-info" class="track-recording-info"></p>
+
+        <p class="next">
+          Up Next: <span id="up-next">...</span>
+        </p>
+
         <p id="track-progress" class="track-progress">Tuning position...</p>
-        <p id="station-clock" class="station-clock">Station Time: tuning...</p>
 
         <div class="button-row">
           <button id="play-button" type="button">Play Signal</button>
           <button id="resync-button" type="button">Resync Signal</button>
         </div>
 
-        <p class="next">
-          Up Next: <span id="up-next">...</span>
-        </p>
+        <p id="station-clock" class="station-clock">Station Time: tuning...</p>
 
         <div class="station-details">
         </div>
@@ -80,6 +100,43 @@
           </button>
         </div>
         <ul id="track-list" class="collapsed"></ul>
+      </section>
+
+      <section id="bar-tab" class="bar-card">
+        <div class="track-list-header">
+          <div>
+            <p class="label">Bottle on the Bar</p>
+            <p class="loop-length">Label a bottle for the Hoojshwah Radio bar.</p>
+          </div>
+          <button id="bar-toggle" class="secondary-button" type="button">
+            Show Bar
+          </button>
+        </div>
+
+        <div id="bar-content" class="bar-content collapsed">
+          <form id="bottle-form" class="bottle-form">
+            <label>
+              Bottle Style
+              <select id="bottle-style">
+                <option value="green">Green Bottle</option>
+                <option value="brown">Brown Bottle</option>
+                <option value="clear">Clear Bottle</option>
+                <option value="fancy">Fancy Bottle</option>
+                <option value="jug">Weird Jug</option>
+                <option value="can">Aluminum Can</option>
+              </select>
+            </label>
+
+            <label>
+              Bottle Label
+              <input id="bottle-label" type="text" maxlength="16" placeholder="Moon Sauce">
+            </label>
+
+            <button type="submit">What bottle did you bring for the bar?</button>
+          </form>
+
+          <ul id="bottle-list" class="bottle-list"></ul>
+        </div>
       </section>
     </section>
   </main>

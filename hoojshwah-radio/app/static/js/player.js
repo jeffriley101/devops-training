@@ -103,7 +103,7 @@ function getRecordingInfo(track) {
   return "";
 }
 
-function renderTrackList(tracks) {
+function renderTrackList(tracks, currentTrackId = null) {
   if (!trackList) {
     return;
   }
@@ -114,6 +114,10 @@ function renderTrackList(tracks) {
     const item = document.createElement("li");
     const typeLabel = track.type === "bumper" ? "Station ID" : "Track";
     const recordingInfo = getRecordingInfo(track);
+
+    if (currentTrackId && track.id === currentTrackId) {
+      item.classList.add("current-track");
+    }
 
     item.innerHTML = `
       <span class="playlist-title">${track.title} — ${track.artist} (${typeLabel})</span>
@@ -147,6 +151,7 @@ function tuneStation() {
   const result = findCurrentTrack(station.tracks, loopPosition);
 
   renderTrackInfo(result);
+  renderTrackList(station.tracks, result.track.id);
 
   audio.src = result.track.audio_url;
 
@@ -248,3 +253,110 @@ renderStationClock();
 window.setInterval(renderStationClock, 1000);
 
 loadStation();
+
+const donationToggle = document.querySelector("#donation-toggle");
+const donationPanel = document.querySelector("#donation-panel");
+const barToggle = document.querySelector("#bar-toggle");
+const barContent = document.querySelector("#bar-content");
+const bottleForm = document.querySelector("#bottle-form");
+const bottleStyle = document.querySelector("#bottle-style");
+const bottleLabel = document.querySelector("#bottle-label");
+const bottleList = document.querySelector("#bottle-list");
+
+const bottleStorageKey = "hoojshwah-radio-bottles";
+
+function getBottleStamp(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `BOTTLED:${year}${month}${day}`;
+}
+
+function loadBottles() {
+  try {
+    return JSON.parse(window.localStorage.getItem(bottleStorageKey)) || [];
+  } catch (error) {
+    console.error("Could not load bottles:", error);
+    return [];
+  }
+}
+
+function saveBottles(bottles) {
+  window.localStorage.setItem(bottleStorageKey, JSON.stringify(bottles));
+}
+
+function renderBottles() {
+  if (!bottleList) {
+    return;
+  }
+
+  const bottles = loadBottles();
+  bottleList.innerHTML = "";
+
+  if (bottles.length === 0) {
+    const empty = document.createElement("li");
+    empty.className = "bottle";
+    empty.innerHTML = `
+      <div class="bottle-shape green"></div>
+      <div class="bottle-label">Signal Jar</div>
+      <div class="bottle-stamp">${getBottleStamp()}</div>
+    `;
+    bottleList.appendChild(empty);
+    return;
+  }
+
+  bottles.forEach((bottle) => {
+    const item = document.createElement("li");
+    item.className = "bottle";
+    item.innerHTML = `
+      <div class="bottle-shape ${bottle.style}"></div>
+      <div class="bottle-label"></div>
+      <div class="bottle-stamp"></div>
+    `;
+
+    item.querySelector(".bottle-label").textContent = bottle.label;
+    item.querySelector(".bottle-stamp").textContent = bottle.stamp;
+
+    bottleList.appendChild(item);
+  });
+}
+
+if (donationToggle && donationPanel) {
+  donationToggle.addEventListener("click", () => {
+    donationPanel.hidden = !donationPanel.hidden;
+  });
+}
+
+if (barToggle && barContent) {
+  barToggle.addEventListener("click", () => {
+    const isCollapsed = barContent.classList.toggle("collapsed");
+    barToggle.textContent = isCollapsed ? "Show Bar" : "Hide Bar";
+  });
+}
+
+if (bottleForm && bottleStyle && bottleLabel) {
+  bottleForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+
+    const label = bottleLabel.value.trim().slice(0, 16);
+
+    if (!label) {
+      return;
+    }
+
+    const bottles = loadBottles();
+
+    bottles.push({
+      style: bottleStyle.value,
+      label,
+      stamp: getBottleStamp()
+    });
+
+    saveBottles(bottles);
+    bottleLabel.value = "";
+    renderBottles();
+  });
+}
+
+renderBottles();
