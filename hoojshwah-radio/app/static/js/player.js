@@ -34,14 +34,32 @@ function renderStationClock() {
   }
 
   const now = new Date();
-  const time = new Intl.DateTimeFormat("en-US", {
+  const baseTime = new Intl.DateTimeFormat("en-US", {
     hour: "numeric",
     minute: "2-digit",
-    second: "2-digit",
-    timeZoneName: "short"
+    second: "2-digit"
   }).format(now);
 
-  stationClock.textContent = `Station Time: ${time}`;
+  const decimal = String(Math.floor(now.getMilliseconds() / 10)).padStart(2, "0");
+  const zone = new Intl.DateTimeFormat("en-US", {
+    timeZoneName: "short"
+  })
+    .formatToParts(now)
+    .find((part) => part.type === "timeZoneName")?.value || "";
+
+  stationClock.innerHTML = `
+    <span class="station-time-label">Station Time</span>
+    <span class="station-time-value">${baseTime}.${decimal} ${zone}</span>
+    <span class="time-vortex" aria-hidden="true">
+      <span>2</span>
+      <span>0</span>
+      <span>2</span>
+      <span>6</span>
+      <span>5</span>
+      <span>1</span>
+      <span>8</span>
+    </span>
+  `;
 }
 
 function getLoopPosition(totalDurationSeconds) {
