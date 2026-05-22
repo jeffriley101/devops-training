@@ -15,6 +15,8 @@ const loopLength = document.querySelector("#loop-length");
 const trackListToggle = document.querySelector("#track-list-toggle");
 
 let station = null;
+let currentTrackIndex = 0;
+
 const MAX_ACTIVE_PLAYBACK_SECONDS = 90 * 60;
 let activePlaybackSeconds = 0;
 let activePlaybackInterval = null;
@@ -120,6 +122,7 @@ function findCurrentTrack(tracks, loopPositionSeconds) {
     if (loopPositionSeconds < nextElapsed) {
       return {
         track,
+	trackIndex: index,
         nextTrack: tracks[(index + 1) % tracks.length],
         offsetSeconds: loopPositionSeconds - elapsed
       };
@@ -130,6 +133,7 @@ function findCurrentTrack(tracks, loopPositionSeconds) {
 
   return {
     track: tracks[0],
+    trackIndex: 0,
     nextTrack: tracks[1] || tracks[0],
     offsetSeconds: 0
   };
@@ -211,6 +215,8 @@ function tuneStation() {
   const loopPosition = getLoopPosition(station.total_duration_seconds);
   const result = findCurrentTrack(station.tracks, loopPosition);
 
+  currentTrackIndex = result.trackIndex;
+
   renderTrackInfo(result);
   renderTrackList(station.tracks, result.track.id);
 
@@ -225,6 +231,30 @@ function tuneStation() {
     },
     { once: true }
   );
+}
+
+function playTrackByIndex(index) {
+  if (!station || !station.tracks || station.tracks.length === 0) {
+    return;
+  }
+
+  currentTrackIndex = index % station.tracks.length;
+
+  const track = station.tracks[currentTrackIndex];
+  const nextTrack = station.tracks[(currentTrackIndex + 1) % station.tracks.length];
+
+  const result = {
+    track,
+    trackIndex: currentTrackIndex,
+    nextTrack,
+    offsetSeconds: 0
+  };
+
+  renderTrackInfo(result);
+  renderTrackList(station.tracks, track.id);
+
+  audio.src = track.audio_url;
+  audio.currentTime = 0;
 }
 
 async function loadStation() {
@@ -308,11 +338,11 @@ audio.addEventListener("pause", () => {
 });
 
 audio.addEventListener("ended", async () => {
-  if (!station) {
+  if (!station || !station.tracks || station.tracks.length === 0) {
     return;
   }
 
-  tuneStation();
+  playTrackByIndex(currentTrackIndex + 1);
 
   try {
     await audio.play();
