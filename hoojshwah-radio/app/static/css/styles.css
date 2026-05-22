@@ -1370,3 +1370,9 @@ button:hover {
     margin-top: 24px;
   }
 }
+
+.signal-timer {
+  margin: 0.25rem 0 0;
+  font-size: 0.85rem;
+  color: rgba(255, 244, 214, 0.7);
+}
