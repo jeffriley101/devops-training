@@ -44,6 +44,17 @@
     "recording_context": "Live, original, unrehearsed, ad-lib performance"
   },
   {
+    "id": "track-sb-1get-001",
+    "type": "bumper",
+    "title": "Get It Going Signal",
+    "artist": "Hoojshwah Radio",
+    "duration_seconds": 15,
+    "audio_url": "/static/audio/bumpers/sb-1get.mp3",
+    "recorded_date": null,
+    "recorded_location": null,
+    "recording_context": "Sound bite for the Get It Going suite"
+  },
+  {
     "id": "track-005",
     "type": "song",
     "title": "Get It Going",
@@ -539,6 +550,17 @@
     "recording_context": "Sound bite by special DJ host Jim Davis"
   },
   {
+    "id": "track-sb-7bob-001",
+    "type": "bumper",
+    "title": "Broadway Oyster Bar Signal",
+    "artist": "Hoojshwah Radio",
+    "duration_seconds": 19,
+    "audio_url": "/static/audio/bumpers/sb-7bob.mp3",
+    "recorded_date": null,
+    "recorded_location": null,
+    "recording_context": "Sound bite for the Broadway Oyster Bar block"
+  },
+  {
     "id": "track-051",
     "type": "song",
     "title": "Supabad \u2014 Broadway Oyster Bar",
@@ -561,6 +583,17 @@
     "recording_context": "Station bumper with voice-over and Hoojshwah music bed"
   },
   {
+    "id": "track-sb-8san-001",
+    "type": "bumper",
+    "title": "San Loo Signal",
+    "artist": "Hoojshwah Radio",
+    "duration_seconds": 19,
+    "audio_url": "/static/audio/bumpers/sb-8san.mp3",
+    "recorded_date": null,
+    "recorded_location": null,
+    "recording_context": "Sound bite for the San Loo block"
+  },
+  {
     "id": "track-052",
     "type": "song",
     "title": "Like Boom \u2014 San Loo",
@@ -572,15 +605,15 @@
     "recording_context": "Live, original, unrehearsed, ad-lib performance"
   },
   {
-    "id": "track-phase1c-spacement-001",
+    "id": "track-sb-5ss-001",
     "type": "bumper",
-    "title": "Spacement Signal",
+    "title": "Swimmin Shallow Signal",
     "artist": "Hoojshwah Radio",
-    "duration_seconds": 100,
-    "audio_url": "/static/audio/bumpers/bumper-sm.mp3",
+    "duration_seconds": 10,
+    "audio_url": "/static/audio/bumpers/sb-5ss.mp3",
     "recorded_date": null,
     "recorded_location": null,
-    "recording_context": "Temporary lead-in before Swimmin Shallow; station bumper with voice-over and Hoojshwah music bed"
+    "recording_context": "Dedicated sound bite for Swimmin Shallow"
   },
   {
     "id": "track-053",
@@ -605,6 +638,17 @@
     "recording_context": "Sound bite by special DJ host Jim Davis"
   },
   {
+    "id": "track-sb-9mv-001",
+    "type": "bumper",
+    "title": "Mountain & Valley Signal",
+    "artist": "Hoojshwah Radio",
+    "duration_seconds": 16,
+    "audio_url": "/static/audio/bumpers/sb-9mv.mp3",
+    "recorded_date": null,
+    "recorded_location": null,
+    "recording_context": "Sound bite for Mountain & Valley"
+  },
+  {
     "id": "track-054",
     "type": "song",
     "title": "Mountain and Valley",
@@ -614,6 +658,17 @@
     "recorded_date": "2023-09-30",
     "recorded_location": "Chelsea's Corner Cafe, Eureka AR",
     "recording_context": "Live, original, unrehearsed, ad-lib performance"
+  },
+  {
+    "id": "track-sb-10ko-001",
+    "type": "bumper",
+    "title": "Kokomo Joe's Family Fun Center Signal",
+    "artist": "Hoojshwah Radio",
+    "duration_seconds": 11,
+    "audio_url": "/static/audio/bumpers/sb-10ko.mp3",
+    "recorded_date": null,
+    "recorded_location": null,
+    "recording_context": "Sound bite for Kokomo Joe's Family Fun Center"
   },
   {
     "id": "track-055",
@@ -636,6 +691,17 @@
     "recorded_date": null,
     "recorded_location": null,
     "recording_context": "Station bumper with voice-over and Hoojshwah music bed"
+  },
+  {
+    "id": "track-sb-6btt-001",
+    "type": "bumper",
+    "title": "Between the Trees Festival Signal",
+    "artist": "Hoojshwah Radio",
+    "duration_seconds": 8,
+    "audio_url": "/static/audio/bumpers/sb-6btt.mp3",
+    "recorded_date": null,
+    "recorded_location": null,
+    "recording_context": "Sound bite for the Between the Trees Festival block"
   },
   {
     "id": "track-050",
