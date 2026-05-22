@@ -9,11 +9,54 @@ const shareButton = document.querySelector("#share-button");
 const shareStatus = document.querySelector("#share-status");
 const trackProgress = document.querySelector("#track-progress");
 const stationClock = document.querySelector("#station-clock");
+const signalTimer = document.querySelector("#signal-timer");
 const trackRecordingInfo = document.querySelector("#track-recording-info");
 const loopLength = document.querySelector("#loop-length");
 const trackListToggle = document.querySelector("#track-list-toggle");
 
 let station = null;
+const MAX_ACTIVE_PLAYBACK_SECONDS = 90 * 60;
+let activePlaybackSeconds = 0;
+let activePlaybackInterval = null;
+
+function renderSignalTimer() {
+  if (!signalTimer) {
+    return;
+  }
+
+  signalTimer.textContent = `Signal Time: ${formatDuration(activePlaybackSeconds)} / ${formatDuration(MAX_ACTIVE_PLAYBACK_SECONDS)}`;
+}
+
+function stopActivePlaybackTimer() {
+  if (activePlaybackInterval) {
+    window.clearInterval(activePlaybackInterval);
+    activePlaybackInterval = null;
+  }
+}
+
+function handleActivePlaybackLimit() {
+  stopActivePlaybackTimer();
+  audio.pause();
+  playButton.textContent = "Still tuned in? Press Play Signal to continue.";
+}
+
+function startActivePlaybackTimer() {
+  stopActivePlaybackTimer();
+
+  activePlaybackInterval = window.setInterval(() => {
+    activePlaybackSeconds += 1;
+    renderSignalTimer();
+
+    if (activePlaybackSeconds >= MAX_ACTIVE_PLAYBACK_SECONDS) {
+      handleActivePlaybackLimit();
+    }
+  }, 1000);
+}
+
+function resetActivePlaybackTimer() {
+  activePlaybackSeconds = 0;
+  renderSignalTimer();
+}
 
 function formatDuration(totalSeconds) {
   const seconds = Math.max(0, Math.floor(totalSeconds || 0));
@@ -250,7 +293,9 @@ playButton.addEventListener("click", async () => {
   tuneStation();
 
   try {
+    resetActivePlaybackTimer();
     await audio.play();
+    startActivePlaybackTimer();
     playButton.textContent = "Signal Playing";
   } catch (error) {
     console.error("Could not play audio:", error);
@@ -258,16 +303,28 @@ playButton.addEventListener("click", async () => {
   }
 });
 
-audio.addEventListener("ended", () => {
+audio.addEventListener("pause", () => {
+  stopActivePlaybackTimer();
+});
+
+audio.addEventListener("ended", async () => {
   if (!station) {
     return;
   }
 
   tuneStation();
-  audio.play();
+
+  try {
+    await audio.play();
+    startActivePlaybackTimer();
+  } catch (error) {
+    console.error("Could not continue audio:", error);
+    playButton.textContent = "Signal Blocked";
+  }
 });
 
 renderStationClock();
+renderSignalTimer();
 window.setInterval(renderStationClock, 1000);
 
 loadStation();
