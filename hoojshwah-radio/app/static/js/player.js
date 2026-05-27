@@ -8,7 +8,6 @@ const trackList = document.querySelector("#track-list");
 const shareButton = document.querySelector("#share-button");
 const shareStatus = document.querySelector("#share-status");
 const trackProgress = document.querySelector("#track-progress");
-const stationClock = document.querySelector("#station-clock");
 const signalTimer = document.querySelector("#signal-timer");
 const trackRecordingInfo = document.querySelector("#track-recording-info");
 const loopLength = document.querySelector("#loop-length");
@@ -71,40 +70,6 @@ function formatDuration(totalSeconds) {
   }
 
   return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
-}
-
-function renderStationClock() {
-  if (!stationClock) {
-    return;
-  }
-
-  const now = new Date();
-  const baseTime = new Intl.DateTimeFormat("en-US", {
-    hour: "numeric",
-    minute: "2-digit",
-    second: "2-digit"
-  }).format(now);
-
-  const decimal = String(Math.floor(now.getMilliseconds() / 10)).padStart(2, "0");
-  const zone = new Intl.DateTimeFormat("en-US", {
-    timeZoneName: "short"
-  })
-    .formatToParts(now)
-    .find((part) => part.type === "timeZoneName")?.value || "";
-
-  stationClock.innerHTML = `
-    <span class="station-time-label">Station Time</span>
-    <span class="station-time-value">${baseTime}.${decimal} ${zone}</span>
-    <span class="time-vortex" aria-hidden="true">
-      <span>2</span>
-      <span>0</span>
-      <span>2</span>
-      <span>6</span>
-      <span>5</span>
-      <span>1</span>
-      <span>8</span>
-    </span>
-  `;
 }
 
 function getLoopPosition(totalDurationSeconds) {
@@ -353,9 +318,7 @@ audio.addEventListener("ended", async () => {
   }
 });
 
-renderStationClock();
 renderSignalTimer();
-window.setInterval(renderStationClock, 1000);
 
 loadStation();
 
