@@ -324,7 +324,7 @@
     "title": "Arrive",
     "artist": "Hoojshwah",
     "duration_seconds": 508,
-    "audio_url": "/static/audio/arrive.mp3",
+    "audio_url": "https://pub-0ec8c664abcd4f5eb71668b2066f8b3e.r2.dev/audio/arrive.mp3",
     "recorded_date": "2025-02-06",
     "recorded_location": "The Spacement",
     "recording_context": "Live, original, unrehearsed, ad-lib performance"
