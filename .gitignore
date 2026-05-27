@@ -52,3 +52,6 @@ containerized-tools/market-snapshot-bot/app/.main.py.swp
 
 # JILT generated chart artifacts
 jilt/charts/*.png
+
+# Hoojshwah Radio audio is hosted in Cloudflare R2
+hoojshwah-radio/app/static/audio/
