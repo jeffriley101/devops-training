@@ -8,7 +8,7 @@
   <meta name="theme-color" content="#d6a84f">
   <link rel="icon" href="/static/icons/hoojshwah-icon-192.png">
   <link rel="apple-touch-icon" href="/static/icons/hoojshwah-icon-192.png">
-  <link rel="stylesheet" href="/static/css/styles.css?v=phase1c-mobile-2">
+  <link rel="stylesheet" href="/static/css/styles.css?v=phase2b-bottle-3">
 </head>
 <body>
   <main class="radio-shell">
@@ -107,18 +107,18 @@
         <ul id="track-list" class="collapsed"></ul>
       </section>
 
-      <section id="bar-tab" class="bar-card">
-        <div class="track-list-header">
-          <div>
-            <p class="label">Bottle on the Bar</p>
-            <p class="loop-length">Label a bottle for the Hoojshwah Radio bar.</p>
+      <section id="bar-tab" class="bar-card bottle-bar-section">
+        <div class="bar-stage">
+          <div class="bar-header">
+            <div>
+              <p class="label">Bottle on the Bar</p>
+              <h2>Create a bottle to place on the shelf.</h2>
+              <p class="loop-length">
+                Leave a little signal on the Hoojshwah Radio shelf. For now, bottles live on this device.
+              </p>
+            </div>
           </div>
-          <button id="bar-toggle" class="secondary-button" type="button">
-            Show Bar
-          </button>
-        </div>
 
-        <div id="bar-content" class="bar-content collapsed">
           <form id="bottle-form" class="bottle-form">
             <label>
               Bottle Style
@@ -127,8 +127,8 @@
                 <option value="brown">Brown Bottle</option>
                 <option value="clear">Clear Bottle</option>
                 <option value="fancy">Fancy Bottle</option>
-                <option value="jug">Weird Jug</option>
-                <option value="can">Aluminum Can</option>
+                <option value="jug">Jug</option>
+                <option value="can">Can</option>
               </select>
             </label>
 
@@ -137,15 +137,21 @@
               <input id="bottle-label" type="text" maxlength="16" placeholder="Moon Sauce">
             </label>
 
-            <button type="submit">What bottle did you bring for the bar?</button>
+            <button type="submit">Place bottle on the shelf</button>
           </form>
 
-          <ul id="bottle-list" class="bottle-list"></ul>
+          <div class="bottle-shelf-wrap" aria-label="Bottle shelf">
+            <div class="stl-stadium" aria-hidden="true"></div>
+            <div class="gateway-arch" aria-hidden="true"></div>
+            <div class="bottle-shelf-back"></div>
+            <ul id="bottle-list" class="bottle-list bottle-shelf"></ul>
+            <div class="bottle-bar-rail"></div>
+          </div>
         </div>
       </section>
     </section>
   </main>
 
-  <script src="/static/js/player.js?v=phase1c-mobile-2"></script>
+  <script src="/static/js/player.js?v=phase2b-bottle-3"></script>
 </body>
 </html>

@@ -365,26 +365,28 @@ function renderBottles() {
   if (bottles.length === 0) {
     const empty = document.createElement("li");
     empty.className = "bottle";
+    empty.dataset.stamp = getBottleStamp();
     empty.innerHTML = `
       <div class="bottle-shape green"></div>
       <div class="bottle-label">Signal Jar</div>
-      <div class="bottle-stamp">${getBottleStamp()}</div>
+      <div class="bottle-hover-date">${empty.dataset.stamp}</div>
     `;
     bottleList.appendChild(empty);
     return;
   }
 
-  bottles.forEach((bottle) => {
+  bottles.slice().reverse().forEach((bottle) => {
     const item = document.createElement("li");
     item.className = "bottle";
+    item.dataset.stamp = bottle.stamp;
     item.innerHTML = `
       <div class="bottle-shape ${bottle.style}"></div>
       <div class="bottle-label"></div>
-      <div class="bottle-stamp"></div>
+      <div class="bottle-hover-date"></div>
     `;
 
     item.querySelector(".bottle-label").textContent = bottle.label;
-    item.querySelector(".bottle-stamp").textContent = bottle.stamp;
+    item.querySelector(".bottle-hover-date").textContent = item.dataset.stamp;
 
     bottleList.appendChild(item);
   });

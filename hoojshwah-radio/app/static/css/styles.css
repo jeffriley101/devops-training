@@ -1195,3 +1195,653 @@ button:hover {
   font-size: 0.85rem;
   color: rgba(255, 244, 214, 0.7);
 }
+
+/* Phase 2B Bottle on the Bar redesign */
+.bottle-bar-section {
+  padding: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 20% 0%, rgba(255, 220, 140, 0.16), transparent 28%),
+    linear-gradient(180deg, rgba(61, 34, 18, 0.95), rgba(24, 14, 9, 0.98));
+  border: 1px solid rgba(236, 190, 106, 0.32);
+}
+
+.bar-stage {
+  padding: 1.25rem;
+}
+
+.bar-stage .bar-header h2 {
+  margin: 0.15rem 0 0.35rem;
+  font-size: clamp(1.6rem, 4vw, 2.4rem);
+  color: #ffe7aa;
+}
+
+.bar-stage .loop-length {
+  max-width: 720px;
+}
+
+.bottle-bar-section .bottle-form {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) minmax(180px, 1fr) auto;
+  gap: 0.85rem;
+  align-items: end;
+  margin: 1.2rem 0 1.5rem;
+  padding: 1rem;
+  border-radius: 18px;
+  background: rgba(12, 7, 4, 0.38);
+  border: 1px solid rgba(255, 214, 130, 0.18);
+}
+
+.bottle-shelf-wrap {
+  position: relative;
+  margin-top: 1rem;
+  min-height: 260px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 2rem 1rem 1.4rem;
+  border-radius: 24px;
+  background:
+    linear-gradient(180deg, rgba(14, 8, 5, 0.15), rgba(7, 4, 3, 0.52)),
+    repeating-linear-gradient(
+      90deg,
+      rgba(96, 54, 24, 0.95) 0,
+      rgba(96, 54, 24, 0.95) 42px,
+      rgba(75, 39, 18, 0.95) 42px,
+      rgba(75, 39, 18, 0.95) 84px
+    );
+  box-shadow: inset 0 20px 35px rgba(0, 0, 0, 0.42);
+}
+
+.bottle-shelf-back {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 4.85rem;
+  height: 28px;
+  background: linear-gradient(180deg, #9b5a2c, #4d2713);
+  border-top: 2px solid rgba(255, 219, 146, 0.28);
+  border-bottom: 4px solid rgba(20, 9, 4, 0.65);
+  box-shadow: 0 -12px 24px rgba(0, 0, 0, 0.25);
+}
+
+.bottle-bar-rail {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 1.1rem;
+  height: 42px;
+  background: linear-gradient(180deg, #b06a34, #5c2f16 58%, #2a1309);
+  border-top: 2px solid rgba(255, 225, 154, 0.34);
+  box-shadow: 0 -12px 28px rgba(0, 0, 0, 0.45);
+}
+
+.bottle-shelf {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: flex-end;
+  gap: 1.1rem;
+  min-width: max-content;
+  padding: 0 0.5rem 2.35rem;
+  margin: 0;
+  list-style: none;
+}
+
+.bottle-shelf .bottle {
+  flex: 0 0 auto;
+  width: 92px;
+  min-height: 170px;
+  margin: 0;
+  display: grid;
+  justify-items: center;
+  align-content: end;
+  filter: drop-shadow(0 12px 12px rgba(0, 0, 0, 0.35));
+}
+
+.bottle-shelf .bottle-shape {
+  width: 58px;
+  height: 118px;
+}
+
+.bottle-shelf .bottle-label {
+  max-width: 86px;
+  margin-top: 0.45rem;
+  padding: 0.22rem 0.4rem;
+  border-radius: 8px;
+  background: rgba(255, 238, 184, 0.9);
+  color: #241208;
+  font-size: 0.72rem;
+  line-height: 1.1;
+  text-align: center;
+  word-break: break-word;
+}
+
+.bottle-shelf .bottle-stamp {
+  margin-top: 0.22rem;
+  font-size: 0.65rem;
+  color: rgba(255, 232, 184, 0.7);
+}
+
+@media (max-width: 720px) {
+  .bottle-bar-section .bottle-form {
+    grid-template-columns: 1fr;
+  }
+
+  .bottle-shelf-wrap {
+    margin-left: -0.75rem;
+    margin-right: -0.75rem;
+    border-radius: 18px;
+  }
+}
+
+/* Phase 2B cleanup: remove old ghost panels and visible date stamps from shelf bottles */
+.bottle-shelf .bottle::before,
+.bottle-shelf .bottle::after,
+.bottle-shelf .bottle-shape::marker {
+  display: none !important;
+  content: none !important;
+}
+
+.bottle-shelf .bottle-stamp {
+  display: none !important;
+}
+
+.bottle-shelf .bottle {
+  cursor: help;
+}
+
+.bottle-shelf .bottle:hover .bottle-shape {
+  transform: translateY(-8px) scale(1.08);
+}
+
+.bottle-shelf .bottle-shape {
+  position: relative;
+  overflow: visible;
+}
+
+/* Phase 2B: St. Louis skyline shelf backdrop */
+.bottle-shelf-wrap {
+  background:
+    radial-gradient(circle at 10% 13%, rgba(255, 244, 205, 0.95) 0 32px, rgba(255, 244, 205, 0.28) 33px 48px, transparent 50px),
+    radial-gradient(circle at 91% 14%, rgba(255, 174, 76, 0.95) 0 34px, rgba(255, 174, 76, 0.28) 35px 54px, transparent 56px),
+    linear-gradient(180deg, rgba(7, 31, 72, 0.95) 0%, rgba(12, 58, 111, 0.92) 45%, rgba(18, 35, 62, 0.96) 100%);
+}
+
+.bottle-shelf-wrap::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 5.35rem;
+  height: 135px;
+  background:
+    linear-gradient(180deg, transparent 0 24px, rgba(53, 116, 172, 0.86) 25px 100%),
+    repeating-linear-gradient(
+      90deg,
+      rgba(16, 57, 105, 0.95) 0 28px,
+      rgba(33, 86, 142, 0.95) 28px 56px,
+      rgba(9, 41, 88, 0.95) 56px 82px,
+      rgba(48, 105, 160, 0.95) 82px 118px
+    );
+  clip-path: polygon(
+    0% 48%, 5% 48%, 5% 36%, 10% 36%, 10% 22%, 15% 22%,
+    15% 44%, 20% 44%, 20% 30%, 25% 30%, 25% 52%, 31% 52%,
+    31% 18%, 36% 18%, 36% 40%, 42% 40%, 42% 28%, 48% 28%,
+    48% 46%, 54% 46%, 54% 20%, 59% 20%, 59% 38%, 65% 38%,
+    65% 26%, 71% 26%, 71% 50%, 77% 50%, 77% 34%, 83% 34%,
+    83% 16%, 88% 16%, 88% 42%, 94% 42%, 94% 30%, 100% 30%,
+    100% 100%, 0% 100%
+  );
+  opacity: 0.95;
+  z-index: 0;
+}
+
+.bottle-shelf-wrap::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 5.35rem;
+  width: 76px;
+  height: 124px;
+  transform: translateX(-50%);
+  border: 6px solid rgba(144, 203, 246, 0.92);
+  border-bottom: 0;
+  border-radius: 76px 76px 0 0;
+  opacity: 0.82;
+  z-index: 1;
+  box-shadow: 0 0 24px rgba(144, 203, 246, 0.26);
+}
+
+.bottle-shelf-back,
+.bottle-bar-rail,
+.bottle-shelf {
+  z-index: 2;
+}
+
+.bottle-shelf {
+  z-index: 3;
+}
+
+/* Phase 2B: improved St. Louis shelf backdrop */
+.bottle-shelf-wrap {
+  background:
+    radial-gradient(circle at 10% 13%, rgba(255, 244, 205, 0.96) 0 33px, transparent 34px),
+    radial-gradient(circle at 6% 10%, rgba(7, 31, 72, 0.98) 0 31px, transparent 32px),
+    radial-gradient(circle at 91% 14%, rgba(255, 174, 76, 0.95) 0 34px, rgba(255, 174, 76, 0.28) 35px 54px, transparent 56px),
+    linear-gradient(180deg, rgba(7, 31, 72, 0.95) 0%, rgba(12, 58, 111, 0.92) 45%, rgba(18, 35, 62, 0.96) 100%);
+  background-repeat: no-repeat, no-repeat, no-repeat, repeat-x;
+  background-size: auto, auto, auto, 900px 100%;
+}
+
+.bottle-shelf-wrap::before {
+  left: 0;
+  right: auto;
+  width: max(100%, 1800px);
+  bottom: 5.35rem;
+  height: 145px;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      rgba(12, 45, 91, 0.96) 0 34px,
+      rgba(41, 98, 158, 0.96) 34px 62px,
+      rgba(9, 38, 82, 0.96) 62px 92px,
+      rgba(57, 126, 186, 0.96) 92px 132px,
+      rgba(18, 60, 111, 0.96) 132px 172px
+    );
+  clip-path: polygon(
+    0% 50%, 3% 50%, 3% 38%, 6% 38%, 6% 24%, 9% 24%,
+    9% 46%, 12% 46%, 12% 31%, 15% 31%, 15% 54%, 19% 54%,
+    19% 18%, 22% 18%, 22% 42%, 26% 42%, 26% 29%, 30% 29%,
+    30% 48%, 34% 48%, 34% 21%, 37% 21%, 37% 40%, 41% 40%,
+    41% 27%, 45% 27%, 45% 53%, 49% 53%, 49% 35%, 53% 35%,
+    53% 17%, 56% 17%, 56% 44%, 60% 44%, 60% 30%, 64% 30%,
+    64% 50%, 68% 50%, 68% 38%, 71% 38%, 71% 24%, 75% 24%,
+    75% 46%, 79% 46%, 79% 31%, 83% 31%, 83% 54%, 87% 54%,
+    87% 18%, 90% 18%, 90% 42%, 94% 42%, 94% 29%, 100% 29%,
+    100% 100%, 0% 100%
+  );
+  z-index: 0;
+}
+
+.bottle-shelf-wrap::after {
+  left: 50%;
+  bottom: 5.28rem;
+  width: 132px;
+  height: 150px;
+  transform: translateX(-50%);
+  border: none;
+  border-radius: 0;
+  background:
+    radial-gradient(ellipse at center bottom, transparent 0 41px, rgba(150, 214, 255, 0.95) 42px 48px, transparent 49px),
+    radial-gradient(ellipse at center bottom, transparent 0 62px, rgba(150, 214, 255, 0.86) 63px 70px, transparent 71px);
+  clip-path: polygon(
+    6% 100%, 15% 100%, 19% 76%, 24% 55%, 31% 36%, 40% 20%,
+    50% 12%, 60% 20%, 69% 36%, 76% 55%, 81% 76%, 85% 100%,
+    94% 100%, 89% 70%, 82% 45%, 72% 24%, 61% 10%, 50% 4%,
+    39% 10%, 28% 24%, 18% 45%, 11% 70%
+  );
+  opacity: 0.95;
+  z-index: 1;
+  box-shadow: 0 0 24px rgba(144, 203, 246, 0.34);
+}
+
+.bottle-shelf-back,
+.bottle-bar-rail {
+  left: 0;
+  right: auto;
+  width: max(100%, 1800px);
+}
+
+.bottle-bar-rail {
+  background:
+    repeating-linear-gradient(
+      90deg,
+      #b06a34 0 90px,
+      #8e4e25 90px 180px,
+      #6f3718 180px 270px
+    );
+  border-top: 2px solid rgba(255, 225, 154, 0.34);
+}
+
+.bottle-shelf-back {
+  background:
+    repeating-linear-gradient(
+      90deg,
+      #9b5a2c 0 80px,
+      #7d421f 80px 160px,
+      #5e2e16 160px 240px
+    );
+}
+
+/* Phase 2B: bottle shelf visual fixes */
+.bottle-shelf .bottle-shape.jug::after {
+  border-color: rgba(115, 68, 31, 0.95) !important;
+  background: rgba(159, 103, 48, 0.28) !important;
+  box-shadow: inset -4px 0 6px rgba(62, 31, 12, 0.32);
+}
+
+/* Keep the Gateway Arch visible as part of the station backdrop */
+.bottle-shelf-wrap::after {
+  z-index: 4;
+  pointer-events: none;
+  opacity: 0.72;
+  mix-blend-mode: screen;
+}
+
+.bottle-shelf {
+  z-index: 3;
+}
+
+/* Phase 2B: explicit St. Louis backdrop details */
+.bottle-shelf-wrap {
+  background:
+    radial-gradient(circle at 6% 10%, rgba(7, 31, 72, 0.98) 0 31px, transparent 32px),
+    radial-gradient(circle at 10% 13%, rgba(255, 244, 205, 0.96) 0 33px, rgba(255, 244, 205, 0.25) 34px 46px, transparent 48px),
+    radial-gradient(circle at 91% 14%, rgba(255, 174, 76, 0.95) 0 34px, rgba(255, 174, 76, 0.28) 35px 54px, transparent 56px),
+    linear-gradient(180deg, rgba(7, 31, 72, 0.95) 0%, rgba(12, 58, 111, 0.92) 45%, rgba(18, 35, 62, 0.96) 100%);
+  background-repeat: no-repeat, no-repeat, no-repeat, repeat-x;
+  background-size: auto, auto, auto, 900px 100%;
+}
+
+/* Retire old pseudo arch so the real arch element controls placement */
+.bottle-shelf-wrap::after {
+  display: none !important;
+  content: none !important;
+}
+
+.gateway-arch {
+  position: absolute;
+  left: 50%;
+  bottom: 5.25rem;
+  width: 150px;
+  height: 170px;
+  transform: translateX(-50%);
+  z-index: 4;
+  pointer-events: none;
+  opacity: 0.82;
+}
+
+.gateway-arch::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 9px solid rgba(168, 224, 255, 0.92);
+  border-bottom: 0;
+  border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+  clip-path: polygon(
+    0% 100%, 15% 100%, 22% 68%, 31% 42%, 42% 21%,
+    50% 12%, 58% 21%, 69% 42%, 78% 68%, 85% 100%,
+    100% 100%, 91% 62%, 79% 31%, 65% 10%, 50% 0%,
+    35% 10%, 21% 31%, 9% 62%
+  );
+  filter: drop-shadow(0 0 14px rgba(146, 210, 255, 0.35));
+}
+
+.gateway-arch::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 92px;
+  height: 132px;
+  transform: translateX(-50%);
+  border: 4px solid rgba(209, 239, 255, 0.55);
+  border-bottom: 0;
+  border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+  opacity: 0.7;
+}
+
+.stl-stadium {
+  position: absolute;
+  right: 10%;
+  bottom: 5.35rem;
+  width: 150px;
+  height: 78px;
+  z-index: 2;
+  pointer-events: none;
+  opacity: 0.9;
+  background:
+    radial-gradient(ellipse at center bottom, rgba(130, 205, 255, 0.22) 0 44px, transparent 45px),
+    linear-gradient(180deg, transparent 0 20px, rgba(40, 111, 172, 0.95) 21px 100%);
+  border-radius: 14px 14px 6px 6px;
+  box-shadow: inset 0 0 0 2px rgba(163, 218, 255, 0.22);
+}
+
+.stl-stadium::before {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: 12px;
+  height: 26px;
+  border: 4px solid rgba(174, 225, 255, 0.75);
+  border-bottom: 0;
+  border-radius: 50% 50% 0 0;
+}
+
+.stl-stadium::after {
+  content: "";
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  bottom: 12px;
+  height: 12px;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      rgba(190, 230, 255, 0.65) 0 7px,
+      transparent 7px 14px
+    );
+  border-radius: 999px;
+}
+
+.bottle-shelf {
+  z-index: 5;
+}
+
+.bottle-shelf-back,
+.bottle-bar-rail {
+  z-index: 6;
+}
+
+/* Phase 2B: smoother arch and visible bottle date hover */
+.gateway-arch::before {
+  clip-path: none !important;
+  border: 8px solid rgba(168, 224, 255, 0.92);
+  border-bottom: 0;
+  border-radius: 999px 999px 0 0 / 100% 100% 0 0;
+  background: transparent;
+}
+
+.gateway-arch::after {
+  clip-path: none !important;
+  border: 4px solid rgba(209, 239, 255, 0.55);
+  border-bottom: 0;
+  border-radius: 999px 999px 0 0 / 100% 100% 0 0;
+}
+
+.bottle-shelf .bottle {
+  cursor: pointer;
+  position: relative;
+}
+
+.bottle-shelf .bottle:hover::after {
+  content: attr(data-stamp);
+  position: absolute;
+  left: 50%;
+  bottom: -1.6rem;
+  transform: translateX(-50%);
+  z-index: 20;
+  white-space: nowrap;
+  padding: 0.18rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(255, 238, 184, 0.96);
+  color: #241208;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35);
+}
+
+/* Phase 2B: repair Gateway Arch shape */
+.gateway-arch {
+  width: 150px;
+  height: 175px;
+  bottom: 5.2rem;
+}
+
+.gateway-arch::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 118px;
+  height: 158px;
+  transform: translateX(-50%);
+  border: 0 !important;
+  border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+  background: none;
+  box-shadow:
+    inset 9px 0 0 rgba(168, 224, 255, 0.92),
+    inset -9px 0 0 rgba(168, 224, 255, 0.92),
+    inset 0 9px 0 rgba(168, 224, 255, 0.92);
+  clip-path: ellipse(50% 100% at 50% 100%);
+  filter: drop-shadow(0 0 14px rgba(146, 210, 255, 0.35));
+}
+
+.gateway-arch::after {
+  display: none !important;
+  content: none !important;
+}
+
+/* Phase 2B: real hover date label for bottles */
+.bottle-shelf .bottle-hover-date {
+  display: none;
+  position: absolute;
+  left: 50%;
+  bottom: -1.55rem;
+  transform: translateX(-50%);
+  z-index: 30;
+  white-space: nowrap;
+  padding: 0.18rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(255, 238, 184, 0.96);
+  color: #241208;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+
+.bottle-shelf .bottle:hover .bottle-hover-date,
+.bottle-shelf .bottle:focus-within .bottle-hover-date {
+  display: block;
+}
+
+/* Phase 2B emergency label restore */
+.bottle-shelf .bottle {
+  position: relative;
+  overflow: visible;
+}
+
+.bottle-shelf .bottle-label {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  position: relative;
+  z-index: 40;
+  max-width: 86px;
+  margin-top: 0.45rem;
+  padding: 0.22rem 0.4rem;
+  border-radius: 8px;
+  background: rgba(255, 238, 184, 0.94);
+  color: #241208;
+  font-size: 0.72rem;
+  line-height: 1.1;
+  text-align: center;
+  word-break: break-word;
+}
+
+.bottle-shelf .bottle-hover-date {
+  display: none;
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  transform: translateX(-50%) translateY(-0.45rem);
+  z-index: 80;
+  white-space: nowrap;
+  padding: 0.18rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(255, 238, 184, 0.98);
+  color: #241208;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+
+.bottle-shelf .bottle:hover .bottle-hover-date {
+  display: block !important;
+}
+
+/* Disable the older empty pseudo-date hover rule */
+.bottle-shelf .bottle:hover::after {
+  display: none !important;
+  content: none !important;
+}
+
+/* Phase 2B: restore bottle names above the bar rail */
+.bottle-shelf {
+  z-index: 20 !important;
+}
+
+.bottle-shelf .bottle {
+  z-index: 21 !important;
+  position: relative;
+  overflow: visible !important;
+}
+
+.bottle-shelf .bottle-label {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  position: relative !important;
+  z-index: 50 !important;
+  margin-top: 0.45rem !important;
+  background: rgba(255, 238, 184, 0.96) !important;
+  color: #241208 !important;
+}
+
+.bottle-bar-rail {
+  z-index: 10 !important;
+}
+
+.bottle-shelf-back {
+  z-index: 8 !important;
+}
+
+/* Larger hover timestamp, without "Bottled:" */
+.bottle-shelf .bottle-hover-date {
+  display: none;
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  transform: translateX(-50%) translateY(-0.45rem);
+  z-index: 90 !important;
+  white-space: nowrap;
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(255, 238, 184, 0.98);
+  color: #241208;
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+
+.bottle-shelf .bottle:hover .bottle-hover-date {
+  display: block !important;
+}
