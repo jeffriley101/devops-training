@@ -1924,3 +1924,129 @@ body {
     overflow-x: auto;
   }
 }
+
+/* Phase 2B: cooler station title treatment */
+.hero-card h1 {
+  font-family: "Trebuchet MS", "Arial Black", Impact, system-ui, sans-serif;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 0.95;
+  color: #ffe7aa;
+  text-shadow:
+    0 2px 0 rgba(70, 35, 8, 0.95),
+    0 0 16px rgba(255, 194, 87, 0.45),
+    0 0 34px rgba(94, 170, 255, 0.22);
+}
+
+.hero-card h1::after {
+  content: "✦";
+  display: inline-block;
+  margin-left: 0.28em;
+  color: #7ec8ff;
+  text-shadow: 0 0 14px rgba(126, 200, 255, 0.7);
+}
+
+/* Phase 2B layout stabilization: normal page width, internal shelf scroll only */
+html,
+body {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.radio-shell,
+.hero-card,
+.player-card,
+.bio-card,
+.playlist-card,
+.bar-card,
+.bottle-bar-section,
+.bar-stage {
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
+.hero-card h1 {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  font-size: clamp(2.35rem, 9vw, 5.4rem);
+  letter-spacing: clamp(0.02em, 0.9vw, 0.08em);
+}
+
+.bottle-shelf-wrap {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  box-sizing: border-box;
+  contain: paint;
+}
+
+/* Make the scrollable shelf artwork extend with the bottle row without widening the page */
+.bottle-shelf {
+  width: max-content;
+  min-width: 100%;
+  max-width: none;
+  padding-right: 3rem;
+}
+
+.bottle-shelf-wrap::before,
+.bottle-shelf-back,
+.bottle-bar-rail {
+  width: 100%;
+  min-width: 100%;
+}
+
+/* When bottles overflow, make the background feel continuous inside the scroll area */
+.bottle-shelf::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 5.35rem;
+  height: 145px;
+  min-width: 100%;
+  z-index: -2;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      rgba(12, 45, 91, 0.96) 0 34px,
+      rgba(41, 98, 158, 0.96) 34px 62px,
+      rgba(9, 38, 82, 0.96) 62px 92px,
+      rgba(57, 126, 186, 0.96) 92px 132px,
+      rgba(18, 60, 111, 0.96) 132px 172px
+    );
+  clip-path: polygon(
+    0% 50%, 3% 50%, 3% 38%, 6% 38%, 6% 24%, 9% 24%,
+    9% 46%, 12% 46%, 12% 31%, 15% 31%, 15% 54%, 19% 54%,
+    19% 18%, 22% 18%, 22% 42%, 26% 42%, 26% 29%, 30% 29%,
+    30% 48%, 34% 48%, 34% 21%, 37% 21%, 37% 40%, 41% 40%,
+    41% 27%, 45% 27%, 45% 53%, 49% 53%, 49% 35%, 53% 35%,
+    53% 17%, 56% 17%, 56% 44%, 60% 44%, 60% 30%, 64% 30%,
+    64% 50%, 68% 50%, 68% 38%, 71% 38%, 71% 24%, 75% 24%,
+    75% 46%, 79% 46%, 79% 31%, 83% 31%, 83% 54%, 87% 54%,
+    87% 18%, 90% 18%, 90% 42%, 94% 42%, 94% 29%, 100% 29%,
+    100% 100%, 0% 100%
+  );
+}
+
+@media (max-width: 720px) {
+  .radio-shell {
+    max-width: 100vw;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+
+  .hero-card h1 {
+    font-size: clamp(2rem, 11vw, 3.35rem);
+    letter-spacing: 0.025em;
+  }
+
+  .bottle-shelf-wrap {
+    margin-left: 0;
+    margin-right: 0;
+  }
+}
