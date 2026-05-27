@@ -9,5 +9,6 @@
     "description": "A simulated-live broadcast of original Hoojshwah music.",
     "image_url": "/static/images/hooj01.jpeg"
   },
-  "phase": "2A-public-station-foundation"
+  "phase": "2A-public-station-foundation",
+  "media_base_url": "https://pub-0ec8c664abcd4f5eb71668b2066f8b3e.r2.dev"
 }

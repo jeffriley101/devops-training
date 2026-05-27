@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from app.radio import load_station_config, load_tracks
+from app.radio import build_station_tracks, load_station_config, load_tracks
 
 app = FastAPI(title="Hoojshwah Radio")
 
@@ -26,10 +26,14 @@ def home(request: Request):
 def station():
     station_config = load_station_config()
     tracks = load_tracks()
-    total_duration = sum(track["duration_seconds"] for track in tracks)
+    station_tracks = build_station_tracks(
+        tracks=tracks,
+        media_base_url=station_config["media_base_url"],
+    )
+    total_duration = sum(track["duration_seconds"] for track in station_tracks)
 
     return {
         **station_config,
         "total_duration_seconds": total_duration,
-        "tracks": tracks,
+        "tracks": station_tracks,
     }
