@@ -1436,7 +1436,7 @@ button:hover {
 .bottle-shelf-wrap::before {
   left: 0;
   right: auto;
-  width: max(100%, 1800px);
+  width: 100%;
   bottom: 5.35rem;
   height: 145px;
   background:
@@ -1489,7 +1489,7 @@ button:hover {
 .bottle-bar-rail {
   left: 0;
   right: auto;
-  width: max(100%, 1800px);
+  width: 100%;
 }
 
 .bottle-bar-rail {
@@ -1844,4 +1844,83 @@ button:hover {
 
 .bottle-shelf .bottle:hover .bottle-hover-date {
   display: block !important;
+}
+
+/* Phase 2B mobile width fix: stop skyline/backdrop from widening the whole page */
+.bottle-shelf-wrap::before,
+.bottle-shelf-back,
+.bottle-bar-rail {
+  width: 100% !important;
+  max-width: 100% !important;
+  left: 0 !important;
+  right: 0 !important;
+}
+
+.bottle-shelf-wrap {
+  contain: layout paint;
+  max-width: 100%;
+}
+
+.bottle-shelf {
+  max-width: none;
+}
+
+/* Phase 2B hard mobile viewport containment */
+html,
+body {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+body {
+  position: relative;
+}
+
+.radio-shell,
+.hero-card,
+.player-card,
+.bio-card,
+.playlist-card,
+.bar-card,
+.bottle-bar-section,
+.bar-stage {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-wrap: anywhere;
+}
+
+.bottle-shelf-wrap {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  box-sizing: border-box;
+}
+
+.bottle-shelf {
+  width: max-content;
+  max-width: none;
+}
+
+@media (max-width: 720px) {
+  .radio-shell {
+    width: 100%;
+    max-width: 100vw;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+    overflow-x: hidden;
+  }
+
+  .hero-card {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  .bottle-shelf-wrap {
+    max-width: 100%;
+    overflow-x: auto;
+  }
 }
