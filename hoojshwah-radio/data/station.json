@@ -1,0 +1,13 @@
+{
+  "station_name": "Hoojshwah Radio",
+  "station_tagline": "Sign the guestbook and donate!",
+  "station_mode": "simulated-live-loop",
+  "active_playlist": "main",
+  "active_show": {
+    "id": "main-signal",
+    "title": "The Main Signal",
+    "description": "A simulated-live broadcast of original Hoojshwah music.",
+    "image_url": "/static/images/hooj01.jpeg"
+  },
+  "phase": "2A-public-station-foundation"
+}
