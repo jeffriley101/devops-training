@@ -548,7 +548,7 @@ audio.addEventListener("ended", async () => {
   });
 });
 
-["waiting", "stalled", "error", "abort"].forEach((eventName) => {
+["waiting", "stalled", "suspend", "error", "abort"].forEach((eventName) => {
   audio.addEventListener(eventName, () => {
     schedulePlaybackRecovery(eventName);
   });
