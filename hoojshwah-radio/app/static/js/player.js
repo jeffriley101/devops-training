@@ -12,9 +12,15 @@ const signalTimer = document.querySelector("#signal-timer");
 const trackRecordingInfo = document.querySelector("#track-recording-info");
 const loopLength = document.querySelector("#loop-length");
 const trackListToggle = document.querySelector("#track-list-toggle");
+const backstageTrigger = document.querySelector("#backstage-trigger");
+const backstageDialog = document.querySelector("#backstage-dialog");
+const backstageForm = document.querySelector("#backstage-form");
+const backstagePass = document.querySelector("#backstage-pass");
 
 let station = null;
 let currentTrackIndex = 0;
+let backstageUnlocked = false;
+let backstagePickActive = false;
 
 let wakeLock = null;
 
@@ -204,13 +210,30 @@ function renderTrackList(tracks, currentTrackId = null) {
 
   trackList.innerHTML = "";
 
-  tracks.forEach((track) => {
+  tracks.forEach((track, index) => {
     const item = document.createElement("li");
     const typeLabel = track.type === "bumper" ? "Station ID" : "Track";
     const recordingInfo = getRecordingInfo(track);
 
     if (currentTrackId && track.id === currentTrackId) {
       item.classList.add("current-track");
+    }
+
+    if (backstageUnlocked) {
+      item.tabIndex = 0;
+      item.setAttribute("role", "button");
+      item.title = "Play this Backstage Pick";
+
+      item.addEventListener("click", () => {
+        playBackstageTrack(index);
+      });
+
+      item.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          playBackstageTrack(index);
+        }
+      });
     }
 
     item.innerHTML = `
@@ -287,6 +310,47 @@ function playTrackByIndex(index) {
   audio.src = track.audio_url;
   audio.currentTime = 0;
 }
+
+async function playBackstageTrack(index) {
+  if (!backstageUnlocked || !station || !station.tracks || station.tracks.length === 0) {
+    return;
+  }
+
+  backstagePickActive = true;
+  playTrackByIndex(index);
+
+  if (trackProgress) {
+    trackProgress.textContent = "Backstage Pick";
+    trackProgress.classList.add("backstage-pick");
+  }
+
+  try {
+    resetActivePlaybackTimer();
+    await audio.play();
+    await requestWakeLock();
+    startActivePlaybackTimer();
+    playButton.textContent = "Backstage Signal";
+  } catch (error) {
+    console.error("Could not play Backstage Pick:", error);
+    playButton.textContent = "Signal Blocked";
+  }
+}
+
+function unlockBackstage() {
+  backstageUnlocked = true;
+  document.body.classList.add("backstage-active");
+
+  if (backstageDialog) {
+    backstageDialog.hidden = true;
+  }
+
+  if (backstagePass) {
+    backstagePass.value = "";
+  }
+
+  renderTrackList(station?.tracks || [], station?.tracks?.[currentTrackIndex]?.id);
+}
+
 
 async function loadStation() {
   try {
@@ -375,10 +439,21 @@ audio.addEventListener("ended", async () => {
     return;
   }
 
-  playTrackByIndex(currentTrackIndex + 1);
+  if (backstagePickActive) {
+    backstagePickActive = false;
+
+    if (trackProgress) {
+      trackProgress.classList.remove("backstage-pick");
+    }
+
+    tuneStation();
+  } else {
+    playTrackByIndex(currentTrackIndex + 1);
+  }
 
   try {
     await audio.play();
+    await requestWakeLock();
     startActivePlaybackTimer();
   } catch (error) {
     console.error("Could not continue audio:", error);
@@ -391,6 +466,29 @@ document.addEventListener("visibilitychange", async () => {
     await requestWakeLock();
   }
 });
+
+if (backstageTrigger && backstageDialog && backstagePass) {
+  backstageTrigger.addEventListener("click", () => {
+    backstageDialog.hidden = !backstageDialog.hidden;
+
+    if (!backstageDialog.hidden) {
+      backstagePass.focus();
+    }
+  });
+}
+
+if (backstageForm && backstagePass) {
+  backstageForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+
+    if (backstagePass.value.trim().toLowerCase() === "hoojshwah") {
+      unlockBackstage();
+    } else {
+      backstagePass.value = "";
+    }
+  });
+}
+
 
 renderSignalTimer();
 

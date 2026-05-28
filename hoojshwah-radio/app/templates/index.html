@@ -8,7 +8,7 @@
   <meta name="theme-color" content="#d6a84f">
   <link rel="icon" href="/static/icons/hoojshwah-icon-192.png">
   <link rel="apple-touch-icon" href="/static/icons/hoojshwah-icon-192.png">
-  <link rel="stylesheet" href="/static/css/styles.css?v=phase2b-bottle-8">
+  <link rel="stylesheet" href="/static/css/styles.css?v=phase2f-backstage-1">
 </head>
 <body>
   <main class="radio-shell">
@@ -59,6 +59,22 @@
         </div>
 
         <audio id="radio-audio" preload="metadata"></audio>
+      </div>
+
+      <button id="backstage-trigger" class="backstage-trigger" type="button" aria-label="Backstage Pass">
+        ⌤
+      </button>
+
+      <div id="backstage-dialog" class="backstage-dialog" hidden>
+        <form id="backstage-form" class="backstage-form">
+          <input
+            id="backstage-pass"
+            class="backstage-pass"
+            type="password"
+            autocomplete="off"
+            spellcheck="false"
+          >
+        </form>
       </div>
 
       <img
@@ -147,6 +163,6 @@
     </section>
   </main>
 
-  <script src="/static/js/player.js?v=phase2b-bottle-8"></script>
+  <script src="/static/js/player.js?v=phase2f-backstage-1"></script>
 </body>
 </html>
