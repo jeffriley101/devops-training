@@ -16,6 +16,70 @@ const trackListToggle = document.querySelector("#track-list-toggle");
 let station = null;
 let currentTrackIndex = 0;
 
+let wakeLock = null;
+
+async function requestWakeLock() {
+  if (!("wakeLock" in navigator)) {
+    return;
+  }
+
+  if (wakeLock) {
+    return;
+  }
+
+  try {
+    wakeLock = await navigator.wakeLock.request("screen");
+    wakeLock.addEventListener("release", () => {
+      wakeLock = null;
+    });
+  } catch (error) {
+    console.warn("Wake Lock not available:", error);
+  }
+}
+
+async function releaseWakeLock() {
+  if (!wakeLock) {
+    return;
+  }
+
+  try {
+    await wakeLock.release();
+    wakeLock = null;
+  } catch (error) {
+    console.warn("Could not release Wake Lock:", error);
+  }
+}
+
+function updateMediaSession(track) {
+  if (!("mediaSession" in navigator) || typeof MediaMetadata === "undefined" || !track) {
+    return;
+  }
+
+  navigator.mediaSession.metadata = new MediaMetadata({
+    title: track.title,
+    artist: track.artist,
+    album: "Hoojshwah Radio"
+  });
+
+  navigator.mediaSession.setActionHandler("play", async () => {
+    try {
+      await audio.play();
+      await requestWakeLock();
+      startActivePlaybackTimer();
+      playButton.textContent = "Signal Playing";
+    } catch (error) {
+      console.error("Could not play from media session:", error);
+    }
+  });
+
+  navigator.mediaSession.setActionHandler("pause", async () => {
+    audio.pause();
+    stopActivePlaybackTimer();
+    await releaseWakeLock();
+    playButton.textContent = "Play Signal";
+  });
+}
+
 const MAX_ACTIVE_PLAYBACK_SECONDS = 90 * 60;
 let activePlaybackSeconds = 0;
 let activePlaybackInterval = null;
@@ -163,6 +227,8 @@ function renderTrackInfo(result) {
   nowArtist.textContent = result.track.artist;
   upNext.textContent = result.nextTrack.title;
 
+  updateMediaSession(result.track);
+
   if (trackRecordingInfo) {
     trackRecordingInfo.textContent = getRecordingInfo(result.track);
   }
@@ -290,6 +356,7 @@ playButton.addEventListener("click", async () => {
   try {
     resetActivePlaybackTimer();
     await audio.play();
+    await requestWakeLock();
     startActivePlaybackTimer();
     playButton.textContent = "Signal Playing";
   } catch (error) {
@@ -298,8 +365,9 @@ playButton.addEventListener("click", async () => {
   }
 });
 
-audio.addEventListener("pause", () => {
+audio.addEventListener("pause", async () => {
   stopActivePlaybackTimer();
+  await releaseWakeLock();
 });
 
 audio.addEventListener("ended", async () => {
@@ -315,6 +383,12 @@ audio.addEventListener("ended", async () => {
   } catch (error) {
     console.error("Could not continue audio:", error);
     playButton.textContent = "Signal Blocked";
+  }
+});
+
+document.addEventListener("visibilitychange", async () => {
+  if (document.visibilityState === "visible" && !audio.paused) {
+    await requestWakeLock();
   }
 });
 
