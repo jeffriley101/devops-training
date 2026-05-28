@@ -12,6 +12,7 @@
     return {
       version: 2,
       profile: {
+        woodchuckName: "",
         instrument: "",
         level: "",
         goal: "",

@@ -1,18 +1,23 @@
-# Woodshed Woodchuck (Phase 2)
+# Woodshed Woodchuck
 
-Woodshed Woodchuck is a music-practice companion demo project.
+Woodshed Woodchuck is a FastAPI music-practice companion game for young musicians.
 
-Phase 2 includes:
+The app helps students create a Woodchuck, log practice, complete flexible quests, earn credits, buy simple gear, and export practice records for a band director or parent.
 
-- instrument-based daily quest pool
-- local-date quest selection
-- practice logging on the Quest page
-- partial practice logs that accumulate toward the daily target
-- once-per-day quest completion
-- credits + streak updates when target minutes are met
-- supportive Sax Viking messaging for below-target logs
-- Home page reflection for quest status, credits, and streak
-- browser localStorage migration from Phase 1 state
+Current features include:
+
+- Woodchuck naming and profile setup
+- band-instrument-focused setup flow
+- Woodshed scene shell with clickable room objects
+- P-Book / P-Chart practice logging
+- optional practice notes
+- copy/export P-Chart
+- email P-Chart handoff through the user's mail app
+- flexible Quest Book with choose/skip quest options
+- instrument-specific Viking Sax advice
+- credits, streaks, and local progress tracking
+- active Store with buy/equip state for hats and hoodies
+- browser localStorage persistence and migration from earlier state
 
 ## Local run
 
@@ -36,25 +41,61 @@ Use the standard Render/FastAPI startup command:
 uvicorn app.main:app --host 0.0.0.0 --port $PORT
 ```
 
-## Quest and streak rules
+## Practice, quest, and store rules
 
-- Quest is selected from the musician's instrument pool per local calendar day.
-- Logs with minutes below target are saved and receive supportive feedback.
+### P-Book / P-Chart
+
+- Students can log practice date, minutes, and an optional note.
+- Each P-Book submission creates a new practice page.
+- P-Book entries award practice credits.
+- Recent practice pages display in the app.
+- P-Chart can be copied for sharing.
+- P-Chart can be sent through the user's email app with teacher and parent fields.
+- Notes are included in the export when present.
+
+### Quest Book
+
+- Quest options come from the selected instrument pool.
+- Students can choose another quest or skip to a different quest.
+- Quest practice logs accumulate toward the active target.
 - Quest completion requires cumulative daily logs meeting `targetMinutes`.
 - Credits and streak update only on the first completed quest of the day.
-- Extra same-day practice logs are allowed, but do not award duplicate credits.
+- Extra same-day practice logs are allowed, but do not award duplicate quest credits.
 - Completion is limited to once per local day.
+
+### Store
+
+- Students earn credits through practice.
+- Store items can be purchased with credits.
+- Duplicate purchases are blocked.
+- Owned items can be equipped.
+- Equipped hat/hoodie state persists in `localStorage`.
+- Clothing state exists, but visual clothing overlays are deferred until proper art assets exist.
 
 ## Visual asset hooks
 
-The UI uses these project art assets:
+Current assets:
 
 - `/static/img/woodchuck-hero.png`
 - `/static/img/woodchuck-home.png`
 - `/static/img/sax-viking-portrait.png`
 
+Planned / desired future assets:
+
+- `/static/img/woodshed-room-bg.png`
+- `/static/img/woodchuck-base.png`
+- `/static/img/woodchuck-saxophone.png`
+- `/static/img/woodchuck-clarinet.png`
+- `/static/img/woodchuck-flute.png`
+- `/static/img/woodchuck-drums.png`
+- `/static/img/woodchuck-tuba.png`
+
+Future outfit assets may include hat and hoodie overlays, but exact implementation should wait for final art.
+
 ## Notes
 
-- Persistence uses browser localStorage only.
-- Backend database, auth, store purchases, account logic, and payment logic are intentionally deferred.
-- Store purchase/equip logic is a future phase.
+- Persistence uses browser `localStorage` only.
+- Refreshing or reopening the same browser should preserve state.
+- Different browsers/devices start fresh unless future backend/account sync is added.
+- Backend database, auth, account logic, payment logic, subscriptions, teacher dashboards, and server-sent email are intentionally deferred.
+- Real tuner/metronome tools, achievements, printable/PDF reports, and visual clothing overlays are future phases.

@@ -1,18 +1,22 @@
 {% extends "base.html" %}
 
 {% block content %}
+<header class="site-header wood-panel">
+  <p class="eyebrow">Practice. Grow. Play.</p>
+  <h1 class="logo">The Woodshed Woodchuck</h1>
+</header>
+
 <section class="card hero-card">
   <div>
     <p class="chip">Music companion game demo</p>
-    <h2 class="hero-title">Help your Woodchuck build a musical world.</h2>
-    <p class="body-copy">
-      You practice in real life. Your Woodchuck grows with every step.
-      Sax Viking guides the journey with quests and encouragement.
-    </p>
     <div class="button-row">
-      <a class="btn btn-primary" href="/setup">Start Your Woodshed</a>
-      <a class="btn btn-secondary" href="/home" data-requires-profile="true">Continue</a>
+      <a class="btn btn-primary" href="/setup">Create a Woodchuck</a>
+      <a class="btn btn-secondary" href="/home" data-requires-profile="true">Back to the Woodshed</a>
+      <a class="btn btn-red" href="/p-book" data-requires-profile="true">P-Chart Quick Submit</a>
     </div>
+    <p class="body-copy">
+      Build a musical world. Practice in real life and watch your Woodchuck grow! The Viking Sax is there to help.
+    </p>
   </div>
   <aside class="art-frame" aria-label="Woodchuck hero art">
     <img class="character-art" src="/static/img/woodchuck-hero.png" alt="Woodchuck companion hero art" />
