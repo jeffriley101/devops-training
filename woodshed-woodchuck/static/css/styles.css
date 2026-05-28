@@ -154,6 +154,11 @@ body {
   color: #fff7e9;
   box-shadow: inset 0 1px 0 rgba(212, 236, 204, 0.5), 0 5px 10px rgba(25, 40, 28, 0.35);
 }
+.btn-red {
+  background: linear-gradient(180deg, #d95b4f, #9f2f28);
+  color: #fff8f3;
+  box-shadow: inset 0 1px 0 rgba(255, 219, 210, 0.65), 0 5px 10px rgba(80, 24, 20, 0.35);
+}
 .btn.disabled { opacity: 0.7; cursor: not-allowed; }
 .button-row { display: flex; gap: 0.66rem; flex-wrap: wrap; margin-top: 0.8rem; }
 
