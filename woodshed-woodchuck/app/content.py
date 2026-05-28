@@ -1,12 +1,13 @@
 """Static content used by the Woodshed Woodchuck demo."""
 
 INSTRUMENT_OPTIONS = [
+    "Flute",
+    "Clarinet",
     "Saxophone",
-    "Guitar",
-    "Piano",
-    "Voice",
     "Trumpet",
-    "Violin",
+    "Trombone",
+    "Tuba",
+    "Percussion",
 ]
 
 LEVEL_OPTIONS = ["Beginner", "Intermediate", "Advanced"]
@@ -21,88 +22,102 @@ GOAL_OPTIONS = [
 SAX_VIKING_WELCOME = "Ahoy, musician! Set your path and let the woodshed sing."
 
 QUEST_POOL = {
+    "Flute": [
+        {
+            "id": "flute-trill",
+            "text": "Practice a trill.",
+            "target_minutes": 10,
+            "reward_credits": 15,
+        },
+        {
+            "id": "flute-trill-metronome",
+            "text": "Use the metronome to practice trilling at different speeds.",
+            "target_minutes": 15,
+            "reward_credits": 20,
+        },
+    ],
+    "Clarinet": [
+        {
+            "id": "clarinet-break",
+            "text": "Practice playing over the break.",
+            "target_minutes": 10,
+            "reward_credits": 15,
+        },
+        {
+            "id": "clarinet-break-metronome",
+            "text": "Use the metronome to practice playing over the break at different speeds.",
+            "target_minutes": 15,
+            "reward_credits": 20,
+        },
+    ],
     "Saxophone": [
         {
-            "id": "sax-long-tone",
-            "text": "Play long tones across your comfortable range.",
+            "id": "sax-middle-b-tonguing",
+            "text": "Play a middle B and practice tonguing.",
+            "target_minutes": 10,
+            "reward_credits": 15,
+        },
+        {
+            "id": "sax-tonguing-metronome",
+            "text": "Use the metronome to practice tonguing at different speeds.",
             "target_minutes": 15,
             "reward_credits": 20,
-        },
-        {
-            "id": "sax-scale",
-            "text": "Play a B-flat major scale with a metronome.",
-            "target_minutes": 20,
-            "reward_credits": 25,
-        },
-    ],
-    "Guitar": [
-        {
-            "id": "gtr-chords",
-            "text": "Practice clean chord changes through 4 shapes.",
-            "target_minutes": 15,
-            "reward_credits": 20,
-        },
-        {
-            "id": "gtr-scale",
-            "text": "Run a major scale in two positions.",
-            "target_minutes": 20,
-            "reward_credits": 25,
-        },
-    ],
-    "Piano": [
-        {
-            "id": "pn-hands",
-            "text": "Play a major scale hands-separate, then hands-together.",
-            "target_minutes": 20,
-            "reward_credits": 25,
-        },
-        {
-            "id": "pn-rhythm",
-            "text": "Practice a chord progression with steady rhythm.",
-            "target_minutes": 15,
-            "reward_credits": 20,
-        },
-    ],
-    "Voice": [
-        {
-            "id": "vox-breath",
-            "text": "Do breath control and sustained vowel practice.",
-            "target_minutes": 15,
-            "reward_credits": 20,
-        },
-        {
-            "id": "vox-intervals",
-            "text": "Practice interval jumps with a reference pitch.",
-            "target_minutes": 20,
-            "reward_credits": 25,
         },
     ],
     "Trumpet": [
         {
-            "id": "trp-long-tone",
-            "text": "Play long tones with steady embouchure.",
-            "target_minutes": 15,
-            "reward_credits": 20,
+            "id": "trumpet-low-f-sharp-tonguing",
+            "text": "Play a low F# and practice tonguing.",
+            "target_minutes": 10,
+            "reward_credits": 15,
         },
         {
-            "id": "trp-articulation",
-            "text": "Practice tonguing patterns at two tempos.",
-            "target_minutes": 20,
-            "reward_credits": 25,
+            "id": "trumpet-tonguing-metronome",
+            "text": "Use the metronome to practice tonguing at different speeds.",
+            "target_minutes": 15,
+            "reward_credits": 20,
         },
     ],
-    "Violin": [
+    "Trombone": [
         {
-            "id": "vln-bow",
-            "text": "Work on even bow strokes across open strings.",
+            "id": "trombone-first-position-lip-slurs",
+            "text": "Play in the first position and practice lip slurs.",
+            "target_minutes": 10,
+            "reward_credits": 15,
+        },
+        {
+            "id": "trombone-lip-slurs-metronome",
+            "text": "Use the metronome to practice lip slurs at different speeds.",
             "target_minutes": 15,
             "reward_credits": 20,
         },
+    ],
+    "Tuba": [
         {
-            "id": "vln-scale",
-            "text": "Play a two-octave scale with intonation focus.",
-            "target_minutes": 20,
-            "reward_credits": 25,
+            "id": "tuba-long-note",
+            "text": "Play an easy note for as long as you can, three times.",
+            "target_minutes": 10,
+            "reward_credits": 15,
+        },
+        {
+            "id": "tuba-tuner-pitch",
+            "text": "Use the tuner to make sure your pitch stays consistent.",
+            "target_minutes": 15,
+            "reward_credits": 20,
+        },
+    ],
+    "Percussion": [
+        {
+            "id": "percussion-paradiddles",
+            "text": "Play 10 paradiddles.",
+            "target_minutes": 10,
+            "reward_credits": 15,
+        },
+        {
+            "id": "percussion-paradiddles-metronome",
+            "text": "Use the metronome to make sure your paradiddles are even at different speeds.",
+            "target_minutes": 15,
+            "reward_credits": 20,
         },
     ],
 }

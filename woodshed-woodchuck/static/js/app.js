@@ -183,6 +183,25 @@
     progress.lastCompletedDate = today;
   }
 
+  const INSTRUMENT_ADVICE = {
+    Flute: "Use the head joint trick if you're having a hard time getting notes out.",
+    Clarinet: "Cover the holes all the way to prevent squawking.",
+    Saxophone: "Use full tone, but don't play loud.",
+    Trumpet: "Keep getting faster... Then one day we will show you double-tonguing!",
+    Trombone: "Use more air!",
+    Tuba: "Big air. Let the room rumble.",
+    Percussion: "Paradiddles are like tongue-twisters for drummers.",
+  };
+
+  function updateInstrumentAdvice(state) {
+    const adviceEl = document.getElementById("instrument-advice");
+    if (!adviceEl) return;
+
+    const instrument = state.profile.instrument;
+    const advice = INSTRUMENT_ADVICE[instrument] || "Choose a quest and keep moving.";
+    adviceEl.textContent = `“${advice}”`;
+  }
+
   function wireQuestForm(state) {
     const questTextEl = document.getElementById("quest-text");
     const questTargetEl = document.getElementById("quest-target");
@@ -266,6 +285,7 @@
     }
 
     renderQuestStatus(state);
+    updateInstrumentAdvice(state);
 
     if (state.daily.completed && feedbackEl) {
       feedbackEl.querySelector("p:last-child").textContent = pickMessage("already_done", today);
@@ -289,6 +309,7 @@
         stateApi.saveState(next);
         renderQuestStatus(next);
         hydrateHome(next);
+        updateInstrumentAdvice(next);
 
         if (feedbackEl) {
           feedbackEl.querySelector("p:last-child").textContent = "Quest skipped. Pick up momentum with this one instead.";
@@ -311,6 +332,7 @@
         stateApi.saveState(next);
         renderQuestStatus(next);
         hydrateHome(next);
+        updateInstrumentAdvice(next);
 
         if (questChoicePanel) questChoicePanel.classList.add("hidden");
         if (feedbackEl) {

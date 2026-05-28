@@ -466,3 +466,17 @@ select {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+.quest-advice-card {
+  grid-template-columns: 72px 1fr;
+  align-items: center;
+}
+
+.quest-advice-portrait {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 999px;
+  border: 2px solid rgba(120, 84, 34, 0.45);
+  box-shadow: 0 5px 12px rgba(0, 0, 0, 0.18);
+}
