@@ -87,7 +87,7 @@
   function routeGuard(state) {
     const path = window.location.pathname;
 
-    if (["/home", "/quest", "/store"].includes(path) && !hasProfile(state)) {
+    if (["/home", "/p-book", "/quest", "/store"].includes(path) && !hasProfile(state)) {
       window.location.replace("/setup");
       return false;
     }
@@ -279,6 +279,142 @@
     });
   }
 
+  function wirePBook(state) {
+    const form = document.getElementById("p-book-form");
+    if (!form) return;
+
+    const dateEl = document.getElementById("p-book-date");
+    const minutesEl = document.getElementById("p-book-minutes");
+    const noteEl = document.getElementById("p-book-note");
+    const errorEl = document.getElementById("p-book-error");
+    const feedbackEl = document.getElementById("p-book-feedback");
+    const entriesEl = document.getElementById("p-book-entries");
+    const exportBtn = document.getElementById("export-p-chart-btn");
+    const emailBtn = document.getElementById("email-p-chart-btn");
+    const teacherEmailEl = document.getElementById("teacher-email");
+    const parentEmailEl = document.getElementById("parent-email");
+
+    const PAGE_CREDIT_REWARD = 5;
+
+    function formatEntry(entry) {
+      const noteText = entry.note ? ` — ${entry.note}` : "";
+      return `${entry.dateKey} — ${entry.minutes} minutes${noteText}`;
+    }
+
+    function renderEntries(s) {
+      if (!entriesEl) return;
+
+      const entries = Array.isArray(s.practiceLog) ? s.practiceLog.slice(0, 10) : [];
+
+      if (!entries.length) {
+        entriesEl.innerHTML = "<p>No practice pages logged yet.</p>";
+        return;
+      }
+
+      entriesEl.innerHTML = entries
+        .map((entry) => `<p>${formatEntry(entry)}</p>`)
+        .join("");
+    }
+
+    function buildExportText(s) {
+      const profileName = s.profile.woodchuckName || "Not named";
+      const instrument = s.profile.instrument || "Not set";
+      const entries = Array.isArray(s.practiceLog) ? s.practiceLog : [];
+      const totalMinutes = entries.reduce((sum, entry) => sum + (Number(entry.minutes) || 0), 0);
+
+      const lines = [
+        "Woodshed Woodchuck Practice Chart",
+        "",
+        `Student/Woodchuck: ${profileName}`,
+        `Instrument: ${instrument}`,
+        `Total Minutes: ${totalMinutes}`,
+        "",
+        "Practice Entries:",
+      ];
+
+      if (!entries.length) {
+        lines.push("No practice entries yet.");
+      } else {
+        entries.forEach((entry) => {
+          lines.push(formatEntry(entry));
+        });
+      }
+
+      return lines.join("\n");
+    }
+
+    dateEl.value = stateApi.localDateKey();
+    renderEntries(state);
+
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      errorEl.textContent = "";
+
+      const dateKey = dateEl.value || stateApi.localDateKey();
+      const minutes = Number(minutesEl.value);
+      const note = noteEl.value.trim();
+
+      if (!Number.isFinite(minutes) || minutes <= 0) {
+        errorEl.textContent = "Enter a positive number of minutes.";
+        return;
+      }
+
+      const next = stateApi.getState();
+
+      next.practiceLog.unshift({
+        dateKey,
+        minutes,
+        note,
+        source: "p-book",
+        creditsAwarded: PAGE_CREDIT_REWARD,
+        loggedAt: new Date().toISOString(),
+      });
+
+      next.practiceLog = next.practiceLog.slice(0, 100);
+      next.progress.credits = (next.progress.credits || 0) + PAGE_CREDIT_REWARD;
+
+      stateApi.saveState(next);
+      renderEntries(next);
+
+      feedbackEl.textContent = `A new page was added to your P-Book. +${PAGE_CREDIT_REWARD} credits added to your bank.`;
+      minutesEl.value = "";
+      noteEl.value = "";
+      hydrateHome(next);
+    });
+
+    if (exportBtn) {
+      exportBtn.addEventListener("click", async function () {
+        const next = stateApi.getState();
+        const exportText = buildExportText(next);
+
+        try {
+          await navigator.clipboard.writeText(exportText);
+          feedbackEl.textContent = "P-Chart copied. You can paste it into a message or email for your band director.";
+        } catch (_err) {
+          feedbackEl.textContent = exportText;
+        }
+      });
+    }
+
+    if (emailBtn) {
+      emailBtn.addEventListener("click", function () {
+        const next = stateApi.getState();
+        const exportText = buildExportText(next);
+        const teacherEmail = teacherEmailEl ? teacherEmailEl.value.trim() : "";
+        const parentEmail = parentEmailEl ? parentEmailEl.value.trim() : "";
+        const subject = "Woodshed Woodchuck Practice Chart";
+
+        const params = new URLSearchParams();
+        if (parentEmail) params.set("cc", parentEmail);
+        params.set("subject", subject);
+        params.set("body", exportText);
+
+        const mailtoUrl = `mailto:${encodeURIComponent(teacherEmail)}?${params.toString()}`;
+        window.location.href = mailtoUrl;
+      });
+    }
+  }
+
   const state = ensureTodayQuest(stateApi.getState());
   stateApi.saveState(state);
 
@@ -287,4 +423,5 @@
   wireSetupForm(state);
   hydrateHome(state);
   wireQuestForm(state);
+  wirePBook(state);
 })();

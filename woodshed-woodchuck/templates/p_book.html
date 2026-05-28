@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="card">
+  <div class="section-head">
+    <h2>P-Book</h2>
+    <p class="body-copy">Add a page to your practice book. Log the date, minutes, and an optional note.</p>
+  </div>
+
+  <form id="p-book-form" class="stack-form mt-md" novalidate>
+    <label for="p-book-date">Practice date</label>
+    <input id="p-book-date" name="p-book-date" type="date" required />
+
+    <label for="p-book-minutes">Minutes practiced</label>
+    <input id="p-book-minutes" name="p-book-minutes" type="number" min="1" step="1" required />
+
+    <label for="p-book-note">Short note (optional)</label>
+    <textarea id="p-book-note" name="p-book-note" rows="3" maxlength="180" placeholder="Scales, band music, rhythm work..."></textarea>
+
+    <p id="p-book-error" class="error-text" aria-live="polite"></p>
+
+    <button class="btn btn-primary" type="submit">Add Page to P-Book</button>
+  </form>
+
+  <article class="mentor-card mt-md" aria-live="polite">
+    <p class="chip">Practice Book</p>
+    <p id="p-book-feedback">No new page added yet.</p>
+  </article>
+
+  <article class="mentor-card mt-md">
+    <p class="chip">Recent Pages</p>
+    <div id="p-book-entries">
+      <p>No practice pages logged yet.</p>
+    </div>
+  </article>
+
+  <article class="mentor-card mt-md">
+    <p class="chip">Email P-Chart</p>
+
+    <div class="stack-form">
+      <label for="teacher-email">Teacher email</label>
+      <input id="teacher-email" name="teacher-email" type="email" placeholder="band.director@school.edu" />
+
+      <label for="parent-email">Parent email</label>
+      <input id="parent-email" name="parent-email" type="email" placeholder="parent@example.com" />
+    </div>
+  </article>
+
+  <div class="button-row">
+    <button id="export-p-chart-btn" class="btn btn-secondary" type="button">Copy P-Chart</button>
+    <button id="email-p-chart-btn" class="btn btn-red" type="button">Email P-Chart</button>
+  </div>
+</section>
+{% endblock %}
