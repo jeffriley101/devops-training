@@ -110,15 +110,18 @@
     if (!form) return;
 
     const errorEl = document.getElementById("setup-error");
+    const woodchuckNameEl = document.getElementById("woodchuck-name");
     const instrumentEl = document.getElementById("instrument");
     const levelEl = document.getElementById("level");
     const goalEl = document.getElementById("goal");
 
+    if (state.profile.woodchuckName) woodchuckNameEl.value = state.profile.woodchuckName;
     if (state.profile.instrument) instrumentEl.value = state.profile.instrument;
     if (state.profile.level) levelEl.value = state.profile.level;
     if (state.profile.goal) goalEl.value = state.profile.goal;
 
     form.addEventListener("submit", function (event) {
+      const woodchuckName = woodchuckNameEl.value.trim();
       const instrument = instrumentEl.value.trim();
       const level = levelEl.value.trim();
       const goal = goalEl.value.trim();
@@ -130,6 +133,7 @@
       }
 
       const next = stateApi.getState();
+      next.profile.woodchuckName = woodchuckName;
       next.profile.instrument = instrument;
       next.profile.level = level;
       next.profile.goal = goal;
@@ -143,6 +147,7 @@
   function hydrateHome(state) {
     const creditsEl = document.getElementById("credits-value");
     const streakEl = document.getElementById("streak-value");
+    const woodchuckNameEl = document.getElementById("woodchuck-name-value");
     const profileEl = document.getElementById("profile-value");
     const questSummaryEl = document.getElementById("home-quest-summary");
     const questStatusEl = document.getElementById("home-quest-status");
@@ -151,6 +156,7 @@
 
     creditsEl.textContent = String(state.progress.credits ?? 0);
     streakEl.textContent = `${state.progress.streak ?? 0} days`;
+    if (woodchuckNameEl) woodchuckNameEl.textContent = state.profile.woodchuckName || "Not named yet";
     profileEl.textContent = hasProfile(state)
       ? `${state.profile.instrument} · ${state.profile.level}`
       : "Not set";

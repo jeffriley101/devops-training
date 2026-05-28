@@ -1,16 +1,16 @@
 :root {
-  --bg-night-top: #152a36;
-  --bg-night-bottom: #10231c;
-  --panel-warm-wood: #5b3a24;
-  --panel-warm-wood-dark: #3f2819;
-  --panel-parchment: #f4e9cf;
-  --panel-parchment-deep: #e8d6ad;
-  --accent-brass: #efbb45;
-  --accent-brass-dark: #b77f1f;
-  --accent-forest: #3f6f46;
-  --accent-forest-dark: #2a4f2f;
-  --text-ink: #2a1d12;
-  --text-light: #f9f3e7;
+  --bg-night-top: #203f3a;
+  --bg-night-bottom: #10261f;
+  --panel-warm-wood: #6a4a2f;
+  --panel-warm-wood-dark: #3f2f22;
+  --panel-parchment: #f3ecd7;
+  --panel-parchment-deep: #dfd0a8;
+  --accent-brass: #dcae4c;
+  --accent-brass-dark: #9b6f2a;
+  --accent-forest: #426b4f;
+  --accent-forest-dark: #244633;
+  --text-ink: #26301f;
+  --text-light: #f5f1df;
   --danger: #a33a2b;
   --radius-xl: 22px;
   --radius-lg: 16px;
@@ -131,7 +131,9 @@ body {
 .asset-hook code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 
 .btn {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 999px;
   padding: 0.72rem 1.22rem;
   text-decoration: none;
