@@ -21,6 +21,8 @@ let station = null;
 let currentTrackIndex = 0;
 let backstageUnlocked = false;
 let backstagePickActive = false;
+let userWantsPlayback = false;
+let playbackRecoveryTimeout = null;
 
 let wakeLock = null;
 
@@ -69,6 +71,7 @@ function updateMediaSession(track) {
 
   navigator.mediaSession.setActionHandler("play", async () => {
     try {
+      userWantsPlayback = true;
       await audio.play();
       await requestWakeLock();
       startActivePlaybackTimer();
@@ -79,6 +82,7 @@ function updateMediaSession(track) {
   });
 
   navigator.mediaSession.setActionHandler("pause", async () => {
+    userWantsPlayback = false;
     audio.pause();
     stopActivePlaybackTimer();
     await releaseWakeLock();
@@ -106,6 +110,7 @@ function stopActivePlaybackTimer() {
 }
 
 function handleActivePlaybackLimit() {
+  userWantsPlayback = false;
   stopActivePlaybackTimer();
   audio.pause();
   playButton.textContent = "Still tuned in? Press Play Signal to continue.";
@@ -128,6 +133,51 @@ function resetActivePlaybackTimer() {
   activePlaybackSeconds = 0;
   renderSignalTimer();
 }
+
+function schedulePlaybackRecovery(reason) {
+  if (!userWantsPlayback || !station) {
+    return;
+  }
+
+  if (playbackRecoveryTimeout) {
+    window.clearTimeout(playbackRecoveryTimeout);
+  }
+
+  console.warn(`Scheduling playback recovery after: ${reason}`);
+
+  playbackRecoveryTimeout = window.setTimeout(async () => {
+    playbackRecoveryTimeout = null;
+
+    if (!userWantsPlayback || !audio.paused) {
+      return;
+    }
+
+    try {
+      await requestWakeLock();
+      await audio.play();
+      startActivePlaybackTimer();
+      playButton.textContent = backstagePickActive ? "Backstage Signal" : "Signal Playing";
+      console.warn("Playback recovery succeeded.");
+    } catch (error) {
+      console.error("Playback recovery failed, resyncing station:", error);
+
+      if (!backstagePickActive) {
+        tuneStation();
+      }
+
+      try {
+        await audio.play();
+        await requestWakeLock();
+        startActivePlaybackTimer();
+        playButton.textContent = "Signal Playing";
+      } catch (secondError) {
+        console.error("Playback recovery after resync failed:", secondError);
+        playButton.textContent = "Signal Blocked";
+      }
+    }
+  }, 1200);
+}
+
 
 function formatDuration(totalSeconds) {
   const seconds = Math.max(0, Math.floor(totalSeconds || 0));
@@ -325,6 +375,7 @@ async function playBackstageTrack(index) {
   }
 
   try {
+    userWantsPlayback = true;
     resetActivePlaybackTimer();
     await audio.play();
     await requestWakeLock();
@@ -418,12 +469,14 @@ playButton.addEventListener("click", async () => {
   tuneStation();
 
   try {
+    userWantsPlayback = true;
     resetActivePlaybackTimer();
     await audio.play();
     await requestWakeLock();
     startActivePlaybackTimer();
     playButton.textContent = "Signal Playing";
   } catch (error) {
+    userWantsPlayback = false;
     console.error("Could not play audio:", error);
     playButton.textContent = "Signal Blocked";
   }
@@ -432,6 +485,10 @@ playButton.addEventListener("click", async () => {
 audio.addEventListener("pause", async () => {
   stopActivePlaybackTimer();
   await releaseWakeLock();
+
+  if (userWantsPlayback) {
+    schedulePlaybackRecovery("pause");
+  }
 });
 
 audio.addEventListener("ended", async () => {
@@ -452,6 +509,7 @@ audio.addEventListener("ended", async () => {
   }
 
   try {
+    userWantsPlayback = true;
     await audio.play();
     await requestWakeLock();
     startActivePlaybackTimer();
@@ -461,9 +519,20 @@ audio.addEventListener("ended", async () => {
   }
 });
 
+["waiting", "stalled", "error", "abort"].forEach((eventName) => {
+  audio.addEventListener(eventName, () => {
+    console.warn(`Audio event: ${eventName}`, audio.error || "");
+    schedulePlaybackRecovery(eventName);
+  });
+});
+
 document.addEventListener("visibilitychange", async () => {
-  if (document.visibilityState === "visible" && !audio.paused) {
+  if (document.visibilityState === "visible" && userWantsPlayback) {
     await requestWakeLock();
+
+    if (audio.paused) {
+      schedulePlaybackRecovery("visibilitychange");
+    }
   }
 });
 
