@@ -9,6 +9,7 @@ const shareButton = document.querySelector("#share-button");
 const shareStatus = document.querySelector("#share-status");
 const trackProgress = document.querySelector("#track-progress");
 const signalTimer = document.querySelector("#signal-timer");
+const signalEvent = document.querySelector("#signal-event");
 const trackRecordingInfo = document.querySelector("#track-recording-info");
 const loopLength = document.querySelector("#loop-length");
 const trackListToggle = document.querySelector("#track-list-toggle");
@@ -101,6 +102,28 @@ function renderSignalTimer() {
 
   signalTimer.textContent = `Signal Time: ${formatDuration(activePlaybackSeconds)} / ${formatDuration(MAX_ACTIVE_PLAYBACK_SECONDS)}`;
 }
+
+function logSignalEvent(eventName, detail = "") {
+  const timestamp = new Date().toLocaleTimeString();
+  const trackTitle = nowTitle ? nowTitle.textContent : "unknown track";
+  const message = `Signal Event: ${eventName} at ${timestamp}${detail ? ` · ${detail}` : ""}`;
+
+  console.warn(message, {
+    eventName,
+    detail,
+    trackTitle,
+    paused: audio.paused,
+    currentTime: audio.currentTime,
+    readyState: audio.readyState,
+    networkState: audio.networkState,
+    error: audio.error
+  });
+
+  if (signalEvent) {
+    signalEvent.textContent = message;
+  }
+}
+
 
 function stopActivePlaybackTimer() {
   if (activePlaybackInterval) {
@@ -519,14 +542,21 @@ audio.addEventListener("ended", async () => {
   }
 });
 
+["play", "playing", "pause", "waiting", "stalled", "suspend", "error", "abort", "emptied", "ended"].forEach((eventName) => {
+  audio.addEventListener(eventName, () => {
+    logSignalEvent(eventName, audio.error ? audio.error.message : "");
+  });
+});
+
 ["waiting", "stalled", "error", "abort"].forEach((eventName) => {
   audio.addEventListener(eventName, () => {
-    console.warn(`Audio event: ${eventName}`, audio.error || "");
     schedulePlaybackRecovery(eventName);
   });
 });
 
 document.addEventListener("visibilitychange", async () => {
+  logSignalEvent(`visibilitychange:${document.visibilityState}`);
+
   if (document.visibilityState === "visible" && userWantsPlayback) {
     await requestWakeLock();
 
@@ -534,6 +564,15 @@ document.addEventListener("visibilitychange", async () => {
       schedulePlaybackRecovery("visibilitychange");
     }
   }
+});
+
+window.addEventListener("online", () => {
+  logSignalEvent("online");
+  schedulePlaybackRecovery("online");
+});
+
+window.addEventListener("offline", () => {
+  logSignalEvent("offline");
 });
 
 if (backstageTrigger && backstageDialog && backstagePass) {
