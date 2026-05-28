@@ -379,6 +379,125 @@
     });
   }
 
+  const STORE_ITEMS = [
+    { id: "hat-red", name: "Red Hat", slot: "head", price: 15 },
+    { id: "hat-blue", name: "Blue Hat", slot: "head", price: 15 },
+    { id: "hat-green", name: "Green Hat", slot: "head", price: 15 },
+    { id: "hat-purple", name: "Purple Hat", slot: "head", price: 15 },
+    { id: "hoodie-red", name: "Red Hoodie", slot: "body", price: 25 },
+    { id: "hoodie-blue", name: "Blue Hoodie", slot: "body", price: 25 },
+    { id: "hoodie-green", name: "Green Hoodie", slot: "body", price: 25 },
+    { id: "hoodie-purple", name: "Purple Hoodie", slot: "body", price: 25 },
+  ];
+
+  function getStoreItem(itemId) {
+    return STORE_ITEMS.find((item) => item.id === itemId);
+  }
+
+  function itemDisplayName(itemId) {
+    const item = getStoreItem(itemId);
+    return item ? item.name : "None";
+  }
+
+  function ensureInventoryShape(state) {
+    state.inventory = state.inventory || {};
+    state.inventory.ownedItems = Array.isArray(state.inventory.ownedItems)
+      ? state.inventory.ownedItems
+      : [];
+    state.inventory.equipped = state.inventory.equipped || {};
+    state.inventory.equipped.head = state.inventory.equipped.head || null;
+    state.inventory.equipped.body = state.inventory.equipped.body || null;
+    return state;
+  }
+
+  function wireStore(state) {
+    const creditsEl = document.getElementById("store-credits-value");
+    const equippedHeadEl = document.getElementById("equipped-head-value");
+    const equippedBodyEl = document.getElementById("equipped-body-value");
+    const feedbackEl = document.getElementById("store-feedback");
+    const itemsEl = document.getElementById("store-items");
+
+    if (!creditsEl || !equippedHeadEl || !equippedBodyEl || !itemsEl) return;
+
+    function renderStore(rawState) {
+      const s = ensureInventoryShape(rawState);
+
+      creditsEl.textContent = String(s.progress.credits ?? 0);
+      equippedHeadEl.textContent = itemDisplayName(s.inventory.equipped.head);
+      equippedBodyEl.textContent = itemDisplayName(s.inventory.equipped.body);
+
+      itemsEl.innerHTML = STORE_ITEMS.map((item) => {
+        const owned = s.inventory.ownedItems.includes(item.id);
+        const equipped = s.inventory.equipped[item.slot] === item.id;
+        const cardClasses = ["store-item-card"];
+        if (owned) cardClasses.push("owned");
+        if (equipped) cardClasses.push("equipped");
+
+        const primaryAction = owned
+          ? `<button class="btn btn-secondary" type="button" data-equip-item="${item.id}">${equipped ? "Equipped" : "Equip"}</button>`
+          : `<button class="btn btn-primary" type="button" data-buy-item="${item.id}">Buy</button>`;
+
+        return `
+          <article class="${cardClasses.join(" ")}">
+            <h3>${item.name}</h3>
+            <p>${item.price} credits · ${item.slot === "head" ? "Hat" : "Hoodie"}</p>
+            <div class="store-item-actions">
+              ${primaryAction}
+            </div>
+          </article>
+        `;
+      }).join("");
+    }
+
+    itemsEl.addEventListener("click", function (event) {
+      const buyButton = event.target.closest("[data-buy-item]");
+      const equipButton = event.target.closest("[data-equip-item]");
+      const next = ensureInventoryShape(stateApi.getState());
+
+      if (buyButton) {
+        const item = getStoreItem(buyButton.dataset.buyItem);
+        if (!item) return;
+
+        if (next.inventory.ownedItems.includes(item.id)) {
+          feedbackEl.textContent = "You already own that item.";
+          return;
+        }
+
+        if ((next.progress.credits || 0) < item.price) {
+          feedbackEl.textContent = `Not enough credits yet. ${item.name} costs ${item.price} credits.`;
+          return;
+        }
+
+        next.progress.credits -= item.price;
+        next.inventory.ownedItems.push(item.id);
+        next.inventory.equipped[item.slot] = item.id;
+
+        stateApi.saveState(next);
+        renderStore(next);
+        feedbackEl.textContent = `${item.name} purchased and equipped.`;
+        return;
+      }
+
+      if (equipButton) {
+        const item = getStoreItem(equipButton.dataset.equipItem);
+        if (!item) return;
+
+        if (!next.inventory.ownedItems.includes(item.id)) {
+          feedbackEl.textContent = "Buy that item before equipping it.";
+          return;
+        }
+
+        next.inventory.equipped[item.slot] = item.id;
+
+        stateApi.saveState(next);
+        renderStore(next);
+        feedbackEl.textContent = `${item.name} equipped.`;
+      }
+    });
+
+    renderStore(ensureInventoryShape(state));
+  }
+
   function wirePBook(state) {
     const form = document.getElementById("p-book-form");
     if (!form) return;
@@ -523,5 +642,6 @@
   wireSetupForm(state);
   hydrateHome(state);
   wireQuestForm(state);
+  wireStore(state);
   wirePBook(state);
 })();

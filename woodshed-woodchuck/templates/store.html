@@ -4,13 +4,29 @@
 <section class="card">
   <div class="section-head">
     <h2>Woodchuck Store</h2>
-    <p class="body-copy">Phase 1 shell complete. Purchases and equip visuals are next.</p>
+    <p class="body-copy">Spend practice credits on simple gear for your Woodchuck.</p>
   </div>
 
-  <div class="store-placeholder-grid">
-    <article class="stat-card"><h3>Hat</h3><p>Placeholder slot</p></article>
-    <article class="stat-card"><h3>Cape</h3><p>Placeholder slot</p></article>
-    <article class="stat-card"><h3>Shoes</h3><p>Placeholder slot</p></article>
+  <div class="stats-grid">
+    <article class="stat-card">
+      <h3>Bank</h3>
+      <p><span id="store-credits-value">0</span> credits</p>
+    </article>
+    <article class="stat-card">
+      <h3>Hat</h3>
+      <p id="equipped-head-value">None</p>
+    </article>
+    <article class="stat-card">
+      <h3>Hoodie</h3>
+      <p id="equipped-body-value">None</p>
+    </article>
   </div>
+
+  <article class="mentor-card mt-md">
+    <p class="chip">The Viking Sax says</p>
+    <p id="store-feedback">Earn credits by practicing, then pick something for your Woodchuck.</p>
+  </article>
+
+  <div id="store-items" class="store-item-grid mt-md" aria-label="Store items"></div>
 </section>
 {% endblock %}

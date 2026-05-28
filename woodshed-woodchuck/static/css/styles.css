@@ -422,3 +422,47 @@ select {
   display: block;
   line-height: 1.35;
 }
+
+.store-item-grid {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.store-item-card {
+  background: #fff8e8;
+  border: 1px solid #d8bf8a;
+  border-radius: var(--radius-md);
+  padding: 0.85rem;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.store-item-card h3 {
+  margin: 0;
+}
+
+.store-item-card p {
+  margin: 0;
+  line-height: 1.35;
+}
+
+.store-item-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.store-item-card.owned {
+  background: #f1ead3;
+}
+
+.store-item-card.equipped {
+  border-color: var(--accent-forest-dark);
+  box-shadow: inset 0 0 0 2px rgba(36, 70, 51, 0.28);
+}
+
+@media (min-width: 720px) {
+  .store-item-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
