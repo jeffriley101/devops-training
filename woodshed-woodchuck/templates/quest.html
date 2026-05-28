@@ -8,11 +8,21 @@
   </div>
 
   <article class="mentor-card">
-    <p class="chip">Today’s Quest</p>
+    <p class="chip">Quest Book</p>
     <h3 id="quest-text">Loading quest...</h3>
     <p><strong>Target:</strong> <span id="quest-target">0</span> minutes</p>
     <p><strong>Status:</strong> <span id="quest-status">Not started</span></p>
     <p><strong>Progress:</strong> <span id="quest-progress">0/0 minutes logged</span></p>
+
+    <div class="button-row">
+      <button id="choose-quest-btn" class="btn btn-secondary" type="button">Choose Another Quest</button>
+      <button id="skip-quest-btn" class="btn btn-red" type="button">Skip Quest</button>
+    </div>
+  </article>
+
+  <article id="quest-choice-panel" class="mentor-card mt-md hidden">
+    <p class="chip">Choose your quest</p>
+    <div id="quest-choice-list" class="quest-choice-list"></div>
   </article>
 
   <form id="practice-form" class="stack-form mt-md" novalidate>

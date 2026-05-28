@@ -194,6 +194,10 @@
     const errorEl = document.getElementById("practice-error");
     const feedbackEl = document.getElementById("quest-feedback");
     const completeBtn = document.getElementById("complete-quest-btn");
+    const chooseQuestBtn = document.getElementById("choose-quest-btn");
+    const skipQuestBtn = document.getElementById("skip-quest-btn");
+    const questChoicePanel = document.getElementById("quest-choice-panel");
+    const questChoiceList = document.getElementById("quest-choice-list");
 
     if (!form || !questTextEl || !questTargetEl || !questStatusEl) return;
 
@@ -213,10 +217,106 @@
       }
     }
 
+    function activateQuest(next, quest) {
+      const todayKey = stateApi.localDateKey();
+
+      next.daily = {
+        dateKey: todayKey,
+        questId: quest.id,
+        questText: quest.text,
+        targetMinutes: quest.target_minutes,
+        rewardCredits: quest.reward_credits,
+        loggedMinutes: 0,
+        completed: false,
+        completedAt: null,
+        encouragement: "",
+      };
+
+      next.quest = {
+        dateKey: todayKey,
+        text: quest.text,
+        targetMinutes: quest.target_minutes,
+        completed: false,
+        rewardCredits: quest.reward_credits,
+      };
+    }
+
+    function renderQuestChoices() {
+      if (!questChoicePanel || !questChoiceList) return;
+
+      const current = stateApi.getState();
+      const quests = questPool[current.profile.instrument] || [];
+
+      if (!quests.length) {
+        questChoiceList.innerHTML = "<p>No alternate quests found for this instrument yet.</p>";
+        questChoicePanel.classList.remove("hidden");
+        return;
+      }
+
+      questChoiceList.innerHTML = quests
+        .map((quest) => `
+          <button class="quest-choice-card" type="button" data-quest-id="${quest.id}">
+            <strong>${quest.text}</strong>
+            <small>${quest.target_minutes} minutes · ${quest.reward_credits} credits</small>
+          </button>
+        `)
+        .join("");
+
+      questChoicePanel.classList.remove("hidden");
+    }
+
     renderQuestStatus(state);
 
     if (state.daily.completed && feedbackEl) {
       feedbackEl.querySelector("p:last-child").textContent = pickMessage("already_done", today);
+    }
+
+    if (chooseQuestBtn) {
+      chooseQuestBtn.addEventListener("click", renderQuestChoices);
+    }
+
+    if (skipQuestBtn) {
+      skipQuestBtn.addEventListener("click", function () {
+        const next = stateApi.getState();
+        const quests = questPool[next.profile.instrument] || [];
+
+        if (!quests.length) return;
+
+        const currentIndex = quests.findIndex((quest) => quest.id === next.daily.questId);
+        const nextQuest = quests[(currentIndex + 1) % quests.length];
+
+        activateQuest(next, nextQuest);
+        stateApi.saveState(next);
+        renderQuestStatus(next);
+        hydrateHome(next);
+
+        if (feedbackEl) {
+          feedbackEl.querySelector("p:last-child").textContent = "Quest skipped. Pick up momentum with this one instead.";
+        }
+      });
+    }
+
+    if (questChoiceList) {
+      questChoiceList.addEventListener("click", function (event) {
+        const button = event.target.closest("[data-quest-id]");
+        if (!button) return;
+
+        const next = stateApi.getState();
+        const quests = questPool[next.profile.instrument] || [];
+        const selectedQuest = quests.find((quest) => quest.id === button.dataset.questId);
+
+        if (!selectedQuest) return;
+
+        activateQuest(next, selectedQuest);
+        stateApi.saveState(next);
+        renderQuestStatus(next);
+        hydrateHome(next);
+
+        if (questChoicePanel) questChoicePanel.classList.add("hidden");
+        if (feedbackEl) {
+          feedbackEl.querySelector("p:last-child").textContent = "Quest selected. Keep moving.";
+        }
+      });
     }
 
     form.addEventListener("submit", function (event) {

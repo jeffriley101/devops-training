@@ -392,3 +392,33 @@ select {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
+
+.hidden {
+  display: none !important;
+}
+
+.quest-choice-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.quest-choice-card {
+  width: 100%;
+  text-align: left;
+  border: 1px solid #d8bf8a;
+  border-radius: var(--radius-md);
+  background: #fff8e8;
+  color: var(--text-ink);
+  padding: 0.72rem;
+  cursor: pointer;
+}
+
+.quest-choice-card strong {
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.quest-choice-card small {
+  display: block;
+  line-height: 1.35;
+}
