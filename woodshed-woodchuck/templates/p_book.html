@@ -58,10 +58,26 @@
 
     <div class="stack-form">
       <label for="teacher-email">Teacher email</label>
-      <input id="teacher-email" name="teacher-email" type="email" placeholder="band.director@school.edu" />
+      <input
+        id="teacher-email"
+        name="teacher-email"
+        type="email"
+        list="teacher-email-options"
+        placeholder="band.director@school.edu"
+      />
+      <datalist id="teacher-email-options"></datalist>
 
       <label for="parent-email">Parent email</label>
-      <input id="parent-email" name="parent-email" type="email" placeholder="parent@example.com" />
+      <input
+        id="parent-email"
+        name="parent-email"
+        type="email"
+        list="parent-email-options"
+        placeholder="parent@example.com"
+      />
+      <datalist id="parent-email-options"></datalist>
+
+      <p class="body-copy">Recent emails are saved only on this device for quicker P-Chart sharing.</p>
     </div>
   </article>
 

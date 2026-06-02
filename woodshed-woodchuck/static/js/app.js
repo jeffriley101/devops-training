@@ -534,6 +534,8 @@
     const emailBtn = document.getElementById("email-p-chart-btn");
     const teacherEmailEl = document.getElementById("teacher-email");
     const parentEmailEl = document.getElementById("parent-email");
+    const teacherEmailOptionsEl = document.getElementById("teacher-email-options");
+    const parentEmailOptionsEl = document.getElementById("parent-email-options");
 
     const totalMinutesEl = document.getElementById("p-book-total-minutes");
     const practiceDaysEl = document.getElementById("p-book-practice-days");
@@ -541,6 +543,43 @@
     const creditsEarnedEl = document.getElementById("p-book-credits-earned");
 
     const PAGE_CREDIT_REWARD = 5;
+
+    function getRecentEmails(s, type) {
+      const contacts = s.exportContacts || {};
+      const emails = contacts[type] || [];
+      return Array.isArray(emails) ? emails : [];
+    }
+
+    function isValidEmail(email) {
+      return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email);
+    }
+
+    function saveRecentEmail(state, type, email) {
+      const cleanEmail = email.trim().toLowerCase();
+      if (!cleanEmail || !isValidEmail(cleanEmail)) return;
+
+      state.exportContacts = state.exportContacts || {};
+      const current = getRecentEmails(state, type);
+      const nextEmails = [cleanEmail, ...current.filter((item) => item !== cleanEmail)].slice(0, 5);
+      state.exportContacts[type] = nextEmails;
+    }
+
+    function renderEmailOptions(s) {
+      const teacherEmails = getRecentEmails(s, "teacherEmails");
+      const parentEmails = getRecentEmails(s, "parentEmails");
+
+      if (teacherEmailOptionsEl) {
+        teacherEmailOptionsEl.innerHTML = teacherEmails
+          .map((email) => `<option value="${email}"></option>`)
+          .join("");
+      }
+
+      if (parentEmailOptionsEl) {
+        parentEmailOptionsEl.innerHTML = parentEmails
+          .map((email) => `<option value="${email}"></option>`)
+          .join("");
+      }
+    }
 
     function formatEntry(entry) {
       const noteText = entry.note ? ` — ${entry.note}` : "";
@@ -605,6 +644,7 @@
     dateEl.value = stateApi.localDateKey();
     renderEntries(state);
     renderPBookSummary(state);
+    renderEmailOptions(state);
 
     form.addEventListener("submit", function (event) {
       event.preventDefault();
@@ -663,6 +703,10 @@
         const exportText = buildExportText(next);
         const teacherEmail = teacherEmailEl ? teacherEmailEl.value.trim() : "";
         const parentEmail = parentEmailEl ? parentEmailEl.value.trim() : "";
+        saveRecentEmail(next, "teacherEmails", teacherEmail);
+        saveRecentEmail(next, "parentEmails", parentEmail);
+        stateApi.saveState(next);
+        renderEmailOptions(next);
         const subject = "Woodshed Woodchuck Practice Chart";
 
         const params = new URLSearchParams();
