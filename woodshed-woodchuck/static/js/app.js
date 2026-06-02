@@ -535,6 +535,11 @@
     const teacherEmailEl = document.getElementById("teacher-email");
     const parentEmailEl = document.getElementById("parent-email");
 
+    const totalMinutesEl = document.getElementById("p-book-total-minutes");
+    const practiceDaysEl = document.getElementById("p-book-practice-days");
+    const pagesCountEl = document.getElementById("p-book-pages-count");
+    const creditsEarnedEl = document.getElementById("p-book-credits-earned");
+
     const PAGE_CREDIT_REWARD = 5;
 
     function formatEntry(entry) {
@@ -555,6 +560,19 @@
       entriesEl.innerHTML = entries
         .map((entry) => `<p>${formatEntry(entry)}</p>`)
         .join("");
+    }
+
+    function renderPBookSummary(s) {
+      const entries = Array.isArray(s.practiceLog) ? s.practiceLog : [];
+      const totalMinutes = entries.reduce((sum, entry) => sum + (Number(entry.minutes) || 0), 0);
+      const practiceDays = new Set(entries.map((entry) => entry.dateKey).filter(Boolean)).size;
+      const pagesCount = entries.length;
+      const creditsEarned = entries.reduce((sum, entry) => sum + (Number(entry.creditsAwarded) || 0), 0);
+
+      if (totalMinutesEl) totalMinutesEl.textContent = String(totalMinutes);
+      if (practiceDaysEl) practiceDaysEl.textContent = String(practiceDays);
+      if (pagesCountEl) pagesCountEl.textContent = String(pagesCount);
+      if (creditsEarnedEl) creditsEarnedEl.textContent = String(creditsEarned);
     }
 
     function buildExportText(s) {
@@ -586,6 +604,7 @@
 
     dateEl.value = stateApi.localDateKey();
     renderEntries(state);
+    renderPBookSummary(state);
 
     form.addEventListener("submit", function (event) {
       event.preventDefault();
@@ -616,6 +635,7 @@
 
       stateApi.saveState(next);
       renderEntries(next);
+      renderPBookSummary(next);
 
       feedbackEl.textContent = `A new page was added to your P-Book. +${PAGE_CREDIT_REWARD} credits added to your bank.`;
       minutesEl.value = "";
