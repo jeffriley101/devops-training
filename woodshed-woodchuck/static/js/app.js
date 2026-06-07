@@ -527,6 +527,11 @@
     const dateEl = document.getElementById("p-book-date");
     const minutesEl = document.getElementById("p-book-minutes");
     const noteEl = document.getElementById("p-book-note");
+    const practiceDetailEls = Array.from(document.querySelectorAll("input[name='practice-detail']"));
+    const timerDisplayEl = document.getElementById("practice-timer-display");
+    const timerStartBtn = document.getElementById("practice-timer-start-btn");
+    const timerStopBtn = document.getElementById("practice-timer-stop-btn");
+    const timerFeedbackEl = document.getElementById("practice-timer-feedback");
     const errorEl = document.getElementById("p-book-error");
     const feedbackEl = document.getElementById("p-book-feedback");
     const entriesEl = document.getElementById("p-book-entries");
@@ -540,9 +545,72 @@
     const totalMinutesEl = document.getElementById("p-book-total-minutes");
     const practiceDaysEl = document.getElementById("p-book-practice-days");
     const pagesCountEl = document.getElementById("p-book-pages-count");
-    const creditsEarnedEl = document.getElementById("p-book-credits-earned");
 
     const PAGE_CREDIT_REWARD = 5;
+
+    let practiceTimerStartedAt = null;
+    let practiceTimerInterval = null;
+
+    function formatTimerSeconds(totalSeconds) {
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+    }
+
+    function updatePracticeTimerDisplay() {
+      if (!timerDisplayEl || !practiceTimerStartedAt) return;
+
+      const elapsedSeconds = Math.max(0, Math.floor((Date.now() - practiceTimerStartedAt) / 1000));
+      timerDisplayEl.textContent = formatTimerSeconds(elapsedSeconds);
+    }
+
+    function stopPracticeTimerInterval() {
+      if (practiceTimerInterval) {
+        window.clearInterval(practiceTimerInterval);
+        practiceTimerInterval = null;
+      }
+    }
+
+    function wirePracticeTimer() {
+      if (!timerDisplayEl || !timerStartBtn || !timerStopBtn || !minutesEl) return;
+
+      timerStartBtn.addEventListener("click", function () {
+        practiceTimerStartedAt = Date.now();
+        stopPracticeTimerInterval();
+        timerDisplayEl.textContent = "00:00";
+        practiceTimerInterval = window.setInterval(updatePracticeTimerDisplay, 1000);
+
+        if (timerFeedbackEl) {
+          timerFeedbackEl.textContent = "Timer started. Go make some music.";
+        }
+      });
+
+      timerStopBtn.addEventListener("click", function () {
+        if (!practiceTimerStartedAt) {
+          if (timerFeedbackEl) {
+            timerFeedbackEl.textContent = "Start the timer first.";
+          }
+          return;
+        }
+
+        const elapsedSeconds = Math.max(0, Math.floor((Date.now() - practiceTimerStartedAt) / 1000));
+        const elapsedMinutes = Math.max(1, Math.round(elapsedSeconds / 60));
+
+        stopPracticeTimerInterval();
+        timerDisplayEl.textContent = formatTimerSeconds(elapsedSeconds);
+        practiceTimerStartedAt = null;
+
+        const shouldFillMinutes = window.confirm(`Do you want to enter ${elapsedMinutes} practice minute${elapsedMinutes === 1 ? "" : "s"}?`);
+        if (shouldFillMinutes) {
+          minutesEl.value = String(elapsedMinutes);
+          if (timerFeedbackEl) {
+            timerFeedbackEl.textContent = `${elapsedMinutes} minute${elapsedMinutes === 1 ? "" : "s"} added. You can change it before submitting.`;
+          }
+        } else if (timerFeedbackEl) {
+          timerFeedbackEl.textContent = "Timer stopped. Minutes were not added.";
+        }
+      });
+    }
 
     function getRecentEmails(s, type) {
       const contacts = s.exportContacts || {};
@@ -583,7 +651,10 @@
 
     function formatEntry(entry) {
       const noteText = entry.note ? ` — ${entry.note}` : "";
-      return `${entry.dateKey} — ${entry.minutes} minutes${noteText}`;
+      const details = Array.isArray(entry.practiceDetails) ? entry.practiceDetails : [];
+      const detailText = details.length ? ` — ${details.join(", ")}` : "";
+
+      return `${entry.dateKey} — ${entry.minutes} minutes${detailText}${noteText}`;
     }
 
     function renderEntries(s) {
@@ -606,12 +677,10 @@
       const totalMinutes = entries.reduce((sum, entry) => sum + (Number(entry.minutes) || 0), 0);
       const practiceDays = new Set(entries.map((entry) => entry.dateKey).filter(Boolean)).size;
       const pagesCount = entries.length;
-      const creditsEarned = entries.reduce((sum, entry) => sum + (Number(entry.creditsAwarded) || 0), 0);
 
       if (totalMinutesEl) totalMinutesEl.textContent = String(totalMinutes);
       if (practiceDaysEl) practiceDaysEl.textContent = String(practiceDays);
       if (pagesCountEl) pagesCountEl.textContent = String(pagesCount);
-      if (creditsEarnedEl) creditsEarnedEl.textContent = String(creditsEarned);
     }
 
     function buildExportText(s) {
@@ -645,6 +714,7 @@
     renderEntries(state);
     renderPBookSummary(state);
     renderEmailOptions(state);
+    wirePracticeTimer();
 
     form.addEventListener("submit", function (event) {
       event.preventDefault();
@@ -653,6 +723,9 @@
       const dateKey = dateEl.value || stateApi.localDateKey();
       const minutes = Number(minutesEl.value);
       const note = noteEl.value.trim();
+      const practiceDetails = practiceDetailEls
+        .filter((checkbox) => checkbox.checked)
+        .map((checkbox) => checkbox.value);
 
       if (!Number.isFinite(minutes) || minutes <= 0) {
         errorEl.textContent = "Enter a positive number of minutes.";
@@ -665,6 +738,7 @@
         dateKey,
         minutes,
         note,
+        practiceDetails,
         source: "p-book",
         creditsAwarded: PAGE_CREDIT_REWARD,
         loggedAt: new Date().toISOString(),
@@ -677,9 +751,12 @@
       renderEntries(next);
       renderPBookSummary(next);
 
-      feedbackEl.textContent = `A new page was added to your P-Book. +${PAGE_CREDIT_REWARD} credits added to your bank.`;
+      feedbackEl.textContent = `A new page was added to your P-Book. +${PAGE_CREDIT_REWARD} dandelions added to your bank.`;
       minutesEl.value = "";
       noteEl.value = "";
+      practiceDetailEls.forEach((checkbox) => {
+        checkbox.checked = false;
+      });
       hydrateHome(next);
     });
 
