@@ -276,7 +276,7 @@
         .map((quest) => `
           <button class="quest-choice-card" type="button" data-quest-id="${quest.id}">
             <strong>${quest.text}</strong>
-            <small>${quest.target_minutes} minutes · ${quest.reward_credits} credits</small>
+            <small>${quest.target_minutes} minutes · ${quest.reward_credits} dandelions</small>
           </button>
         `)
         .join("");
@@ -386,7 +386,7 @@
         lastLog.creditsAwarded = next.daily.rewardCredits;
 
         feedbackEl.querySelector("p:last-child").textContent =
-          `${pickMessage("reward", dateKey)} +${next.daily.rewardCredits} credits earned.`;
+          `${pickMessage("reward", dateKey)} +${next.daily.rewardCredits} dandelions earned.`;
       } else {
         feedbackEl.querySelector("p:last-child").textContent =
           `${pickMessage("supportive", dateKey)} (${next.daily.loggedMinutes}/${next.daily.targetMinutes} minutes)`;
@@ -462,7 +462,7 @@
         return `
           <article class="${cardClasses.join(" ")}">
             <h3>${item.name}</h3>
-            <p>${item.price} credits · ${item.slot === "head" ? "Hat" : "Hoodie"}</p>
+            <p>${item.price} dandelions · ${item.slot === "head" ? "Hat" : "Hoodie"}</p>
             <div class="store-item-actions">
               ${primaryAction}
             </div>
@@ -486,7 +486,7 @@
         }
 
         if ((next.progress.credits || 0) < item.price) {
-          feedbackEl.textContent = `Not enough credits yet. ${item.name} costs ${item.price} credits.`;
+          feedbackEl.textContent = `Not enough dandelions yet. ${item.name} costs ${item.price} dandelions.`;
           return;
         }
 

@@ -22,10 +22,10 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 
 NAV_ITEMS = [
-    {"label": "shed", "href": "/home", "key": "home"},
-    {"label": "book", "href": "/p-book", "key": "p_book"},
-    {"label": "board", "href": "/quest", "key": "quest"},
-    {"label": "shop", "href": "/store", "key": "store"},
+    {"label": "SHED", "href": "/home", "key": "home"},
+    {"label": "BOOK", "href": "/p-book", "key": "p_book"},
+    {"label": "BOARD", "href": "/quest", "key": "quest"},
+    {"label": "SHOP", "href": "/store", "key": "store"},
 ]
 
 
