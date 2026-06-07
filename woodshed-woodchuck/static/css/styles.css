@@ -206,6 +206,16 @@ select {
   }
 }
 
+.success-callout {
+  background: #f5ffe8;
+  border: 1px solid #9acb72;
+  border-radius: 14px;
+  color: #24451f;
+  font-weight: 800;
+  padding: 0.8rem 0.9rem;
+  box-shadow: 0 5px 12px rgba(43, 91, 35, 0.16);
+}
+
 .error-text { color: var(--danger); min-height: 1.2rem; margin: 0; font-weight: 700; }
 
 .mentor-card {

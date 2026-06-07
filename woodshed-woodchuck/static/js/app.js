@@ -546,7 +546,20 @@
     const practiceDaysEl = document.getElementById("p-book-practice-days");
     const pagesCountEl = document.getElementById("p-book-pages-count");
 
-    const PAGE_CREDIT_REWARD = 5;
+    const DANDELION_DAILY_CAP = 75;
+
+    function calculateDandelionsForPractice(minutes, practiceDetails, existingEntries, dateKey) {
+      const minuteDandelions = Math.floor(minutes / 5);
+      const detailDandelions = Array.isArray(practiceDetails) ? practiceDetails.length : 0;
+      const possibleDandelions = minuteDandelions + detailDandelions;
+
+      const earnedToday = existingEntries
+        .filter((entry) => entry.dateKey === dateKey)
+        .reduce((sum, entry) => sum + (Number(entry.creditsAwarded) || 0), 0);
+
+      const remainingToday = Math.max(0, DANDELION_DAILY_CAP - earnedToday);
+      return Math.min(possibleDandelions, remainingToday);
+    }
 
     let practiceTimerStartedAt = null;
     let practiceTimerInterval = null;
@@ -719,6 +732,7 @@
     form.addEventListener("submit", function (event) {
       event.preventDefault();
       errorEl.textContent = "";
+      feedbackEl.classList.remove("success-callout");
 
       const dateKey = dateEl.value || stateApi.localDateKey();
       const minutes = Number(minutesEl.value);
@@ -733,6 +747,12 @@
       }
 
       const next = stateApi.getState();
+      const dandelionsEarned = calculateDandelionsForPractice(
+        minutes,
+        practiceDetails,
+        next.practiceLog || [],
+        dateKey
+      );
 
       next.practiceLog.unshift({
         dateKey,
@@ -740,18 +760,19 @@
         note,
         practiceDetails,
         source: "p-book",
-        creditsAwarded: PAGE_CREDIT_REWARD,
+        creditsAwarded: dandelionsEarned,
         loggedAt: new Date().toISOString(),
       });
 
       next.practiceLog = next.practiceLog.slice(0, 100);
-      next.progress.credits = (next.progress.credits || 0) + PAGE_CREDIT_REWARD;
+      next.progress.credits = (next.progress.credits || 0) + dandelionsEarned;
 
       stateApi.saveState(next);
       renderEntries(next);
       renderPBookSummary(next);
 
-      feedbackEl.textContent = `A new page was added to your P-Book. +${PAGE_CREDIT_REWARD} dandelions added to your bank.`;
+      feedbackEl.classList.add("success-callout");
+      feedbackEl.textContent = `A new page was added to your P-Book. +${dandelionsEarned} dandelions added to your bank.`;
       minutesEl.value = "";
       noteEl.value = "";
       practiceDetailEls.forEach((checkbox) => {
