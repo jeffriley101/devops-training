@@ -148,18 +148,28 @@
     const creditsEl = document.getElementById("credits-value");
     const streakEl = document.getElementById("streak-value");
     const woodchuckNameEl = document.getElementById("woodchuck-name-value");
-    const profileEl = document.getElementById("profile-value");
+    const instrumentEl = document.getElementById("instrument-value");
+    const levelEl = document.getElementById("level-value");
+    const campLevelEl = document.getElementById("camp-level-value");
+    const totalPChartsEl = document.getElementById("total-p-charts-value");
     const questSummaryEl = document.getElementById("home-quest-summary");
     const questStatusEl = document.getElementById("home-quest-status");
+    const practiceLog = Array.isArray(state.practiceLog) ? state.practiceLog : [];
+    if (campLevelEl) campLevelEl.textContent = "Chuckling";
+    if (totalPChartsEl) totalPChartsEl.textContent = String(practiceLog.length);
 
-    if (!creditsEl || !streakEl || !profileEl) return;
+    if (!creditsEl || !streakEl) return;
 
     creditsEl.textContent = String(state.progress.credits ?? 0);
     streakEl.textContent = `${state.progress.streak ?? 0} days`;
-    if (woodchuckNameEl) woodchuckNameEl.textContent = state.profile.woodchuckName || "Not named yet";
-    profileEl.textContent = hasProfile(state)
-      ? `${state.profile.instrument} · ${state.profile.level}`
-      : "Not set";
+    if (woodchuckNameEl) woodchuckNameEl.textContent = state.profile.woodchuckName || "Name your Woodchuck";
+    if (instrumentEl) {
+      instrumentEl.textContent = state.profile.instrument || "Not set";
+    }
+
+    if (levelEl) {
+      levelEl.textContent = state.profile.level || "Not set";
+    }
 
     if (questSummaryEl && questStatusEl && state.daily && state.daily.questText) {
       questSummaryEl.textContent = `${state.daily.questText} (${state.daily.loggedMinutes || 0}/${state.daily.targetMinutes} min)`;
