@@ -510,6 +510,139 @@ select {
   line-height: 1.35;
 }
 
+.shop-page {
+  overflow: hidden;
+}
+
+.shop-intro {
+  margin-top: 0;
+  font-weight: 800;
+}
+
+.shop-feedback {
+  margin: 0.8rem 0 0;
+  min-height: 1.2rem;
+  font-weight: 800;
+}
+
+.shop-scene {
+  display: grid;
+  grid-template-columns: minmax(130px, 0.42fr) minmax(280px, 1.4fr) minmax(130px, 0.42fr);
+  gap: 0.55rem;
+  align-items: stretch;
+  min-height: 560px;
+  border-radius: var(--radius-xl);
+  border: 1px solid rgba(79, 58, 34, 0.35);
+  background:
+    linear-gradient(180deg, rgba(86, 43, 21, 0.18), rgba(44, 29, 20, 0.4)),
+    linear-gradient(180deg, #d8c28f, #8c633a 56%, #4a3423);
+  padding: 0.75rem;
+  box-shadow: inset 0 0 0 1px rgba(255, 244, 210, 0.25);
+}
+
+.shop-column {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.shop-column-left,
+.shop-column-right {
+  justify-content: space-between;
+}
+
+.shop-column-center {
+  justify-content: center;
+  align-items: center;
+  min-width: 0;
+}
+
+.shop-character-art {
+  width: min(94%, 620px);
+  max-height: 520px;
+  object-fit: contain;
+  border-radius: 18px;
+  background: rgba(255, 247, 224, 0.18);
+  box-shadow: 0 8px 18px rgba(36, 24, 16, 0.22);
+}
+
+.shop-shelf-list {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.shop-shelf,
+.shop-status-card {
+  background: rgba(251, 241, 220, 0.9);
+  border: 1px solid rgba(108, 76, 42, 0.32);
+  border-radius: var(--radius-md);
+  box-shadow: 0 5px 12px rgba(36, 24, 16, 0.18);
+}
+
+.shop-shelf {
+  padding: 0.4rem 0.5rem;
+}
+
+.shop-shelf summary {
+  cursor: pointer;
+  font-weight: 900;
+  font-size: 0.88rem;
+  letter-spacing: 0.02em;
+}
+
+.shop-shelf-items {
+  display: grid;
+  gap: 0.45rem;
+  margin-top: 0.45rem;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.shop-shelf .store-item-card {
+  padding: 0.55rem;
+  gap: 0.4rem;
+}
+
+.shop-shelf .store-item-card h3 {
+  font-size: 0.95rem;
+}
+
+.shop-shelf .store-item-card p {
+  font-size: 0.85rem;
+}
+
+.shop-status-card {
+  display: grid;
+  gap: 0.25rem;
+  min-height: 72px;
+  padding: 0.55rem 0.65rem;
+}
+
+.shop-status-card strong {
+  font-size: 0.95rem;
+}
+
+.shop-status-card small {
+  line-height: 1.3;
+}
+
+@media (max-width: 640px) {
+  .shop-scene {
+    grid-template-columns: 1fr 1fr;
+    min-height: 620px;
+  }
+
+  .shop-column-center {
+    grid-column: 1 / -1;
+    order: -1;
+  }
+
+  .shop-character-art {
+    max-height: 300px;
+  }
+}
+
 .store-item-grid {
   display: grid;
   gap: 0.75rem;

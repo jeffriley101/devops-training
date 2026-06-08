@@ -420,6 +420,10 @@
     { id: "hoodie-blue", name: "Blue Hoodie", slot: "body", price: 25 },
     { id: "hoodie-green", name: "Green Hoodie", slot: "body", price: 25 },
     { id: "hoodie-purple", name: "Purple Hoodie", slot: "body", price: 25 },
+    { id: "water-bottle-red", name: "Red Water Bottle", slot: "waterBottle", price: 15 },
+    { id: "water-bottle-blue", name: "Blue Water Bottle", slot: "waterBottle", price: 15 },
+    { id: "water-bottle-green", name: "Green Water Bottle", slot: "waterBottle", price: 15 },
+    { id: "water-bottle-purple", name: "Purple Water Bottle", slot: "waterBottle", price: 15 },
   ];
 
   function getStoreItem(itemId) {
@@ -439,6 +443,7 @@
     state.inventory.equipped = state.inventory.equipped || {};
     state.inventory.equipped.head = state.inventory.equipped.head || null;
     state.inventory.equipped.body = state.inventory.equipped.body || null;
+    state.inventory.equipped.waterBottle = state.inventory.equipped.waterBottle || null;
     return state;
   }
 
@@ -446,6 +451,7 @@
     const creditsEl = document.getElementById("store-credits-value");
     const equippedHeadEl = document.getElementById("equipped-head-value");
     const equippedBodyEl = document.getElementById("equipped-body-value");
+    const equippedWaterBottleEl = document.getElementById("equipped-water-bottle-value");
     const feedbackEl = document.getElementById("store-feedback");
     const itemsEl = document.getElementById("store-items");
 
@@ -457,26 +463,47 @@
       creditsEl.textContent = String(s.progress.credits ?? 0);
       equippedHeadEl.textContent = itemDisplayName(s.inventory.equipped.head);
       equippedBodyEl.textContent = itemDisplayName(s.inventory.equipped.body);
+      if (equippedWaterBottleEl) {
+        equippedWaterBottleEl.textContent = itemDisplayName(s.inventory.equipped.waterBottle);
+      }
+      const shelves = [
+        { title: "HATS", slot: "head" },
+        { title: "HOODIES", slot: "body" },
+        { title: "WATER BOTTLES", slot: "waterBottle" },
+      ];
 
-      itemsEl.innerHTML = STORE_ITEMS.map((item) => {
-        const owned = s.inventory.ownedItems.includes(item.id);
-        const equipped = s.inventory.equipped[item.slot] === item.id;
-        const cardClasses = ["store-item-card"];
-        if (owned) cardClasses.push("owned");
-        if (equipped) cardClasses.push("equipped");
+      itemsEl.innerHTML = shelves.map((shelf) => {
+        const shelfItems = STORE_ITEMS.filter((item) => item.slot === shelf.slot);
 
-        const primaryAction = owned
-          ? `<button class="btn btn-secondary" type="button" data-equip-item="${item.id}">${equipped ? "Equipped" : "Equip"}</button>`
-          : `<button class="btn btn-primary" type="button" data-buy-item="${item.id}">Buy</button>`;
+        const itemButtons = shelfItems.map((item) => {
+          const owned = s.inventory.ownedItems.includes(item.id);
+          const equipped = s.inventory.equipped[item.slot] === item.id;
+          const cardClasses = ["store-item-card"];
+          if (owned) cardClasses.push("owned");
+          if (equipped) cardClasses.push("equipped");
+
+          const primaryAction = owned
+            ? `<button class="btn btn-secondary" type="button" data-equip-item="${item.id}">${equipped ? "Equipped" : "Equip"}</button>`
+            : `<button class="btn btn-primary" type="button" data-buy-item="${item.id}">Buy</button>`;
+
+          return `
+            <article class="${cardClasses.join(" ")}">
+              <h3>${item.name}</h3>
+              <p>${item.price} dandelions</p>
+              <div class="store-item-actions">
+                ${primaryAction}
+              </div>
+            </article>
+          `;
+        }).join("");
 
         return `
-          <article class="${cardClasses.join(" ")}">
-            <h3>${item.name}</h3>
-            <p>${item.price} dandelions · ${item.slot === "head" ? "Hat" : "Hoodie"}</p>
-            <div class="store-item-actions">
-              ${primaryAction}
+          <details class="shop-shelf">
+            <summary>${shelf.title}</summary>
+            <div class="shop-shelf-items">
+              ${itemButtons}
             </div>
-          </article>
+          </details>
         `;
       }).join("");
     }
