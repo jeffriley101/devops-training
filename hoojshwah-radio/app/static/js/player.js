@@ -611,8 +611,6 @@ const bottleStyle = document.querySelector("#bottle-style");
 const bottleLabel = document.querySelector("#bottle-label");
 const bottleList = document.querySelector("#bottle-list");
 
-const bottleStorageKey = "hoojshwah-radio-bottles";
-
 function getBottleStamp(date = new Date()) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -621,25 +619,44 @@ function getBottleStamp(date = new Date()) {
   return `BOTTLED:${year}${month}${day}`;
 }
 
-function loadBottles() {
+async function loadBottles() {
   try {
-    return JSON.parse(window.localStorage.getItem(bottleStorageKey)) || [];
+    const response = await fetch("/api/bottles", { cache: "no-store" });
+
+    if (!response.ok) {
+      throw new Error(`Bottle API returned ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.bottles || [];
   } catch (error) {
     console.error("Could not load bottles:", error);
     return [];
   }
 }
 
-function saveBottles(bottles) {
-  window.localStorage.setItem(bottleStorageKey, JSON.stringify(bottles));
+async function saveBottle(bottle) {
+  const response = await fetch("/api/bottles", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(bottle)
+  });
+
+  if (!response.ok) {
+    throw new Error(`Bottle API returned ${response.status}`);
+  }
+
+  return response.json();
 }
 
-function renderBottles() {
+async function renderBottles() {
   if (!bottleList) {
     return;
   }
 
-  const bottles = loadBottles();
+  const bottles = await loadBottles();
   bottleList.innerHTML = "";
 
   if (bottles.length === 0) {
@@ -686,7 +703,7 @@ if (barToggle && barContent) {
 }
 
 if (bottleForm && bottleStyle && bottleLabel) {
-  bottleForm.addEventListener("submit", (event) => {
+  bottleForm.addEventListener("submit", async (event) => {
     event.preventDefault();
 
     const label = bottleLabel.value.trim().slice(0, 16);
@@ -695,17 +712,17 @@ if (bottleForm && bottleStyle && bottleLabel) {
       return;
     }
 
-    const bottles = loadBottles();
+    try {
+      await saveBottle({
+        style: bottleStyle.value,
+        label
+      });
 
-    bottles.push({
-      style: bottleStyle.value,
-      label,
-      stamp: getBottleStamp()
-    });
-
-    saveBottles(bottles);
-    bottleLabel.value = "";
-    renderBottles();
+      bottleLabel.value = "";
+      await renderBottles();
+    } catch (error) {
+      console.error("Could not save bottle:", error);
+    }
   });
 }
 
