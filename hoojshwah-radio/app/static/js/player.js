@@ -11,6 +11,8 @@ const trackProgress = document.querySelector("#track-progress");
 const signalTimer = document.querySelector("#signal-timer");
 const signalEvent = document.querySelector("#signal-event");
 const trackRecordingInfo = document.querySelector("#track-recording-info");
+const reactionPanel = document.querySelector("#reaction-panel");
+const reactionButtons = document.querySelectorAll(".reaction-button");
 const loopLength = document.querySelector("#loop-length");
 const trackListToggle = document.querySelector("#track-list-toggle");
 const backstageTrigger = document.querySelector("#backstage-trigger");
@@ -318,11 +320,66 @@ function renderTrackList(tracks, currentTrackId = null) {
   });
 }
 
+async function loadReactions() {
+  try {
+    const response = await fetch("/api/reactions", { cache: "no-store" });
+
+    if (!response.ok) {
+      throw new Error(`Reaction API returned ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.reactions || {};
+  } catch (error) {
+    console.error("Could not load reactions:", error);
+    return {};
+  }
+}
+
+async function saveReaction(trackId, emoji) {
+  const response = await fetch("/api/reactions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      track_id: trackId,
+      emoji
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(`Reaction API returned ${response.status}`);
+  }
+
+  return response.json();
+}
+
+async function updateReactionCounts(trackId) {
+  if (!reactionPanel || !trackId) {
+    return;
+  }
+
+  const reactions = await loadReactions();
+  const trackReactions = reactions[trackId] || {};
+
+  reactionButtons.forEach((button) => {
+    const emoji = button.dataset.emoji;
+    const count = trackReactions[emoji] || 0;
+    const countLabel = button.querySelector("span");
+
+    if (countLabel) {
+      countLabel.textContent = count;
+    }
+  });
+}
+
 function renderTrackInfo(result) {
   nowTitle.textContent = result.track.title;
   nowArtist.textContent = result.track.artist;
   upNext.textContent = result.nextTrack.title;
 
+  updateReactionCounts(result.track.id);
   updateMediaSession(result.track);
 
   if (trackRecordingInfo) {
@@ -444,6 +501,30 @@ async function loadStation() {
     nowTitle.textContent = "Station temporarily unavailable";
     upNext.textContent = "try refreshing";
   }
+}
+
+if (reactionButtons.length > 0) {
+  reactionButtons.forEach((button) => {
+    button.addEventListener("click", async () => {
+      const track = station?.tracks?.[currentTrackIndex];
+      const emoji = button.dataset.emoji;
+
+      if (!track || !emoji) {
+        return;
+      }
+
+      try {
+        const result = await saveReaction(track.id, emoji);
+        const countLabel = button.querySelector("span");
+
+        if (countLabel) {
+          countLabel.textContent = result.count;
+        }
+      } catch (error) {
+        console.error("Could not save reaction:", error);
+      }
+    });
+  });
 }
 
 if (trackListToggle && trackList) {

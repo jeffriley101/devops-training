@@ -128,7 +128,7 @@ button:hover {
 
 .button-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 12px;
 }
 
@@ -157,7 +157,7 @@ button:hover {
 
 .button-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 12px;
 }
 
@@ -370,7 +370,7 @@ button:hover {
 
 .donation-links {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 10px;
 }
 
@@ -1128,7 +1128,7 @@ button:hover {
   }
 
   .bottle-list {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr;
     gap: 14px;
     margin-top: 18px;
   }
@@ -2111,4 +2111,34 @@ body {
 
 .backstage-pick {
   color: #ffd25e;
+}
+
+.reaction-panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0 12px;
+}
+
+.reaction-button {
+  width: auto;
+  min-width: 54px;
+  padding: 7px 11px;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.reaction-button span {
+  margin-left: 4px;
+  font-weight: 900;
+}
+
+.player-card .button-row {
+  grid-template-columns: 1fr;
+  width: min(280px, 100%);
+  margin-top: 18px;
+}
+
+.player-card .button-row button {
+  width: 100%;
 }
