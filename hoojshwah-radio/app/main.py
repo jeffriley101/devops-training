@@ -1,4 +1,5 @@
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
@@ -16,7 +17,7 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 templates = Jinja2Templates(directory="app/templates")
 
-BOTTLES_PATH = Path("data/bottles.json")
+BOTTLES_PATH = Path(os.environ.get("BOTTLES_PATH", "data/bottles.json"))
 ALLOWED_BOTTLE_STYLES = {"green", "brown", "clear", "fancy", "jug", "can"}
 
 
