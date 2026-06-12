@@ -808,3 +808,13 @@ if (bottleForm && bottleStyle && bottleLabel) {
 }
 
 renderBottles();
+
+setInterval(() => {
+  renderBottles();
+}, 15000);
+
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) {
+    renderBottles();
+  }
+});

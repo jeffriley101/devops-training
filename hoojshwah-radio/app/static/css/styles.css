@@ -2142,3 +2142,19 @@ body {
 .player-card .button-row button {
   width: 100%;
 }
+
+
+/* Phase 3 mobile player button polish */
+.player-card .button-row {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  gap: 10px !important;
+  width: 100% !important;
+}
+
+.player-card .button-row button {
+  width: min(280px, 88vw) !important;
+  max-width: 280px !important;
+  padding: 12px 18px !important;
+}
