@@ -2158,3 +2158,21 @@ body {
   max-width: 280px !important;
   padding: 12px 18px !important;
 }
+
+/* Keep reaction emojis in one row */
+.reaction-panel {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  gap: 8px !important;
+  overflow-x: auto !important;
+  padding-bottom: 4px !important;
+}
+
+.reaction-button {
+  flex: 0 0 auto !important;
+  width: auto !important;
+  min-width: 48px !important;
+  padding: 7px 10px !important;
+  white-space: nowrap !important;
+}
