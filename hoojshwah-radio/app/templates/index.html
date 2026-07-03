@@ -11,7 +11,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="icon" href="/static/icons/hoojshwah-icon-192.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/static/icons/apple-touch-icon-180.png">
-  <link rel="stylesheet" href="/static/css/styles.css?v=phase4b-social-1">
+  <link rel="stylesheet" href="/static/css/styles.css?v=phase4b-social-2">
 </head>
 <body>
   <main class="radio-shell">
@@ -97,6 +97,7 @@
 
       <section class="bio-card">
         <p class="label">About Hoojshwah Radio</p>
+        <h2>Visit <a href="https://hoojshwah.com/" target="_blank" rel="noopener">hoojshwah.com</a>.</h2>
         <p>
           Hoojshwah Radio is a simulated-live broadcast of original, unrehearsed
           Hoojshwah music — basement transmissions, live-show fragments, long-form
@@ -108,12 +109,8 @@
           people who like their music raw, exploratory, funny, heavy, and alive.
         </p>
         <p>
-          Four released Hoojshwah albums are available to stream now. Search
-          “Hoojshwah” wherever you listen, or visit
-          <a href="https://hoojshwah.com/" target="_blank" rel="noopener">hoojshwah.com</a>
-          for more.
+          Four released Hoojshwah albums are available wherever you stream music.
         </p>
-        <p>Thanks for tuning in. Sign the guestbook and donate!</p>
       </section>
 
 
@@ -121,11 +118,12 @@
         <div class="track-list-header">
           <div>
             <p class="label">On the Station</p>
+            <h2>View the current playlist.</h2>
             <p id="loop-length" class="loop-length">Calculating broadcast loop...</p>
+            <button id="track-list-toggle" class="secondary-button" type="button">
+              Show Playlist
+            </button>
           </div>
-          <button id="track-list-toggle" class="secondary-button" type="button">
-            Show Playlist
-          </button>
         </div>
         <ul id="track-list" class="collapsed"></ul>
       </section>
@@ -151,7 +149,7 @@
         <div class="bar-stage">
           <div class="bar-header">
             <div>
-              <p class="label">Sign the guestbook.</p>
+              <p class="label">Sign the guestbook</p>
               <h2>Leave something on the bar.</h2>
               <p class="loop-length">
                 Leave a little signal on the shared Hoojshwah Radio shelf.
@@ -192,6 +190,7 @@
 
       <section id="reaction-standings" class="reaction-standings-card">
         <p class="label">Most Loved on KHJW</p>
+        <h2>Check out the top tracks.</h2>
         <ol id="reaction-standings-list" class="reaction-standings-list">
           <li>Waiting for listener signals...</li>
         </ol>
@@ -200,6 +199,6 @@
     </section>
   </main>
 
-  <script src="/static/js/player.js?v=phase4b-social-1"></script>
+  <script src="/static/js/player.js?v=phase4b-social-2"></script>
 </body>
 </html>

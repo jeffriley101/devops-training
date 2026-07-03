@@ -2418,3 +2418,95 @@ body {
   margin-top: 56px;
   background: linear-gradient(90deg, #f2e6cc 0 72%, #d79a4b 72% 88%, #5f5f5f 88% 100%);
 }
+
+
+/* Phase 4B layout polish */
+.bio-card .label {
+  color: #ffd35f;
+}
+
+.track-list-card {
+  border: 1px solid rgba(255, 239, 199, 0.18);
+  border-radius: 18px;
+  background: rgba(31, 27, 38, 0.92);
+  padding: 1rem;
+}
+
+
+/* Phase 4B section heading consistency */
+.bio-card h2,
+.track-list-card h2 {
+  margin: 0.2rem 0 0.45rem;
+  color: #ffe4a0;
+  font-size: clamp(1.55rem, 4vw, 2.25rem);
+  line-height: 1.05;
+}
+
+.track-list-card .track-list-header {
+  align-items: flex-start;
+}
+
+.track-list-card .secondary-button {
+  margin-top: 0.75rem;
+}
+
+
+/* Phase 4B Most Loved heading polish */
+.reaction-standings-card h2 {
+  margin: 0.2rem 0 0.45rem;
+  color: #ffe4a0;
+  font-size: clamp(1.55rem, 4vw, 2.25rem);
+  line-height: 1.05;
+}
+
+.bio-card h2 a {
+  color: inherit;
+  text-decoration-thickness: 0.08em;
+  text-underline-offset: 0.12em;
+}
+
+/* Phase 4B button size consistency */
+.track-list-card .secondary-button,
+.bottle-form button[type="submit"] {
+  min-width: 9.5rem;
+  min-height: 2.75rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.95rem;
+  text-align: center;
+}
+
+/* Phase 4B stronger button size consistency */
+.track-list-card button#track-list-toggle,
+.bottle-form button[type="submit"] {
+  width: 11rem !important;
+  min-width: 11rem !important;
+  max-width: 11rem !important;
+  min-height: 2.75rem !important;
+  padding: 0.75rem 1rem !important;
+  font-size: 0.95rem !important;
+  line-height: 1.1 !important;
+  text-align: center !important;
+  justify-content: center !important;
+}
+
+.bottle-form button[type="submit"] {
+  justify-self: start !important;
+}
+
+/* Phase 4B stronger button size consistency */
+.track-list-card button#track-list-toggle,
+.bottle-form button[type="submit"] {
+  width: 11rem !important;
+  min-width: 11rem !important;
+  max-width: 11rem !important;
+  min-height: 2.75rem !important;
+  padding: 0.75rem 1rem !important;
+  font-size: 0.95rem !important;
+  line-height: 1.1 !important;
+  text-align: center !important;
+  justify-content: center !important;
+}
+
+.bottle-form button[type="submit"] {
+  justify-self: start !important;
+}
