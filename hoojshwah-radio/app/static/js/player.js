@@ -496,6 +496,7 @@ async function loadStation() {
     renderTrackList(station.tracks);
     renderLoopLength(station.total_duration_seconds);
     tuneStation();
+    await renderReactionStandings();
   } catch (error) {
     console.error("Could not load station:", error);
     nowTitle.textContent = "Station temporarily unavailable";
@@ -900,9 +901,6 @@ if (bottleForm && bottleStyle && bottleLabel) {
 
       bottleLabel.value = "";
       await renderBottles();
-renderReactionStandings();
-      await renderReactionStandings();
-renderReactionStandings();
       await renderReactionStandings();
     } catch (error) {
       console.error("Could not save bottle:", error);
