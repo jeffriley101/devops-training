@@ -19,8 +19,8 @@ templates = Jinja2Templates(directory="app/templates")
 
 BOTTLES_PATH = Path(os.environ.get("BOTTLES_PATH", "data/bottles.json"))
 REACTIONS_PATH = Path(os.environ.get("REACTIONS_PATH", "data/reactions.json"))
-ALLOWED_BOTTLE_STYLES = {"green", "brown", "clear", "fancy", "jug", "can"}
-ALLOWED_REACTIONS = {"🔥", "🍺", "❤️", "🕺", "👽", "🎷"}
+ALLOWED_BOTTLE_STYLES = {"green", "brown", "clear", "fancy", "jug", "can", "water-bottle", "energy-drink", "cigarette", "mushroom", "cola-two-liter", "coffee-mug"}
+ALLOWED_REACTIONS = {"🔥", "🍺", "❤️", "🕺", "👽", "🎷", "😎"}
 
 
 class BottleCreate(BaseModel):

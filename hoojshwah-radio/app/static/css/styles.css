@@ -2176,3 +2176,245 @@ body {
   padding: 7px 10px !important;
   white-space: nowrap !important;
 }
+
+
+/* Phase 4B social polish */
+.secret-guestbook-trigger {
+  position: absolute;
+  top: 0.65rem;
+  left: 0.7rem;
+  z-index: 4;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 239, 199, 0.5);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.secret-guestbook-trigger:hover,
+.secret-guestbook-trigger:focus {
+  color: rgba(255, 239, 199, 0.9);
+}
+
+.secret-guestbook-dialog {
+  position: absolute;
+  top: 1.9rem;
+  left: 0.7rem;
+  z-index: 5;
+}
+
+.secret-guestbook-pass {
+  width: 7rem;
+  border: 1px solid rgba(255, 239, 199, 0.35);
+  border-radius: 999px;
+  background: rgba(12, 8, 5, 0.88);
+  color: #fff3d0;
+  padding: 0.35rem 0.55rem;
+  font-size: 0.8rem;
+}
+
+.reaction-standings-card {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid rgba(255, 239, 199, 0.18);
+  border-radius: 18px;
+  background: rgba(18, 12, 8, 0.72);
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.22);
+}
+
+.reaction-standings-list {
+  margin: 0.6rem 0 0;
+  padding-left: 1.35rem;
+  color: #ffe9b7;
+}
+
+.reaction-standings-list li {
+  margin: 0.35rem 0;
+}
+
+
+/* Phase 4B social polish */
+.secret-guestbook-trigger {
+  position: absolute;
+  top: 0.65rem;
+  left: 0.7rem;
+  z-index: 4;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 239, 199, 0.5);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.secret-guestbook-trigger:hover,
+.secret-guestbook-trigger:focus {
+  color: rgba(255, 239, 199, 0.9);
+}
+
+.secret-guestbook-dialog {
+  position: absolute;
+  top: 1.9rem;
+  left: 0.7rem;
+  z-index: 5;
+}
+
+.secret-guestbook-pass {
+  width: 7rem;
+  border: 1px solid rgba(255, 239, 199, 0.35);
+  border-radius: 999px;
+  background: rgba(12, 8, 5, 0.88);
+  color: #fff3d0;
+  padding: 0.35rem 0.55rem;
+  font-size: 0.8rem;
+}
+
+.reaction-standings-card {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid rgba(255, 239, 199, 0.18);
+  border-radius: 18px;
+  background: rgba(18, 12, 8, 0.72);
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.22);
+}
+
+.reaction-standings-list {
+  margin: 0.6rem 0 0;
+  padding-left: 1.35rem;
+  color: #ffe9b7;
+}
+
+.reaction-standings-list li {
+  margin: 0.35rem 0;
+}
+
+/* Phase 4B secret guestbook item shapes */
+.bottle-shape.water-bottle {
+  width: 28px;
+  height: 76px;
+  border-radius: 12px 12px 8px 8px;
+  background: linear-gradient(90deg, rgba(55, 130, 190, 0.95), rgba(120, 210, 245, 0.8), rgba(35, 95, 160, 0.95));
+}
+
+.bottle-shape.water-bottle::before {
+  content: "";
+  position: absolute;
+  top: -11px;
+  left: 8px;
+  width: 12px;
+  height: 14px;
+  border-radius: 5px 5px 2px 2px;
+  background: rgba(170, 220, 245, 0.95);
+}
+
+.bottle-shape.energy-drink {
+  width: 30px;
+  height: 62px;
+  border-radius: 8px 8px 6px 6px;
+  background: linear-gradient(90deg, rgba(45, 45, 60, 0.95), rgba(95, 170, 230, 0.85), rgba(25, 25, 35, 0.95));
+}
+
+.bottle-shape.cigarette {
+  width: 70px;
+  height: 10px;
+  margin-top: 52px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #f2e6cc 0 68%, #d78b3a 68% 84%, #555 84% 100%);
+}
+
+.bottle-shape.mushroom {
+  width: 44px;
+  height: 42px;
+  border-radius: 24px 24px 12px 12px;
+  background: radial-gradient(circle at 30% 35%, #fff4dc 0 8%, transparent 9%),
+              radial-gradient(circle at 65% 30%, #fff4dc 0 7%, transparent 8%),
+              rgba(190, 70, 50, 0.95);
+}
+
+.bottle-shape.mushroom::after {
+  content: "";
+  position: absolute;
+  left: 15px;
+  bottom: -28px;
+  width: 14px;
+  height: 32px;
+  border-radius: 8px;
+  background: #ead5ad;
+}
+
+.bottle-shape.cola-two-liter {
+  width: 34px;
+  height: 86px;
+  border-radius: 14px 14px 9px 9px;
+  background: linear-gradient(90deg, rgba(35, 18, 12, 0.96), rgba(110, 55, 35, 0.9), rgba(28, 12, 8, 0.96));
+}
+
+.bottle-shape.cola-two-liter::before {
+  content: "";
+  position: absolute;
+  top: 24px;
+  left: 3px;
+  width: 28px;
+  height: 20px;
+  border-radius: 4px;
+  background: rgba(180, 35, 35, 0.9);
+}
+
+.bottle-shape.coffee-mug {
+  width: 44px;
+  height: 42px;
+  margin-top: 28px;
+  border-radius: 7px 7px 12px 12px;
+  background: rgba(225, 225, 210, 0.92);
+}
+
+.bottle-shape.coffee-mug::after {
+  content: "";
+  position: absolute;
+  right: -16px;
+  top: 10px;
+  width: 18px;
+  height: 18px;
+  border: 4px solid rgba(225, 225, 210, 0.92);
+  border-left: 0;
+  border-radius: 0 14px 14px 0;
+}
+
+/* Phase 4B secret item shape refinements */
+.bottle-shape.coffee-mug {
+  margin-top: 36px;
+  width: 42px;
+  height: 34px;
+  border-radius: 6px 6px 11px 11px;
+}
+
+.bottle-shape.coffee-mug::before {
+  content: none;
+}
+
+.bottle-shape.cola-two-liter::after {
+  content: "";
+  position: absolute;
+  top: -14px;
+  left: 11px;
+  width: 12px;
+  height: 16px;
+  border-radius: 5px 5px 2px 2px;
+  background: rgba(160, 95, 55, 0.96);
+}
+
+.bottle-shape.cola-two-liter::before {
+  top: 26px;
+}
+
+.bottle-shape.cigarette::before,
+.bottle-shape.cigarette::after {
+  content: none;
+}
+
+.bottle-shape.cigarette {
+  height: 8px;
+  margin-top: 56px;
+  background: linear-gradient(90deg, #f2e6cc 0 72%, #d79a4b 72% 88%, #5f5f5f 88% 100%);
+}
