@@ -11,7 +11,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="icon" href="/static/icons/hoojshwah-icon-192.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/static/icons/apple-touch-icon-180.png">
-  <link rel="stylesheet" href="/static/css/styles.css?v=phase3-social-2">
+  <link rel="stylesheet" href="/static/css/styles.css?v=phase4b-social-1">
 </head>
 <body>
   <main class="radio-shell">
@@ -51,6 +51,7 @@
           <button class="reaction-button" type="button" data-emoji="🕺">🕺 <span>0</span></button>
           <button class="reaction-button" type="button" data-emoji="👽">👽 <span>0</span></button>
           <button class="reaction-button" type="button" data-emoji="🎷">🎷 <span>0</span></button>
+          <button class="reaction-button" type="button" data-emoji="😎">😎 <span>0</span></button>
         </div>
 
         <p class="next">
@@ -65,8 +66,6 @@
         <p id="share-status" class="signal-status"></p>
 
         <p id="signal-timer" class="signal-timer">Signal Time: 0:00 / 90:00</p>
-        <p id="signal-event" class="signal-event">Signal Event: waiting</p>
-        <p id="track-progress" class="track-progress">Tuning position...</p>
 
         <div class="station-details">
         </div>
@@ -131,12 +130,29 @@
         <ul id="track-list" class="collapsed"></ul>
       </section>
 
+      <button id="secret-guestbook-trigger" class="secret-guestbook-trigger" type="button" aria-label="Secret guestbook">
+        ⋔
+      </button>
+
+      <div id="secret-guestbook-dialog" class="secret-guestbook-dialog" hidden>
+        <form id="secret-guestbook-form" class="secret-guestbook-form">
+          <input
+            id="secret-guestbook-pass"
+            class="secret-guestbook-pass"
+            type="password"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="signal"
+          >
+        </form>
+      </div>
+
       <section id="bar-tab" class="bar-card bottle-bar-section">
         <div class="bar-stage">
           <div class="bar-header">
             <div>
-              <p class="label">Bottle on the Bar</p>
-              <h2>Create a bottle to place on the shelf.</h2>
+              <p class="label">Sign the guestbook.</p>
+              <h2>Leave something on the bar.</h2>
               <p class="loop-length">
                 Leave a little signal on the shared Hoojshwah Radio shelf.
               </p>
@@ -145,7 +161,7 @@
 
           <form id="bottle-form" class="bottle-form">
             <label>
-              Bottle Style
+              Item
               <select id="bottle-style">
                 <option value="green">Green Bottle</option>
                 <option value="brown">Brown Bottle</option>
@@ -157,11 +173,11 @@
             </label>
 
             <label>
-              Bottle Label
+              Label
               <input id="bottle-label" type="text" maxlength="16" placeholder="Moon Sauce">
             </label>
 
-            <button type="submit">Place bottle on the shelf</button>
+            <button type="submit">Leave it on the bar</button>
           </form>
 
           <div class="bottle-shelf-wrap" aria-label="Bottle shelf">
@@ -173,9 +189,17 @@
           </div>
         </div>
       </section>
+
+      <section id="reaction-standings" class="reaction-standings-card">
+        <p class="label">Most Loved on KHJW</p>
+        <ol id="reaction-standings-list" class="reaction-standings-list">
+          <li>Waiting for listener signals...</li>
+        </ol>
+      </section>
+
     </section>
   </main>
 
-  <script src="/static/js/player.js?v=phase3-social-2"></script>
+  <script src="/static/js/player.js?v=phase4b-social-1"></script>
 </body>
 </html>

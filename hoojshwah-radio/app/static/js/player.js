@@ -387,7 +387,7 @@ function renderTrackInfo(result) {
   }
 
   if (trackProgress) {
-    trackProgress.textContent = `Tuned in at ${formatDuration(result.offsetSeconds)} of ${formatDuration(result.track.duration_seconds)}`;
+    trackProgress.textContent = "";
   }
 }
 
@@ -691,6 +691,85 @@ const bottleForm = document.querySelector("#bottle-form");
 const bottleStyle = document.querySelector("#bottle-style");
 const bottleLabel = document.querySelector("#bottle-label");
 const bottleList = document.querySelector("#bottle-list");
+const secretGuestbookTrigger = document.querySelector("#secret-guestbook-trigger");
+const secretGuestbookDialog = document.querySelector("#secret-guestbook-dialog");
+const secretGuestbookForm = document.querySelector("#secret-guestbook-form");
+const secretGuestbookPass = document.querySelector("#secret-guestbook-pass");
+const reactionStandingsList = document.querySelector("#reaction-standings-list");
+
+const secretGuestbookItems = [
+  ["water-bottle", "Blue Metal Reusable Water Bottle"],
+  ["energy-drink", "Energy Drink Can"],
+  ["cigarette", "Cigarette"],
+  ["mushroom", "Mushroom"],
+  ["cola-two-liter", "Two-Liter of Cola"],
+  ["coffee-mug", "Coffee Mug"]
+];
+
+function unlockSecretGuestbookItems() {
+  if (!bottleStyle) {
+    return;
+  }
+
+  const existingValues = new Set(
+    Array.from(bottleStyle.options).map((option) => option.value)
+  );
+
+  secretGuestbookItems.forEach(([value, label]) => {
+    if (existingValues.has(value)) {
+      return;
+    }
+
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = label;
+    bottleStyle.appendChild(option);
+  });
+
+  bottleStyle.value = "water-bottle";
+}
+
+function renderReactionStandingsFromData(reactions) {
+  if (!reactionStandingsList || !station || !station.tracks) {
+    return;
+  }
+
+  const trackNames = new Map(
+    station.tracks.map((track) => [track.id, track.title])
+  );
+
+  const standings = Object.entries(reactions)
+    .map(([trackId, counts]) => {
+      const total = Object.values(counts || {}).reduce((sum, count) => sum + Number(count || 0), 0);
+      return {
+        title: trackNames.get(trackId) || trackId,
+        total
+      };
+    })
+    .filter((entry) => entry.total > 0)
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 5);
+
+  reactionStandingsList.innerHTML = "";
+
+  if (standings.length === 0) {
+    const item = document.createElement("li");
+    item.textContent = "No listener reactions yet.";
+    reactionStandingsList.appendChild(item);
+    return;
+  }
+
+  standings.forEach((entry) => {
+    const item = document.createElement("li");
+    item.textContent = `${entry.title} — ${entry.total}`;
+    reactionStandingsList.appendChild(item);
+  });
+}
+
+async function renderReactionStandings() {
+  const reactions = await loadReactions();
+  renderReactionStandingsFromData(reactions);
+}
 
 function getBottleStamp(date = new Date()) {
   const year = date.getFullYear();
@@ -783,6 +862,26 @@ if (barToggle && barContent) {
   });
 }
 
+if (secretGuestbookTrigger && secretGuestbookDialog && secretGuestbookForm && secretGuestbookPass) {
+  secretGuestbookTrigger.addEventListener("click", () => {
+    secretGuestbookDialog.hidden = !secretGuestbookDialog.hidden;
+
+    if (!secretGuestbookDialog.hidden) {
+      secretGuestbookPass.focus();
+    }
+  });
+
+  secretGuestbookForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+
+    if (secretGuestbookPass.value.trim().toLowerCase() === "khjw") {
+      unlockSecretGuestbookItems();
+      secretGuestbookPass.value = "";
+      secretGuestbookDialog.hidden = true;
+    }
+  });
+}
+
 if (bottleForm && bottleStyle && bottleLabel) {
   bottleForm.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -801,6 +900,10 @@ if (bottleForm && bottleStyle && bottleLabel) {
 
       bottleLabel.value = "";
       await renderBottles();
+renderReactionStandings();
+      await renderReactionStandings();
+renderReactionStandings();
+      await renderReactionStandings();
     } catch (error) {
       console.error("Could not save bottle:", error);
     }
