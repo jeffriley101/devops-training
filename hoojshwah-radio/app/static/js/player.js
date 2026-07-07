@@ -697,6 +697,9 @@ const secretGuestbookDialog = document.querySelector("#secret-guestbook-dialog")
 const secretGuestbookForm = document.querySelector("#secret-guestbook-form");
 const secretGuestbookPass = document.querySelector("#secret-guestbook-pass");
 const reactionStandingsList = document.querySelector("#reaction-standings-list");
+const reactionStandingsToggle = document.querySelector("#reaction-standings-toggle");
+let showAllReactionStandings = false;
+let latestReactionStandings = [];
 
 const secretGuestbookItems = [
   ["water-bottle", "Blue Metal Reusable Water Bottle"],
@@ -730,6 +733,39 @@ function unlockSecretGuestbookItems() {
   bottleStyle.value = "water-bottle";
 }
 
+function renderReactionStandingsList() {
+  if (!reactionStandingsList) {
+    return;
+  }
+
+  const visibleStandings = showAllReactionStandings
+    ? latestReactionStandings
+    : latestReactionStandings.slice(0, 5);
+
+  reactionStandingsList.innerHTML = "";
+
+  if (visibleStandings.length === 0) {
+    const item = document.createElement("li");
+    item.textContent = "No listener reactions yet.";
+    reactionStandingsList.appendChild(item);
+    if (reactionStandingsToggle) {
+      reactionStandingsToggle.hidden = true;
+    }
+    return;
+  }
+
+  visibleStandings.forEach((entry) => {
+    const item = document.createElement("li");
+    item.textContent = `${entry.title} — ${entry.total}`;
+    reactionStandingsList.appendChild(item);
+  });
+
+  if (reactionStandingsToggle) {
+    reactionStandingsToggle.hidden = latestReactionStandings.length <= 5;
+    reactionStandingsToggle.textContent = showAllReactionStandings ? "Show Top 5" : "Show All";
+  }
+}
+
 function renderReactionStandingsFromData(reactions) {
   if (!reactionStandingsList || !station || !station.tracks) {
     return;
@@ -739,7 +775,7 @@ function renderReactionStandingsFromData(reactions) {
     station.tracks.map((track) => [track.id, track.title])
   );
 
-  const standings = Object.entries(reactions)
+  latestReactionStandings = Object.entries(reactions)
     .map(([trackId, counts]) => {
       const total = Object.values(counts || {}).reduce((sum, count) => sum + Number(count || 0), 0);
       return {
@@ -748,29 +784,23 @@ function renderReactionStandingsFromData(reactions) {
       };
     })
     .filter((entry) => entry.total > 0)
-    .sort((a, b) => b.total - a.total)
-    .slice(0, 5);
+    .sort((a, b) => b.total - a.total);
 
-  reactionStandingsList.innerHTML = "";
-
-  if (standings.length === 0) {
-    const item = document.createElement("li");
-    item.textContent = "No listener reactions yet.";
-    reactionStandingsList.appendChild(item);
-    return;
-  }
-
-  standings.forEach((entry) => {
-    const item = document.createElement("li");
-    item.textContent = `${entry.title} — ${entry.total}`;
-    reactionStandingsList.appendChild(item);
-  });
+  renderReactionStandingsList();
 }
 
 async function renderReactionStandings() {
   const reactions = await loadReactions();
   renderReactionStandingsFromData(reactions);
 }
+
+if (reactionStandingsToggle) {
+  reactionStandingsToggle.addEventListener("click", () => {
+    showAllReactionStandings = !showAllReactionStandings;
+    renderReactionStandingsList();
+  });
+}
+
 
 function getBottleStamp(date = new Date()) {
   const year = date.getFullYear();
