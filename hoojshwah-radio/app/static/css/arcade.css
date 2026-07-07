@@ -1,0 +1,156 @@
+.arcade-card {
+  margin-top: 26px;
+  padding: 24px;
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 20% 15%, rgba(255, 210, 94, 0.16), transparent 16rem),
+    rgba(255, 255, 255, 0.08);
+}
+
+.arcade-copy {
+  margin: 8px 0 18px;
+  color: #f3dfaa;
+  line-height: 1.5;
+}
+
+.arcade-machine {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid rgba(248, 242, 223, 0.18);
+  border-radius: 20px;
+  background: rgba(22, 19, 29, 0.55);
+}
+
+.arcade-scoreboard {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: #f8f2df;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 1rem;
+}
+
+.arcade-scoreboard strong {
+  color: #ffd25e;
+}
+
+.arcade-track {
+  position: relative;
+  height: 64px;
+  border: 1px solid rgba(248, 242, 223, 0.18);
+  border-radius: 999px;
+  overflow: hidden;
+  background:
+    linear-gradient(90deg, rgba(255,255,255,0.05), rgba(255,255,255,0.12), rgba(255,255,255,0.05)),
+    rgba(0, 0, 0, 0.24);
+}
+
+.arcade-target {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 42%;
+  width: 16%;
+  background: rgba(255, 210, 94, 0.28);
+  box-shadow: 0 0 24px rgba(255, 210, 94, 0.26);
+}
+
+.arcade-needle {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  width: 8px;
+  height: 48px;
+  border-radius: 999px;
+  background: #ffd25e;
+  box-shadow: 0 0 18px rgba(255, 210, 94, 0.65);
+  transform: translateX(-50%);
+}
+
+.arcade-status {
+  min-height: 1.4em;
+  margin: 0;
+  color: #cfc2e9;
+  font-weight: 800;
+}
+
+.arcade-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.arcade-buttons button:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+  transform: none;
+}
+
+.arcade-form {
+  display: grid;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(248, 242, 223, 0.18);
+}
+
+.arcade-form label {
+  display: grid;
+  gap: 6px;
+  color: #f3dfaa;
+  font-size: 0.92rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.arcade-form input {
+  width: 100%;
+  border: 1px solid rgba(248, 242, 223, 0.18);
+  border-radius: 14px;
+  padding: 14px;
+  background: rgba(22, 19, 29, 0.72);
+  color: #f8f2df;
+  font: inherit;
+  font-size: 1.4rem;
+  font-weight: 900;
+  letter-spacing: 0.28em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.arcade-leaderboard {
+  margin-top: 18px;
+}
+
+.arcade-scores {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding-left: 1.4rem;
+}
+
+.arcade-scores li {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.07);
+  color: #f8f2df;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-weight: 800;
+}
+
+.arcade-scores .score-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+@media (max-width: 560px) {
+  .arcade-card {
+    padding: 18px;
+  }
+
+  .arcade-buttons {
+    grid-template-columns: 1fr;
+  }
+}
