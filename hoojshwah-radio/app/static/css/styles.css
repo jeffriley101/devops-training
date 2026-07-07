@@ -2510,3 +2510,22 @@ body {
 .bottle-form button[type="submit"] {
   justify-self: start !important;
 }
+
+/* Phase 4C About link button polish */
+.bio-link-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 0.6rem;
+  border-radius: 999px;
+  color: #111111;
+  text-decoration: none;
+  font-weight: 800;
+}
+
+.bio-link-button:visited,
+.bio-link-button:hover,
+.bio-link-button:focus {
+  color: #111111;
+  text-decoration: none;
+}
