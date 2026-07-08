@@ -2617,3 +2617,87 @@ body {
   border-radius: 999px;
   background: rgba(92, 120, 47, 0.65);
 }
+
+/* Phase 4C arcade secret time boost */
+.arcade-time-secret-trigger {
+  position: fixed;
+  top: 0.35rem;
+  right: 0.45rem;
+  left: auto;
+  z-index: 50;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 214, 102, 0.32);
+  font-size: 1.1rem;
+  cursor: pointer;
+  text-align: right;
+}
+
+.arcade-time-secret-trigger:hover,
+.arcade-time-secret-trigger:focus {
+  color: rgba(255, 214, 102, 0.9);
+}
+
+.arcade-time-secret-dialog {
+  position: fixed;
+  top: 2rem;
+  right: 0.75rem;
+  z-index: 51;
+}
+
+.arcade-time-secret-pass {
+  width: 7rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 214, 102, 0.6);
+  padding: 0.35rem 0.65rem;
+  background: rgba(0, 0, 0, 0.82);
+  color: #ffd666;
+  text-align: left;
+}
+
+/* Phase 4C keep guestbook secret fixed like other secret symbols */
+.secret-guestbook-trigger {
+  position: fixed !important;
+  top: 0.45rem !important;
+  left: 0.55rem !important;
+  right: auto !important;
+  bottom: auto !important;
+  z-index: 50 !important;
+}
+
+.secret-guestbook-dialog {
+  position: fixed !important;
+  top: 2rem !important;
+  left: 0.75rem !important;
+  right: auto !important;
+  bottom: auto !important;
+  z-index: 51 !important;
+}
+
+/* Phase 4C force khjw secret to fixed top-left */
+html body button#secret-guestbook-trigger.secret-guestbook-trigger {
+  position: fixed !important;
+  top: 0.45rem !important;
+  left: 0.55rem !important;
+  right: auto !important;
+  bottom: auto !important;
+  z-index: 90 !important;
+  width: auto !important;
+  height: auto !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+  display: inline-block !important;
+  transform: none !important;
+  text-align: left !important;
+}
+
+html body div#secret-guestbook-dialog.secret-guestbook-dialog {
+  position: fixed !important;
+  top: 2rem !important;
+  left: 0.75rem !important;
+  right: auto !important;
+  bottom: auto !important;
+  z-index: 91 !important;
+  transform: none !important;
+  text-align: left !important;
+}

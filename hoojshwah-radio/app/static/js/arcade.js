@@ -8,8 +8,12 @@ const arcadeStatus = document.querySelector("#arcade-status");
 const arcadeForm = document.querySelector("#arcade-form");
 const arcadeInitials = document.querySelector("#arcade-initials");
 const arcadeScores = document.querySelector("#arcade-scores");
+const arcadeTimeSecretTrigger = document.querySelector("#arcade-time-secret-trigger");
+const arcadeTimeSecretDialog = document.querySelector("#arcade-time-secret-dialog");
+const arcadeTimeSecretForm = document.querySelector("#arcade-time-secret-form");
+const arcadeTimeSecretPass = document.querySelector("#arcade-time-secret-pass");
 
-const ARCADE_SECONDS = 30;
+let arcadeSeconds = 30;
 const ARCADE_TICK_MS = 40;
 const ARCADE_CENTER = 50;
 const ARCADE_GOLD_ZONE = 8;
@@ -33,7 +37,7 @@ function renderArcadeState() {
 
   if (arcadeTime) {
     const elapsed = Math.floor((Date.now() - arcadeStartedAt) / 1000);
-    arcadeTime.textContent = Math.max(0, ARCADE_SECONDS - elapsed);
+    arcadeTime.textContent = Math.max(0, arcadeSeconds - elapsed);
   }
 }
 
@@ -70,7 +74,7 @@ function stopArcade() {
 function tickArcade() {
   const elapsedMs = Date.now() - arcadeStartedAt;
 
-  if (elapsedMs >= ARCADE_SECONDS * 1000) {
+  if (elapsedMs >= arcadeSeconds * 1000) {
     stopArcade();
     renderArcadeState();
     return;
@@ -276,3 +280,42 @@ if (arcadeForm && arcadeInitials) {
 }
 
 loadArcadeScores();
+
+
+function unlockArcadeTimeBoost() {
+  arcadeSeconds = 35;
+
+  if (arcadeTime) {
+    arcadeTime.textContent = arcadeSeconds;
+  }
+
+  if (arcadeStatus) {
+    arcadeStatus.textContent = "Secret tuner boost unlocked: 35 seconds.";
+  }
+}
+
+if (arcadeTimeSecretTrigger && arcadeTimeSecretDialog && arcadeTimeSecretPass) {
+  arcadeTimeSecretTrigger.addEventListener("click", () => {
+    arcadeTimeSecretDialog.hidden = !arcadeTimeSecretDialog.hidden;
+
+    if (!arcadeTimeSecretDialog.hidden) {
+      arcadeTimeSecretPass.focus();
+    }
+  });
+}
+
+if (arcadeTimeSecretForm && arcadeTimeSecretPass) {
+  arcadeTimeSecretForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+
+    if (arcadeTimeSecretPass.value.trim().toLowerCase() === "god_mode") {
+      unlockArcadeTimeBoost();
+      arcadeTimeSecretPass.value = "";
+      arcadeTimeSecretDialog.hidden = true;
+    } else {
+      arcadeTimeSecretPass.value = "";
+    }
+  });
+}
+
+window.addEventListener("khjw:arcade-boost", unlockArcadeTimeBoost);
