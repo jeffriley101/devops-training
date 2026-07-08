@@ -707,7 +707,10 @@ const secretGuestbookItems = [
   ["cigarette", "Cigarette"],
   ["mushroom", "Mushroom"],
   ["cola-two-liter", "Two-Liter of Cola"],
-  ["coffee-mug", "Coffee Mug"]
+  ["coffee-mug", "Coffee Mug"],
+  ["skinny-can", "Skinny Can"],
+  ["cigar", "Cigar"],
+  ["egg-salad-sandwich", "Egg Salad Sandwich"]
 ];
 
 function unlockSecretGuestbookItems() {
