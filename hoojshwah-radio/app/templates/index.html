@@ -117,55 +117,6 @@
         </a>
       </section>
 
-      <section id="khjw-arcade" class="arcade-card">
-        <p class="label">KHJW Arcade Game</p>
-        <h2>Tune in the radio station.</h2>
-        <p class="arcade-copy">
-          Tap when the needle hits the gold zone. Thirty seconds. Better than 1338? Type your initials and click Save Score to be remembered as a Top Signal Tuner!
-        </p>
-
-        <div class="arcade-machine" aria-label="Tune in the radio station arcade game">
-          <div class="arcade-scoreboard">
-            <span>Score: <strong id="arcade-score">0</strong></span>
-            <span>Time: <strong id="arcade-time">30</strong></span>
-          </div>
-
-          <div class="arcade-track" aria-hidden="true">
-            <div class="arcade-target"></div>
-            <div id="arcade-needle" class="arcade-needle"></div>
-          </div>
-
-          <p id="arcade-status" class="arcade-status">Press Start Game to wake up the tiny arcade.</p>
-
-          <div class="arcade-buttons">
-            <button id="arcade-start" type="button">Start Game</button>
-            <button id="arcade-tap" type="button" disabled>Tap / Tune</button>
-          </div>
-
-          <form id="arcade-form" class="arcade-form" hidden>
-            <label>
-              Initials
-              <input
-                id="arcade-initials"
-                type="text"
-                maxlength="3"
-                autocomplete="off"
-                spellcheck="false"
-                placeholder="AAA"
-              >
-            </label>
-            <button type="submit">Save Score</button>
-          </form>
-        </div>
-
-        <div class="arcade-leaderboard">
-          <p class="label">Top Signal Tuners</p>
-          <ol id="arcade-scores" class="arcade-scores">
-            <li>Loading arcade board...</li>
-          </ol>
-        </div>
-      </section>
-
       <section class="track-list-card">
         <div class="track-list-header">
           <div>
@@ -196,6 +147,19 @@
           >
         </form>
       </div>
+
+      <section id="reaction-standings" class="reaction-standings-card">
+        <p class="label">Most Loved on KHJW</p>
+        <h2>Check out the top tracks.</h2>
+        <ol id="reaction-standings-list" class="reaction-standings-list">
+          <li>Waiting for listener signals...</li>
+        </ol>
+        <button id="reaction-standings-toggle" class="secondary-button reaction-standings-toggle" type="button" hidden>
+          Show All
+        </button>
+      </section>
+
+    </section>
 
       <section id="bar-tab" class="bar-card bottle-bar-section">
         <div class="bar-stage">
@@ -240,18 +204,56 @@
         </div>
       </section>
 
-      <section id="reaction-standings" class="reaction-standings-card">
-        <p class="label">Most Loved on KHJW</p>
-        <h2>Check out the top tracks.</h2>
-        <ol id="reaction-standings-list" class="reaction-standings-list">
-          <li>Waiting for listener signals...</li>
-        </ol>
-        <button id="reaction-standings-toggle" class="secondary-button reaction-standings-toggle" type="button" hidden>
-          Show All
-        </button>
+      <section id="khjw-arcade" class="arcade-card">
+        <p class="label">KHJW Arcade Game</p>
+        <h2>Try to find the radio station!</h2>
+        <p class="arcade-copy">
+          Find the wavelength by tapping when the needle hits the gold zone within 30 seconds. Type your initials and click Save Score to be remembered as a Top Signal Tuner!
+        </p>
+
+        <div class="arcade-machine" aria-label="Try to find the radio station arcade game">
+          <div class="arcade-scoreboard">
+            <span>Score: <strong id="arcade-score">0</strong></span>
+            <span>Time: <strong id="arcade-time">30</strong></span>
+          </div>
+
+          <div class="arcade-track" aria-hidden="true">
+            <div class="arcade-target"></div>
+            <div id="arcade-needle" class="arcade-needle"></div>
+          </div>
+
+          <p id="arcade-status" class="arcade-status">Press Start Game to wake up the tiny arcade.</p>
+
+          <div class="arcade-buttons">
+            <button id="arcade-start" type="button">Start Game</button>
+            <button id="arcade-tap" type="button" disabled>Tap / Tune</button>
+          </div>
+
+          <form id="arcade-form" class="arcade-form" hidden>
+            <label>
+              Initials
+              <input
+                id="arcade-initials"
+                type="text"
+                maxlength="3"
+                autocomplete="off"
+                spellcheck="false"
+                placeholder="AAA"
+              >
+            </label>
+            <button type="submit">Save Score</button>
+          </form>
+        </div>
+
+        <div class="arcade-leaderboard">
+          <p class="label">Top Signal Tuners</p>
+          <ol id="arcade-scores" class="arcade-scores">
+            <li>Loading arcade board...</li>
+          </ol>
+        </div>
       </section>
 
-    </section>
+
   </main>
 
   <script src="/static/js/player.js?v=phase4b-social-2"></script>
