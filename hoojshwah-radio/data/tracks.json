@@ -845,5 +845,93 @@
     "recorded_location": "Pop's Blue Moon",
     "recording_context": "Live, original, unrehearsed, ad-lib performance; part of The Residency at Pop's block",
     "audio_path": "audio/nameless-improv-jam-pops-blue-moon-20240921.mp3"
+  },
+  {
+    "id": "track-phase4c-jim-001",
+    "type": "bumper",
+    "title": "Jim Davis Signal 2",
+    "artist": "Hoojshwah Radio",
+    "recorded_date": null,
+    "recorded_location": null,
+    "recording_context": "Sound bite by special DJ host Jim Davis",
+    "audio_path": "audio/sb-jim2.mp3",
+    "duration_seconds": 6
+  },
+  {
+    "id": "track-phase4c-jim-002",
+    "type": "bumper",
+    "title": "Jim Davis Signal 2",
+    "artist": "Hoojshwah Radio",
+    "recorded_date": null,
+    "recorded_location": null,
+    "recording_context": "Sound bite by special DJ host Jim Davis",
+    "audio_path": "audio/sb-jim2.mp3",
+    "duration_seconds": 6
+  },
+  {
+    "id": "track-phase4c-cookies-001",
+    "type": "song",
+    "title": "Cookies on Deck",
+    "artist": "Hoojshwah",
+    "recorded_date": null,
+    "recorded_location": "The Spacement",
+    "recording_context": "Live, original, unrehearsed, ad-lib performance",
+    "audio_path": "audio/cookies-on-deck.mp3",
+    "duration_seconds": 438
+  },
+  {
+    "id": "track-phase4c-lyrical-001",
+    "type": "song",
+    "title": "Lyrical Cafeteria",
+    "artist": "Hoojshwah",
+    "recorded_date": null,
+    "recorded_location": "The Spacement",
+    "recording_context": "Live, original, unrehearsed, ad-lib performance",
+    "audio_path": "audio/lyrical-cafeteria.mp3",
+    "duration_seconds": 582
+  },
+  {
+    "id": "track-phase4c-low-1120-001",
+    "type": "song",
+    "title": "Low Lyer 11/20",
+    "artist": "Hoojshwah",
+    "recorded_date": "2025-11-20",
+    "recorded_location": "The Spacement",
+    "recording_context": "Live, original, unrehearsed, ad-lib performance",
+    "audio_path": "audio/low-lyer-2025-11-20.mp3",
+    "duration_seconds": 488
+  },
+  {
+    "id": "track-phase4c-low-0312-001",
+    "type": "song",
+    "title": "Low Lyer 03/12",
+    "artist": "Hoojshwah",
+    "recorded_date": "2026-03-12",
+    "recorded_location": "The Spacement",
+    "recording_context": "Live, original, unrehearsed, ad-lib performance",
+    "audio_path": "audio/low-lyer-2026-03-12.mp3",
+    "duration_seconds": 267
+  },
+  {
+    "id": "track-phase4c-beatrice-001",
+    "type": "song",
+    "title": "Beatrice \u2014 Some of Set 2",
+    "artist": "Hoojshwah",
+    "recorded_date": null,
+    "recorded_location": "The Spacement",
+    "recording_context": "Live, original, unrehearsed, ad-lib performance",
+    "audio_path": "audio/beatrice-some-of-set-2.mp3",
+    "duration_seconds": 459
+  },
+  {
+    "id": "track-phase4c-gravity-001",
+    "type": "song",
+    "title": "Gravity Prone Extended \u2014 Pop's June 2026",
+    "artist": "Hoojshwah",
+    "recorded_date": "2026-06",
+    "recorded_location": "Pop's Blue Moon",
+    "recording_context": "Live, original, unrehearsed, ad-lib performance",
+    "audio_path": "audio/gravity-prone-extended-pops-june-2026.mp3",
+    "duration_seconds": 852
   }
 ]
