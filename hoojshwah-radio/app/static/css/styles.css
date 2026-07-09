@@ -2475,37 +2475,11 @@ body {
   text-align: center;
 }
 
-/* Phase 4B stronger button size consistency */
-.track-list-card button#track-list-toggle,
-.bottle-form button[type="submit"] {
-  width: 11rem !important;
-  min-width: 11rem !important;
-  max-width: 11rem !important;
-  min-height: 2.75rem !important;
-  padding: 0.75rem 1rem !important;
-  font-size: 0.95rem !important;
-  line-height: 1.1 !important;
-  text-align: center !important;
-  justify-content: center !important;
-}
 
 .bottle-form button[type="submit"] {
   justify-self: start !important;
 }
 
-/* Phase 4B stronger button size consistency */
-.track-list-card button#track-list-toggle,
-.bottle-form button[type="submit"] {
-  width: 11rem !important;
-  min-width: 11rem !important;
-  max-width: 11rem !important;
-  min-height: 2.75rem !important;
-  padding: 0.75rem 1rem !important;
-  font-size: 0.95rem !important;
-  line-height: 1.1 !important;
-  text-align: center !important;
-  justify-content: center !important;
-}
 
 .bottle-form button[type="submit"] {
   justify-self: start !important;
@@ -3046,4 +3020,54 @@ button.show-playlist-wide {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.45),
     0 8px 18px rgba(0, 0, 0, 0.24) !important;
+}
+
+/* Phase 4C final Show Playlist width override */
+.track-list-card button#track-list-toggle.secondary-button.show-playlist-wide {
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  width: min(420px, 92vw) !important;
+  max-width: 420px !important;
+  min-width: min(420px, 92vw) !important;
+  min-height: 48px !important;
+  border-radius: 999px !important;
+  padding: 12px 20px !important;
+  margin: 0.75rem 0 !important;
+  background: #ffd25e !important;
+  color: #17131d !important;
+  border: 0 !important;
+  font-weight: 900 !important;
+  text-align: center !important;
+  box-sizing: border-box !important;
+}
+
+/* Phase 4C tune Show Playlist width to match Visit Hoojshwah.com */
+.track-list-card button#track-list-toggle.secondary-button.show-playlist-wide {
+  width: min(225px, 88vw) !important;
+  max-width: 225px !important;
+  min-width: min(225px, 88vw) !important;
+}
+
+/* Phase 4C final-final Show Playlist width: plain fixed value */
+.track-list-card button#track-list-toggle.secondary-button.show-playlist-wide {
+  width: 225px !important;
+  min-width: 225px !important;
+  max-width: 225px !important;
+}
+
+/* Phase 4C god_mode secret: keep clickable area tight to symbol */
+html body button#arcade-time-secret-trigger.arcade-time-secret-trigger {
+  width: 1.35rem !important;
+  min-width: 1.35rem !important;
+  max-width: 1.35rem !important;
+  height: 1.35rem !important;
+  min-height: 1.35rem !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  box-sizing: border-box;
 }
