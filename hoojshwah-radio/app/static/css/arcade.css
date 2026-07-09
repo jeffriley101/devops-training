@@ -154,3 +154,159 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Phase 4C radio arcade visual polish */
+.arcade-card {
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.75), rgba(156, 160, 166, 0.82) 42%, rgba(78, 82, 88, 0.92)),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.12) 0 1px, rgba(0, 0, 0, 0.06) 1px 3px);
+  border: 1px solid rgba(245, 245, 245, 0.68);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.75),
+    inset 0 -2px 8px rgba(0, 0, 0, 0.22),
+    0 18px 46px rgba(0, 0, 0, 0.34);
+  color: #141414;
+}
+
+.arcade-card .label,
+.arcade-card h2,
+.arcade-card .arcade-copy {
+  color: #151515;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+.arcade-machine {
+  background: linear-gradient(180deg, #070707, #111111 52%, #050505);
+  border: 1px solid rgba(255, 214, 102, 0.22);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+    inset 0 0 28px rgba(0, 0, 0, 0.82),
+    0 12px 30px rgba(0, 0, 0, 0.36);
+  color: #f8f2df;
+}
+
+.arcade-machine .arcade-scoreboard,
+.arcade-machine .arcade-status,
+.arcade-machine label {
+  color: #f8f2df;
+}
+
+.arcade-track {
+  background: #191919;
+  border-color: rgba(248, 242, 223, 0.2);
+}
+
+/* Phase 4C stereo-style Tap / Tune button */
+#arcade-tap {
+  width: 4.6rem;
+  height: 4.6rem;
+  min-width: 4.6rem;
+  border-radius: 999px;
+  padding: 0;
+  align-self: center;
+  background:
+    radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.95), rgba(214, 216, 218, 0.96) 24%, rgba(132, 136, 142, 0.96) 58%, rgba(54, 57, 62, 0.98) 100%);
+  color: #111111;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow:
+    inset 0 2px 2px rgba(255, 255, 255, 0.9),
+    inset 0 -5px 9px rgba(0, 0, 0, 0.38),
+    0 5px 0 rgba(0, 0, 0, 0.45),
+    0 12px 22px rgba(0, 0, 0, 0.4);
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+#arcade-tap:active:not(:disabled) {
+  transform: translateY(4px);
+  box-shadow:
+    inset 0 2px 5px rgba(0, 0, 0, 0.45),
+    inset 0 -2px 4px rgba(255, 255, 255, 0.45),
+    0 1px 0 rgba(0, 0, 0, 0.55),
+    0 6px 12px rgba(0, 0, 0, 0.32);
+}
+
+#arcade-tap:disabled {
+  opacity: 0.42;
+  filter: grayscale(0.45);
+  cursor: not-allowed;
+}
+
+.arcade-buttons {
+  align-items: center;
+}
+
+/* Phase 4C stereo-style Start Game button */
+#arcade-start {
+  width: 4.6rem;
+  height: 4.6rem;
+  min-width: 4.6rem;
+  border-radius: 999px;
+  padding: 0;
+  align-self: center;
+  background:
+    radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.95), rgba(214, 216, 218, 0.96) 24%, rgba(132, 136, 142, 0.96) 58%, rgba(54, 57, 62, 0.98) 100%);
+  color: #111111;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow:
+    inset 0 2px 2px rgba(255, 255, 255, 0.9),
+    inset 0 -5px 9px rgba(0, 0, 0, 0.38),
+    0 5px 0 rgba(0, 0, 0, 0.45),
+    0 12px 22px rgba(0, 0, 0, 0.4);
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+#arcade-start:active:not(:disabled) {
+  transform: translateY(4px);
+  box-shadow:
+    inset 0 2px 5px rgba(0, 0, 0, 0.45),
+    inset 0 -2px 4px rgba(255, 255, 255, 0.45),
+    0 1px 0 rgba(0, 0, 0, 0.55),
+    0 6px 12px rgba(0, 0, 0, 0.32);
+}
+
+.arcade-buttons {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+}
+
+/* Phase 4C make stereo arcade buttons larger */
+#arcade-start,
+#arcade-tap {
+  width: 5.75rem !important;
+  height: 5.75rem !important;
+  min-width: 5.75rem !important;
+  font-size: 0.9rem !important;
+}
+
+/* Phase 4C make Save Score match standard station buttons, not stereo knobs */
+.arcade-form button {
+  width: min(280px, 88vw) !important;
+  max-width: 280px !important;
+  min-height: 44px !important;
+  border-radius: 999px !important;
+  padding: 12px 18px !important;
+  background: #ffd25e !important;
+  color: #17131d !important;
+  border: 0 !important;
+  font-size: 0.9rem !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.02em !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    0 8px 18px rgba(0, 0, 0, 0.24) !important;
+}
+
+/* Phase 4C center initials text inside arcade pill */
+.arcade-form input,
+#arcade-initials,
+input[name="initials"] {
+  text-align: center !important;
+}

@@ -11,8 +11,8 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="icon" href="/static/icons/hoojshwah-icon-192.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/static/icons/apple-touch-icon-180.png">
-  <link rel="stylesheet" href="/static/css/styles.css?v=phase4c-khjw-fixed-1">
-  <link rel="stylesheet" href="/static/css/arcade.css?v=arcade-1">
+  <link rel="stylesheet" href="/static/css/styles.css?v=phase4c-arcade-ticker-playlist-1">
+  <link rel="stylesheet" href="/static/css/arcade.css?v=phase4c-ticker-reverted-1">
 </head>
 <body>
   <main class="radio-shell">
@@ -123,7 +123,7 @@
             <p class="label">On the Station</p>
             <h2>View the current playlist.</h2>
             <p id="loop-length" class="loop-length">Calculating broadcast loop...</p>
-            <button id="track-list-toggle" class="secondary-button" type="button">
+            <button id="track-list-toggle" class="secondary-button show-playlist-wide" type="button">
               Show Playlist
             </button>
           </div>
@@ -191,7 +191,7 @@
               <input id="bottle-label" type="text" maxlength="16" placeholder="Moon Sauce">
             </label>
 
-            <button type="submit">Leave it on the bar</button>
+            <button type="submit">Let’s see it!</button>
           </form>
 
           <div class="bottle-shelf-wrap" aria-label="Bottle shelf">
@@ -239,7 +239,7 @@
             <div id="arcade-needle" class="arcade-needle"></div>
           </div>
 
-          <p id="arcade-status" class="arcade-status">Press Start Game to wake up the tiny arcade.</p>
+          <p id="arcade-status" class="arcade-status"></p>
 
           <div class="arcade-buttons">
             <button id="arcade-start" type="button">Start Game</button>
@@ -271,9 +271,26 @@
       </section>
 
 
+      <button id="master-secret-trigger" class="master-secret-trigger" type="button" aria-label="Master signal">
+        .
+      </button>
+
+      <div id="master-secret-dialog" class="master-secret-dialog" hidden>
+        <form id="master-secret-form" class="master-secret-form">
+          <input
+            id="master-secret-pass"
+            class="master-secret-pass"
+            type="password"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="signal"
+          >
+        </form>
+      </div>
+
   </main>
 
-  <script src="/static/js/player.js?v=phase4b-social-2"></script>
-  <script src="/static/js/arcade.js?v=phase4c-godmode-1"></script>
+  <script src="/static/js/player.js?v=phase4c-geph-dialog-fix-1"></script>
+  <script src="/static/js/arcade.js?v=phase4c-arcade-guestbook-fixes-1"></script>
 </body>
 </html>

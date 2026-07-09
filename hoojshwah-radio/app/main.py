@@ -20,7 +20,10 @@ templates = Jinja2Templates(directory="app/templates")
 BOTTLES_PATH = Path(os.environ.get("BOTTLES_PATH", "data/bottles.json"))
 REACTIONS_PATH = Path(os.environ.get("REACTIONS_PATH", "data/reactions.json"))
 GAME_SCORES_PATH = Path(os.environ.get("GAME_SCORES_PATH", "data/game_scores.json"))
-ALLOWED_BOTTLE_STYLES = {"green", "brown", "clear", "fancy", "jug", "can", "water-bottle", "energy-drink", "cigarette", "mushroom", "cola-two-liter", "coffee-mug"}
+ALLOWED_BOTTLE_STYLES = {"green", "brown", "clear", "fancy", "jug", "can", "water-bottle", "energy-drink", "cigarette", "mushroom", "cola-two-liter", "coffee-mug",
+    "skinny-can",
+    "cigar",
+    "egg-salad-sandwich",}
 ALLOWED_REACTIONS = {"🔥", "🍺", "❤️", "🕺", "👽", "🎷", "😎"}
 ALLOWED_GAMES = {"signal"}
 MAX_SIGNAL_GAME_SCORE = 50000

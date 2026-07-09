@@ -659,6 +659,14 @@ window.addEventListener("offline", () => {
 
 if (backstageTrigger && backstageDialog && backstagePass) {
   backstageTrigger.addEventListener("click", () => {
+    if (typeof masterSecretDialog !== "undefined" && masterSecretDialog) {
+      masterSecretDialog.hidden = true;
+    }
+
+    if (typeof masterSecretPass !== "undefined" && masterSecretPass) {
+      masterSecretPass.value = "";
+    }
+
     backstageDialog.hidden = !backstageDialog.hidden;
 
     if (!backstageDialog.hidden) {
@@ -698,6 +706,11 @@ const secretGuestbookForm = document.querySelector("#secret-guestbook-form");
 const secretGuestbookPass = document.querySelector("#secret-guestbook-pass");
 const reactionStandingsList = document.querySelector("#reaction-standings-list");
 const reactionStandingsToggle = document.querySelector("#reaction-standings-toggle");
+const masterSecretTrigger = document.querySelector("#master-secret-trigger");
+const masterSecretDialog = document.querySelector("#master-secret-dialog");
+const masterSecretForm = document.querySelector("#master-secret-form");
+const masterSecretPass = document.querySelector("#master-secret-pass");
+let masterSignalConfettiTimer = null;
 let showAllReactionStandings = false;
 let latestReactionStandings = [];
 
@@ -952,3 +965,83 @@ document.addEventListener("visibilitychange", () => {
     renderBottles();
   }
 });
+
+
+function fireMasterSignalConfetti() {
+  const burst = document.createElement("div");
+  burst.className = "master-signal-confetti";
+  burst.setAttribute("aria-hidden", "true");
+
+  const pieces = ["✦", "✧", "★", "✶", "◆", "●", "▲", "■"];
+
+  for (let i = 0; i < 42; i += 1) {
+    const piece = document.createElement("span");
+    piece.textContent = pieces[i % pieces.length];
+    piece.style.left = `${Math.random() * 100}%`;
+    piece.style.animationDelay = `${Math.random() * 0.45}s`;
+    piece.style.transform = `rotate(${Math.random() * 360}deg)`;
+    burst.appendChild(piece);
+  }
+
+  document.body.appendChild(burst);
+
+  window.setTimeout(() => {
+    burst.remove();
+  }, 2200);
+}
+
+function unlockMasterSignal() {
+  backstageUnlocked = true;
+  document.body.classList.add("backstage-active");
+  renderTrackList(station?.tracks || [], station?.tracks?.[currentTrackIndex]?.id);
+
+  unlockSecretGuestbookItems();
+
+  window.dispatchEvent(new CustomEvent("khjw:arcade-boost"));
+
+  document.body.classList.add("master-signal-active");
+
+  if (masterSecretDialog) {
+    masterSecretDialog.hidden = true;
+  }
+
+  if (masterSecretPass) {
+    masterSecretPass.value = "";
+  }
+
+  fireMasterSignalConfetti();
+
+  if (!masterSignalConfettiTimer) {
+    masterSignalConfettiTimer = window.setInterval(fireMasterSignalConfetti, 5000);
+  }
+}
+
+if (masterSecretTrigger && masterSecretDialog && masterSecretPass) {
+  masterSecretTrigger.addEventListener("click", () => {
+    if (backstageDialog) {
+      backstageDialog.hidden = true;
+    }
+
+    if (backstagePass) {
+      backstagePass.value = "";
+    }
+
+    masterSecretDialog.hidden = !masterSecretDialog.hidden;
+
+    if (!masterSecretDialog.hidden) {
+      masterSecretPass.focus();
+    }
+  });
+}
+
+if (masterSecretForm && masterSecretPass) {
+  masterSecretForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+
+    if (masterSecretPass.value.trim().toLowerCase() === "geph") {
+      unlockMasterSignal();
+    } else {
+      masterSecretPass.value = "";
+    }
+  });
+}

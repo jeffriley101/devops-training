@@ -2701,3 +2701,349 @@ html body div#secret-guestbook-dialog.secret-guestbook-dialog {
   transform: none !important;
   text-align: left !important;
 }
+
+/* Phase 4C master signal secret */
+.master-secret-trigger {
+  position: fixed;
+  right: 0.35rem;
+  bottom: 0.25rem;
+  left: auto;
+  z-index: 90;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 214, 102, 0.28);
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+  text-align: right;
+}
+
+.master-secret-trigger:hover,
+.master-secret-trigger:focus {
+  color: rgba(255, 214, 102, 0.95);
+}
+
+.master-secret-dialog {
+  position: fixed;
+  right: 0.75rem;
+  bottom: 1.9rem;
+  z-index: 91;
+}
+
+.master-secret-pass {
+  width: 7rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 214, 102, 0.65);
+  padding: 0.35rem 0.65rem;
+  background: rgba(0, 0, 0, 0.86);
+  color: #ffd666;
+  text-align: left;
+}
+
+.master-signal-confetti {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 999;
+}
+
+.master-signal-confetti span {
+  position: absolute;
+  top: -2rem;
+  color: #ffd666;
+  font-size: 1.2rem;
+  animation: masterSignalFall 2s ease-out forwards;
+}
+
+@keyframes masterSignalFall {
+  0% {
+    opacity: 0;
+    transform: translateY(-2rem) scale(0.8);
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(105vh) scale(1.45);
+  }
+}
+
+/* Phase 4C keep geph trigger tiny so it does not cover backstage */
+html body button#master-secret-trigger.master-secret-trigger {
+  position: fixed !important;
+  right: 0.35rem !important;
+  bottom: 0.25rem !important;
+  left: auto !important;
+  top: auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: 1.5rem !important;
+  height: auto !important;
+  padding: 0 !important;
+  display: inline-block !important;
+  z-index: 90 !important;
+  transform: none !important;
+  text-align: right !important;
+}
+
+/* Phase 4C move geph trigger away from scrollbar */
+html body button#master-secret-trigger.master-secret-trigger {
+  right: 1.35rem !important;
+  max-width: 1.5rem !important;
+}
+
+html body div#master-secret-dialog.master-secret-dialog {
+  right: 1.75rem !important;
+}
+
+/* Phase 4C unified visible action buttons */
+.player-card .button-row button,
+.bottle-form button,
+.bar-card button:not(.secret-guestbook-trigger),
+.secondary-button {
+  width: min(280px, 88vw) !important;
+  max-width: 280px !important;
+  min-height: 44px !important;
+  border-radius: 999px !important;
+  padding: 12px 18px !important;
+  background: #ffd25e !important;
+  color: #17131d !important;
+  border: 0 !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.02em !important;
+  text-align: center !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    0 8px 18px rgba(0, 0, 0, 0.24) !important;
+}
+
+.player-card .button-row button:hover,
+.bottle-form button:hover,
+.bar-card button:not(.secret-guestbook-trigger):hover,
+.secondary-button:hover {
+  transform: translateY(-1px);
+  background: #ffe08a !important;
+}
+
+/* Phase 4C visible button/input alignment cleanup */
+.track-list-toggle,
+.playlist-toggle,
+button[aria-controls="track-list"],
+.player-card button,
+.bottle-form button,
+.secondary-button {
+  width: min(280px, 88vw) !important;
+  max-width: 280px !important;
+  min-height: 44px !important;
+}
+
+/* Guestbook: stack Item, Label, and submit button in clean left-aligned rows */
+.bottle-form {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  gap: 0.75rem !important;
+}
+
+.bottle-form label,
+.bottle-form select,
+.bottle-form input,
+.bottle-form button {
+  display: block !important;
+  width: min(280px, 88vw) !important;
+  max-width: 280px !important;
+  box-sizing: border-box !important;
+}
+
+.bottle-form select,
+.bottle-form input {
+  min-height: 44px !important;
+}
+
+.bottle-form button {
+  margin-top: 0.15rem !important;
+  align-self: flex-start !important;
+}
+
+/* Phase 4C fix accidental emoji button resize */
+.reaction-button,
+.reaction-buttons button,
+.emoji-reaction,
+button[data-reaction],
+button[data-emoji] {
+  width: auto !important;
+  max-width: none !important;
+  min-width: 2.4rem !important;
+  min-height: 2.4rem !important;
+  padding: 0.45rem 0.55rem !important;
+  border-radius: 999px !important;
+  align-self: auto !important;
+}
+
+/* Phase 4C force Show Playlist to match standard yellow pill width */
+#playlist-toggle,
+#track-list-toggle,
+.playlist-toggle,
+.track-list-toggle,
+button[aria-controls="track-list"],
+button[aria-controls="playlist"],
+button[aria-expanded][aria-controls] {
+  width: min(280px, 88vw) !important;
+  max-width: 280px !important;
+  min-width: 280px !important;
+  min-height: 44px !important;
+  box-sizing: border-box !important;
+}
+
+/* Phase 4C arcade initials field alignment */
+.arcade-form {
+  align-items: flex-start !important;
+}
+
+.arcade-form label,
+.arcade-form input {
+  display: block !important;
+  width: min(280px, 88vw) !important;
+  max-width: 280px !important;
+  box-sizing: border-box !important;
+  text-align: left !important;
+}
+
+.arcade-form input {
+  min-height: 44px !important;
+}
+
+/* Phase 4C guestbook status as radio ticker */
+#bottle-status,
+.bottle-status,
+.bar-status,
+.guestbook-status {
+  width: min(420px, 92vw) !important;
+  max-width: 420px !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+  border-radius: 999px !important;
+  padding: 0.45rem 0.8rem !important;
+  background: rgba(0, 0, 0, 0.72) !important;
+  border: 1px solid rgba(255, 210, 94, 0.38) !important;
+  color: #ffd25e !important;
+  box-sizing: border-box !important;
+}
+
+#bottle-status::after,
+.bottle-status::after,
+.bar-status::after,
+.guestbook-status::after {
+  content: "";
+}
+
+/* If the status line is plain text, this makes the line itself move like a ticker */
+#bottle-status,
+.bottle-status,
+.bar-status,
+.guestbook-status {
+  animation: khjwTickerSlide 9s linear infinite;
+}
+
+@keyframes khjwTickerSlide {
+  0% {
+    text-indent: 100%;
+  }
+  12% {
+    text-indent: 0%;
+  }
+  72% {
+    text-indent: 0%;
+  }
+  100% {
+    text-indent: -100%;
+  }
+}
+
+/* Phase 4C force Show Playlist to use the wide Hoojshwah button treatment */
+#track-list-toggle,
+.track-list-toggle,
+.playlist-toggle,
+button.show-playlist,
+.show-playlist,
+button[data-target="track-list"],
+button[data-target="playlist"] {
+  display: inline-flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  width: min(280px, 88vw) !important;
+  max-width: 280px !important;
+  min-width: min(280px, 88vw) !important;
+  min-height: 44px !important;
+  border-radius: 999px !important;
+  padding: 12px 18px !important;
+  background: #ffd25e !important;
+  color: #17131d !important;
+  border: 0 !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.02em !important;
+  text-align: center !important;
+  box-sizing: border-box !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    0 8px 18px rgba(0, 0, 0, 0.24) !important;
+}
+
+/* Phase 4C undo accidental ticker effect on arcade/status messages */
+#arcade-status,
+.arcade-status,
+#bottle-status,
+.bottle-status,
+.bar-status,
+.guestbook-status {
+  animation: none !important;
+  text-indent: 0 !important;
+}
+
+/* Phase 4C make Show Playlist match the big site-link button footprint */
+.track-list-card button,
+.track-list-card .track-list-toggle,
+.track-list-card .playlist-toggle,
+button#track-list-toggle {
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  width: 100% !important;
+  max-width: 420px !important;
+  min-width: 0 !important;
+  min-height: 48px !important;
+  border-radius: 999px !important;
+  margin: 0.75rem 0 !important;
+  padding: 12px 20px !important;
+  background: #ffd25e !important;
+  color: #17131d !important;
+  border: 0 !important;
+  font-weight: 900 !important;
+  text-align: center !important;
+  box-sizing: border-box !important;
+}
+
+/* Phase 4C precise Show Playlist width: match big Visit Hoojshwah-style button */
+button.show-playlist-wide {
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  width: min(420px, 92vw) !important;
+  max-width: 420px !important;
+  min-width: 0 !important;
+  min-height: 48px !important;
+  border-radius: 999px !important;
+  padding: 12px 20px !important;
+  margin: 0.75rem 0 !important;
+  background: #ffd25e !important;
+  color: #17131d !important;
+  border: 0 !important;
+  font-weight: 900 !important;
+  text-align: center !important;
+  box-sizing: border-box !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    0 8px 18px rgba(0, 0, 0, 0.24) !important;
+}
