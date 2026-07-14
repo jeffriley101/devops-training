@@ -128,14 +128,17 @@
           <span class="room-object-icon" aria-hidden="true">🔱</span>
         </button>
 
-        <a
+        <button
+          id="mum-open-button"
           class="room-object chair-object"
-          href="#chair"
-          aria-label="Rest in the chair"
-          title="Chair"
+          type="button"
+          aria-label="Visit Mum's chair"
+          aria-controls="mum-panel"
+          aria-expanded="false"
+          title="Mum's Chair"
         >
           <span class="room-object-icon" aria-hidden="true">🪑</span>
-        </a>
+        </button>
       </div>
     </div>
   </div>
@@ -259,6 +262,74 @@
       type="button"
     >
       Put it back
+    </button>
+  </section>
+
+  <section
+    id="mum-panel"
+    class="mum-panel hidden"
+    aria-labelledby="mum-title"
+  >
+    <div class="mum-panel-head">
+      <div>
+        <p class="chip">Mum's Corner</p>
+        <h2 id="mum-title">Take care of the musician</h2>
+      </div>
+
+      <button
+        id="mum-close-button"
+        class="mum-close-button"
+        type="button"
+        aria-label="Close Mum's Corner"
+      >
+        ×
+      </button>
+    </div>
+
+    <p id="mum-message" class="mum-message" aria-live="polite">
+      Sit for a moment. Have you eaten, had water, and packed everything for camp?
+    </p>
+
+    <div class="mum-choice-grid">
+      <button
+        class="btn btn-secondary"
+        type="button"
+        data-mum-choice="water"
+      >
+        Water check
+      </button>
+
+      <button
+        class="btn btn-secondary"
+        type="button"
+        data-mum-choice="snack"
+      >
+        Snack break
+      </button>
+
+      <button
+        class="btn btn-secondary"
+        type="button"
+        data-mum-choice="rest"
+      >
+        Rest my chops
+      </button>
+
+      <button
+        class="btn btn-secondary"
+        type="button"
+        data-mum-choice="camp"
+      >
+        Camp bag check
+      </button>
+    </div>
+
+    <button
+      id="mum-ready-button"
+      class="btn btn-primary"
+      type="button"
+    >
+      I'm ready to practice
     </button>
   </section>
 

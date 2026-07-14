@@ -646,6 +646,81 @@ select {
   }
 }
 
+
+.chair-object {
+  cursor: pointer;
+  font: inherit;
+}
+
+.mum-panel {
+  display: grid;
+  gap: 1rem;
+  max-width: 680px;
+  margin: 1rem auto 0;
+  padding: 1rem;
+  background:
+    linear-gradient(180deg, #fff4dc, #e5cfa3);
+  border: 1px solid rgba(108, 76, 42, 0.38);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 8px 18px rgba(36, 24, 16, 0.18);
+}
+
+.mum-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.mum-panel-head h2 {
+  margin: 0.25rem 0 0;
+}
+
+.mum-close-button {
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  color: var(--text-ink);
+  font-size: 1.8rem;
+  line-height: 1;
+  background: transparent;
+  border: 1px solid rgba(108, 76, 42, 0.35);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.mum-message {
+  min-height: 3rem;
+  margin: 0;
+  padding: 0.85rem;
+  font-size: 1.05rem;
+  font-weight: 800;
+  line-height: 1.5;
+  background: rgba(255, 248, 232, 0.72);
+  border-left: 5px solid #8b5d36;
+  border-radius: 8px;
+}
+
+.mum-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+#mum-ready-button {
+  justify-self: center;
+}
+
+@media (max-width: 520px) {
+  .mum-choice-grid {
+    grid-template-columns: 1fr;
+  }
+
+  #mum-ready-button {
+    width: 100%;
+  }
+}
+
 .support-line {
   margin: 0.85rem 0 0;
   text-align: center;

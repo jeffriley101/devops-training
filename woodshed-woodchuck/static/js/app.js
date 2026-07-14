@@ -517,6 +517,88 @@
     }
   }
 
+
+  function wireMum(state) {
+    const openButton = document.getElementById("mum-open-button");
+    const closeButton = document.getElementById("mum-close-button");
+    const readyButton = document.getElementById("mum-ready-button");
+    const panel = document.getElementById("mum-panel");
+    const messageEl = document.getElementById("mum-message");
+    const choiceButtons = document.querySelectorAll("[data-mum-choice]");
+
+    if (!openButton || !panel || !messageEl) return;
+
+    const name = state.profile.woodchuckName || "musician";
+
+    const dailyGreetings = [
+      `Sit for a moment, ${name}. Have you eaten and had some water?`,
+      `Welcome back, ${name}. Check your shoulders and take one slow breath.`,
+      "Band camp takes energy. Make sure the musician is cared for too.",
+      "Before the next challenge: water, food, music, pencil, and instrument.",
+      "You do not have to practice tired and uncomfortable. Sit down a minute.",
+    ];
+
+    const responses = {
+      water:
+        "Take a few steady sips. You do not need to finish the whole bottle at once.",
+      snack:
+        "Choose something that will last through rehearsal—not just a quick burst of sugar.",
+      rest:
+        "Set the instrument down safely. Relax your jaw, shoulders, hands, and back for a few minutes.",
+      camp:
+        "Camp check: instrument, music, pencil, water, sunscreen, hat, comfortable shoes, and anything your director requested.",
+    };
+
+    function closeMumPanel() {
+      panel.classList.add("hidden");
+      openButton.setAttribute("aria-expanded", "false");
+      openButton.focus();
+    }
+
+    openButton.addEventListener("click", function () {
+      const greeting =
+        dailyGreetings[getDayIndex(new Date()) % dailyGreetings.length];
+
+      messageEl.textContent = greeting;
+      panel.classList.remove("hidden");
+      openButton.setAttribute("aria-expanded", "true");
+
+      panel.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+      });
+    });
+
+    choiceButtons.forEach((button) => {
+      button.addEventListener("click", function () {
+        const response = responses[button.dataset.mumChoice];
+
+        if (response) {
+          messageEl.textContent = response;
+        }
+      });
+    });
+
+    if (closeButton) {
+      closeButton.addEventListener("click", closeMumPanel);
+    }
+
+    if (readyButton) {
+      readyButton.addEventListener("click", function () {
+        messageEl.textContent =
+          "Good. Take what you need with you, and do not rush the first note.";
+
+        window.setTimeout(closeMumPanel, 900);
+      });
+    }
+
+    panel.addEventListener("keydown", function (event) {
+      if (event.key === "Escape") {
+        closeMumPanel();
+      }
+    });
+  }
+
   function wireMetronome() {
     const openButton = document.getElementById(
       "metronome-open-button"
@@ -1790,6 +1872,7 @@
   hydrateHome(state);
   wireMetronome();
   wireTuner();
+  wireMum(state);
   wireQuestForm(state);
   wireBandCamp(state);
   wireStore(state);
