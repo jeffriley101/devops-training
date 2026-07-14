@@ -20,6 +20,7 @@
       },
       progress: {
         credits: 0,
+        level: 1,
         streak: 0,
         lastCompletedDate: null,
       },
@@ -52,6 +53,7 @@
   function migrateProgress(progress = {}) {
     return {
       credits: typeof progress.credits === "number" ? progress.credits : 0,
+      level: typeof progress.level === "number" ? progress.level : 1,
       streak: typeof progress.streak === "number" ? progress.streak : 0,
       lastCompletedDate: progress.lastCompletedDate || progress.lastPracticeDate || null,
     };

@@ -2,120 +2,146 @@
 
 {% block content %}
 <section class="card woodshed-page">
-  <p class="body-copy woodshed-intro">Tap around the room to practice, check your quest, tune up, visit the store, or rest your Woodchuck.</p>
+  <p class="body-copy woodshed-intro">
+    Tap around the room to practice, check your quest, tune up, visit the store, or rest your Woodchuck.
+  </p>
 
   <div class="woodshed-scene" aria-label="Interactive Woodshed room">
     <div class="woodshed-character-layer" aria-label="Woodchuck holding selected instrument">
-      <img class="character-art woodshed-character-art" src="/static/img/woodchuck-home.png" alt="Woodchuck holding instrument in the Woodshed" />
+      <img
+        class="character-art woodshed-character-art"
+        src="/static/img/woodchuck-home.png"
+        alt="Woodchuck holding an instrument in the Woodshed"
+      />
     </div>
 
     <div class="woodshed-foreground" aria-label="Clickable Woodshed objects">
       <div class="woodshed-object-column woodshed-object-column-left">
-        <article class="room-object room-object-info">
-          <span class="room-object-icon">🪵</span>
-          <span>
-            <strong id="woodchuck-name-value">Name your Woodchuck</strong>
-          </span>
-        </article>
+        <div
+          id="woodchuck-name-value"
+          class="shed-readout shed-readout-name"
+          title="Woodchuck name"
+        >
+          Name your Woodchuck
+        </div>
 
-        <article class="room-object room-object-info">
-          <span class="room-object-icon">🎓</span>
-          <span>
-            <strong>Class</strong>
-            <small id="camp-level-value">Chuckling</small>
-          </span>
-        </article>
+        <div
+          id="camp-level-value"
+          class="shed-readout shed-readout-class"
+          title="Class"
+        >
+          Chuckling
+        </div>
 
-        <article class="room-object room-object-info">
-          <span class="room-object-icon">🎷</span>
-          <span>
-            <strong>Instrument</strong>
-            <small id="instrument-value">Not set</small>
-          </span>
-        </article>
+        <div
+          id="instrument-object"
+          class="shed-icon-object"
+          role="img"
+          aria-label="Instrument"
+          title="Instrument"
+        >
+          🎷
+        </div>
 
-        <article class="room-object room-object-info">
-          <span class="room-object-icon">📈</span>
-          <span>
-            <strong>Level</strong>
-            <small id="level-value">Not set</small>
-          </span>
-        </article>
+        <div
+          id="level-value"
+          class="shed-readout shed-readout-level"
+          title="Level"
+        >
+          #1
+        </div>
 
-        <a id="p-book" class="room-object p-book-object" href="/p-book">
-          <span class="room-object-icon">📘</span>
-          <span>
-            <strong>P-Chart</strong>
-            <small>Submit to P-Book.</small>
-          </span>
+        <a
+          id="p-book"
+          class="room-object p-book-object"
+          href="/p-book"
+          aria-label="Open P-Chart Book"
+          title="P-Chart Book"
+        >
+          <span class="room-object-icon" aria-hidden="true">📓</span>
         </a>
 
-        <a class="room-object quest-object" href="/quest">
-          <span class="room-object-icon">🎼</span>
-          <span>
-            <strong>Quest Book</strong>
-            <small id="home-quest-summary">Loading today's quest...</small>
-            <small><strong>Status:</strong> <span id="home-quest-status">Not started</span></small>
-          </span>
+        <a
+          class="room-object quest-object"
+          href="/quest"
+          aria-label="Open Quest Book"
+          title="Quest Book"
+        >
+          <span class="room-object-icon" aria-hidden="true">📕</span>
         </a>
       </div>
 
-      <div class="woodshed-object-column woodshed-object-column-center" aria-hidden="true"></div>
+      <div
+        class="woodshed-object-column woodshed-object-column-center"
+        aria-hidden="true"
+      ></div>
 
       <div class="woodshed-object-column woodshed-object-column-right">
-        <article class="room-object room-object-info">
-          <span class="room-object-icon">🔥</span>
-          <span>
-            <strong>Streak</strong>
-            <small id="streak-value">0 days</small>
-          </span>
-        </article>
+        <div
+          id="streak-value"
+          class="shed-readout"
+          title="Practice streak"
+        >
+          0
+        </div>
 
-        <article class="room-object room-object-info">
-          <span class="room-object-icon">📚</span>
-          <span>
-            <strong>Total P-Charts</strong>
-            <small id="total-p-charts-value">0</small>
-          </span>
-        </article>
+        <div
+          id="total-p-charts-value"
+          class="shed-readout"
+          title="Total P-Charts"
+        >
+          0
+        </div>
 
-        <a class="room-object wallet-object" href="/store">
-          <span class="room-object-icon">🌼</span>
-          <span>
-            <strong>Dandelions</strong>
-            <small><span id="credits-value">0</span> in your wallet.</small>
-          </span>
+        <a
+          id="dandelion-object"
+          class="room-object dandelion-object"
+          href="/store"
+          aria-label="Open the shop"
+          title="Dandelions and Shop"
+        >
+          <span class="room-object-icon" aria-hidden="true">🌼</span>
+          <span id="credits-value" class="dandelion-count">0</span>
         </a>
 
-        <a class="room-object metronome-object" href="#metronome">
-          <span class="room-object-icon">⏱️</span>
-          <span>
-            <strong>Metronome</strong>
-            <small>Coming Soon</small>
-          </span>
+        <a
+          class="room-object metronome-object"
+          href="#metronome"
+          aria-label="Open metronome"
+          title="Metronome"
+        >
+          <span class="room-object-icon" aria-hidden="true">🕰️</span>
         </a>
 
-        <a class="room-object tuner-object" href="#tuner">
-          <span class="room-object-icon">🎚️</span>
-          <span>
-            <strong>Tuner</strong>
-            <small>Coming Soon</small>
-          </span>
+        <a
+          class="room-object tuner-object"
+          href="#tuner"
+          aria-label="Open tuner"
+          title="Tuner"
+        >
+          <span class="room-object-icon" aria-hidden="true">🔱</span>
         </a>
 
-        <a class="room-object chair-object" href="#chair">
-          <span class="room-object-icon">🪑</span>
-          <span>
-            <strong>Chair</strong>
-            <small>Rest here.</small>
-          </span>
+        <a
+          class="room-object chair-object"
+          href="#chair"
+          aria-label="Rest in the chair"
+          title="Chair"
+        >
+          <span class="room-object-icon" aria-hidden="true">🪑</span>
         </a>
       </div>
     </div>
   </div>
 
   <p class="support-line">
-    <a href="https://venmo.com/u/jeffriley101" target="_blank" rel="noopener noreferrer">Please Support the Shed Project!</a>
+    <a
+      href="https://venmo.com/u/jeffriley101"
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      Please Support the Shed Project!
+    </a>
   </p>
 </section>
 {% endblock %}

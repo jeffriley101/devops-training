@@ -148,32 +148,69 @@
     const creditsEl = document.getElementById("credits-value");
     const streakEl = document.getElementById("streak-value");
     const woodchuckNameEl = document.getElementById("woodchuck-name-value");
-    const instrumentEl = document.getElementById("instrument-value");
+    const instrumentObjectEl = document.getElementById("instrument-object");
     const levelEl = document.getElementById("level-value");
     const campLevelEl = document.getElementById("camp-level-value");
     const totalPChartsEl = document.getElementById("total-p-charts-value");
-    const questSummaryEl = document.getElementById("home-quest-summary");
-    const questStatusEl = document.getElementById("home-quest-status");
-    const practiceLog = Array.isArray(state.practiceLog) ? state.practiceLog : [];
-    if (campLevelEl) campLevelEl.textContent = "Chuckling";
-    if (totalPChartsEl) totalPChartsEl.textContent = String(practiceLog.length);
+    const dandelionObjectEl = document.getElementById("dandelion-object");
 
-    if (!creditsEl || !streakEl) return;
+    const practiceLog = Array.isArray(state.practiceLog)
+      ? state.practiceLog
+      : [];
 
-    creditsEl.textContent = String(state.progress.credits ?? 0);
-    streakEl.textContent = `${state.progress.streak ?? 0} days`;
-    if (woodchuckNameEl) woodchuckNameEl.textContent = state.profile.woodchuckName || "Name your Woodchuck";
-    if (instrumentEl) {
-      instrumentEl.textContent = state.profile.instrument || "Not set";
+    const totalPCharts = practiceLog.filter(
+      (entry) => entry && entry.source === "p-book"
+    ).length;
+
+    const dandelions = state.progress.credits ?? 0;
+    const streak = state.progress.streak ?? 0;
+    const gameLevel = state.progress.level ?? 1;
+    const instrument = state.profile.instrument || "Instrument not set";
+
+    if (woodchuckNameEl) {
+      woodchuckNameEl.textContent =
+        state.profile.woodchuckName || "Name your Woodchuck";
+    }
+
+    if (campLevelEl) {
+      campLevelEl.textContent = "Chuckling";
+    }
+
+    if (instrumentObjectEl) {
+      instrumentObjectEl.title = instrument;
+      instrumentObjectEl.setAttribute("aria-label", instrument);
     }
 
     if (levelEl) {
-      levelEl.textContent = state.profile.level || "Not set";
+      levelEl.textContent = `#${gameLevel}`;
+      levelEl.setAttribute("aria-label", `Level ${gameLevel}`);
     }
 
-    if (questSummaryEl && questStatusEl && state.daily && state.daily.questText) {
-      questSummaryEl.textContent = `${state.daily.questText} (${state.daily.loggedMinutes || 0}/${state.daily.targetMinutes} min)`;
-      questStatusEl.textContent = state.daily.completed ? "Complete ✅" : "Incomplete";
+    if (streakEl) {
+      streakEl.textContent = `Streak ${streak}`;
+      streakEl.setAttribute(
+        "aria-label",
+        `${streak} day practice streak`
+      );
+    }
+
+    if (totalPChartsEl) {
+      totalPChartsEl.textContent = `P-Charts ${totalPCharts}`;
+      totalPChartsEl.setAttribute(
+        "aria-label",
+        `${totalPCharts} total P-Charts`
+      );
+    }
+
+    if (creditsEl) {
+      creditsEl.textContent = String(dandelions);
+    }
+
+    if (dandelionObjectEl) {
+      dandelionObjectEl.setAttribute(
+        "aria-label",
+        `${dandelions} dandelions. Open the shop.`
+      );
     }
   }
 
