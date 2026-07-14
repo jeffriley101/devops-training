@@ -787,8 +787,10 @@ function renderReactionStandingsFromData(reactions) {
     return;
   }
 
+  const titleSource = station.track_catalog || station.tracks || [];
+
   const trackNames = new Map(
-    station.tracks.map((track) => [track.id, track.title])
+    titleSource.map((track) => [track.id, track.title])
   );
 
   latestReactionStandings = Object.entries(reactions)

@@ -140,11 +140,21 @@ def station():
     )
     total_duration = sum(track["duration_seconds"] for track in station_tracks)
 
+    track_catalog = [
+        {
+            "id": track["id"],
+            "title": track.get("title", track["id"]),
+            "type": track.get("type"),
+        }
+        for track in tracks
+    ]
+
     return {
         **station_config,
         "active_playlist_title": playlist.get("title"),
         "total_duration_seconds": total_duration,
         "tracks": station_tracks,
+        "track_catalog": track_catalog,
     }
 
 
