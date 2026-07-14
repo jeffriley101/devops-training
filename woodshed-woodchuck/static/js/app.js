@@ -485,6 +485,375 @@
   }
 
 
+
+  function wireMetronome() {
+    const openButton = document.getElementById(
+      "metronome-open-button"
+    );
+    const closeButton = document.getElementById(
+      "metronome-close-button"
+    );
+    const panel = document.getElementById("metronome-panel");
+    const startButton = document.getElementById(
+      "metronome-start-button"
+    );
+    const tapButton = document.getElementById(
+      "metronome-tap-button"
+    );
+    const slowerButton = document.getElementById(
+      "metronome-slower-button"
+    );
+    const fasterButton = document.getElementById(
+      "metronome-faster-button"
+    );
+    const rangeInput = document.getElementById(
+      "metronome-bpm-range"
+    );
+    const numberInput = document.getElementById(
+      "metronome-bpm-input"
+    );
+    const bpmReadout = document.getElementById(
+      "metronome-bpm-readout"
+    );
+    const pulse = document.getElementById("metronome-pulse");
+    const beatNumber = document.getElementById(
+      "metronome-beat-number"
+    );
+    const status = document.getElementById("metronome-status");
+
+    if (
+      !openButton ||
+      !panel ||
+      !startButton ||
+      !rangeInput ||
+      !numberInput
+    ) {
+      return;
+    }
+
+    const BPM_STORAGE_KEY = "woodshedWoodchuckMetronomeBpm";
+    const AudioContextClass =
+      window.AudioContext || window.webkitAudioContext;
+
+    let bpm = 100;
+    let audioContext = null;
+    let schedulerTimer = null;
+    let nextBeatTime = 0;
+    let currentBeat = 0;
+    let isRunning = false;
+    let tapTimes = [];
+    const visualTimers = new Set();
+
+    function clampBpm(value) {
+      const numericValue = Number(value);
+
+      if (!Number.isFinite(numericValue)) {
+        return bpm;
+      }
+
+      return Math.min(220, Math.max(40, Math.round(numericValue)));
+    }
+
+    function saveBpm() {
+      try {
+        window.localStorage.setItem(BPM_STORAGE_KEY, String(bpm));
+      } catch (_error) {
+        // The metronome still works if browser storage is unavailable.
+      }
+    }
+
+    function loadBpm() {
+      try {
+        const saved = window.localStorage.getItem(BPM_STORAGE_KEY);
+
+        if (saved !== null) {
+          bpm = clampBpm(saved);
+        }
+      } catch (_error) {
+        bpm = 100;
+      }
+    }
+
+    function renderBpm() {
+      rangeInput.value = String(bpm);
+      numberInput.value = String(bpm);
+
+      if (bpmReadout) {
+        bpmReadout.textContent = String(bpm);
+      }
+
+      saveBpm();
+    }
+
+    function setBpm(value) {
+      bpm = clampBpm(value);
+      renderBpm();
+
+      if (status && !isRunning) {
+        status.textContent =
+          `Stopped at ${bpm} BPM. Beat one is accented.`;
+      }
+    }
+
+    function queueVisualUpdate(callback, delayMilliseconds) {
+      const timer = window.setTimeout(function () {
+        visualTimers.delete(timer);
+        callback();
+      }, delayMilliseconds);
+
+      visualTimers.add(timer);
+    }
+
+    function clearVisualTimers() {
+      visualTimers.forEach((timer) => window.clearTimeout(timer));
+      visualTimers.clear();
+    }
+
+    function showBeat(beat, scheduledTime) {
+      if (!audioContext || !pulse || !beatNumber) return;
+
+      const delay = Math.max(
+        0,
+        (scheduledTime - audioContext.currentTime) * 1000
+      );
+
+      queueVisualUpdate(function () {
+        if (!isRunning) return;
+
+        beatNumber.textContent = String(beat + 1);
+        pulse.classList.remove("is-active", "is-accent");
+
+        void pulse.offsetWidth;
+
+        pulse.classList.add("is-active");
+
+        if (beat === 0) {
+          pulse.classList.add("is-accent");
+        }
+
+        queueVisualUpdate(function () {
+          pulse.classList.remove("is-active", "is-accent");
+        }, 110);
+      }, delay);
+    }
+
+    function playClick(beat, scheduledTime) {
+      if (!audioContext) return;
+
+      const oscillator = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+      const isAccent = beat === 0;
+
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(
+        isAccent ? 1250 : 850,
+        scheduledTime
+      );
+
+      gain.gain.setValueAtTime(0.0001, scheduledTime);
+      gain.gain.exponentialRampToValueAtTime(
+        isAccent ? 0.24 : 0.14,
+        scheduledTime + 0.003
+      );
+      gain.gain.exponentialRampToValueAtTime(
+        0.0001,
+        scheduledTime + 0.055
+      );
+
+      oscillator.connect(gain);
+      gain.connect(audioContext.destination);
+
+      oscillator.start(scheduledTime);
+      oscillator.stop(scheduledTime + 0.06);
+
+      showBeat(beat, scheduledTime);
+    }
+
+    function scheduler() {
+      if (!audioContext || !isRunning) return;
+
+      while (
+        nextBeatTime <
+        audioContext.currentTime + 0.1
+      ) {
+        playClick(currentBeat, nextBeatTime);
+
+        nextBeatTime += 60 / bpm;
+        currentBeat = (currentBeat + 1) % 4;
+      }
+    }
+
+    async function startMetronome() {
+      if (!AudioContextClass) {
+        if (status) {
+          status.textContent =
+            "This browser does not support the metronome audio tool.";
+        }
+        return;
+      }
+
+      if (!audioContext) {
+        audioContext = new AudioContextClass();
+      }
+
+      if (audioContext.state === "suspended") {
+        await audioContext.resume();
+      }
+
+      isRunning = true;
+      currentBeat = 0;
+      nextBeatTime = audioContext.currentTime + 0.05;
+
+      scheduler();
+      schedulerTimer = window.setInterval(scheduler, 25);
+
+      startButton.textContent = "Stop";
+      startButton.classList.add("metronome-stop-button");
+
+      if (status) {
+        status.textContent =
+          `Playing at ${bpm} BPM. Beat one is accented.`;
+      }
+    }
+
+    function stopMetronome() {
+      isRunning = false;
+
+      if (schedulerTimer !== null) {
+        window.clearInterval(schedulerTimer);
+        schedulerTimer = null;
+      }
+
+      clearVisualTimers();
+
+      if (pulse) {
+        pulse.classList.remove("is-active", "is-accent");
+      }
+
+      if (beatNumber) {
+        beatNumber.textContent = "1";
+      }
+
+      startButton.textContent = "Start";
+      startButton.classList.remove("metronome-stop-button");
+
+      if (status) {
+        status.textContent =
+          `Stopped at ${bpm} BPM. Beat one is accented.`;
+      }
+    }
+
+    function toggleMetronome() {
+      if (isRunning) {
+        stopMetronome();
+      } else {
+        startMetronome().catch(function () {
+          if (status) {
+            status.textContent =
+              "The browser could not start metronome audio.";
+          }
+        });
+      }
+    }
+
+    function registerTap() {
+      const now = performance.now();
+      const lastTap = tapTimes[tapTimes.length - 1];
+
+      if (lastTap && now - lastTap > 2000) {
+        tapTimes = [];
+      }
+
+      tapTimes.push(now);
+      tapTimes = tapTimes.slice(-6);
+
+      if (tapTimes.length < 2) {
+        if (status) {
+          status.textContent = "Tap again to set the tempo.";
+        }
+        return;
+      }
+
+      const intervals = [];
+
+      for (let index = 1; index < tapTimes.length; index += 1) {
+        const interval = tapTimes[index] - tapTimes[index - 1];
+
+        if (interval >= 250 && interval <= 1500) {
+          intervals.push(interval);
+        }
+      }
+
+      if (!intervals.length) {
+        if (status) {
+          status.textContent =
+            "Keep tapping a steady beat between 40 and 220 BPM.";
+        }
+        return;
+      }
+
+      const averageInterval =
+        intervals.reduce((total, interval) => total + interval, 0) /
+        intervals.length;
+
+      setBpm(60000 / averageInterval);
+
+      if (status) {
+        status.textContent = `Tap tempo set to ${bpm} BPM.`;
+      }
+    }
+
+    loadBpm();
+    renderBpm();
+
+    openButton.addEventListener("click", function () {
+      panel.classList.remove("hidden");
+      openButton.setAttribute("aria-expanded", "true");
+
+      panel.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+      });
+    });
+
+    if (closeButton) {
+      closeButton.addEventListener("click", function () {
+        stopMetronome();
+        panel.classList.add("hidden");
+        openButton.setAttribute("aria-expanded", "false");
+        openButton.focus();
+      });
+    }
+
+    startButton.addEventListener("click", toggleMetronome);
+
+    if (tapButton) {
+      tapButton.addEventListener("click", registerTap);
+    }
+
+    if (slowerButton) {
+      slowerButton.addEventListener("click", function () {
+        setBpm(bpm - 5);
+      });
+    }
+
+    if (fasterButton) {
+      fasterButton.addEventListener("click", function () {
+        setBpm(bpm + 5);
+      });
+    }
+
+    rangeInput.addEventListener("input", function () {
+      setBpm(rangeInput.value);
+    });
+
+    numberInput.addEventListener("change", function () {
+      setBpm(numberInput.value);
+    });
+
+    window.addEventListener("pagehide", stopMetronome);
+  }
+
   const BAND_CAMP_TRIVIA = [
     {
       question: "How many beats does a whole note receive in 4/4 time?",
@@ -1388,6 +1757,7 @@
 
   wireSetupForm(state);
   hydrateHome(state);
+  wireMetronome();
   wireQuestForm(state);
   wireBandCamp(state);
   wireStore(state);

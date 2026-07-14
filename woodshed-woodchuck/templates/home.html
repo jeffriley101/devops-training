@@ -104,14 +104,17 @@
           <span id="credits-value" class="dandelion-count">0</span>
         </a>
 
-        <a
+        <button
+          id="metronome-open-button"
           class="room-object metronome-object"
-          href="#metronome"
+          type="button"
           aria-label="Open metronome"
+          aria-controls="metronome-panel"
+          aria-expanded="false"
           title="Metronome"
         >
           <span class="room-object-icon" aria-hidden="true">🕰️</span>
-        </a>
+        </button>
 
         <a
           class="room-object tuner-object"
@@ -133,6 +136,106 @@
       </div>
     </div>
   </div>
+
+  <section
+    id="metronome-panel"
+    class="metronome-panel hidden"
+    aria-labelledby="metronome-title"
+  >
+    <div class="metronome-panel-head">
+      <div>
+        <p class="chip">Practice Tool</p>
+        <h2 id="metronome-title">Metronome</h2>
+      </div>
+
+      <button
+        id="metronome-close-button"
+        class="metronome-close-button"
+        type="button"
+        aria-label="Close metronome"
+      >
+        ×
+      </button>
+    </div>
+
+    <div class="metronome-display">
+      <div
+        id="metronome-pulse"
+        class="metronome-pulse"
+        aria-hidden="true"
+      >
+        <span id="metronome-beat-number">1</span>
+      </div>
+
+      <div class="metronome-tempo-readout">
+        <strong id="metronome-bpm-readout">100</strong>
+        <span>BPM</span>
+      </div>
+    </div>
+
+    <div class="metronome-controls">
+      <label for="metronome-bpm-range">Tempo</label>
+
+      <input
+        id="metronome-bpm-range"
+        type="range"
+        min="40"
+        max="220"
+        step="1"
+        value="100"
+      />
+
+      <div class="metronome-number-row">
+        <button
+          id="metronome-slower-button"
+          class="btn btn-secondary"
+          type="button"
+        >
+          −5
+        </button>
+
+        <input
+          id="metronome-bpm-input"
+          type="number"
+          min="40"
+          max="220"
+          step="1"
+          value="100"
+          aria-label="Metronome beats per minute"
+        />
+
+        <button
+          id="metronome-faster-button"
+          class="btn btn-secondary"
+          type="button"
+        >
+          +5
+        </button>
+      </div>
+
+      <div class="button-row metronome-button-row">
+        <button
+          id="metronome-tap-button"
+          class="btn btn-secondary"
+          type="button"
+        >
+          Tap Tempo
+        </button>
+
+        <button
+          id="metronome-start-button"
+          class="btn btn-primary"
+          type="button"
+        >
+          Start
+        </button>
+      </div>
+    </div>
+
+    <p id="metronome-status" class="metronome-status" aria-live="polite">
+      Stopped at 100 BPM. Beat one is accented.
+    </p>
+  </section>
 
   <p class="support-line">
     <a

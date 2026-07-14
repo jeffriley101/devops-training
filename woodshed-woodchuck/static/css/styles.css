@@ -451,6 +451,162 @@ select {
     0 0 6px rgba(35, 24, 16, 0.85);
 }
 
+
+.metronome-object {
+  cursor: pointer;
+  font: inherit;
+}
+
+.metronome-panel {
+  max-width: 620px;
+  margin: 1rem auto 0;
+  padding: 1rem;
+  background:
+    linear-gradient(180deg, #fff8e8, #ead5a8);
+  border: 1px solid rgba(108, 76, 42, 0.38);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 8px 18px rgba(36, 24, 16, 0.18);
+}
+
+.metronome-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.metronome-panel-head h2 {
+  margin: 0.25rem 0 0;
+}
+
+.metronome-close-button {
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  color: var(--text-ink);
+  font-size: 1.8rem;
+  line-height: 1;
+  background: transparent;
+  border: 1px solid rgba(108, 76, 42, 0.35);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.metronome-display {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.25rem;
+  margin: 1.2rem 0;
+}
+
+.metronome-pulse {
+  display: grid;
+  place-items: center;
+  width: 5.4rem;
+  height: 5.4rem;
+  color: #fff4d4;
+  font-size: 2rem;
+  font-weight: 900;
+  background: #7d2d26;
+  border: 5px solid #4b211e;
+  border-radius: 999px;
+  box-shadow:
+    inset 0 0 0 4px rgba(255, 244, 212, 0.14),
+    0 7px 16px rgba(36, 24, 16, 0.26);
+  transform: scale(0.92);
+  transition:
+    transform 70ms ease,
+    filter 70ms ease;
+}
+
+.metronome-pulse.is-active {
+  transform: scale(1.06);
+  filter: brightness(1.18);
+}
+
+.metronome-pulse.is-accent {
+  transform: scale(1.14);
+  filter: brightness(1.35);
+}
+
+.metronome-tempo-readout {
+  display: grid;
+  text-align: center;
+}
+
+.metronome-tempo-readout strong {
+  font-size: clamp(2.5rem, 8vw, 4.4rem);
+  line-height: 0.9;
+}
+
+.metronome-tempo-readout span {
+  margin-top: 0.4rem;
+  font-size: 0.9rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+}
+
+.metronome-controls {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.metronome-controls > label {
+  font-weight: 900;
+}
+
+.metronome-controls input[type="range"] {
+  width: 100%;
+}
+
+.metronome-number-row {
+  display: grid;
+  grid-template-columns: auto minmax(90px, 130px) auto;
+  gap: 0.6rem;
+  justify-content: center;
+}
+
+.metronome-number-row input {
+  text-align: center;
+  font-size: 1.2rem;
+  font-weight: 900;
+}
+
+.metronome-button-row {
+  justify-content: center;
+}
+
+.metronome-stop-button {
+  background: #7d2d26;
+}
+
+.metronome-status {
+  min-height: 1.3rem;
+  margin: 0.9rem 0 0;
+  font-weight: 800;
+  text-align: center;
+}
+
+@media (max-width: 520px) {
+  .metronome-display {
+    gap: 0.8rem;
+  }
+
+  .metronome-pulse {
+    width: 4.5rem;
+    height: 4.5rem;
+  }
+
+  .metronome-number-row {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+
+  .metronome-button-row {
+    display: grid;
+  }
+}
+
 .support-line {
   margin: 0.85rem 0 0;
   text-align: center;
