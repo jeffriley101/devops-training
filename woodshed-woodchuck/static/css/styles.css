@@ -607,6 +607,45 @@ select {
   }
 }
 
+
+.tuner-object {
+  cursor: pointer;
+  font: inherit;
+}
+
+.tuner-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  max-width: 620px;
+  margin: 1rem auto 0;
+  padding: 1rem;
+  background:
+    linear-gradient(180deg, #f3ead4, #ddc99e);
+  border: 1px solid rgba(108, 76, 42, 0.38);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 8px 18px rgba(36, 24, 16, 0.18);
+}
+
+.tuner-panel h2 {
+  margin: 0.25rem 0;
+}
+
+.tuner-message {
+  margin: 0.4rem 0 0;
+  font-size: 1.05rem;
+  font-style: italic;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+@media (max-width: 520px) {
+  .tuner-panel {
+    display: grid;
+  }
+}
+
 .support-line {
   margin: 0.85rem 0 0;
   text-align: center;

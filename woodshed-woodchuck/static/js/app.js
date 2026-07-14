@@ -486,6 +486,37 @@
 
 
 
+
+  function wireTuner() {
+    const openButton = document.getElementById("tuner-open-button");
+    const closeButton = document.getElementById("tuner-close-button");
+    const panel = document.getElementById("tuner-panel");
+
+    if (!openButton || !panel) return;
+
+    openButton.addEventListener("click", function () {
+      panel.classList.remove("hidden");
+      openButton.setAttribute("aria-expanded", "true");
+
+      panel.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+      });
+
+      if (closeButton) {
+        closeButton.focus();
+      }
+    });
+
+    if (closeButton) {
+      closeButton.addEventListener("click", function () {
+        panel.classList.add("hidden");
+        openButton.setAttribute("aria-expanded", "false");
+        openButton.focus();
+      });
+    }
+  }
+
   function wireMetronome() {
     const openButton = document.getElementById(
       "metronome-open-button"
@@ -1758,6 +1789,7 @@
   wireSetupForm(state);
   hydrateHome(state);
   wireMetronome();
+  wireTuner();
   wireQuestForm(state);
   wireBandCamp(state);
   wireStore(state);
