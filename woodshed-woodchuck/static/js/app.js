@@ -484,6 +484,495 @@
     return state;
   }
 
+
+  const BAND_CAMP_TRIVIA = [
+    {
+      question: "How many beats does a whole note receive in 4/4 time?",
+      options: ["2", "3", "4"],
+      answer: 2,
+    },
+    {
+      question: "Which word means to gradually get louder?",
+      options: ["Crescendo", "Diminuendo", "Fermata"],
+      answer: 0,
+    },
+    {
+      question: "What does a conductor’s upbeat usually help signal?",
+      options: ["An entrance", "A break", "The end of rehearsal"],
+      answer: 0,
+    },
+    {
+      question: "What should most wind players use for a stronger tone?",
+      options: ["Less air", "More air", "A tighter music stand"],
+      answer: 1,
+    },
+    {
+      question: "What does the marking piano mean?",
+      options: ["Play softly", "Play quickly", "Stop playing"],
+      answer: 0,
+    },
+    {
+      question: "Which section usually includes trumpets and trombones?",
+      options: ["Woodwinds", "Brass", "Percussion"],
+      answer: 1,
+    },
+    {
+      question: "What does a metronome help a musician maintain?",
+      options: ["Tempo", "Instrument color", "Music-stand height"],
+      answer: 0,
+    },
+  ];
+
+  const BAND_CAMP_MARCHING_CHALLENGES = [
+    "Mark time for one minute while counting evenly.",
+    "Practice eight steps forward while keeping your upper body still.",
+    "Stand at attention with tall posture for thirty seconds.",
+    "March sixteen counts while quietly singing your part.",
+    "Practice a clean eight-count halt.",
+    "Check that your toes, shoulders, and instrument face forward.",
+    "March in place while clapping a steady four-beat pulse.",
+  ];
+
+  const BAND_CAMP_CROWNS = {
+    hours: "Camp Commitment Crown",
+    care: "Instrument Care Crown",
+    trivia: "Trivia Crown",
+    marching: "Marching Challenge Crown",
+  };
+
+  function wireBandCamp(state) {
+    const playerNameEl = document.getElementById("board-player-name");
+    if (!playerNameEl) return;
+
+    const playerPointsEl = document.getElementById("board-player-points");
+    const leaderNameEl = document.getElementById("board-leader-name");
+    const leaderPointsEl = document.getElementById("board-leader-points");
+
+    const hoursForm = document.getElementById("camp-hours-form");
+    const hoursInput = document.getElementById("camp-hours");
+    const hoursButton = document.getElementById("camp-hours-button");
+    const hoursStatusEl = document.getElementById("camp-hours-status");
+
+    const careButton = document.getElementById("instrument-care-button");
+    const careStatusEl = document.getElementById("instrument-care-status");
+
+    const triviaForm = document.getElementById("trivia-form");
+    const triviaQuestionEl = document.getElementById("trivia-question");
+    const triviaOptionsEl = document.getElementById("trivia-options");
+    const triviaButton = document.getElementById("trivia-button");
+    const triviaStatusEl = document.getElementById("trivia-status");
+
+    const marchingTextEl = document.getElementById(
+      "marching-challenge-text"
+    );
+    const marchingButton = document.getElementById(
+      "marching-challenge-button"
+    );
+    const marchingStatusEl = document.getElementById(
+      "marching-challenge-status"
+    );
+
+    const crownHoursEl = document.getElementById("crown-hours");
+    const crownCareEl = document.getElementById("crown-care");
+    const crownTriviaEl = document.getElementById("crown-trivia");
+    const crownMarchingEl = document.getElementById("crown-marching");
+
+    const pastWinnersList = document.getElementById(
+      "past-winners-list"
+    );
+    const championsList = document.getElementById("champions-list");
+    const feedbackEl = document.getElementById("board-feedback");
+
+    const today = stateApi.localDateKey();
+    const dayIndex = getDayIndex(new Date());
+    const trivia =
+      BAND_CAMP_TRIVIA[dayIndex % BAND_CAMP_TRIVIA.length];
+    const marchingChallenge =
+      BAND_CAMP_MARCHING_CHALLENGES[
+        dayIndex % BAND_CAMP_MARCHING_CHALLENGES.length
+      ];
+
+    function freshBandCampDay(dateKey) {
+      return {
+        dateKey,
+        hours: null,
+        careComplete: false,
+        triviaAttempted: false,
+        triviaCorrect: false,
+        marchingComplete: false,
+        awarded: [],
+      };
+    }
+
+    function prepareCurrentDay(current) {
+      if (current.bandCamp.daily.dateKey !== today) {
+        current.bandCamp.daily = freshBandCampDay(today);
+        stateApi.saveState(current);
+      }
+
+      return current;
+    }
+
+    function playerName(current) {
+      return current.profile.woodchuckName || "Your Woodchuck";
+    }
+
+    function hasAward(current, contestKey) {
+      return current.bandCamp.daily.awarded.includes(contestKey);
+    }
+
+    function addCrownIfEarned(current, contestKey) {
+      const wins = current.bandCamp.totals.wins[contestKey] || 0;
+
+      if (wins < 10) return;
+
+      const alreadyEarned = current.bandCamp.champions.some(
+        (entry) => entry.contest === contestKey
+      );
+
+      if (alreadyEarned) return;
+
+      current.bandCamp.champions.unshift({
+        contest: contestKey,
+        crown: BAND_CAMP_CROWNS[contestKey],
+        name: playerName(current),
+        earnedAt: today,
+      });
+    }
+
+    function addDailyWinnerIfComplete(current) {
+      const requiredContests = [
+        "hours",
+        "care",
+        "trivia",
+        "marching",
+      ];
+
+      const completedEverything = requiredContests.every(
+        (contestKey) => hasAward(current, contestKey)
+      );
+
+      if (!completedEverything) return;
+
+      const alreadyRecorded = current.bandCamp.pastWinners.some(
+        (entry) => entry.dateKey === today
+      );
+
+      if (alreadyRecorded) return;
+
+      current.bandCamp.pastWinners.unshift({
+        dateKey: today,
+        name: playerName(current),
+        points: requiredContests.length,
+      });
+
+      current.bandCamp.pastWinners =
+        current.bandCamp.pastWinners.slice(0, 20);
+    }
+
+    function awardContest(current, contestKey) {
+      if (hasAward(current, contestKey)) return false;
+
+      current.bandCamp.daily.awarded.push(contestKey);
+      current.bandCamp.totals.points += 1;
+      current.bandCamp.totals.wins[contestKey] += 1;
+      current.progress.credits += 1;
+
+      addCrownIfEarned(current, contestKey);
+      addDailyWinnerIfComplete(current);
+
+      return true;
+    }
+
+    function setButtonComplete(button, text) {
+      if (!button) return;
+
+      button.disabled = true;
+      button.textContent = text;
+    }
+
+    function renderNameList(listEl, entries, emptyText, formatter) {
+      if (!listEl) return;
+
+      listEl.replaceChildren();
+
+      if (!entries.length) {
+        const item = document.createElement("li");
+        item.textContent = emptyText;
+        listEl.appendChild(item);
+        return;
+      }
+
+      entries.forEach((entry) => {
+        const item = document.createElement("li");
+        item.textContent = formatter(entry);
+        listEl.appendChild(item);
+      });
+    }
+
+    function crownText(wins, crownEarned) {
+      const progress = `${Math.min(wins, 10)}/10`;
+      return crownEarned ? `${progress} 👑` : progress;
+    }
+
+    function renderTriviaOptions(current) {
+      if (!triviaOptionsEl) return;
+
+      triviaOptionsEl.replaceChildren();
+
+      trivia.options.forEach((option, index) => {
+        const label = document.createElement("label");
+        label.className = "trivia-option";
+
+        const input = document.createElement("input");
+        input.type = "radio";
+        input.name = "trivia-answer";
+        input.value = String(index);
+        input.disabled = current.bandCamp.daily.triviaAttempted;
+
+        const text = document.createElement("span");
+        text.textContent = option;
+
+        label.append(input, text);
+        triviaOptionsEl.appendChild(label);
+      });
+    }
+
+    function renderBoard(current) {
+      const name = playerName(current);
+      const points = current.bandCamp.totals.points;
+      const wins = current.bandCamp.totals.wins;
+      const daily = current.bandCamp.daily;
+      const champions = current.bandCamp.champions;
+
+      playerNameEl.textContent = name;
+
+      if (playerPointsEl) {
+        playerPointsEl.textContent = String(points);
+      }
+
+      if (leaderNameEl) {
+        leaderNameEl.textContent = points > 0 ? name : "No camper yet";
+      }
+
+      if (leaderPointsEl) {
+        leaderPointsEl.textContent =
+          points === 1 ? "1 point" : `${points} points`;
+      }
+
+      if (hoursInput) {
+        hoursInput.value =
+          daily.hours === null ? "" : String(daily.hours);
+        hoursInput.disabled = hasAward(current, "hours");
+      }
+
+      if (hasAward(current, "hours")) {
+        setButtonComplete(hoursButton, "Added to Board");
+        if (hoursStatusEl) {
+          hoursStatusEl.textContent =
+            `${daily.hours} camp hours recorded today`;
+        }
+      } else if (hoursStatusEl) {
+        hoursStatusEl.textContent = "Not completed today";
+      }
+
+      if (daily.careComplete) {
+        setButtonComplete(careButton, "Instrument ready ✓");
+        if (careStatusEl) {
+          careStatusEl.textContent = "Completed today";
+        }
+      } else if (careStatusEl) {
+        careStatusEl.textContent = "Not completed today";
+      }
+
+      if (triviaQuestionEl) {
+        triviaQuestionEl.textContent = trivia.question;
+      }
+
+      renderTriviaOptions(current);
+
+      if (daily.triviaAttempted) {
+        setButtonComplete(
+          triviaButton,
+          daily.triviaCorrect ? "Correct ✓" : "Attempt used"
+        );
+
+        if (triviaStatusEl) {
+          triviaStatusEl.textContent = daily.triviaCorrect
+            ? "Correct answer—point earned"
+            : "Try a new question tomorrow";
+        }
+      } else if (triviaStatusEl) {
+        triviaStatusEl.textContent = "One attempt per day";
+      }
+
+      if (marchingTextEl) {
+        marchingTextEl.textContent = marchingChallenge;
+      }
+
+      if (daily.marchingComplete) {
+        setButtonComplete(
+          marchingButton,
+          "Challenge completed ✓"
+        );
+
+        if (marchingStatusEl) {
+          marchingStatusEl.textContent = "Completed today";
+        }
+      } else if (marchingStatusEl) {
+        marchingStatusEl.textContent = "Not completed today";
+      }
+
+      if (crownHoursEl) {
+        crownHoursEl.textContent = crownText(
+          wins.hours,
+          champions.some((entry) => entry.contest === "hours")
+        );
+      }
+
+      if (crownCareEl) {
+        crownCareEl.textContent = crownText(
+          wins.care,
+          champions.some((entry) => entry.contest === "care")
+        );
+      }
+
+      if (crownTriviaEl) {
+        crownTriviaEl.textContent = crownText(
+          wins.trivia,
+          champions.some((entry) => entry.contest === "trivia")
+        );
+      }
+
+      if (crownMarchingEl) {
+        crownMarchingEl.textContent = crownText(
+          wins.marching,
+          champions.some((entry) => entry.contest === "marching")
+        );
+      }
+
+      renderNameList(
+        pastWinnersList,
+        current.bandCamp.pastWinners,
+        "No daily champion yet.",
+        (entry) =>
+          `${entry.name} — ${entry.dateKey} — ${entry.points} points`
+      );
+
+      renderNameList(
+        championsList,
+        champions,
+        "No crowns earned yet.",
+        (entry) =>
+          `${entry.name} — ${entry.crown} — ${entry.earnedAt}`
+      );
+    }
+
+    let current = prepareCurrentDay(stateApi.getState());
+    renderBoard(current);
+
+    if (hoursForm) {
+      hoursForm.addEventListener("submit", function (event) {
+        event.preventDefault();
+
+        const next = prepareCurrentDay(stateApi.getState());
+        const hours = Number(hoursInput.value);
+
+        if (!Number.isFinite(hours) || hours <= 0) {
+          feedbackEl.textContent =
+            "Enter how many hours you spent at band camp.";
+          return;
+        }
+
+        if (hasAward(next, "hours")) return;
+
+        next.bandCamp.daily.hours = hours;
+        awardContest(next, "hours");
+        stateApi.saveState(next);
+
+        feedbackEl.textContent =
+          `${hours} camp hours added. +1 Camp Point and +1 dandelion.`;
+
+        renderBoard(next);
+        hydrateHome(next);
+      });
+    }
+
+    if (careButton) {
+      careButton.addEventListener("click", function () {
+        const next = prepareCurrentDay(stateApi.getState());
+
+        if (next.bandCamp.daily.careComplete) return;
+
+        next.bandCamp.daily.careComplete = true;
+        awardContest(next, "care");
+        stateApi.saveState(next);
+
+        feedbackEl.textContent =
+          "Instrument care completed. +1 Camp Point and +1 dandelion.";
+
+        renderBoard(next);
+        hydrateHome(next);
+      });
+    }
+
+    if (triviaForm) {
+      triviaForm.addEventListener("submit", function (event) {
+        event.preventDefault();
+
+        const next = prepareCurrentDay(stateApi.getState());
+
+        if (next.bandCamp.daily.triviaAttempted) return;
+
+        const selected = triviaForm.querySelector(
+          'input[name="trivia-answer"]:checked'
+        );
+
+        if (!selected) {
+          feedbackEl.textContent =
+            "Choose an answer before submitting trivia.";
+          return;
+        }
+
+        const isCorrect = Number(selected.value) === trivia.answer;
+
+        next.bandCamp.daily.triviaAttempted = true;
+        next.bandCamp.daily.triviaCorrect = isCorrect;
+
+        if (isCorrect) {
+          awardContest(next, "trivia");
+          feedbackEl.textContent =
+            "Correct! +1 Camp Point and +1 dandelion.";
+        } else {
+          feedbackEl.textContent =
+            `Not quite. The correct answer was “${trivia.options[trivia.answer]}.”`;
+        }
+
+        stateApi.saveState(next);
+        renderBoard(next);
+        hydrateHome(next);
+      });
+    }
+
+    if (marchingButton) {
+      marchingButton.addEventListener("click", function () {
+        const next = prepareCurrentDay(stateApi.getState());
+
+        if (next.bandCamp.daily.marchingComplete) return;
+
+        next.bandCamp.daily.marchingComplete = true;
+        awardContest(next, "marching");
+        stateApi.saveState(next);
+
+        feedbackEl.textContent =
+          "Marching challenge completed. +1 Camp Point and +1 dandelion.";
+
+        renderBoard(next);
+        hydrateHome(next);
+      });
+    }
+  }
+
   function wireStore(state) {
     const creditsEl = document.getElementById("store-credits-value");
     const equippedHeadEl = document.getElementById("equipped-head-value");
@@ -900,6 +1389,7 @@
   wireSetupForm(state);
   hydrateHome(state);
   wireQuestForm(state);
+  wireBandCamp(state);
   wireStore(state);
   wirePBook(state);
 })();
