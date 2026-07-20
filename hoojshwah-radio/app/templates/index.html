@@ -11,31 +11,12 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="icon" href="/static/icons/hoojshwah-icon-192.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/static/icons/apple-touch-icon-180.png">
-  <link rel="stylesheet" href="/static/css/styles.css?v=phase4c-inline-playlist-width">
+  <link rel="stylesheet" href="/static/css/styles.css?v=phase4d-final-polish-1">
   <link rel="stylesheet" href="/static/css/arcade.css?v=phase4c-ticker-reverted-1">
 </head>
 <body>
   <main class="radio-shell">
     <section class="hero-card">
-      <nav class="top-actions" aria-label="Station actions">
-        <div class="donation-menu">
-          <button id="donation-toggle" class="top-action-button" type="button">
-            DONATIONS
-          </button>
-          <div id="donation-panel" class="donation-panel" hidden>
-            <p class="donation-title">Support the Signal</p>
-            <p class="donation-copy">Help keep Hoojshwah Radio broadcasting weird original music.</p>
-            <div class="donation-links">
-              <a href="https://venmo.com/u/jeffriley101" target="_blank" rel="noopener noreferrer">
-                Tip with Venmo
-              </a>
-            </div>
-          </div>
-        </div>
-
-        <a class="top-action-link" href="#bar-tab">GUESTBOOK</a>
-      </nav>
-
       <p class="eyebrow">Signal locked</p>
       <h1>{{ station_name }}</h1>
 
@@ -44,6 +25,7 @@
         <h2 id="now-title">Tuning station...</h2>
         <p id="now-artist">Hoojshwah</p>
         <p id="track-recording-info" class="track-recording-info"></p>
+        <p id="track-progress" class="track-progress">Track Time: 0:00 / 0:00</p>
 
         <div id="reaction-panel" class="reaction-panel" aria-label="Track reactions">
           <button class="reaction-button" type="button" data-emoji="🔥">🔥 <span>0</span></button>
@@ -123,7 +105,7 @@
             <p class="label">On the Station</p>
             <h2>View the current playlist.</h2>
             <p id="loop-length" class="loop-length">Calculating broadcast loop...</p>
-            <button id="track-list-toggle" class="secondary-button bio-link-button show-playlist-wide" type="button" style="width: 225px !important; min-width: 225px !important; max-width: 225px !important;">
+            <button id="track-list-toggle" class="secondary-button bio-link-button show-playlist-wide" type="button">
               Show Playlist
             </button>
           </div>
@@ -271,6 +253,23 @@
       </section>
 
 
+      <section class="bottom-actions-card" aria-label="Support the station">
+        <div class="donation-menu bottom-donation-menu">
+          <button id="donation-toggle" class="secondary-button bio-link-button bottom-donation-button" type="button">
+            TIP THE BAND &amp; MAKE A DONATION TO KHJW!
+          </button>
+          <div id="donation-panel" class="donation-panel bottom-donation-panel" hidden>
+            <p class="donation-title">Support the Signal</p>
+            <p class="donation-copy">Help keep Hoojshwah Radio broadcasting weird original music.</p>
+            <div class="donation-links">
+              <a href="https://venmo.com/u/jeffriley101" target="_blank" rel="noopener noreferrer">
+                Tip with Venmo
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <button id="master-secret-trigger" class="master-secret-trigger" type="button" aria-label="Master signal">
         .
       </button>
@@ -290,7 +289,7 @@
 
   </main>
 
-  <script src="/static/js/player.js?v=phase4c-reaction-title-fix-1"></script>
+  <script src="/static/js/player.js?v=phase4d-track-time-1"></script>
   <script src="/static/js/arcade.js?v=phase4c-arcade-guestbook-fixes-1"></script>
 </body>
 </html>

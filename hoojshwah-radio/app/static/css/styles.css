@@ -3071,3 +3071,235 @@ html body button#arcade-time-secret-trigger.arcade-time-secret-trigger {
   line-height: 1;
   box-sizing: border-box;
 }
+
+/* Phase 4D quick park: track time, bottom donation, game-show bar */
+.track-progress {
+  margin: 0.35rem 0 1rem;
+  color: #ffe7aa;
+  font-size: 0.95rem;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+}
+
+.bottom-actions-card {
+  margin-top: 1.25rem;
+  padding: 1.15rem;
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 20% 0%, rgba(255, 210, 94, 0.22), transparent 42%),
+    rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 210, 94, 0.25);
+}
+
+.bottom-donation-menu {
+  position: relative;
+  width: min(280px, 88vw);
+  max-width: 100%;
+}
+
+.bottom-donation-button {
+  width: 100% !important;
+  max-width: 280px !important;
+  padding: 12px 18px !important;
+}
+
+.bottom-donation-panel {
+  position: static !important;
+  width: 100% !important;
+  margin-top: 0.85rem;
+  background: rgba(22, 19, 29, 0.96);
+}
+
+.bottle-bar-section {
+  background:
+    radial-gradient(circle at 12% 10%, rgba(255, 238, 112, 0.35), transparent 26%),
+    radial-gradient(circle at 88% 12%, rgba(126, 200, 255, 0.30), transparent 28%),
+    linear-gradient(135deg, rgba(42, 15, 71, 0.98), rgba(139, 31, 94, 0.94) 44%, rgba(20, 63, 122, 0.96)) !important;
+  border: 2px solid rgba(255, 210, 94, 0.72) !important;
+  box-shadow:
+    0 0 0 4px rgba(126, 200, 255, 0.12),
+    0 24px 60px rgba(0, 0, 0, 0.38);
+}
+
+.bottle-bar-section .label {
+  color: #7ec8ff;
+}
+
+.bar-stage .bar-header h2 {
+  color: #fff1a8 !important;
+  text-shadow:
+    0 2px 0 rgba(45, 8, 64, 0.95),
+    0 0 18px rgba(255, 210, 94, 0.45);
+}
+
+.bottle-bar-section .loop-length {
+  color: #f6d0ff;
+}
+
+.bottle-bar-section .bottle-form {
+  background: rgba(16, 8, 45, 0.72) !important;
+  border: 1px solid rgba(255, 238, 112, 0.36) !important;
+  box-shadow: inset 0 0 22px rgba(126, 200, 255, 0.08);
+}
+
+.bottle-bar-section .bottle-form label {
+  color: #fff1a8;
+}
+
+.bottle-shelf-wrap {
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  background:
+    radial-gradient(circle at 14% 18%, rgba(255, 238, 112, 0.95) 0 26px, transparent 28px),
+    radial-gradient(circle at 86% 18%, rgba(126, 200, 255, 0.95) 0 24px, transparent 26px),
+    linear-gradient(180deg, rgba(37, 13, 72, 0.96), rgba(13, 28, 76, 0.96)) !important;
+  border: 2px solid rgba(255, 210, 94, 0.35);
+}
+
+.bottle-shelf {
+  width: max-content !important;
+  min-width: 100% !important;
+}
+
+.bottle-shelf-back {
+  background:
+    repeating-linear-gradient(
+      90deg,
+      #ffcf4f 0 64px,
+      #ff4fa3 64px 128px,
+      #43b7ff 128px 192px,
+      #7c5cff 192px 256px
+    ) !important;
+}
+
+.bottle-bar-rail {
+  background:
+    repeating-linear-gradient(
+      90deg,
+      #f5a623 0 80px,
+      #c8377d 80px 160px,
+      #1976b9 160px 240px
+    ) !important;
+  border-top: 2px solid rgba(255, 244, 199, 0.75) !important;
+}
+
+.bottle-shelf .bottle-label {
+  background: rgba(255, 241, 168, 0.98) !important;
+  color: #24073e !important;
+  border: 1px solid rgba(36, 7, 62, 0.28);
+}
+
+@media (max-width: 560px) {
+  .bottom-actions-card {
+    padding: 1rem;
+  }
+
+  .bottom-donation-menu,
+  .bottom-donation-button {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+}
+
+/* Phase 4D final polish: left alignment, wood shelf restore, button sizing */
+.bottom-actions-card {
+  text-align: left !important;
+}
+
+.bottom-donation-menu {
+  margin-left: 0 !important;
+  margin-right: auto !important;
+}
+
+.bottom-donation-button {
+  display: block !important;
+  width: min(280px, 88vw) !important;
+  max-width: 280px !important;
+  min-width: 280px !important;
+  margin-left: 0 !important;
+  margin-right: auto !important;
+  text-align: center !important;
+  white-space: normal !important;
+  line-height: 1.15 !important;
+}
+
+.arcade-card {
+  text-align: left !important;
+}
+
+.show-playlist-wide,
+#track-list-toggle {
+  display: block !important;
+  width: min(280px, 88vw) !important;
+  max-width: 280px !important;
+  min-width: 280px !important;
+  margin-left: 0 !important;
+  margin-right: auto !important;
+  text-align: center !important;
+}
+
+/* Keep the game-show glow, but restore the shelf and rail to wood tones */
+.bottle-shelf-back {
+  background:
+    repeating-linear-gradient(
+      90deg,
+      #9b5a2c 0 80px,
+      #7d421f 80px 160px,
+      #5e2e16 160px 240px
+    ) !important;
+  border-top: 2px solid rgba(255, 219, 146, 0.38) !important;
+  border-bottom: 4px solid rgba(20, 9, 4, 0.65) !important;
+}
+
+.bottle-bar-rail {
+  background:
+    repeating-linear-gradient(
+      90deg,
+      #b06a34 0 90px,
+      #8e4e25 90px 180px,
+      #6f3718 180px 270px
+    ) !important;
+  border-top: 2px solid rgba(255, 225, 154, 0.45) !important;
+  box-shadow:
+    0 -12px 28px rgba(0, 0, 0, 0.45),
+    inset 0 2px 4px rgba(255, 235, 180, 0.15) !important;
+}
+
+@media (max-width: 560px) {
+  .bottom-donation-button,
+  .show-playlist-wide,
+  #track-list-toggle {
+    width: min(280px, 100%) !important;
+    min-width: 0 !important;
+    max-width: 280px !important;
+  }
+}
+
+/* Phase 4D final correction: force bottom donation left, restore arcade default alignment */
+.hero-card .bottom-actions-card {
+  display: block !important;
+  text-align: left !important;
+}
+
+.hero-card .bottom-actions-card .bottom-donation-menu {
+  display: block !important;
+  width: min(280px, 100%) !important;
+  max-width: 280px !important;
+  margin-left: 0 !important;
+  margin-right: auto !important;
+  text-align: left !important;
+}
+
+.hero-card .bottom-actions-card .bottom-donation-button {
+  display: block !important;
+  width: 100% !important;
+  max-width: 280px !important;
+  margin-left: 0 !important;
+  margin-right: auto !important;
+}
+
+.hero-card .bottom-actions-card .bottom-donation-panel {
+  margin-left: 0 !important;
+  margin-right: auto !important;
+}
+

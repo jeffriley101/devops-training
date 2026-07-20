@@ -217,6 +217,25 @@ function formatDuration(totalSeconds) {
   return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
 }
 
+function renderTrackProgress(track = null, currentSecondsOverride = null) {
+  if (!trackProgress) {
+    return;
+  }
+
+  const currentTrack = track || station?.tracks?.[currentTrackIndex];
+  const fullSeconds = Number.isFinite(audio.duration) && audio.duration > 0
+    ? audio.duration
+    : currentTrack?.duration_seconds || 0;
+
+  const currentSeconds = Number.isFinite(currentSecondsOverride)
+    ? currentSecondsOverride
+    : Number.isFinite(audio.currentTime)
+      ? audio.currentTime
+      : 0;
+
+  trackProgress.textContent = `Track Time: ${formatDuration(currentSeconds)} / ${formatDuration(fullSeconds)}`;
+}
+
 function getLoopPosition(totalDurationSeconds) {
   const nowSeconds = Math.floor(Date.now() / 1000);
   return nowSeconds % totalDurationSeconds;
@@ -387,7 +406,8 @@ function renderTrackInfo(result) {
   }
 
   if (trackProgress) {
-    trackProgress.textContent = "";
+    trackProgress.classList.remove("backstage-pick");
+    renderTrackProgress(result.track, result.offsetSeconds);
   }
 }
 
@@ -412,6 +432,8 @@ function tuneStation() {
       if (Number.isFinite(audio.duration) && result.offsetSeconds < audio.duration) {
         audio.currentTime = result.offsetSeconds;
       }
+
+      renderTrackProgress(result.track);
     },
     { once: true }
   );
@@ -439,6 +461,7 @@ function playTrackByIndex(index) {
 
   audio.src = track.audio_url;
   audio.currentTime = 0;
+  renderTrackProgress(track, 0);
 }
 
 async function playBackstageTrack(index) {
@@ -622,6 +645,12 @@ audio.addEventListener("ended", async () => {
     console.error("Could not continue audio:", error);
     playButton.textContent = "Signal Blocked";
   }
+});
+
+["timeupdate", "loadedmetadata", "durationchange", "seeking", "seeked"].forEach((eventName) => {
+  audio.addEventListener(eventName, () => {
+    renderTrackProgress();
+  });
 });
 
 ["play", "playing", "pause", "waiting", "stalled", "suspend", "error", "abort", "emptied", "ended"].forEach((eventName) => {
