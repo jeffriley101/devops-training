@@ -40,6 +40,7 @@
       account: {
         woodchuckId: "",
         authenticated: false,
+        serverRevision: 0,
         lastSyncedAt: null,
       },
       profile: {
@@ -89,6 +90,10 @@
           ? account.woodchuckId
           : "",
       authenticated: account.authenticated === true,
+      serverRevision:
+        Number.isInteger(account.serverRevision)
+          ? account.serverRevision
+          : 0,
       lastSyncedAt: account.lastSyncedAt || null,
     };
   }
@@ -165,24 +170,32 @@
 
     if (!raw) {
       const fresh = defaultState();
-      saveState(fresh);
+      saveState(fresh, { sync: false });
       return fresh;
     }
 
     try {
       const parsed = JSON.parse(raw);
       const migrated = migrateToV4(parsed);
-      saveState(migrated);
+      saveState(migrated, { sync: false });
       return migrated;
     } catch (_err) {
       const reset = defaultState();
-      saveState(reset);
+      saveState(reset, { sync: false });
       return reset;
     }
   }
 
-  function saveState(state) {
+  function saveState(state, options = {}) {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+
+    if (options.sync !== false) {
+      window.dispatchEvent(
+        new CustomEvent("ww:state-saved", {
+          detail: { state },
+        })
+      );
+    }
   }
 
   function resetState() {

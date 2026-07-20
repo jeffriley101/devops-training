@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Body, Form, HTTPException, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from .accounts import authenticate_woodchuck, create_woodchuck_profile
@@ -138,6 +139,7 @@ def load_account_state(request: Request):
         return {
             "authenticated": True,
             "state": saved_state.state_json if saved_state else None,
+            "revision": saved_state.revision if saved_state else 0,
         }
 
 
@@ -159,6 +161,43 @@ def save_account_state(
         normalized_state = dict(state)
 
         existing_account = normalized_state.get("account")
+        submitted_account = (
+            dict(existing_account)
+            if isinstance(existing_account, dict)
+            else {}
+        )
+        submitted_revision = submitted_account.get(
+            "serverRevision",
+            0,
+        )
+
+        if not isinstance(submitted_revision, int):
+            submitted_revision = 0
+
+        saved_state = session.get(WoodchuckState, profile.id)
+        current_revision = (
+            saved_state.revision
+            if saved_state is not None
+            else 0
+        )
+
+        if submitted_revision != current_revision:
+            return JSONResponse(
+                status_code=409,
+                content={
+                    "saved": False,
+                    "conflict": True,
+                    "message": (
+                        "This Woodshed was updated from another "
+                        "browser or device."
+                    ),
+                    "server_revision": current_revision,
+                },
+            )
+
+        next_revision = current_revision + 1
+
+        existing_account = normalized_state.get("account")
         account = (
             dict(existing_account)
             if isinstance(existing_account, dict)
@@ -168,6 +207,7 @@ def save_account_state(
             {
                 "woodchuckId": profile.woodchuck_id,
                 "authenticated": True,
+                "serverRevision": next_revision,
                 "lastSyncedAt": synced_at,
             }
         )
@@ -189,20 +229,21 @@ def save_account_state(
         )
         normalized_state["profile"] = browser_profile
 
-        saved_state = session.get(WoodchuckState, profile.id)
-
         if saved_state is None:
             saved_state = WoodchuckState(
                 profile_id=profile.id,
                 state_json=normalized_state,
+                revision=next_revision,
             )
             session.add(saved_state)
         else:
             saved_state.state_json = normalized_state
+            saved_state.revision = next_revision
 
         session.commit()
 
         return {
             "saved": True,
+            "revision": next_revision,
             "last_synced_at": synced_at,
         }

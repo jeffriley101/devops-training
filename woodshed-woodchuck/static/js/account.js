@@ -63,10 +63,27 @@
 
     const payload = await response.json();
 
-    state.account.lastSyncedAt =
-      payload.last_synced_at || new Date().toISOString();
+    const latestState = stateApi.getState();
+    const latestAccount =
+      latestState.account && typeof latestState.account === "object"
+        ? latestState.account
+        : {};
 
-    stateApi.saveState(state);
+    const latestRevision =
+      Number.isInteger(payload.revision)
+        ? payload.revision
+        : Number.isInteger(latestAccount.serverRevision)
+          ? latestAccount.serverRevision
+          : 0;
+
+    latestState.account = {
+      ...latestAccount,
+      serverRevision: latestRevision,
+      lastSyncedAt:
+        payload.last_synced_at || new Date().toISOString(),
+    };
+
+    stateApi.saveState(latestState, { sync: false });
 
     return payload;
   }
@@ -183,7 +200,7 @@
           profile
         );
 
-        stateApi.saveState(state);
+        stateApi.saveState(state, { sync: false });
         await uploadState(state);
 
         accountIdEl.textContent = profile.woodchuck_id;
@@ -296,14 +313,20 @@
           statePayload.state &&
           typeof statePayload.state === "object"
         ) {
-          stateApi.saveState(statePayload.state);
+          stateApi.saveState(statePayload.state, { sync: false });
           restoredState = stateApi.getState();
         } else {
           restoredState = stateApi.resetState();
         }
 
         applyAccountProfile(restoredState, profile);
-        stateApi.saveState(restoredState);
+
+        if (Number.isInteger(statePayload.revision)) {
+          restoredState.account.serverRevision =
+            statePayload.revision;
+        }
+
+        stateApi.saveState(restoredState, { sync: false });
 
         if (!statePayload.state) {
           await uploadState(restoredState);
@@ -322,4 +345,171 @@
 
   wireCreateAccount();
   wireLogin();
+})();
+
+(function () {
+  const stateApi = window.WWState;
+
+  if (!stateApi) return;
+
+  let syncTimer = null;
+  let syncInProgress = false;
+  let pendingSync = false;
+
+  function isPersistentAccount(state) {
+    return Boolean(
+      state &&
+      state.account &&
+      state.account.authenticated === true &&
+      state.account.woodchuckId
+    );
+  }
+
+  async function recoverFromConflict(localState) {
+    const backupKey =
+      `woodshedWoodchuckConflictBackup.${Date.now()}`;
+
+    window.localStorage.setItem(
+      backupKey,
+      JSON.stringify(localState)
+    );
+
+    console.warn(
+      "A stale Woodshed copy was backed up as:",
+      backupKey
+    );
+
+    const response = await fetch("/account/state", {
+      credentials: "same-origin",
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        `Could not restore server state: ${response.status}`
+      );
+    }
+
+    const payload = await response.json();
+
+    if (!payload.state || typeof payload.state !== "object") {
+      throw new Error("The server did not return a saved Woodshed.");
+    }
+
+    stateApi.saveState(payload.state, { sync: false });
+
+    const restoredState = stateApi.getState();
+
+    restoredState.account = {
+      ...(restoredState.account || {}),
+      authenticated: true,
+      serverRevision:
+        Number.isInteger(payload.revision)
+          ? payload.revision
+          : restoredState.account.serverRevision || 0,
+    };
+
+    stateApi.saveState(restoredState, { sync: false });
+
+    window.alert(
+      "This Woodshed was updated in another browser. " +
+      "The newest saved version will now load. " +
+      "A backup of this browser's older copy was kept."
+    );
+
+    window.location.reload();
+  }
+
+  async function syncStateToServer() {
+    const state = stateApi.getState();
+
+    if (!isPersistentAccount(state)) return;
+
+    if (syncInProgress) {
+      pendingSync = true;
+      return;
+    }
+
+    syncInProgress = true;
+    pendingSync = false;
+
+    try {
+      const response = await fetch("/account/state", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "same-origin",
+        body: JSON.stringify(state),
+      });
+
+      if (response.status === 401) {
+        state.account.authenticated = false;
+        stateApi.saveState(state, { sync: false });
+        return;
+      }
+
+      if (response.status === 409) {
+        pendingSync = false;
+        await recoverFromConflict(state);
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(`State sync failed with ${response.status}`);
+      }
+
+      const payload = await response.json();
+      const latestState = stateApi.getState();
+      const latestAccount =
+        latestState.account &&
+        typeof latestState.account === "object"
+          ? latestState.account
+          : {};
+
+      latestState.account = {
+        ...latestAccount,
+        serverRevision:
+          Number.isInteger(payload.revision)
+            ? payload.revision
+            : latestAccount.serverRevision || 0,
+        lastSyncedAt:
+          payload.last_synced_at || new Date().toISOString(),
+      };
+
+      stateApi.saveState(latestState, { sync: false });
+    } catch (error) {
+      console.warn("Woodshed account sync failed:", error);
+    } finally {
+      syncInProgress = false;
+
+      if (pendingSync) {
+        pendingSync = false;
+        scheduleSync(100);
+      }
+    }
+  }
+
+  function scheduleSync(delay = 500) {
+    window.clearTimeout(syncTimer);
+
+    syncTimer = window.setTimeout(function () {
+      syncStateToServer();
+    }, delay);
+  }
+
+  window.addEventListener("ww:state-saved", function (event) {
+    const state =
+      event.detail && event.detail.state
+        ? event.detail.state
+        : stateApi.getState();
+
+    if (!isPersistentAccount(state)) return;
+
+    scheduleSync();
+  });
+
+  window.WWAccountSync = {
+    syncNow: syncStateToServer,
+  };
 })();
