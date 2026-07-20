@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, Integer, String
+from sqlalchemy import DateTime, ForeignKey, Integer, JSON, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .db import Base
@@ -35,6 +35,29 @@ class WoodchuckProfile(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=utc_now,
+        nullable=False,
+    )
+
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        onupdate=utc_now,
+        nullable=False,
+    )
+
+
+
+class WoodchuckState(Base):
+    __tablename__ = "woodchuck_states"
+
+    profile_id: Mapped[int] = mapped_column(
+        ForeignKey("woodchuck_profiles.id"),
+        primary_key=True,
+    )
+
+    state_json: Mapped[dict[str, object]] = mapped_column(
+        JSON,
+        default=dict,
         nullable=False,
     )
 

@@ -36,7 +36,12 @@
 
   function defaultState() {
     return {
-      version: 3,
+      version: 4,
+      account: {
+        woodchuckId: "",
+        authenticated: false,
+        lastSyncedAt: null,
+      },
       profile: {
         woodchuckName: "",
         instrument: "",
@@ -74,6 +79,17 @@
       },
       practiceLog: [],
       bandCamp: defaultBandCampState(),
+    };
+  }
+
+  function migrateAccount(account = {}) {
+    return {
+      woodchuckId:
+        typeof account.woodchuckId === "string"
+          ? account.woodchuckId
+          : "",
+      authenticated: account.authenticated === true,
+      lastSyncedAt: account.lastSyncedAt || null,
     };
   }
 
@@ -124,13 +140,14 @@
     };
   }
 
-  function migrateToV3(parsed = {}) {
+  function migrateToV4(parsed = {}) {
     const base = defaultState();
 
     return {
       ...base,
       ...parsed,
-      version: 3,
+      version: 4,
+      account: migrateAccount(parsed.account || {}),
       profile: { ...base.profile, ...(parsed.profile || {}) },
       progress: migrateProgress(parsed.progress || {}),
       quest: { ...base.quest, ...(parsed.quest || {}) },
@@ -154,7 +171,7 @@
 
     try {
       const parsed = JSON.parse(raw);
-      const migrated = migrateToV3(parsed);
+      const migrated = migrateToV4(parsed);
       saveState(migrated);
       return migrated;
     } catch (_err) {

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Form, HTTPException, Request
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, Body, Form, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from .accounts import authenticate_woodchuck, create_woodchuck_profile
 from .db import SessionLocal
-from .models import WoodchuckProfile
+from .models import WoodchuckProfile, WoodchuckState
 
 
 router = APIRouter(prefix="/account", tags=["account"])
@@ -117,3 +119,90 @@ def logout(request: Request):
     request.session.clear()
 
     return {"authenticated": False}
+
+
+
+@router.get("/state")
+def load_account_state(request: Request):
+    with SessionLocal() as session:
+        profile = current_profile(request, session)
+
+        if profile is None:
+            raise HTTPException(
+                status_code=401,
+                detail="Sign in is required.",
+            )
+
+        saved_state = session.get(WoodchuckState, profile.id)
+
+        return {
+            "authenticated": True,
+            "state": saved_state.state_json if saved_state else None,
+        }
+
+
+@router.put("/state")
+def save_account_state(
+    request: Request,
+    state: dict[str, object] = Body(...),
+):
+    with SessionLocal() as session:
+        profile = current_profile(request, session)
+
+        if profile is None:
+            raise HTTPException(
+                status_code=401,
+                detail="Sign in is required.",
+            )
+
+        synced_at = datetime.now(timezone.utc).isoformat()
+        normalized_state = dict(state)
+
+        existing_account = normalized_state.get("account")
+        account = (
+            dict(existing_account)
+            if isinstance(existing_account, dict)
+            else {}
+        )
+        account.update(
+            {
+                "woodchuckId": profile.woodchuck_id,
+                "authenticated": True,
+                "lastSyncedAt": synced_at,
+            }
+        )
+        normalized_state["account"] = account
+
+        existing_profile = normalized_state.get("profile")
+        browser_profile = (
+            dict(existing_profile)
+            if isinstance(existing_profile, dict)
+            else {}
+        )
+        browser_profile.update(
+            {
+                "woodchuckName": profile.display_name,
+                "instrument": profile.instrument,
+                "level": profile.level,
+                "goal": profile.goal,
+            }
+        )
+        normalized_state["profile"] = browser_profile
+
+        saved_state = session.get(WoodchuckState, profile.id)
+
+        if saved_state is None:
+            saved_state = WoodchuckState(
+                profile_id=profile.id,
+                state_json=normalized_state,
+            )
+            session.add(saved_state)
+        else:
+            saved_state.state_json = normalized_state
+
+        session.commit()
+
+        return {
+            "saved": True,
+            "last_synced_at": synced_at,
+        }
