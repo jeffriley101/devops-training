@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Form, Request
@@ -13,10 +14,17 @@ from .content import (
     SAX_VIKING_MESSAGES,
     SAX_VIKING_WELCOME,
 )
+from .db import init_db
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-app = FastAPI(title="Woodshed Woodchuck")
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    init_db()
+    yield
+
+
+app = FastAPI(title="Woodshed Woodchuck", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
