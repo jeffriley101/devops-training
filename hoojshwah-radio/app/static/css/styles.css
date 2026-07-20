@@ -3303,3 +3303,15 @@ html body button#arcade-time-secret-trigger.arcade-time-secret-trigger {
   margin-right: auto !important;
 }
 
+
+/* Phase 4D final donation copy polish */
+.bottom-donation-panel,
+.bottom-donation-panel .donation-title,
+.bottom-donation-panel .donation-copy,
+.bottom-donation-panel .donation-links {
+  text-align: center !important;
+}
+
+.bottom-donation-panel .donation-links {
+  justify-content: center !important;
+}
