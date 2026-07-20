@@ -3,49 +3,126 @@
 {% block content %}
 <section class="card">
   <div class="section-head">
-    <h2>Musician Setup</h2>
-    <p class="body-copy">Set your starting path so Sax Viking can guide your first quests.</p>
+    <h2>Create Your Woodchuck</h2>
+    <p class="body-copy">
+      Choose your musical path and create a four-digit PIN.
+      We will give your Woodchuck a permanent ID.
+    </p>
   </div>
 
   <div class="setup-layout">
-    <form id="setup-form" action="/setup" method="post" class="stack-form" novalidate>
-      <label for="woodchuck-name">Name your Woodchuck</label>
-      <input id="woodchuck-name" name="woodchuck-name" type="text" maxlength="40" placeholder="Benny" />
+    <div>
+      <form id="account-create-form" class="stack-form" novalidate>
+        <label for="woodchuck-name">Name your Woodchuck</label>
+        <input
+          id="woodchuck-name"
+          name="display_name"
+          type="text"
+          maxlength="40"
+          placeholder="Benny"
+          autocomplete="nickname"
+          required
+        />
 
-      <label for="instrument">Instrument</label>
-      <select id="instrument" name="instrument" required>
-        <option value="">Choose an instrument</option>
-        {% for item in instruments %}
-        <option value="{{ item }}">{{ item }}</option>
-        {% endfor %}
-      </select>
+        <label for="instrument">Instrument</label>
+        <select id="instrument" name="instrument" required>
+          <option value="">Choose an instrument</option>
+          {% for item in instruments %}
+          <option value="{{ item }}">{{ item }}</option>
+          {% endfor %}
+        </select>
 
-      <label for="level">Level</label>
-      <select id="level" name="level" required>
-        <option value="">Choose your level</option>
-        {% for item in levels %}
-        <option value="{{ item }}">{{ item }}</option>
-        {% endfor %}
-      </select>
+        <label for="level">Level</label>
+        <select id="level" name="level" required>
+          <option value="">Choose your level</option>
+          {% for item in levels %}
+          <option value="{{ item }}">{{ item }}</option>
+          {% endfor %}
+        </select>
 
-      <label for="goal">Practice goal</label>
-      <select id="goal" name="goal" required>
-        <option value="">Choose a goal</option>
-        {% for item in goals %}
-        <option value="{{ item }}">{{ item }}</option>
-        {% endfor %}
-      </select>
+        <label for="goal">Practice goal</label>
+        <select id="goal" name="goal" required>
+          <option value="">Choose a goal</option>
+          {% for item in goals %}
+          <option value="{{ item }}">{{ item }}</option>
+          {% endfor %}
+        </select>
 
-      <p id="setup-error" class="error-text" aria-live="polite"></p>
-      <button class="btn btn-primary" type="submit">Save Setup</button>
-    </form>
+        <label for="student-pin">Create a four-digit PIN</label>
+        <input
+          id="student-pin"
+          name="pin"
+          type="password"
+          inputmode="numeric"
+          pattern="[0-9]{4}"
+          minlength="4"
+          maxlength="4"
+          autocomplete="new-password"
+          required
+        />
+
+        <p class="form-help">
+          You will use this PIN with your Woodchuck ID on another device.
+        </p>
+
+        <p id="setup-error" class="error-text" aria-live="polite"></p>
+
+        <button class="btn btn-primary" type="submit">
+          Create Persistent Woodchuck
+        </button>
+
+        <a class="btn btn-secondary" href="/login">
+          I Already Have a Woodchuck
+        </a>
+      </form>
+
+      <section
+        id="account-created-panel"
+        class="account-success"
+        aria-live="polite"
+        hidden
+      >
+        <p class="chip">Account created</p>
+        <h3>Your Woodchuck ID</h3>
+
+        <p class="account-id" id="created-woodchuck-id"></p>
+
+        <p>
+          Save this ID and remember your four-digit PIN.
+          You need both to restore your game on another device.
+        </p>
+
+        <div class="button-row">
+          <button
+            id="copy-woodchuck-id"
+            class="btn btn-secondary"
+            type="button"
+          >
+            Copy ID
+          </button>
+
+          <a class="btn btn-primary" href="/home">
+            Enter the Woodshed
+          </a>
+        </div>
+
+        <p id="copy-account-feedback" class="body-copy"></p>
+      </section>
+    </div>
 
     <aside class="mentor-card" aria-label="Sax Viking mentor panel">
-      <img class="mentor-portrait" src="/static/img/sax-viking-portrait.png" alt="Sax Viking mentor portrait" />
+      <img
+        class="mentor-portrait"
+        src="/static/img/sax-viking-portrait.png"
+        alt="Sax Viking mentor portrait"
+      />
       <div>
         <p class="chip">Mentor</p>
         <h3>Sax Viking</h3>
-        <p>“Welcome to camp. Your woodshed is ready. Let’s get to work. Argh.”</p>
+        <p>
+          “Welcome to camp. Your woodshed is ready.
+          Let’s get to work. Argh.”
+        </p>
       </div>
     </aside>
   </div>

@@ -1228,3 +1228,59 @@ select {
   border: 2px solid rgba(120, 84, 34, 0.45);
   box-shadow: 0 5px 12px rgba(0, 0, 0, 0.18);
 }
+
+/* Persistent Woodchuck accounts */
+.account-layout {
+  display: grid;
+  gap: 1rem;
+}
+
+@media (min-width: 760px) {
+  .account-layout {
+    grid-template-columns: minmax(0, 1.25fr) minmax(240px, 0.75fr);
+    align-items: start;
+  }
+}
+
+.stack-form input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.66rem;
+  border-radius: 10px;
+  border: 1px solid #d0bc92;
+  background: #fffaf0;
+  color: #2a1d12;
+  font-size: 1rem;
+}
+
+.form-help {
+  margin: -0.3rem 0 0;
+  color: #67533d;
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+
+.account-success {
+  padding: 1rem;
+  border: 2px solid #8aad63;
+  border-radius: var(--radius-lg);
+  background: #f5ffe8;
+  box-shadow: 0 8px 20px rgba(43, 91, 35, 0.14);
+}
+
+.account-success h3 {
+  margin-bottom: 0.4rem;
+}
+
+.account-id {
+  display: inline-block;
+  margin: 0.35rem 0 0.7rem;
+  padding: 0.65rem 0.85rem;
+  border: 1px dashed #6d854d;
+  border-radius: 10px;
+  background: #ffffff;
+  font-family: monospace;
+  font-size: clamp(1.1rem, 4vw, 1.55rem);
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}

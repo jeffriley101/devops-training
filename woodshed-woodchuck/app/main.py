@@ -77,6 +77,16 @@ def welcome(request: Request):
     return _render(request, "welcome.html", title="Woodshed Woodchuck")
 
 
+@app.get("/login")
+def login_page(request: Request):
+    return _render(
+        request,
+        "login.html",
+        title="Sign In",
+        active_nav=None,
+    )
+
+
 @app.get("/setup")
 def setup(request: Request):
     return _render(
