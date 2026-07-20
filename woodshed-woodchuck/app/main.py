@@ -1,11 +1,14 @@
 from contextlib import asynccontextmanager
+import os
 from pathlib import Path
 
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.sessions import SessionMiddleware
 
+from .account_routes import router as account_router
 from .content import (
     GOAL_OPTIONS,
     INSTRUMENT_OPTIONS,
@@ -24,7 +27,24 @@ async def lifespan(_: FastAPI):
     yield
 
 
+SESSION_SECRET = os.getenv(
+    "SESSION_SECRET",
+    "woodshed-local-development-secret",
+)
+SESSION_COOKIE_SECURE = os.getenv(
+    "SESSION_COOKIE_SECURE",
+    "",
+).lower() in {"1", "true", "yes"}
+
+
 app = FastAPI(title="Woodshed Woodchuck", lifespan=lifespan)
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=SESSION_SECRET,
+    same_site="lax",
+    https_only=SESSION_COOKIE_SECURE,
+)
+app.include_router(account_router)
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
