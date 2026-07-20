@@ -22,10 +22,10 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 
 NAV_ITEMS = [
-    {"label": "Woodshed", "href": "/home", "key": "home"},
-    {"label": "P-Book", "href": "/p-book", "key": "p_book"},
-    {"label": "Quest", "href": "/quest", "key": "quest"},
-    {"label": "Store", "href": "/store", "key": "store"},
+    {"label": "SHED", "href": "/home", "key": "home"},
+    {"label": "BOOK", "href": "/p-book", "key": "p_book"},
+    {"label": "BOARD", "href": "/quest", "key": "quest"},
+    {"label": "SHOP", "href": "/store", "key": "store"},
 ]
 
 
@@ -75,19 +75,19 @@ def setup_submit(
 
 @app.get("/home")
 def home(request: Request):
-    return _render(request, "home.html", title="The Woodshed", active_nav="home")
+    return _render(request, "home.html", title="shed", active_nav="home")
 
 
 @app.get("/p-book")
 def p_book(request: Request):
-    return _render(request, "p_book.html", title="P-Book", active_nav="p_book")
+    return _render(request, "p_book.html", title="book", active_nav="p_book")
 
 
 @app.get("/quest")
 def quest(request: Request):
-    return _render(request, "quest.html", title="Quest Deck", active_nav="quest")
+    return _render(request, "quest.html", title="board", active_nav="quest")
 
 
 @app.get("/store")
 def store(request: Request):
-    return _render(request, "store.html", title="Store", active_nav="store")
+    return _render(request, "store.html", title="shop", active_nav="store")

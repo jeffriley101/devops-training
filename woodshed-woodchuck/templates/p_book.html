@@ -2,53 +2,119 @@
 
 {% block content %}
 <section class="card">
-  <div class="section-head">
-    <h2>P-Book</h2>
-    <p class="body-copy">Add a page to your practice book. Log the date, minutes, and an optional note.</p>
-  </div>
+  <article class="mentor-card" aria-label="Whistler practice guidance">
+    <p class="chip">Whistler says</p>
+    <p>Any time you play counts as practice minutes. Start the timer, or enter your minutes by hand.</p>
+  </article>
+
+  <article class="mentor-card mt-md" aria-label="Practice timer">
+    <p class="chip">Practice Timer</p>
+    <p id="practice-timer-display">00:00</p>
+    <div class="button-row">
+      <button id="practice-timer-start-btn" class="btn btn-secondary" type="button">Start Timer</button>
+      <button id="practice-timer-stop-btn" class="btn btn-red" type="button">Stop Timer</button>
+    </div>
+    <p id="practice-timer-feedback" class="body-copy" aria-live="polite">Stop the timer to fill in your minutes. You can still change them before submitting.</p>
+  </article>
 
   <form id="p-book-form" class="stack-form mt-md" novalidate>
-    <label for="p-book-date">Practice date</label>
-    <input id="p-book-date" name="p-book-date" type="date" required />
-
     <label for="p-book-minutes">Minutes practiced</label>
     <input id="p-book-minutes" name="p-book-minutes" type="number" min="1" step="1" required />
+
+    <label for="p-book-date">Practice date</label>
+    <input id="p-book-date" name="p-book-date" type="date" required />
 
     <label for="p-book-note">Short note (optional)</label>
     <textarea id="p-book-note" name="p-book-note" rows="3" maxlength="180" placeholder="Scales, band music, rhythm work..."></textarea>
 
+    <details class="mentor-card">
+      <summary>What did you work on?</summary>
+      <p class="body-copy">Check anything that fits this practice chart.</p>
+
+      <div class="practice-detail-grid">
+        <label><input type="checkbox" name="practice-detail" value="Long Tones" /> Long Tones</label>
+        <label><input type="checkbox" name="practice-detail" value="Arpeggios" /> Arpeggios</label>
+        <label><input type="checkbox" name="practice-detail" value="Etudes" /> Etudes</label>
+        <label><input type="checkbox" name="practice-detail" value="Patterns" /> Patterns</label>
+        <label><input type="checkbox" name="practice-detail" value="Dynamics" /> Dynamics</label>
+        <label><input type="checkbox" name="practice-detail" value="Articulations" /> Articulations</label>
+        <label><input type="checkbox" name="practice-detail" value="Transcribing" /> Transcribing</label>
+        <label><input type="checkbox" name="practice-detail" value="Ear Training" /> Ear Training</label>
+        <label><input type="checkbox" name="practice-detail" value="Tuning" /> Tuning</label>
+        <label><input type="checkbox" name="practice-detail" value="Metronome Work" /> Metronome Work</label>
+        <label><input type="checkbox" name="practice-detail" value="Band Class" /> Band Class</label>
+        <label><input type="checkbox" name="practice-detail" value="Lessons" /> Lessons</label>
+        <label><input type="checkbox" name="practice-detail" value="Rehearsals" /> Rehearsals</label>
+        <label><input type="checkbox" name="practice-detail" value="Concerts" /> Concerts</label>
+        <label><input type="checkbox" name="practice-detail" value="Tests" /> Tests</label>
+        <label><input type="checkbox" name="practice-detail" value="Performances" /> Performances</label>
+        <label><input type="checkbox" name="practice-detail" value="Busking" /> Busking</label>
+        <label><input type="checkbox" name="practice-detail" value="Warm-ups" /> Warm-ups</label>
+        <label><input type="checkbox" name="practice-detail" value="Scales" /> Scales</label>
+        <label><input type="checkbox" name="practice-detail" value="Songs" /> Songs</label>
+        <label><input type="checkbox" name="practice-detail" value="Improvisation" /> Improvisation</label>
+        <label><input type="checkbox" name="practice-detail" value="Auditions" /> Auditions</label>
+        <label><input type="checkbox" name="practice-detail" value="Fingerings" /> Fingerings</label>
+      </div>
+    </details>
+
     <p id="p-book-error" class="error-text" aria-live="polite"></p>
+    <p id="p-book-feedback" class="body-copy" aria-live="polite"></p>
 
-    <button class="btn btn-primary" type="submit">Add Page to P-Book</button>
-  </form>
-
-  <article class="mentor-card mt-md" aria-live="polite">
-    <p class="chip">Practice Book</p>
-    <p id="p-book-feedback">No new page added yet.</p>
-  </article>
-
-  <article class="mentor-card mt-md">
-    <p class="chip">Recent Pages</p>
-    <div id="p-book-entries">
-      <p>No practice pages logged yet.</p>
+    <div class="button-row">
+      <button class="btn btn-green" type="submit">Submit to P-Book</button>
+      <button id="email-p-chart-btn" class="btn btn-red" type="button">Email P-Chart</button>
+      <button id="export-p-chart-btn" class="btn btn-secondary" type="button">Copy P-Chart</button>
     </div>
-  </article>
 
-  <article class="mentor-card mt-md">
-    <p class="chip">Email P-Chart</p>
+    <details class="mentor-card">
+      <summary>P-Chart sharing contacts</summary>
+      <p class="body-copy">Recent emails are saved only on this device for quicker P-Chart sharing.</p>
 
-    <div class="stack-form">
       <label for="teacher-email">Teacher email</label>
-      <input id="teacher-email" name="teacher-email" type="email" placeholder="band.director@school.edu" />
+      <input
+        id="teacher-email"
+        name="teacher-email"
+        type="email"
+        list="teacher-email-options"
+        placeholder="band.director@school.edu"
+      />
+      <datalist id="teacher-email-options"></datalist>
 
       <label for="parent-email">Parent email</label>
-      <input id="parent-email" name="parent-email" type="email" placeholder="parent@example.com" />
+      <input
+        id="parent-email"
+        name="parent-email"
+        type="email"
+        list="parent-email-options"
+        placeholder="parent@example.com"
+      />
+      <datalist id="parent-email-options"></datalist>
+    </details>
+  </form>
+
+  <hr class="section-divider" />
+
+  <div class="stats-grid mt-md" aria-label="P-Book summary">
+    <article class="stat-card">
+      <h3>Lifetime Minutes</h3>
+      <p id="p-book-total-minutes">0</p>
+    </article>
+    <article class="stat-card">
+      <h3>Practice Days</h3>
+      <p id="p-book-practice-days">0</p>
+    </article>
+    <article class="stat-card">
+      <h3>Charts in Book</h3>
+      <p id="p-book-pages-count">0</p>
+    </article>
+  </div>
+
+  <article class="mentor-card mt-md">
+    <p class="chip">P-Book</p>
+    <div id="p-book-entries">
+      <p>No practice charts logged yet.</p>
     </div>
   </article>
-
-  <div class="button-row">
-    <button id="export-p-chart-btn" class="btn btn-secondary" type="button">Copy P-Chart</button>
-    <button id="email-p-chart-btn" class="btn btn-red" type="button">Email P-Chart</button>
-  </div>
 </section>
 {% endblock %}

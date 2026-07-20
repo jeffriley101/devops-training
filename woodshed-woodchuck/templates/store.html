@@ -1,32 +1,45 @@
 {% extends "base.html" %}
 
 {% block content %}
-<section class="card">
-  <div class="section-head">
-    <h2>Woodchuck Store</h2>
-    <p class="body-copy">Spend practice credits on simple gear for your Woodchuck.</p>
+<section class="card shop-page">
+  <p class="body-copy shop-intro">Trade your dandelions for gear!</p>
+
+  <div class="shop-scene" aria-label="The Viking Sax's Great Dandelion Shop">
+    <div class="shop-column shop-column-left" aria-label="Shop merchandise">
+      <div id="store-items" class="shop-shelf-list" aria-label="Store items"></div>
+    </div>
+
+    <div class="shop-column shop-column-center" aria-label="The Viking Sax">
+      <img class="shop-character-art" src="/static/img/sax-viking-portrait.png" alt="The Viking Sax in the Dandelion Shop" />
+    </div>
+
+    <div class="shop-column shop-column-right" aria-label="Player inventory">
+      <article class="shop-status-card">
+        <strong>Bank</strong>
+        <small><span id="store-credits-value">0</span> dandelions</small>
+      </article>
+
+      <article class="shop-status-card">
+        <strong>Hat</strong>
+        <small id="equipped-head-value">None</small>
+      </article>
+
+      <article class="shop-status-card">
+        <strong>Hoodie</strong>
+        <small id="equipped-body-value">None</small>
+      </article>
+
+      <article class="shop-status-card">
+        <strong>Water Bottle</strong>
+        <small id="equipped-water-bottle-value">None</small>
+      </article>
+
+      <article class="shop-status-card">
+        <strong>Dandelion Crowns</strong>
+        <small>None yet</small>
+      </article>
+    </div>
   </div>
-
-  <div class="stats-grid">
-    <article class="stat-card">
-      <h3>Bank</h3>
-      <p><span id="store-credits-value">0</span> credits</p>
-    </article>
-    <article class="stat-card">
-      <h3>Hat</h3>
-      <p id="equipped-head-value">None</p>
-    </article>
-    <article class="stat-card">
-      <h3>Hoodie</h3>
-      <p id="equipped-body-value">None</p>
-    </article>
-  </div>
-
-  <article class="mentor-card mt-md">
-    <p class="chip">The Viking Sax says</p>
-    <p id="store-feedback">Earn credits by practicing, then pick something for your Woodchuck.</p>
-  </article>
-
-  <div id="store-items" class="store-item-grid mt-md" aria-label="Store items"></div>
+  <p id="store-feedback" class="body-copy shop-feedback" aria-live="polite"></p>
 </section>
 {% endblock %}

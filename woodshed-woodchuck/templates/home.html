@@ -2,94 +2,345 @@
 
 {% block content %}
 <section class="card woodshed-page">
-  <div class="section-head">
-    <h2>The Woodshed</h2>
-    <p class="body-copy">Tap around the room to practice, check your quest, tune up, visit the store, or rest your Woodchuck.</p>
-  </div>
-
-  <div class="stats-grid woodshed-stats">
-    <article class="stat-card">
-      <h3>Woodchuck</h3>
-      <p id="woodchuck-name-value">Not named yet</p>
-    </article>
-    <article class="stat-card">
-      <h3>Credits</h3>
-      <p id="credits-value">0</p>
-    </article>
-    <article class="stat-card">
-      <h3>Streak</h3>
-      <p id="streak-value">0 days</p>
-    </article>
-    <article class="stat-card">
-      <h3>Profile</h3>
-      <p id="profile-value">Not set</p>
-    </article>
-  </div>
+  <p class="body-copy woodshed-intro">
+    Tap around the room to practice, check your quest, tune up, visit the store, or rest your Woodchuck.
+  </p>
 
   <div class="woodshed-scene" aria-label="Interactive Woodshed room">
-    <div class="woodshed-background" aria-hidden="true">
-      <p>Future art slot: <code>woodshed-room-bg.png</code></p>
-    </div>
-
     <div class="woodshed-character-layer" aria-label="Woodchuck holding selected instrument">
-      <img class="character-art woodshed-character-art" src="/static/img/woodchuck-home.png" alt="Woodchuck holding instrument in the Woodshed" />
-      <p class="asset-title">Future instrument art: saxophone, clarinet, flute, drums, tuba</p>
+      <img
+        class="character-art woodshed-character-art"
+        src="/static/img/woodchuck-home.png"
+        alt="Woodchuck holding an instrument in the Woodshed"
+      />
     </div>
 
     <div class="woodshed-foreground" aria-label="Clickable Woodshed objects">
-      <a id="p-book" class="room-object p-book-object" href="/p-book">
-        <span class="room-object-icon">📘</span>
-        <span>
-          <strong>P-Chart Book</strong>
-          <small>Log practice and export for your band director.</small>
-        </span>
-      </a>
+      <div class="woodshed-object-column woodshed-object-column-left">
+        <div
+          id="woodchuck-name-value"
+          class="shed-readout shed-readout-name"
+          title="Woodchuck name"
+        >
+          Name your Woodchuck
+        </div>
 
-      <a class="room-object quest-object" href="/quest">
-        <span class="room-object-icon">🎼</span>
-        <span>
-          <strong>Quest Book</strong>
-          <small id="home-quest-summary">Loading today's quest...</small>
-          <small><strong>Status:</strong> <span id="home-quest-status">Not started</span></small>
-        </span>
-      </a>
+        <div
+          id="camp-level-value"
+          class="shed-readout shed-readout-class"
+          title="Class"
+        >
+          Chuckling
+        </div>
 
-      <a class="room-object tuner-object" href="#tuner">
-        <span class="room-object-icon">🎚️</span>
-        <span>
-          <strong>Tuner</strong>
-          <small>Future tuning tool.</small>
-        </span>
-      </a>
+        <div
+          id="instrument-object"
+          class="shed-icon-object"
+          role="img"
+          aria-label="Instrument"
+          title="Instrument"
+        >
+          🎷
+        </div>
 
-      <a class="room-object metronome-object" href="#metronome">
-        <span class="room-object-icon">⏱️</span>
-        <span>
-          <strong>Metronome</strong>
-          <small>Future rhythm tool.</small>
-        </span>
-      </a>
+        <div
+          id="level-value"
+          class="shed-readout shed-readout-level"
+          title="Level"
+        >
+          #1
+        </div>
 
-      <a class="room-object wallet-object" href="/store">
-        <span class="room-object-icon">👛</span>
-        <span>
-          <strong>Wallet</strong>
-          <small>Check your bank and visit the store.</small>
-        </span>
-      </a>
+        <a
+          id="p-book"
+          class="room-object p-book-object"
+          href="/p-book"
+          aria-label="Open P-Chart Book"
+          title="P-Chart Book"
+        >
+          <span class="room-object-icon" aria-hidden="true">📓</span>
+        </a>
 
-      <a class="room-object chair-object" href="#chair">
-        <span class="room-object-icon">🪑</span>
-        <span>
-          <strong>Chair</strong>
-          <small>Take a nap or eat dandelions.</small>
-        </span>
-      </a>
+        <a
+          class="room-object quest-object"
+          href="/quest"
+          aria-label="Open Quest Book"
+          title="Quest Book"
+        >
+          <span class="room-object-icon" aria-hidden="true">📕</span>
+        </a>
+      </div>
+
+      <div
+        class="woodshed-object-column woodshed-object-column-center"
+        aria-hidden="true"
+      ></div>
+
+      <div class="woodshed-object-column woodshed-object-column-right">
+        <div
+          id="streak-value"
+          class="shed-readout"
+          title="Practice streak"
+        >
+          0
+        </div>
+
+        <div
+          id="total-p-charts-value"
+          class="shed-readout"
+          title="Total P-Charts"
+        >
+          0
+        </div>
+
+        <a
+          id="dandelion-object"
+          class="room-object dandelion-object"
+          href="/store"
+          aria-label="Open the shop"
+          title="Dandelions and Shop"
+        >
+          <span class="room-object-icon" aria-hidden="true">🌼</span>
+          <span id="credits-value" class="dandelion-count">0</span>
+        </a>
+
+        <button
+          id="metronome-open-button"
+          class="room-object metronome-object"
+          type="button"
+          aria-label="Open metronome"
+          aria-controls="metronome-panel"
+          aria-expanded="false"
+          title="Metronome"
+        >
+          <span class="room-object-icon" aria-hidden="true">🕰️</span>
+        </button>
+
+        <button
+          id="tuner-open-button"
+          class="room-object tuner-object"
+          type="button"
+          aria-label="Open tuner"
+          aria-controls="tuner-panel"
+          aria-expanded="false"
+          title="Tuner"
+        >
+          <span class="room-object-icon" aria-hidden="true">🔱</span>
+        </button>
+
+        <button
+          id="mum-open-button"
+          class="room-object chair-object"
+          type="button"
+          aria-label="Visit Mum's chair"
+          aria-controls="mum-panel"
+          aria-expanded="false"
+          title="Mum's Chair"
+        >
+          <span class="room-object-icon" aria-hidden="true">🪑</span>
+        </button>
+      </div>
     </div>
   </div>
 
+  <section
+    id="metronome-panel"
+    class="metronome-panel hidden"
+    aria-labelledby="metronome-title"
+  >
+    <div class="metronome-panel-head">
+      <div>
+        <p class="chip">Practice Tool</p>
+        <h2 id="metronome-title">Metronome</h2>
+      </div>
+
+      <button
+        id="metronome-close-button"
+        class="metronome-close-button"
+        type="button"
+        aria-label="Close metronome"
+      >
+        ×
+      </button>
+    </div>
+
+    <div class="metronome-display">
+      <div
+        id="metronome-pulse"
+        class="metronome-pulse"
+        aria-hidden="true"
+      >
+        <span id="metronome-beat-number">1</span>
+      </div>
+
+      <div class="metronome-tempo-readout">
+        <strong id="metronome-bpm-readout">100</strong>
+        <span>BPM</span>
+      </div>
+    </div>
+
+    <div class="metronome-controls">
+      <label for="metronome-bpm-range">Tempo</label>
+
+      <input
+        id="metronome-bpm-range"
+        type="range"
+        min="40"
+        max="220"
+        step="1"
+        value="100"
+      />
+
+      <div class="metronome-number-row">
+        <button
+          id="metronome-slower-button"
+          class="btn btn-secondary"
+          type="button"
+        >
+          −5
+        </button>
+
+        <input
+          id="metronome-bpm-input"
+          type="number"
+          min="40"
+          max="220"
+          step="1"
+          value="100"
+          aria-label="Metronome beats per minute"
+        />
+
+        <button
+          id="metronome-faster-button"
+          class="btn btn-secondary"
+          type="button"
+        >
+          +5
+        </button>
+      </div>
+
+      <div class="button-row metronome-button-row">
+        <button
+          id="metronome-tap-button"
+          class="btn btn-secondary"
+          type="button"
+        >
+          Tap Tempo
+        </button>
+
+        <button
+          id="metronome-start-button"
+          class="btn btn-primary"
+          type="button"
+        >
+          Start
+        </button>
+      </div>
+    </div>
+
+    <p id="metronome-status" class="metronome-status" aria-live="polite">
+      Stopped at 100 BPM. Beat one is accented.
+    </p>
+  </section>
+
+  <section
+    id="tuner-panel"
+    class="tuner-panel hidden"
+    aria-labelledby="tuner-title"
+  >
+    <div>
+      <p class="chip">Tuner</p>
+      <h2 id="tuner-title">Not quite ready</h2>
+      <p class="tuner-message">
+        “Oh sorry, need to get batteries.”
+      </p>
+    </div>
+
+    <button
+      id="tuner-close-button"
+      class="btn btn-secondary"
+      type="button"
+    >
+      Put it back
+    </button>
+  </section>
+
+  <section
+    id="mum-panel"
+    class="mum-panel hidden"
+    aria-labelledby="mum-title"
+  >
+    <div class="mum-panel-head">
+      <div>
+        <p class="chip">Mum's Corner</p>
+        <h2 id="mum-title">Take care of the musician</h2>
+      </div>
+
+      <button
+        id="mum-close-button"
+        class="mum-close-button"
+        type="button"
+        aria-label="Close Mum's Corner"
+      >
+        ×
+      </button>
+    </div>
+
+    <p id="mum-message" class="mum-message" aria-live="polite">
+      Sit for a moment. Have you eaten, had water, and packed everything for camp?
+    </p>
+
+    <div class="mum-choice-grid">
+      <button
+        class="btn btn-secondary"
+        type="button"
+        data-mum-choice="water"
+      >
+        Water check
+      </button>
+
+      <button
+        class="btn btn-secondary"
+        type="button"
+        data-mum-choice="snack"
+      >
+        Snack break
+      </button>
+
+      <button
+        class="btn btn-secondary"
+        type="button"
+        data-mum-choice="rest"
+      >
+        Rest my chops
+      </button>
+
+      <button
+        class="btn btn-secondary"
+        type="button"
+        data-mum-choice="camp"
+      >
+        Camp bag check
+      </button>
+    </div>
+
+    <button
+      id="mum-ready-button"
+      class="btn btn-primary"
+      type="button"
+    >
+      I'm ready to practice
+    </button>
+  </section>
+
   <p class="support-line">
-    <a href="https://venmo.com/u/jeffriley101" target="_blank" rel="noopener noreferrer">Support the Shed</a>
+    <a
+      href="https://venmo.com/u/jeffriley101"
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      Please Support the Shed Project!
+    </a>
   </p>
 </section>
 {% endblock %}

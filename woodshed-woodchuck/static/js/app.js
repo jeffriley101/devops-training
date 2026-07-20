@@ -148,22 +148,69 @@
     const creditsEl = document.getElementById("credits-value");
     const streakEl = document.getElementById("streak-value");
     const woodchuckNameEl = document.getElementById("woodchuck-name-value");
-    const profileEl = document.getElementById("profile-value");
-    const questSummaryEl = document.getElementById("home-quest-summary");
-    const questStatusEl = document.getElementById("home-quest-status");
+    const instrumentObjectEl = document.getElementById("instrument-object");
+    const levelEl = document.getElementById("level-value");
+    const campLevelEl = document.getElementById("camp-level-value");
+    const totalPChartsEl = document.getElementById("total-p-charts-value");
+    const dandelionObjectEl = document.getElementById("dandelion-object");
 
-    if (!creditsEl || !streakEl || !profileEl) return;
+    const practiceLog = Array.isArray(state.practiceLog)
+      ? state.practiceLog
+      : [];
 
-    creditsEl.textContent = String(state.progress.credits ?? 0);
-    streakEl.textContent = `${state.progress.streak ?? 0} days`;
-    if (woodchuckNameEl) woodchuckNameEl.textContent = state.profile.woodchuckName || "Not named yet";
-    profileEl.textContent = hasProfile(state)
-      ? `${state.profile.instrument} · ${state.profile.level}`
-      : "Not set";
+    const totalPCharts = practiceLog.filter(
+      (entry) => entry && entry.source === "p-book"
+    ).length;
 
-    if (questSummaryEl && questStatusEl && state.daily && state.daily.questText) {
-      questSummaryEl.textContent = `${state.daily.questText} (${state.daily.loggedMinutes || 0}/${state.daily.targetMinutes} min)`;
-      questStatusEl.textContent = state.daily.completed ? "Complete ✅" : "Incomplete";
+    const dandelions = state.progress.credits ?? 0;
+    const streak = state.progress.streak ?? 0;
+    const gameLevel = state.progress.level ?? 1;
+    const instrument = state.profile.instrument || "Instrument not set";
+
+    if (woodchuckNameEl) {
+      woodchuckNameEl.textContent =
+        state.profile.woodchuckName || "Name your Woodchuck";
+    }
+
+    if (campLevelEl) {
+      campLevelEl.textContent = "Chuckling";
+    }
+
+    if (instrumentObjectEl) {
+      instrumentObjectEl.title = instrument;
+      instrumentObjectEl.setAttribute("aria-label", instrument);
+    }
+
+    if (levelEl) {
+      levelEl.textContent = `#${gameLevel}`;
+      levelEl.setAttribute("aria-label", `Level ${gameLevel}`);
+    }
+
+    if (streakEl) {
+      streakEl.textContent = `Streak ${streak}`;
+      streakEl.setAttribute(
+        "aria-label",
+        `${streak} day practice streak`
+      );
+    }
+
+    if (totalPChartsEl) {
+      totalPChartsEl.textContent = `P-Charts ${totalPCharts}`;
+      totalPChartsEl.setAttribute(
+        "aria-label",
+        `${totalPCharts} total P-Charts`
+      );
+    }
+
+    if (creditsEl) {
+      creditsEl.textContent = String(dandelions);
+    }
+
+    if (dandelionObjectEl) {
+      dandelionObjectEl.setAttribute(
+        "aria-label",
+        `${dandelions} dandelions. Open the shop.`
+      );
     }
   }
 
@@ -276,7 +323,7 @@
         .map((quest) => `
           <button class="quest-choice-card" type="button" data-quest-id="${quest.id}">
             <strong>${quest.text}</strong>
-            <small>${quest.target_minutes} minutes · ${quest.reward_credits} credits</small>
+            <small>${quest.target_minutes} minutes · ${quest.reward_credits} dandelions</small>
           </button>
         `)
         .join("");
@@ -386,7 +433,7 @@
         lastLog.creditsAwarded = next.daily.rewardCredits;
 
         feedbackEl.querySelector("p:last-child").textContent =
-          `${pickMessage("reward", dateKey)} +${next.daily.rewardCredits} credits earned.`;
+          `${pickMessage("reward", dateKey)} +${next.daily.rewardCredits} dandelions earned.`;
       } else {
         feedbackEl.querySelector("p:last-child").textContent =
           `${pickMessage("supportive", dateKey)} (${next.daily.loggedMinutes}/${next.daily.targetMinutes} minutes)`;
@@ -410,6 +457,10 @@
     { id: "hoodie-blue", name: "Blue Hoodie", slot: "body", price: 25 },
     { id: "hoodie-green", name: "Green Hoodie", slot: "body", price: 25 },
     { id: "hoodie-purple", name: "Purple Hoodie", slot: "body", price: 25 },
+    { id: "water-bottle-red", name: "Red Water Bottle", slot: "waterBottle", price: 15 },
+    { id: "water-bottle-blue", name: "Blue Water Bottle", slot: "waterBottle", price: 15 },
+    { id: "water-bottle-green", name: "Green Water Bottle", slot: "waterBottle", price: 15 },
+    { id: "water-bottle-purple", name: "Purple Water Bottle", slot: "waterBottle", price: 15 },
   ];
 
   function getStoreItem(itemId) {
@@ -429,13 +480,986 @@
     state.inventory.equipped = state.inventory.equipped || {};
     state.inventory.equipped.head = state.inventory.equipped.head || null;
     state.inventory.equipped.body = state.inventory.equipped.body || null;
+    state.inventory.equipped.waterBottle = state.inventory.equipped.waterBottle || null;
     return state;
+  }
+
+
+
+
+  function wireTuner() {
+    const openButton = document.getElementById("tuner-open-button");
+    const closeButton = document.getElementById("tuner-close-button");
+    const panel = document.getElementById("tuner-panel");
+
+    if (!openButton || !panel) return;
+
+    openButton.addEventListener("click", function () {
+      panel.classList.remove("hidden");
+      openButton.setAttribute("aria-expanded", "true");
+
+      panel.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+      });
+
+      if (closeButton) {
+        closeButton.focus();
+      }
+    });
+
+    if (closeButton) {
+      closeButton.addEventListener("click", function () {
+        panel.classList.add("hidden");
+        openButton.setAttribute("aria-expanded", "false");
+        openButton.focus();
+      });
+    }
+  }
+
+
+  function wireMum(state) {
+    const openButton = document.getElementById("mum-open-button");
+    const closeButton = document.getElementById("mum-close-button");
+    const readyButton = document.getElementById("mum-ready-button");
+    const panel = document.getElementById("mum-panel");
+    const messageEl = document.getElementById("mum-message");
+    const choiceButtons = document.querySelectorAll("[data-mum-choice]");
+
+    if (!openButton || !panel || !messageEl) return;
+
+    const name = state.profile.woodchuckName || "musician";
+
+    const dailyGreetings = [
+      `Sit for a moment, ${name}. Have you eaten and had some water?`,
+      `Welcome back, ${name}. Check your shoulders and take one slow breath.`,
+      "Band camp takes energy. Make sure the musician is cared for too.",
+      "Before the next challenge: water, food, music, pencil, and instrument.",
+      "You do not have to practice tired and uncomfortable. Sit down a minute.",
+    ];
+
+    const responses = {
+      water:
+        "Take a few steady sips. You do not need to finish the whole bottle at once.",
+      snack:
+        "Choose something that will last through rehearsal—not just a quick burst of sugar.",
+      rest:
+        "Set the instrument down safely. Relax your jaw, shoulders, hands, and back for a few minutes.",
+      camp:
+        "Camp check: instrument, music, pencil, water, sunscreen, hat, comfortable shoes, and anything your director requested.",
+    };
+
+    function closeMumPanel() {
+      panel.classList.add("hidden");
+      openButton.setAttribute("aria-expanded", "false");
+      openButton.focus();
+    }
+
+    openButton.addEventListener("click", function () {
+      const greeting =
+        dailyGreetings[getDayIndex(new Date()) % dailyGreetings.length];
+
+      messageEl.textContent = greeting;
+      panel.classList.remove("hidden");
+      openButton.setAttribute("aria-expanded", "true");
+
+      panel.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+      });
+    });
+
+    choiceButtons.forEach((button) => {
+      button.addEventListener("click", function () {
+        const response = responses[button.dataset.mumChoice];
+
+        if (response) {
+          messageEl.textContent = response;
+        }
+      });
+    });
+
+    if (closeButton) {
+      closeButton.addEventListener("click", closeMumPanel);
+    }
+
+    if (readyButton) {
+      readyButton.addEventListener("click", function () {
+        messageEl.textContent =
+          "Good. Take what you need with you, and do not rush the first note.";
+
+        window.setTimeout(closeMumPanel, 900);
+      });
+    }
+
+    panel.addEventListener("keydown", function (event) {
+      if (event.key === "Escape") {
+        closeMumPanel();
+      }
+    });
+  }
+
+  function wireMetronome() {
+    const openButton = document.getElementById(
+      "metronome-open-button"
+    );
+    const closeButton = document.getElementById(
+      "metronome-close-button"
+    );
+    const panel = document.getElementById("metronome-panel");
+    const startButton = document.getElementById(
+      "metronome-start-button"
+    );
+    const tapButton = document.getElementById(
+      "metronome-tap-button"
+    );
+    const slowerButton = document.getElementById(
+      "metronome-slower-button"
+    );
+    const fasterButton = document.getElementById(
+      "metronome-faster-button"
+    );
+    const rangeInput = document.getElementById(
+      "metronome-bpm-range"
+    );
+    const numberInput = document.getElementById(
+      "metronome-bpm-input"
+    );
+    const bpmReadout = document.getElementById(
+      "metronome-bpm-readout"
+    );
+    const pulse = document.getElementById("metronome-pulse");
+    const beatNumber = document.getElementById(
+      "metronome-beat-number"
+    );
+    const status = document.getElementById("metronome-status");
+
+    if (
+      !openButton ||
+      !panel ||
+      !startButton ||
+      !rangeInput ||
+      !numberInput
+    ) {
+      return;
+    }
+
+    const BPM_STORAGE_KEY = "woodshedWoodchuckMetronomeBpm";
+    const AudioContextClass =
+      window.AudioContext || window.webkitAudioContext;
+
+    let bpm = 100;
+    let audioContext = null;
+    let schedulerTimer = null;
+    let nextBeatTime = 0;
+    let currentBeat = 0;
+    let isRunning = false;
+    let tapTimes = [];
+    const visualTimers = new Set();
+
+    function clampBpm(value) {
+      const numericValue = Number(value);
+
+      if (!Number.isFinite(numericValue)) {
+        return bpm;
+      }
+
+      return Math.min(220, Math.max(40, Math.round(numericValue)));
+    }
+
+    function saveBpm() {
+      try {
+        window.localStorage.setItem(BPM_STORAGE_KEY, String(bpm));
+      } catch (_error) {
+        // The metronome still works if browser storage is unavailable.
+      }
+    }
+
+    function loadBpm() {
+      try {
+        const saved = window.localStorage.getItem(BPM_STORAGE_KEY);
+
+        if (saved !== null) {
+          bpm = clampBpm(saved);
+        }
+      } catch (_error) {
+        bpm = 100;
+      }
+    }
+
+    function renderBpm() {
+      rangeInput.value = String(bpm);
+      numberInput.value = String(bpm);
+
+      if (bpmReadout) {
+        bpmReadout.textContent = String(bpm);
+      }
+
+      saveBpm();
+    }
+
+    function setBpm(value) {
+      bpm = clampBpm(value);
+      renderBpm();
+
+      if (status && !isRunning) {
+        status.textContent =
+          `Stopped at ${bpm} BPM. Beat one is accented.`;
+      }
+    }
+
+    function queueVisualUpdate(callback, delayMilliseconds) {
+      const timer = window.setTimeout(function () {
+        visualTimers.delete(timer);
+        callback();
+      }, delayMilliseconds);
+
+      visualTimers.add(timer);
+    }
+
+    function clearVisualTimers() {
+      visualTimers.forEach((timer) => window.clearTimeout(timer));
+      visualTimers.clear();
+    }
+
+    function showBeat(beat, scheduledTime) {
+      if (!audioContext || !pulse || !beatNumber) return;
+
+      const delay = Math.max(
+        0,
+        (scheduledTime - audioContext.currentTime) * 1000
+      );
+
+      queueVisualUpdate(function () {
+        if (!isRunning) return;
+
+        beatNumber.textContent = String(beat + 1);
+        pulse.classList.remove("is-active", "is-accent");
+
+        void pulse.offsetWidth;
+
+        pulse.classList.add("is-active");
+
+        if (beat === 0) {
+          pulse.classList.add("is-accent");
+        }
+
+        queueVisualUpdate(function () {
+          pulse.classList.remove("is-active", "is-accent");
+        }, 110);
+      }, delay);
+    }
+
+    function playClick(beat, scheduledTime) {
+      if (!audioContext) return;
+
+      const oscillator = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+      const isAccent = beat === 0;
+
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(
+        isAccent ? 1250 : 850,
+        scheduledTime
+      );
+
+      gain.gain.setValueAtTime(0.0001, scheduledTime);
+      gain.gain.exponentialRampToValueAtTime(
+        isAccent ? 0.24 : 0.14,
+        scheduledTime + 0.003
+      );
+      gain.gain.exponentialRampToValueAtTime(
+        0.0001,
+        scheduledTime + 0.055
+      );
+
+      oscillator.connect(gain);
+      gain.connect(audioContext.destination);
+
+      oscillator.start(scheduledTime);
+      oscillator.stop(scheduledTime + 0.06);
+
+      showBeat(beat, scheduledTime);
+    }
+
+    function scheduler() {
+      if (!audioContext || !isRunning) return;
+
+      while (
+        nextBeatTime <
+        audioContext.currentTime + 0.1
+      ) {
+        playClick(currentBeat, nextBeatTime);
+
+        nextBeatTime += 60 / bpm;
+        currentBeat = (currentBeat + 1) % 4;
+      }
+    }
+
+    async function startMetronome() {
+      if (!AudioContextClass) {
+        if (status) {
+          status.textContent =
+            "This browser does not support the metronome audio tool.";
+        }
+        return;
+      }
+
+      if (!audioContext) {
+        audioContext = new AudioContextClass();
+      }
+
+      if (audioContext.state === "suspended") {
+        await audioContext.resume();
+      }
+
+      isRunning = true;
+      currentBeat = 0;
+      nextBeatTime = audioContext.currentTime + 0.05;
+
+      scheduler();
+      schedulerTimer = window.setInterval(scheduler, 25);
+
+      startButton.textContent = "Stop";
+      startButton.classList.add("metronome-stop-button");
+
+      if (status) {
+        status.textContent =
+          `Playing at ${bpm} BPM. Beat one is accented.`;
+      }
+    }
+
+    function stopMetronome() {
+      isRunning = false;
+
+      if (schedulerTimer !== null) {
+        window.clearInterval(schedulerTimer);
+        schedulerTimer = null;
+      }
+
+      clearVisualTimers();
+
+      if (pulse) {
+        pulse.classList.remove("is-active", "is-accent");
+      }
+
+      if (beatNumber) {
+        beatNumber.textContent = "1";
+      }
+
+      startButton.textContent = "Start";
+      startButton.classList.remove("metronome-stop-button");
+
+      if (status) {
+        status.textContent =
+          `Stopped at ${bpm} BPM. Beat one is accented.`;
+      }
+    }
+
+    function toggleMetronome() {
+      if (isRunning) {
+        stopMetronome();
+      } else {
+        startMetronome().catch(function () {
+          if (status) {
+            status.textContent =
+              "The browser could not start metronome audio.";
+          }
+        });
+      }
+    }
+
+    function registerTap() {
+      const now = performance.now();
+      const lastTap = tapTimes[tapTimes.length - 1];
+
+      if (lastTap && now - lastTap > 2000) {
+        tapTimes = [];
+      }
+
+      tapTimes.push(now);
+      tapTimes = tapTimes.slice(-6);
+
+      if (tapTimes.length < 2) {
+        if (status) {
+          status.textContent = "Tap again to set the tempo.";
+        }
+        return;
+      }
+
+      const intervals = [];
+
+      for (let index = 1; index < tapTimes.length; index += 1) {
+        const interval = tapTimes[index] - tapTimes[index - 1];
+
+        if (interval >= 250 && interval <= 1500) {
+          intervals.push(interval);
+        }
+      }
+
+      if (!intervals.length) {
+        if (status) {
+          status.textContent =
+            "Keep tapping a steady beat between 40 and 220 BPM.";
+        }
+        return;
+      }
+
+      const averageInterval =
+        intervals.reduce((total, interval) => total + interval, 0) /
+        intervals.length;
+
+      setBpm(60000 / averageInterval);
+
+      if (status) {
+        status.textContent = `Tap tempo set to ${bpm} BPM.`;
+      }
+    }
+
+    loadBpm();
+    renderBpm();
+
+    openButton.addEventListener("click", function () {
+      panel.classList.remove("hidden");
+      openButton.setAttribute("aria-expanded", "true");
+
+      panel.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+      });
+    });
+
+    if (closeButton) {
+      closeButton.addEventListener("click", function () {
+        stopMetronome();
+        panel.classList.add("hidden");
+        openButton.setAttribute("aria-expanded", "false");
+        openButton.focus();
+      });
+    }
+
+    startButton.addEventListener("click", toggleMetronome);
+
+    if (tapButton) {
+      tapButton.addEventListener("click", registerTap);
+    }
+
+    if (slowerButton) {
+      slowerButton.addEventListener("click", function () {
+        setBpm(bpm - 5);
+      });
+    }
+
+    if (fasterButton) {
+      fasterButton.addEventListener("click", function () {
+        setBpm(bpm + 5);
+      });
+    }
+
+    rangeInput.addEventListener("input", function () {
+      setBpm(rangeInput.value);
+    });
+
+    numberInput.addEventListener("change", function () {
+      setBpm(numberInput.value);
+    });
+
+    window.addEventListener("pagehide", stopMetronome);
+  }
+
+  const BAND_CAMP_TRIVIA = [
+    {
+      question: "How many beats does a whole note receive in 4/4 time?",
+      options: ["2", "3", "4"],
+      answer: 2,
+    },
+    {
+      question: "Which word means to gradually get louder?",
+      options: ["Crescendo", "Diminuendo", "Fermata"],
+      answer: 0,
+    },
+    {
+      question: "What does a conductor’s upbeat usually help signal?",
+      options: ["An entrance", "A break", "The end of rehearsal"],
+      answer: 0,
+    },
+    {
+      question: "What should most wind players use for a stronger tone?",
+      options: ["Less air", "More air", "A tighter music stand"],
+      answer: 1,
+    },
+    {
+      question: "What does the marking piano mean?",
+      options: ["Play softly", "Play quickly", "Stop playing"],
+      answer: 0,
+    },
+    {
+      question: "Which section usually includes trumpets and trombones?",
+      options: ["Woodwinds", "Brass", "Percussion"],
+      answer: 1,
+    },
+    {
+      question: "What does a metronome help a musician maintain?",
+      options: ["Tempo", "Instrument color", "Music-stand height"],
+      answer: 0,
+    },
+  ];
+
+  const BAND_CAMP_MARCHING_CHALLENGES = [
+    "Mark time for one minute while counting evenly.",
+    "Practice eight steps forward while keeping your upper body still.",
+    "Stand at attention with tall posture for thirty seconds.",
+    "March sixteen counts while quietly singing your part.",
+    "Practice a clean eight-count halt.",
+    "Check that your toes, shoulders, and instrument face forward.",
+    "March in place while clapping a steady four-beat pulse.",
+  ];
+
+  const BAND_CAMP_CROWNS = {
+    hours: "Camp Commitment Crown",
+    care: "Instrument Care Crown",
+    trivia: "Trivia Crown",
+    marching: "Marching Challenge Crown",
+  };
+
+  function wireBandCamp(state) {
+    const playerNameEl = document.getElementById("board-player-name");
+    if (!playerNameEl) return;
+
+    const playerPointsEl = document.getElementById("board-player-points");
+    const leaderNameEl = document.getElementById("board-leader-name");
+    const leaderPointsEl = document.getElementById("board-leader-points");
+
+    const hoursForm = document.getElementById("camp-hours-form");
+    const hoursInput = document.getElementById("camp-hours");
+    const hoursButton = document.getElementById("camp-hours-button");
+    const hoursStatusEl = document.getElementById("camp-hours-status");
+
+    const careButton = document.getElementById("instrument-care-button");
+    const careStatusEl = document.getElementById("instrument-care-status");
+
+    const triviaForm = document.getElementById("trivia-form");
+    const triviaQuestionEl = document.getElementById("trivia-question");
+    const triviaOptionsEl = document.getElementById("trivia-options");
+    const triviaButton = document.getElementById("trivia-button");
+    const triviaStatusEl = document.getElementById("trivia-status");
+
+    const marchingTextEl = document.getElementById(
+      "marching-challenge-text"
+    );
+    const marchingButton = document.getElementById(
+      "marching-challenge-button"
+    );
+    const marchingStatusEl = document.getElementById(
+      "marching-challenge-status"
+    );
+
+    const crownHoursEl = document.getElementById("crown-hours");
+    const crownCareEl = document.getElementById("crown-care");
+    const crownTriviaEl = document.getElementById("crown-trivia");
+    const crownMarchingEl = document.getElementById("crown-marching");
+
+    const pastWinnersList = document.getElementById(
+      "past-winners-list"
+    );
+    const championsList = document.getElementById("champions-list");
+    const feedbackEl = document.getElementById("board-feedback");
+
+    const today = stateApi.localDateKey();
+    const dayIndex = getDayIndex(new Date());
+    const trivia =
+      BAND_CAMP_TRIVIA[dayIndex % BAND_CAMP_TRIVIA.length];
+    const marchingChallenge =
+      BAND_CAMP_MARCHING_CHALLENGES[
+        dayIndex % BAND_CAMP_MARCHING_CHALLENGES.length
+      ];
+
+    function freshBandCampDay(dateKey) {
+      return {
+        dateKey,
+        hours: null,
+        careComplete: false,
+        triviaAttempted: false,
+        triviaCorrect: false,
+        marchingComplete: false,
+        awarded: [],
+      };
+    }
+
+    function prepareCurrentDay(current) {
+      if (current.bandCamp.daily.dateKey !== today) {
+        current.bandCamp.daily = freshBandCampDay(today);
+        stateApi.saveState(current);
+      }
+
+      return current;
+    }
+
+    function playerName(current) {
+      return current.profile.woodchuckName || "Your Woodchuck";
+    }
+
+    function hasAward(current, contestKey) {
+      return current.bandCamp.daily.awarded.includes(contestKey);
+    }
+
+    function addCrownIfEarned(current, contestKey) {
+      const wins = current.bandCamp.totals.wins[contestKey] || 0;
+
+      if (wins < 10) return;
+
+      const alreadyEarned = current.bandCamp.champions.some(
+        (entry) => entry.contest === contestKey
+      );
+
+      if (alreadyEarned) return;
+
+      current.bandCamp.champions.unshift({
+        contest: contestKey,
+        crown: BAND_CAMP_CROWNS[contestKey],
+        name: playerName(current),
+        earnedAt: today,
+      });
+    }
+
+    function addDailyWinnerIfComplete(current) {
+      const requiredContests = [
+        "hours",
+        "care",
+        "trivia",
+        "marching",
+      ];
+
+      const completedEverything = requiredContests.every(
+        (contestKey) => hasAward(current, contestKey)
+      );
+
+      if (!completedEverything) return;
+
+      const alreadyRecorded = current.bandCamp.pastWinners.some(
+        (entry) => entry.dateKey === today
+      );
+
+      if (alreadyRecorded) return;
+
+      current.bandCamp.pastWinners.unshift({
+        dateKey: today,
+        name: playerName(current),
+        points: requiredContests.length,
+      });
+
+      current.bandCamp.pastWinners =
+        current.bandCamp.pastWinners.slice(0, 20);
+    }
+
+    function awardContest(current, contestKey) {
+      if (hasAward(current, contestKey)) return false;
+
+      current.bandCamp.daily.awarded.push(contestKey);
+      current.bandCamp.totals.points += 1;
+      current.bandCamp.totals.wins[contestKey] += 1;
+      current.progress.credits += 1;
+
+      addCrownIfEarned(current, contestKey);
+      addDailyWinnerIfComplete(current);
+
+      return true;
+    }
+
+    function setButtonComplete(button, text) {
+      if (!button) return;
+
+      button.disabled = true;
+      button.textContent = text;
+    }
+
+    function renderNameList(listEl, entries, emptyText, formatter) {
+      if (!listEl) return;
+
+      listEl.replaceChildren();
+
+      if (!entries.length) {
+        const item = document.createElement("li");
+        item.textContent = emptyText;
+        listEl.appendChild(item);
+        return;
+      }
+
+      entries.forEach((entry) => {
+        const item = document.createElement("li");
+        item.textContent = formatter(entry);
+        listEl.appendChild(item);
+      });
+    }
+
+    function crownText(wins, crownEarned) {
+      const progress = `${Math.min(wins, 10)}/10`;
+      return crownEarned ? `${progress} 👑` : progress;
+    }
+
+    function renderTriviaOptions(current) {
+      if (!triviaOptionsEl) return;
+
+      triviaOptionsEl.replaceChildren();
+
+      trivia.options.forEach((option, index) => {
+        const label = document.createElement("label");
+        label.className = "trivia-option";
+
+        const input = document.createElement("input");
+        input.type = "radio";
+        input.name = "trivia-answer";
+        input.value = String(index);
+        input.disabled = current.bandCamp.daily.triviaAttempted;
+
+        const text = document.createElement("span");
+        text.textContent = option;
+
+        label.append(input, text);
+        triviaOptionsEl.appendChild(label);
+      });
+    }
+
+    function renderBoard(current) {
+      const name = playerName(current);
+      const points = current.bandCamp.totals.points;
+      const wins = current.bandCamp.totals.wins;
+      const daily = current.bandCamp.daily;
+      const champions = current.bandCamp.champions;
+
+      playerNameEl.textContent = name;
+
+      if (playerPointsEl) {
+        playerPointsEl.textContent = String(points);
+      }
+
+      if (leaderNameEl) {
+        leaderNameEl.textContent = points > 0 ? name : "No camper yet";
+      }
+
+      if (leaderPointsEl) {
+        leaderPointsEl.textContent =
+          points === 1 ? "1 point" : `${points} points`;
+      }
+
+      if (hoursInput) {
+        hoursInput.value =
+          daily.hours === null ? "" : String(daily.hours);
+        hoursInput.disabled = hasAward(current, "hours");
+      }
+
+      if (hasAward(current, "hours")) {
+        setButtonComplete(hoursButton, "Added to Board");
+        if (hoursStatusEl) {
+          hoursStatusEl.textContent =
+            `${daily.hours} camp hours recorded today`;
+        }
+      } else if (hoursStatusEl) {
+        hoursStatusEl.textContent = "Not completed today";
+      }
+
+      if (daily.careComplete) {
+        setButtonComplete(careButton, "Instrument ready ✓");
+        if (careStatusEl) {
+          careStatusEl.textContent = "Completed today";
+        }
+      } else if (careStatusEl) {
+        careStatusEl.textContent = "Not completed today";
+      }
+
+      if (triviaQuestionEl) {
+        triviaQuestionEl.textContent = trivia.question;
+      }
+
+      renderTriviaOptions(current);
+
+      if (daily.triviaAttempted) {
+        setButtonComplete(
+          triviaButton,
+          daily.triviaCorrect ? "Correct ✓" : "Attempt used"
+        );
+
+        if (triviaStatusEl) {
+          triviaStatusEl.textContent = daily.triviaCorrect
+            ? "Correct answer—point earned"
+            : "Try a new question tomorrow";
+        }
+      } else if (triviaStatusEl) {
+        triviaStatusEl.textContent = "One attempt per day";
+      }
+
+      if (marchingTextEl) {
+        marchingTextEl.textContent = marchingChallenge;
+      }
+
+      if (daily.marchingComplete) {
+        setButtonComplete(
+          marchingButton,
+          "Challenge completed ✓"
+        );
+
+        if (marchingStatusEl) {
+          marchingStatusEl.textContent = "Completed today";
+        }
+      } else if (marchingStatusEl) {
+        marchingStatusEl.textContent = "Not completed today";
+      }
+
+      if (crownHoursEl) {
+        crownHoursEl.textContent = crownText(
+          wins.hours,
+          champions.some((entry) => entry.contest === "hours")
+        );
+      }
+
+      if (crownCareEl) {
+        crownCareEl.textContent = crownText(
+          wins.care,
+          champions.some((entry) => entry.contest === "care")
+        );
+      }
+
+      if (crownTriviaEl) {
+        crownTriviaEl.textContent = crownText(
+          wins.trivia,
+          champions.some((entry) => entry.contest === "trivia")
+        );
+      }
+
+      if (crownMarchingEl) {
+        crownMarchingEl.textContent = crownText(
+          wins.marching,
+          champions.some((entry) => entry.contest === "marching")
+        );
+      }
+
+      renderNameList(
+        pastWinnersList,
+        current.bandCamp.pastWinners,
+        "No daily champion yet.",
+        (entry) =>
+          `${entry.name} — ${entry.dateKey} — ${entry.points} points`
+      );
+
+      renderNameList(
+        championsList,
+        champions,
+        "No crowns earned yet.",
+        (entry) =>
+          `${entry.name} — ${entry.crown} — ${entry.earnedAt}`
+      );
+    }
+
+    let current = prepareCurrentDay(stateApi.getState());
+    renderBoard(current);
+
+    if (hoursForm) {
+      hoursForm.addEventListener("submit", function (event) {
+        event.preventDefault();
+
+        const next = prepareCurrentDay(stateApi.getState());
+        const hours = Number(hoursInput.value);
+
+        if (!Number.isFinite(hours) || hours <= 0) {
+          feedbackEl.textContent =
+            "Enter how many hours you spent at band camp.";
+          return;
+        }
+
+        if (hasAward(next, "hours")) return;
+
+        next.bandCamp.daily.hours = hours;
+        awardContest(next, "hours");
+        stateApi.saveState(next);
+
+        feedbackEl.textContent =
+          `${hours} camp hours added. +1 Camp Point and +1 dandelion.`;
+
+        renderBoard(next);
+        hydrateHome(next);
+      });
+    }
+
+    if (careButton) {
+      careButton.addEventListener("click", function () {
+        const next = prepareCurrentDay(stateApi.getState());
+
+        if (next.bandCamp.daily.careComplete) return;
+
+        next.bandCamp.daily.careComplete = true;
+        awardContest(next, "care");
+        stateApi.saveState(next);
+
+        feedbackEl.textContent =
+          "Instrument care completed. +1 Camp Point and +1 dandelion.";
+
+        renderBoard(next);
+        hydrateHome(next);
+      });
+    }
+
+    if (triviaForm) {
+      triviaForm.addEventListener("submit", function (event) {
+        event.preventDefault();
+
+        const next = prepareCurrentDay(stateApi.getState());
+
+        if (next.bandCamp.daily.triviaAttempted) return;
+
+        const selected = triviaForm.querySelector(
+          'input[name="trivia-answer"]:checked'
+        );
+
+        if (!selected) {
+          feedbackEl.textContent =
+            "Choose an answer before submitting trivia.";
+          return;
+        }
+
+        const isCorrect = Number(selected.value) === trivia.answer;
+
+        next.bandCamp.daily.triviaAttempted = true;
+        next.bandCamp.daily.triviaCorrect = isCorrect;
+
+        if (isCorrect) {
+          awardContest(next, "trivia");
+          feedbackEl.textContent =
+            "Correct! +1 Camp Point and +1 dandelion.";
+        } else {
+          feedbackEl.textContent =
+            `Not quite. The correct answer was “${trivia.options[trivia.answer]}.”`;
+        }
+
+        stateApi.saveState(next);
+        renderBoard(next);
+        hydrateHome(next);
+      });
+    }
+
+    if (marchingButton) {
+      marchingButton.addEventListener("click", function () {
+        const next = prepareCurrentDay(stateApi.getState());
+
+        if (next.bandCamp.daily.marchingComplete) return;
+
+        next.bandCamp.daily.marchingComplete = true;
+        awardContest(next, "marching");
+        stateApi.saveState(next);
+
+        feedbackEl.textContent =
+          "Marching challenge completed. +1 Camp Point and +1 dandelion.";
+
+        renderBoard(next);
+        hydrateHome(next);
+      });
+    }
   }
 
   function wireStore(state) {
     const creditsEl = document.getElementById("store-credits-value");
     const equippedHeadEl = document.getElementById("equipped-head-value");
     const equippedBodyEl = document.getElementById("equipped-body-value");
+    const equippedWaterBottleEl = document.getElementById("equipped-water-bottle-value");
     const feedbackEl = document.getElementById("store-feedback");
     const itemsEl = document.getElementById("store-items");
 
@@ -447,26 +1471,47 @@
       creditsEl.textContent = String(s.progress.credits ?? 0);
       equippedHeadEl.textContent = itemDisplayName(s.inventory.equipped.head);
       equippedBodyEl.textContent = itemDisplayName(s.inventory.equipped.body);
+      if (equippedWaterBottleEl) {
+        equippedWaterBottleEl.textContent = itemDisplayName(s.inventory.equipped.waterBottle);
+      }
+      const shelves = [
+        { title: "HATS", slot: "head" },
+        { title: "HOODIES", slot: "body" },
+        { title: "WATER BOTTLES", slot: "waterBottle" },
+      ];
 
-      itemsEl.innerHTML = STORE_ITEMS.map((item) => {
-        const owned = s.inventory.ownedItems.includes(item.id);
-        const equipped = s.inventory.equipped[item.slot] === item.id;
-        const cardClasses = ["store-item-card"];
-        if (owned) cardClasses.push("owned");
-        if (equipped) cardClasses.push("equipped");
+      itemsEl.innerHTML = shelves.map((shelf) => {
+        const shelfItems = STORE_ITEMS.filter((item) => item.slot === shelf.slot);
 
-        const primaryAction = owned
-          ? `<button class="btn btn-secondary" type="button" data-equip-item="${item.id}">${equipped ? "Equipped" : "Equip"}</button>`
-          : `<button class="btn btn-primary" type="button" data-buy-item="${item.id}">Buy</button>`;
+        const itemButtons = shelfItems.map((item) => {
+          const owned = s.inventory.ownedItems.includes(item.id);
+          const equipped = s.inventory.equipped[item.slot] === item.id;
+          const cardClasses = ["store-item-card"];
+          if (owned) cardClasses.push("owned");
+          if (equipped) cardClasses.push("equipped");
+
+          const primaryAction = owned
+            ? `<button class="btn btn-secondary" type="button" data-equip-item="${item.id}">${equipped ? "Equipped" : "Equip"}</button>`
+            : `<button class="btn btn-primary" type="button" data-buy-item="${item.id}">Buy</button>`;
+
+          return `
+            <article class="${cardClasses.join(" ")}">
+              <h3>${item.name}</h3>
+              <p>${item.price} dandelions</p>
+              <div class="store-item-actions">
+                ${primaryAction}
+              </div>
+            </article>
+          `;
+        }).join("");
 
         return `
-          <article class="${cardClasses.join(" ")}">
-            <h3>${item.name}</h3>
-            <p>${item.price} credits · ${item.slot === "head" ? "Hat" : "Hoodie"}</p>
-            <div class="store-item-actions">
-              ${primaryAction}
+          <details class="shop-shelf">
+            <summary>${shelf.title}</summary>
+            <div class="shop-shelf-items">
+              ${itemButtons}
             </div>
-          </article>
+          </details>
         `;
       }).join("");
     }
@@ -486,7 +1531,7 @@
         }
 
         if ((next.progress.credits || 0) < item.price) {
-          feedbackEl.textContent = `Not enough credits yet. ${item.name} costs ${item.price} credits.`;
+          feedbackEl.textContent = `Not enough dandelions yet. ${item.name} costs ${item.price} dandelions.`;
           return;
         }
 
@@ -527,6 +1572,11 @@
     const dateEl = document.getElementById("p-book-date");
     const minutesEl = document.getElementById("p-book-minutes");
     const noteEl = document.getElementById("p-book-note");
+    const practiceDetailEls = Array.from(document.querySelectorAll("input[name='practice-detail']"));
+    const timerDisplayEl = document.getElementById("practice-timer-display");
+    const timerStartBtn = document.getElementById("practice-timer-start-btn");
+    const timerStopBtn = document.getElementById("practice-timer-stop-btn");
+    const timerFeedbackEl = document.getElementById("practice-timer-feedback");
     const errorEl = document.getElementById("p-book-error");
     const feedbackEl = document.getElementById("p-book-feedback");
     const entriesEl = document.getElementById("p-book-entries");
@@ -534,12 +1584,135 @@
     const emailBtn = document.getElementById("email-p-chart-btn");
     const teacherEmailEl = document.getElementById("teacher-email");
     const parentEmailEl = document.getElementById("parent-email");
+    const teacherEmailOptionsEl = document.getElementById("teacher-email-options");
+    const parentEmailOptionsEl = document.getElementById("parent-email-options");
 
-    const PAGE_CREDIT_REWARD = 5;
+    const totalMinutesEl = document.getElementById("p-book-total-minutes");
+    const practiceDaysEl = document.getElementById("p-book-practice-days");
+    const pagesCountEl = document.getElementById("p-book-pages-count");
+
+    const DANDELION_DAILY_CAP = 75;
+
+    function calculateDandelionsForPractice(minutes, practiceDetails, existingEntries, dateKey) {
+      const minuteDandelions = Math.floor(minutes / 5);
+      const detailDandelions = Array.isArray(practiceDetails) ? practiceDetails.length : 0;
+      const possibleDandelions = minuteDandelions + detailDandelions;
+
+      const earnedToday = existingEntries
+        .filter((entry) => entry.dateKey === dateKey)
+        .reduce((sum, entry) => sum + (Number(entry.creditsAwarded) || 0), 0);
+
+      const remainingToday = Math.max(0, DANDELION_DAILY_CAP - earnedToday);
+      return Math.min(possibleDandelions, remainingToday);
+    }
+
+    let practiceTimerStartedAt = null;
+    let practiceTimerInterval = null;
+
+    function formatTimerSeconds(totalSeconds) {
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+    }
+
+    function updatePracticeTimerDisplay() {
+      if (!timerDisplayEl || !practiceTimerStartedAt) return;
+
+      const elapsedSeconds = Math.max(0, Math.floor((Date.now() - practiceTimerStartedAt) / 1000));
+      timerDisplayEl.textContent = formatTimerSeconds(elapsedSeconds);
+    }
+
+    function stopPracticeTimerInterval() {
+      if (practiceTimerInterval) {
+        window.clearInterval(practiceTimerInterval);
+        practiceTimerInterval = null;
+      }
+    }
+
+    function wirePracticeTimer() {
+      if (!timerDisplayEl || !timerStartBtn || !timerStopBtn || !minutesEl) return;
+
+      timerStartBtn.addEventListener("click", function () {
+        practiceTimerStartedAt = Date.now();
+        stopPracticeTimerInterval();
+        timerDisplayEl.textContent = "00:00";
+        practiceTimerInterval = window.setInterval(updatePracticeTimerDisplay, 1000);
+
+        if (timerFeedbackEl) {
+          timerFeedbackEl.textContent = "Timer started. Go make some music.";
+        }
+      });
+
+      timerStopBtn.addEventListener("click", function () {
+        if (!practiceTimerStartedAt) {
+          if (timerFeedbackEl) {
+            timerFeedbackEl.textContent = "Start the timer first.";
+          }
+          return;
+        }
+
+        const elapsedSeconds = Math.max(0, Math.floor((Date.now() - practiceTimerStartedAt) / 1000));
+        const elapsedMinutes = Math.max(1, Math.round(elapsedSeconds / 60));
+
+        stopPracticeTimerInterval();
+        timerDisplayEl.textContent = formatTimerSeconds(elapsedSeconds);
+        practiceTimerStartedAt = null;
+
+        const shouldFillMinutes = window.confirm(`Do you want to enter ${elapsedMinutes} practice minute${elapsedMinutes === 1 ? "" : "s"}?`);
+        if (shouldFillMinutes) {
+          minutesEl.value = String(elapsedMinutes);
+          if (timerFeedbackEl) {
+            timerFeedbackEl.textContent = `${elapsedMinutes} minute${elapsedMinutes === 1 ? "" : "s"} added. You can change it before submitting.`;
+          }
+        } else if (timerFeedbackEl) {
+          timerFeedbackEl.textContent = "Timer stopped. Minutes were not added.";
+        }
+      });
+    }
+
+    function getRecentEmails(s, type) {
+      const contacts = s.exportContacts || {};
+      const emails = contacts[type] || [];
+      return Array.isArray(emails) ? emails : [];
+    }
+
+    function isValidEmail(email) {
+      return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email);
+    }
+
+    function saveRecentEmail(state, type, email) {
+      const cleanEmail = email.trim().toLowerCase();
+      if (!cleanEmail || !isValidEmail(cleanEmail)) return;
+
+      state.exportContacts = state.exportContacts || {};
+      const current = getRecentEmails(state, type);
+      const nextEmails = [cleanEmail, ...current.filter((item) => item !== cleanEmail)].slice(0, 5);
+      state.exportContacts[type] = nextEmails;
+    }
+
+    function renderEmailOptions(s) {
+      const teacherEmails = getRecentEmails(s, "teacherEmails");
+      const parentEmails = getRecentEmails(s, "parentEmails");
+
+      if (teacherEmailOptionsEl) {
+        teacherEmailOptionsEl.innerHTML = teacherEmails
+          .map((email) => `<option value="${email}"></option>`)
+          .join("");
+      }
+
+      if (parentEmailOptionsEl) {
+        parentEmailOptionsEl.innerHTML = parentEmails
+          .map((email) => `<option value="${email}"></option>`)
+          .join("");
+      }
+    }
 
     function formatEntry(entry) {
       const noteText = entry.note ? ` — ${entry.note}` : "";
-      return `${entry.dateKey} — ${entry.minutes} minutes${noteText}`;
+      const details = Array.isArray(entry.practiceDetails) ? entry.practiceDetails : [];
+      const detailText = details.length ? ` — ${details.join(", ")}` : "";
+
+      return `${entry.dateKey} — ${entry.minutes} minutes${detailText}${noteText}`;
     }
 
     function renderEntries(s) {
@@ -555,6 +1728,17 @@
       entriesEl.innerHTML = entries
         .map((entry) => `<p>${formatEntry(entry)}</p>`)
         .join("");
+    }
+
+    function renderPBookSummary(s) {
+      const entries = Array.isArray(s.practiceLog) ? s.practiceLog : [];
+      const totalMinutes = entries.reduce((sum, entry) => sum + (Number(entry.minutes) || 0), 0);
+      const practiceDays = new Set(entries.map((entry) => entry.dateKey).filter(Boolean)).size;
+      const pagesCount = entries.length;
+
+      if (totalMinutesEl) totalMinutesEl.textContent = String(totalMinutes);
+      if (practiceDaysEl) practiceDaysEl.textContent = String(practiceDays);
+      if (pagesCountEl) pagesCountEl.textContent = String(pagesCount);
     }
 
     function buildExportText(s) {
@@ -586,14 +1770,21 @@
 
     dateEl.value = stateApi.localDateKey();
     renderEntries(state);
+    renderPBookSummary(state);
+    renderEmailOptions(state);
+    wirePracticeTimer();
 
     form.addEventListener("submit", function (event) {
       event.preventDefault();
       errorEl.textContent = "";
+      feedbackEl.classList.remove("success-callout");
 
       const dateKey = dateEl.value || stateApi.localDateKey();
       const minutes = Number(minutesEl.value);
       const note = noteEl.value.trim();
+      const practiceDetails = practiceDetailEls
+        .filter((checkbox) => checkbox.checked)
+        .map((checkbox) => checkbox.value);
 
       if (!Number.isFinite(minutes) || minutes <= 0) {
         errorEl.textContent = "Enter a positive number of minutes.";
@@ -601,25 +1792,37 @@
       }
 
       const next = stateApi.getState();
+      const dandelionsEarned = calculateDandelionsForPractice(
+        minutes,
+        practiceDetails,
+        next.practiceLog || [],
+        dateKey
+      );
 
       next.practiceLog.unshift({
         dateKey,
         minutes,
         note,
+        practiceDetails,
         source: "p-book",
-        creditsAwarded: PAGE_CREDIT_REWARD,
+        creditsAwarded: dandelionsEarned,
         loggedAt: new Date().toISOString(),
       });
 
       next.practiceLog = next.practiceLog.slice(0, 100);
-      next.progress.credits = (next.progress.credits || 0) + PAGE_CREDIT_REWARD;
+      next.progress.credits = (next.progress.credits || 0) + dandelionsEarned;
 
       stateApi.saveState(next);
       renderEntries(next);
+      renderPBookSummary(next);
 
-      feedbackEl.textContent = `A new page was added to your P-Book. +${PAGE_CREDIT_REWARD} credits added to your bank.`;
+      feedbackEl.classList.add("success-callout");
+      feedbackEl.textContent = `A new page was added to your P-Book. +${dandelionsEarned} dandelions added to your bank.`;
       minutesEl.value = "";
       noteEl.value = "";
+      practiceDetailEls.forEach((checkbox) => {
+        checkbox.checked = false;
+      });
       hydrateHome(next);
     });
 
@@ -643,6 +1846,10 @@
         const exportText = buildExportText(next);
         const teacherEmail = teacherEmailEl ? teacherEmailEl.value.trim() : "";
         const parentEmail = parentEmailEl ? parentEmailEl.value.trim() : "";
+        saveRecentEmail(next, "teacherEmails", teacherEmail);
+        saveRecentEmail(next, "parentEmails", parentEmail);
+        stateApi.saveState(next);
+        renderEmailOptions(next);
         const subject = "Woodshed Woodchuck Practice Chart";
 
         const params = new URLSearchParams();
@@ -663,7 +1870,11 @@
 
   wireSetupForm(state);
   hydrateHome(state);
+  wireMetronome();
+  wireTuner();
+  wireMum(state);
   wireQuestForm(state);
+  wireBandCamp(state);
   wireStore(state);
   wirePBook(state);
 })();
