@@ -117,6 +117,77 @@ class TrustedVerifier(Base):
     )
 
 
+class TrustedVerifierInvitation(Base):
+    __tablename__ = "trusted_verifier_invitations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    profile_id: Mapped[int] = mapped_column(
+        ForeignKey(
+            "woodchuck_profiles.id",
+            ondelete="CASCADE",
+        ),
+        nullable=False,
+        index=True,
+    )
+
+    email: Mapped[str] = mapped_column(
+        String(320),
+        nullable=False,
+        index=True,
+    )
+
+    role: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+    )
+
+    token_hash: Mapped[str] = mapped_column(
+        String(64),
+        unique=True,
+        nullable=False,
+        index=True,
+    )
+
+    status: Mapped[str] = mapped_column(
+        String(20),
+        default="pending",
+        nullable=False,
+        index=True,
+    )
+
+    accepted_verifier_id: Mapped[int | None] = mapped_column(
+        ForeignKey(
+            "trusted_verifiers.id",
+            ondelete="SET NULL",
+        ),
+        nullable=True,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        nullable=False,
+    )
+
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+    )
+
+    accepted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        onupdate=utc_now,
+        nullable=False,
+    )
+
+
 class StudentVerifierConnection(Base):
     __tablename__ = "student_verifier_connections"
     __table_args__ = (
