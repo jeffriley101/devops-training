@@ -53,10 +53,3 @@ SessionLocal = sessionmaker(
 
 class Base(DeclarativeBase):
     pass
-
-
-def init_db() -> None:
-    # Import models so SQLAlchemy knows which tables to create.
-    from . import models  # noqa: F401
-
-    Base.metadata.create_all(bind=engine)
