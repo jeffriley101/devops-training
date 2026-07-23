@@ -34,7 +34,9 @@
   const roleLabel = (role) =>
     String(role || "")
       .replaceAll("_", " ")
-      .replace(/\b\w/g, (character) => character.toUpperCase());
+      .replace(/\b\w/g, (character) =>
+        character.toUpperCase()
+      );
 
   const clearElement = (element) => {
     while (element.firstChild) {
@@ -49,7 +51,12 @@
     element.appendChild(paragraph);
   };
 
-  const addRecord = (element, title, details) => {
+  const addRecord = (
+    element,
+    title,
+    details,
+    action = null
+  ) => {
     const card = document.createElement("article");
     card.className = "mentor-card";
 
@@ -60,7 +67,67 @@
     paragraph.textContent = details;
 
     card.append(heading, paragraph);
+
+    if (action) {
+      const button = document.createElement("button");
+
+      button.className =
+        `btn ${action.className || "btn-secondary"}`;
+      button.type = "button";
+      button.textContent = action.label;
+
+      button.addEventListener("click", () => {
+        action.onClick(button);
+      });
+
+      card.appendChild(button);
+    }
+
     element.appendChild(card);
+  };
+
+  const runLifecycleAction = async (
+    button,
+    path,
+    confirmation
+  ) => {
+    if (!window.confirm(confirmation)) {
+      return;
+    }
+
+    button.disabled = true;
+    errorText.textContent = "";
+
+    try {
+      const response = await fetch(path, {
+        method: "DELETE",
+        credentials: "same-origin",
+      });
+
+      const payload = await response.json();
+
+      if (response.status === 401) {
+        window.location.assign("/login");
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          payload.detail || "The change could not be completed."
+        );
+      }
+
+      currentInvitationUrl = "";
+      successPanel.hidden = true;
+      copyFeedback.textContent = "";
+
+      await loadVerifiers();
+    } catch (error) {
+      errorText.textContent =
+        error.message || "The change could not be completed.";
+    } finally {
+      button.disabled = false;
+    }
   };
 
   const loadVerifiers = async () => {
@@ -87,36 +154,75 @@
     clearElement(connectionList);
     clearElement(invitationList);
 
-    if (payload.connections.length === 0) {
+    const activeConnections = payload.connections.filter(
+      (connection) => connection.status === "accepted"
+    );
+
+    if (activeConnections.length === 0) {
       addEmptyMessage(
         connectionList,
         "No trusted adults are connected yet."
       );
     } else {
-      payload.connections.forEach((connection) => {
+      activeConnections.forEach((connection) => {
+        const verifierName =
+          connection.verifier.display_name;
+
         addRecord(
           connectionList,
-          connection.verifier.display_name,
-          `${roleLabel(connection.role)} · ${connection.status}`
+          verifierName,
+          `${roleLabel(connection.role)} · Connected`,
+          {
+            label: "Disconnect",
+            className: "btn-red",
+            onClick: (button) =>
+              runLifecycleAction(
+                button,
+                (
+                  "/trusted-verifiers/connections/" +
+                  connection.id
+                ),
+                (
+                  `Disconnect ${verifierName} from ` +
+                  "this Woodchuck?"
+                )
+              ),
+          }
         );
       });
     }
 
-    const visibleInvitations = payload.invitations.filter(
-      (invitation) => invitation.status !== "accepted"
+    const pendingInvitations = payload.invitations.filter(
+      (invitation) => invitation.status === "pending"
     );
 
-    if (visibleInvitations.length === 0) {
+    if (pendingInvitations.length === 0) {
       addEmptyMessage(
         invitationList,
         "No open invitations."
       );
     } else {
-      visibleInvitations.forEach((invitation) => {
+      pendingInvitations.forEach((invitation) => {
         addRecord(
           invitationList,
           invitation.email,
-          `${roleLabel(invitation.role)} · ${invitation.status}`
+          `${roleLabel(invitation.role)} · Pending`,
+          {
+            label: "Cancel Invitation",
+            className: "btn-red",
+            onClick: (button) =>
+              runLifecycleAction(
+                button,
+                (
+                  "/trusted-verifiers/invitations/" +
+                  invitation.id
+                ),
+                (
+                  `Cancel the invitation for ` +
+                  `${invitation.email}?`
+                )
+              ),
+          }
         );
       });
     }
@@ -172,7 +278,9 @@
       await navigator.clipboard.writeText(
         currentInvitationUrl
       );
-      copyFeedback.textContent = "Invitation link copied.";
+
+      copyFeedback.textContent =
+        "Invitation link copied.";
     } catch {
       copyFeedback.textContent =
         "Select and copy the invitation link above.";
@@ -182,6 +290,7 @@
   loadVerifiers().catch((error) => {
     connectionList.textContent =
       error.message || "Could not load trusted verifiers.";
+
     invitationList.textContent = "";
   });
 })();

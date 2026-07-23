@@ -192,6 +192,104 @@ def create_student_invitation(
         }
 
 
+@router.delete("/invitations/{invitation_id}")
+def cancel_student_invitation(
+    request: Request,
+    invitation_id: int,
+):
+    with SessionLocal() as session:
+        profile = current_profile(request, session)
+
+        if profile is None:
+            raise HTTPException(
+                status_code=401,
+                detail="Student sign-in is required.",
+            )
+
+        invitation = session.scalar(
+            select(TrustedVerifierInvitation).where(
+                TrustedVerifierInvitation.id == invitation_id,
+                TrustedVerifierInvitation.profile_id == profile.id,
+            )
+        )
+
+        if invitation is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Invitation was not found.",
+            )
+
+        if invitation.status != "pending":
+            raise HTTPException(
+                status_code=400,
+                detail="Only pending invitations can be cancelled.",
+            )
+
+        invitation.status = "cancelled"
+        session.commit()
+        session.refresh(invitation)
+
+        return {
+            "cancelled": True,
+            "invitation": invitation_payload(invitation),
+            "reserved_slots": count_reserved_verifier_slots(
+                session,
+                profile_id=profile.id,
+            ),
+        }
+
+
+@router.delete("/connections/{connection_id}")
+def disconnect_student_verifier(
+    request: Request,
+    connection_id: int,
+):
+    with SessionLocal() as session:
+        profile = current_profile(request, session)
+
+        if profile is None:
+            raise HTTPException(
+                status_code=401,
+                detail="Student sign-in is required.",
+            )
+
+        connection = session.scalar(
+            select(StudentVerifierConnection).where(
+                StudentVerifierConnection.id == connection_id,
+                StudentVerifierConnection.profile_id == profile.id,
+            )
+        )
+
+        if connection is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Trusted-verifier connection was not found.",
+            )
+
+        if connection.status != "accepted":
+            raise HTTPException(
+                status_code=400,
+                detail="That trusted verifier is not currently connected.",
+            )
+
+        connection.status = "disconnected"
+        session.commit()
+        session.refresh(connection)
+
+        return {
+            "disconnected": True,
+            "connection": {
+                "id": connection.id,
+                "role": connection.role,
+                "status": connection.status,
+            },
+            "reserved_slots": count_reserved_verifier_slots(
+                session,
+                profile_id=profile.id,
+            ),
+        }
+
+
 @router.post("/invitations/{token}/accept")
 def accept_invitation(
     request: Request,
