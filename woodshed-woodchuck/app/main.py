@@ -1,4 +1,3 @@
-from contextlib import asynccontextmanager
 import os
 from pathlib import Path
 
@@ -17,15 +16,8 @@ from .content import (
     SAX_VIKING_MESSAGES,
     SAX_VIKING_WELCOME,
 )
-from .db import init_db
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-
-@asynccontextmanager
-async def lifespan(_: FastAPI):
-    init_db()
-    yield
-
 
 SESSION_SECRET = os.getenv(
     "SESSION_SECRET",
@@ -37,7 +29,7 @@ SESSION_COOKIE_SECURE = os.getenv(
 ).lower() in {"1", "true", "yes"}
 
 
-app = FastAPI(title="Woodshed Woodchuck", lifespan=lifespan)
+app = FastAPI(title="Woodshed Woodchuck")
 app.add_middleware(
     SessionMiddleware,
     secret_key=SESSION_SECRET,
