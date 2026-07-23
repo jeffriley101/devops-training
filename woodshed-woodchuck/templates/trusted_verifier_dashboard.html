@@ -22,6 +22,33 @@
     <p class="body-copy">Loading connected musicians...</p>
   </div>
 
+  <hr class="section-divider" />
+
+  <section aria-labelledby="verifier-pchart-heading">
+    <h3 id="verifier-pchart-heading">
+      P-Charts Awaiting Review
+    </h3>
+
+    <p class="body-copy">
+      Approve practice you can confirm, or reject a chart that
+      needs to be corrected and resubmitted.
+    </p>
+
+    <div
+      id="verifier-practice-chart-list"
+      class="stack-form"
+      aria-live="polite"
+    >
+      <p class="body-copy">Loading P-Charts...</p>
+    </div>
+
+    <p
+      id="verifier-practice-chart-feedback"
+      class="body-copy"
+      aria-live="polite"
+    ></p>
+  </section>
+
   <p
     id="verifier-dashboard-error"
     class="error-text"
@@ -41,5 +68,5 @@
 {% endblock %}
 
 {% block page_scripts %}
-<script src="/static/js/trusted-verifier-dashboard.js?v=1"></script>
+<script src="/static/js/trusted-verifier-dashboard.js?v=2"></script>
 {% endblock %}

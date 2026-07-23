@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from sqlalchemy import (
+    Date,
     DateTime,
     ForeignKey,
     Integer,
@@ -373,6 +374,133 @@ class VerifierOrganizationMembership(Base):
     joined_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=utc_now,
+        nullable=False,
+    )
+
+
+class PracticeChart(Base):
+    __tablename__ = "practice_charts"
+
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+    )
+
+    profile_id: Mapped[int] = mapped_column(
+        ForeignKey(
+            "woodchuck_profiles.id",
+            ondelete="CASCADE",
+        ),
+        nullable=False,
+        index=True,
+    )
+
+    practice_date: Mapped[date] = mapped_column(
+        Date,
+        nullable=False,
+        index=True,
+    )
+
+    minutes: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+    )
+
+    instrument: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+    )
+
+    note: Mapped[str | None] = mapped_column(
+        String(180),
+        nullable=True,
+    )
+
+    practice_details: Mapped[list[str]] = mapped_column(
+        JSON,
+        default=list,
+        nullable=False,
+    )
+
+    source: Mapped[str] = mapped_column(
+        String(30),
+        default="p-book",
+        nullable=False,
+    )
+
+    credits_awarded: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+        nullable=False,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        nullable=False,
+    )
+
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        onupdate=utc_now,
+        nullable=False,
+    )
+
+
+class PracticeChartVerification(Base):
+    __tablename__ = "practice_chart_verifications"
+
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+    )
+
+    practice_chart_id: Mapped[int] = mapped_column(
+        ForeignKey(
+            "practice_charts.id",
+            ondelete="CASCADE",
+        ),
+        nullable=False,
+        index=True,
+    )
+
+    verifier_id: Mapped[int | None] = mapped_column(
+        ForeignKey(
+            "trusted_verifiers.id",
+            ondelete="SET NULL",
+        ),
+        nullable=True,
+        index=True,
+    )
+
+    status: Mapped[str] = mapped_column(
+        String(20),
+        default="pending",
+        nullable=False,
+        index=True,
+    )
+
+    response_note: Mapped[str | None] = mapped_column(
+        String(300),
+        nullable=True,
+    )
+
+    requested_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        nullable=False,
+    )
+
+    responded_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        onupdate=utc_now,
         nullable=False,
     )
 

@@ -1586,12 +1586,296 @@
     const parentEmailEl = document.getElementById("parent-email");
     const teacherEmailOptionsEl = document.getElementById("teacher-email-options");
     const parentEmailOptionsEl = document.getElementById("parent-email-options");
+    const verifierSelectEl = document.getElementById("p-book-verifier");
+    const verifierHelpEl = document.getElementById("p-book-verifier-help");
+    const submitBtn = form.querySelector("button[type='submit']");
 
     const totalMinutesEl = document.getElementById("p-book-total-minutes");
     const practiceDaysEl = document.getElementById("p-book-practice-days");
     const pagesCountEl = document.getElementById("p-book-pages-count");
 
     const DANDELION_DAILY_CAP = 75;
+
+    function verifierRoleLabel(role) {
+      return String(role || "")
+        .replaceAll("_", " ")
+        .replace(/\b\w/g, (character) =>
+          character.toUpperCase()
+        );
+    }
+
+    async function loadVerifierOptions() {
+      if (!verifierSelectEl) return;
+
+      verifierSelectEl.disabled = true;
+
+      try {
+        const response = await fetch(
+          "/trusted-verifiers/invitations",
+          {
+            credentials: "same-origin",
+          }
+        );
+
+        if (response.status === 401) {
+          verifierSelectEl.replaceChildren(
+            new Option(
+              "Sign in to request verification",
+              ""
+            )
+          );
+
+          if (verifierHelpEl) {
+            verifierHelpEl.textContent =
+              "Sign in to your Woodchuck account to send a " +
+              "P-Chart to a trusted verifier.";
+          }
+
+          return;
+        }
+
+        const payload = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            payload.detail ||
+            "Trusted verifiers could not be loaded."
+          );
+        }
+
+        const connections = Array.isArray(payload.connections)
+          ? payload.connections.filter(
+              (connection) =>
+                connection.status === "accepted" &&
+                connection.verifier
+            )
+          : [];
+
+        verifierSelectEl.replaceChildren(
+          new Option(
+            "Do not request verification",
+            ""
+          )
+        );
+
+        connections.forEach((connection) => {
+          const verifier = connection.verifier;
+          const role = verifierRoleLabel(connection.role);
+
+          verifierSelectEl.appendChild(
+            new Option(
+              `${verifier.display_name} — ${role}`,
+              String(verifier.id)
+            )
+          );
+        });
+
+        verifierSelectEl.disabled = false;
+
+        if (verifierHelpEl) {
+          verifierHelpEl.textContent = connections.length
+            ? (
+                "Choose one connected adult to review this " +
+                "P-Chart, or leave it open."
+              )
+            : (
+                "No trusted verifiers are connected yet. " +
+                "This chart can still be saved on this device."
+              );
+        }
+      } catch (error) {
+        verifierSelectEl.replaceChildren(
+          new Option(
+            "Trusted verifiers unavailable",
+            ""
+          )
+        );
+
+        if (verifierHelpEl) {
+          verifierHelpEl.textContent =
+            error.message ||
+            "Trusted verifiers could not be loaded.";
+        }
+      }
+    }
+
+    async function createPersistentPracticeChart({
+      verifierId,
+      dateKey,
+      minutes,
+      note,
+      practiceDetails,
+      creditsAwarded,
+    }) {
+      const response = await fetch(
+        "/practice-charts",
+        {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            verifier_id: verifierId,
+            practice_date: dateKey,
+            minutes,
+            note,
+            practice_details: practiceDetails,
+            source: "p-book",
+            credits_awarded: creditsAwarded,
+          }),
+        }
+      );
+
+      const payload = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          payload.detail ||
+          "The persistent P-Chart could not be created."
+        );
+      }
+
+      return payload.chart;
+    }
+
+    async function loadPersistentPracticeCharts() {
+      try {
+        const response = await fetch(
+          "/practice-charts",
+          {
+            credentials: "same-origin",
+            cache: "no-store",
+          }
+        );
+
+        if (response.status === 401) {
+          return;
+        }
+
+        const payload = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            payload.detail ||
+            "Persistent P-Charts could not be loaded."
+          );
+        }
+
+        const serverCharts = Array.isArray(payload.charts)
+          ? payload.charts
+          : [];
+
+        const next = stateApi.getState();
+
+        next.practiceLog = Array.isArray(next.practiceLog)
+          ? next.practiceLog
+          : [];
+
+        const entriesByServerId = new Map(
+          next.practiceLog
+            .filter((entry) => entry && entry.serverChartId)
+            .map((entry) => [
+              String(entry.serverChartId),
+              entry,
+            ])
+        );
+
+        let changed = false;
+        let verificationChanged = false;
+
+        serverCharts.forEach((serverChart) => {
+          const verification =
+            serverChart.verification || {};
+
+          const serverId = String(serverChart.id);
+          const status = verification.status || "pending";
+          const responseNote =
+            verification.response_note || "";
+
+          const verifierName =
+            verification.verifier &&
+            verification.verifier.display_name
+              ? verification.verifier.display_name
+              : "";
+
+          const existing = entriesByServerId.get(serverId);
+
+          if (existing) {
+            if (existing.verificationStatus !== status) {
+              existing.verificationStatus = status;
+              verificationChanged = true;
+              changed = true;
+            }
+
+            if (
+              existing.verificationResponseNote !== responseNote
+            ) {
+              existing.verificationResponseNote = responseNote;
+              changed = true;
+            }
+
+            if (existing.verifierName !== verifierName) {
+              existing.verifierName = verifierName;
+              changed = true;
+            }
+
+            return;
+          }
+
+          next.practiceLog.push({
+            dateKey: serverChart.practice_date,
+            minutes: serverChart.minutes,
+            note: serverChart.note || "",
+            practiceDetails: Array.isArray(
+              serverChart.practice_details
+            )
+              ? serverChart.practice_details
+              : [],
+            source: serverChart.source || "p-book",
+            creditsAwarded:
+              Number(serverChart.credits_awarded) || 0,
+            loggedAt:
+              serverChart.created_at ||
+              new Date().toISOString(),
+            serverChartId: serverChart.id,
+            verificationStatus: status,
+            verificationResponseNote: responseNote,
+            verifierId: verification.verifier_id || null,
+            verifierName,
+          });
+
+          changed = true;
+        });
+
+        if (!changed) {
+          return;
+        }
+
+        next.practiceLog.sort((left, right) =>
+          String(right.loggedAt || "").localeCompare(
+            String(left.loggedAt || "")
+          )
+        );
+
+        next.practiceLog = next.practiceLog.slice(0, 100);
+
+        stateApi.saveState(next);
+        renderEntries(next);
+        renderPBookSummary(next);
+
+        if (verificationChanged && feedbackEl) {
+          feedbackEl.classList.add("success-callout");
+          feedbackEl.textContent =
+            "Verification results were refreshed.";
+        }
+      } catch (error) {
+        console.warn(
+          "Could not refresh persistent P-Charts:",
+          error
+        );
+      }
+    }
 
     function calculateDandelionsForPractice(minutes, practiceDetails, existingEntries, dateKey) {
       const minuteDandelions = Math.floor(minutes / 5);
@@ -1709,10 +1993,35 @@
 
     function formatEntry(entry) {
       const noteText = entry.note ? ` — ${entry.note}` : "";
-      const details = Array.isArray(entry.practiceDetails) ? entry.practiceDetails : [];
-      const detailText = details.length ? ` — ${details.join(", ")}` : "";
+      const details = Array.isArray(entry.practiceDetails)
+        ? entry.practiceDetails
+        : [];
+      const detailText = details.length
+        ? ` — ${details.join(", ")}`
+        : "";
 
-      return `${entry.dateKey} — ${entry.minutes} minutes${detailText}${noteText}`;
+      const verificationText =
+        entry.verificationStatus === "pending"
+          ? " — Verification pending"
+          : entry.verificationStatus === "approved"
+            ? " — Verified"
+            : entry.verificationStatus === "rejected"
+              ? " — Needs correction"
+              : "";
+
+      const verifierNoteText =
+        entry.verificationResponseNote
+          ? (
+              ` — Verifier note: ` +
+              entry.verificationResponseNote
+            )
+          : "";
+
+      return (
+        `${entry.dateKey} — ${entry.minutes} minutes` +
+        `${detailText}${noteText}` +
+        `${verificationText}${verifierNoteText}`
+      );
     }
 
     function renderEntries(s) {
@@ -1773,8 +2082,10 @@
     renderPBookSummary(state);
     renderEmailOptions(state);
     wirePracticeTimer();
+    loadVerifierOptions();
+    loadPersistentPracticeCharts();
 
-    form.addEventListener("submit", function (event) {
+    form.addEventListener("submit", async function (event) {
       event.preventDefault();
       errorEl.textContent = "";
       feedbackEl.classList.remove("success-callout");
@@ -1791,6 +2102,16 @@
         return;
       }
 
+      if (
+        !Number.isInteger(minutes) ||
+        minutes < 1 ||
+        minutes > 1440
+      ) {
+        errorEl.textContent =
+          "Enter a whole number of minutes between 1 and 1440.";
+        return;
+      }
+
       const next = stateApi.getState();
       const dandelionsEarned = calculateDandelionsForPractice(
         minutes,
@@ -1799,31 +2120,101 @@
         dateKey
       );
 
-      next.practiceLog.unshift({
-        dateKey,
-        minutes,
-        note,
-        practiceDetails,
-        source: "p-book",
-        creditsAwarded: dandelionsEarned,
-        loggedAt: new Date().toISOString(),
-      });
+      const verifierId = verifierSelectEl
+        ? Number(verifierSelectEl.value)
+        : 0;
 
-      next.practiceLog = next.practiceLog.slice(0, 100);
-      next.progress.credits = (next.progress.credits || 0) + dandelionsEarned;
+      const verifierName =
+        verifierSelectEl &&
+        verifierSelectEl.selectedOptions.length
+          ? verifierSelectEl.selectedOptions[0].textContent
+          : "";
 
-      stateApi.saveState(next);
-      renderEntries(next);
-      renderPBookSummary(next);
+      if (submitBtn) {
+        submitBtn.disabled = true;
+      }
 
-      feedbackEl.classList.add("success-callout");
-      feedbackEl.textContent = `A new page was added to your P-Book. +${dandelionsEarned} dandelions added to your bank.`;
-      minutesEl.value = "";
-      noteEl.value = "";
-      practiceDetailEls.forEach((checkbox) => {
-        checkbox.checked = false;
-      });
-      hydrateHome(next);
+      try {
+        const serverChart = verifierId
+          ? await createPersistentPracticeChart({
+              verifierId,
+              dateKey,
+              minutes,
+              note,
+              practiceDetails,
+              creditsAwarded: dandelionsEarned,
+            })
+          : null;
+
+        next.practiceLog.unshift({
+          dateKey,
+          minutes,
+          note,
+          practiceDetails,
+          source: "p-book",
+          creditsAwarded: dandelionsEarned,
+          loggedAt: new Date().toISOString(),
+          serverChartId: serverChart
+            ? serverChart.id
+            : null,
+          verificationStatus: serverChart
+            ? serverChart.verification.status
+            : "open",
+          verificationResponseNote: serverChart
+            ? serverChart.verification.response_note || ""
+            : "",
+          verifierId: serverChart
+            ? serverChart.verification.verifier_id
+            : null,
+          verifierName:
+            serverChart &&
+            serverChart.verification.verifier
+              ? (
+                  serverChart.verification.verifier
+                    .display_name || ""
+                )
+              : "",
+        });
+
+        next.practiceLog = next.practiceLog.slice(0, 100);
+        next.progress.credits =
+          (next.progress.credits || 0) +
+          dandelionsEarned;
+
+        stateApi.saveState(next);
+        renderEntries(next);
+        renderPBookSummary(next);
+
+        feedbackEl.classList.add("success-callout");
+
+        feedbackEl.textContent = serverChart
+          ? (
+              `A new page was added and sent to ` +
+              `${verifierName}. Verification is pending. ` +
+              `+${dandelionsEarned} dandelions added.`
+            )
+          : (
+              `A new open page was added to this device. ` +
+              `+${dandelionsEarned} dandelions added.`
+            );
+
+        minutesEl.value = "";
+        noteEl.value = "";
+
+        practiceDetailEls.forEach((checkbox) => {
+          checkbox.checked = false;
+        });
+
+        hydrateHome(next);
+      } catch (error) {
+        errorEl.textContent =
+          error.message ||
+          "The P-Chart could not be submitted.";
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+        }
+      }
     });
 
     if (exportBtn) {

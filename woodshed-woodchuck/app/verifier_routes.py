@@ -1,16 +1,22 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Form, HTTPException, Request
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .account_routes import current_profile
 from .db import SessionLocal
 from .models import (
+    PracticeChart,
+    PracticeChartVerification,
     StudentVerifierConnection,
     TrustedVerifier,
     TrustedVerifierInvitation,
     WoodchuckProfile,
+)
+from .practice_charts import (
+    respond_to_practice_chart_verification,
 )
 from .verifiers import (
     VERIFIER_ROLES,
@@ -459,6 +465,167 @@ def verifier_me(request: Request):
                 }
                 for connection, profile in connection_rows
             ],
+        }
+
+
+
+class PracticeChartResponseSubmission(BaseModel):
+    decision: str
+    response_note: str = ""
+
+
+def pending_practice_chart_payload(
+    verification: PracticeChartVerification,
+    chart: PracticeChart,
+    profile: WoodchuckProfile,
+) -> dict[str, object]:
+    return {
+        "verification_id": verification.id,
+        "status": verification.status,
+        "requested_at": verification.requested_at.isoformat(),
+        "student": {
+            "woodchuck_id": profile.woodchuck_id,
+            "display_name": profile.display_name,
+            "instrument": profile.instrument,
+            "level": profile.level,
+        },
+        "chart": {
+            "id": chart.id,
+            "practice_date": chart.practice_date.isoformat(),
+            "minutes": chart.minutes,
+            "instrument": chart.instrument,
+            "note": chart.note or "",
+            "practice_details": chart.practice_details,
+            "source": chart.source,
+            "credits_awarded": chart.credits_awarded,
+            "created_at": chart.created_at.isoformat(),
+        },
+    }
+
+
+@router.get("/practice-charts")
+def list_verifier_practice_charts(request: Request):
+    with SessionLocal() as session:
+        verifier = current_verifier(request, session)
+
+        if verifier is None:
+            raise HTTPException(
+                status_code=401,
+                detail="Trusted-verifier sign-in is required.",
+            )
+
+        rows = session.execute(
+            select(
+                PracticeChartVerification,
+                PracticeChart,
+                WoodchuckProfile,
+            )
+            .join(
+                PracticeChart,
+                PracticeChart.id
+                == PracticeChartVerification.practice_chart_id,
+            )
+            .join(
+                WoodchuckProfile,
+                WoodchuckProfile.id == PracticeChart.profile_id,
+            )
+            .join(
+                StudentVerifierConnection,
+                StudentVerifierConnection.profile_id
+                == PracticeChart.profile_id,
+            )
+            .where(
+                PracticeChartVerification.verifier_id
+                == verifier.id,
+                PracticeChartVerification.status == "pending",
+                StudentVerifierConnection.verifier_id
+                == verifier.id,
+                StudentVerifierConnection.status == "accepted",
+            )
+            .order_by(
+                PracticeChartVerification.requested_at.asc(),
+                PracticeChartVerification.id.asc(),
+            )
+        ).all()
+
+        return {
+            "pending_charts": [
+                pending_practice_chart_payload(
+                    verification,
+                    chart,
+                    profile,
+                )
+                for verification, chart, profile in rows
+            ]
+        }
+
+
+@router.post(
+    "/practice-charts/{verification_id}/respond"
+)
+def respond_to_verifier_practice_chart(
+    request: Request,
+    verification_id: int,
+    submitted: PracticeChartResponseSubmission,
+):
+    with SessionLocal() as session:
+        verifier = current_verifier(request, session)
+
+        if verifier is None:
+            raise HTTPException(
+                status_code=401,
+                detail="Trusted-verifier sign-in is required.",
+            )
+
+        try:
+            verification = (
+                respond_to_practice_chart_verification(
+                    session,
+                    verifier=verifier,
+                    verification_id=verification_id,
+                    decision=submitted.decision,
+                    response_note=submitted.response_note,
+                )
+            )
+        except LookupError as error:
+            raise HTTPException(
+                status_code=404,
+                detail=str(error),
+            ) from error
+        except ValueError as error:
+            raise HTTPException(
+                status_code=400,
+                detail=str(error),
+            ) from error
+        except RuntimeError as error:
+            raise HTTPException(
+                status_code=500,
+                detail=(
+                    "The P-Chart verification response "
+                    "could not be saved."
+                ),
+            ) from error
+
+        return {
+            "responded": True,
+            "verification": {
+                "id": verification.id,
+                "practice_chart_id": (
+                    verification.practice_chart_id
+                ),
+                "status": verification.status,
+                "response_note": (
+                    verification.response_note or ""
+                ),
+                "requested_at": (
+                    verification.requested_at.isoformat()
+                ),
+                "responded_at": (
+                    verification.responded_at.isoformat()
+                    if verification.responded_at is not None
+                    else None
+                ),
+            },
         }
 
 
