@@ -10,6 +10,7 @@ from .models import (
     StudentVerifierConnection,
     TrustedVerifier,
     TrustedVerifierInvitation,
+    WoodchuckProfile,
 )
 from .verifiers import (
     VERIFIER_ROLES,
@@ -270,18 +271,25 @@ def verifier_me(request: Request):
                 "verifier": None,
             }
 
-        connections = session.execute(
+        connection_rows = session.execute(
             select(
                 StudentVerifierConnection,
+                WoodchuckProfile,
+            )
+            .join(
+                WoodchuckProfile,
+                StudentVerifierConnection.profile_id
+                == WoodchuckProfile.id,
             )
             .where(
                 StudentVerifierConnection.verifier_id
-                == verifier.id
+                == verifier.id,
+                StudentVerifierConnection.status == "accepted",
             )
             .order_by(
                 StudentVerifierConnection.accepted_at.desc()
             )
-        ).scalars().all()
+        ).all()
 
         return {
             "authenticated": True,
@@ -289,7 +297,6 @@ def verifier_me(request: Request):
             "student_connections": [
                 {
                     "id": connection.id,
-                    "profile_id": connection.profile_id,
                     "role": connection.role,
                     "status": connection.status,
                     "accepted_at": (
@@ -297,8 +304,15 @@ def verifier_me(request: Request):
                         if connection.accepted_at is not None
                         else None
                     ),
+                    "student": {
+                        "woodchuck_id": profile.woodchuck_id,
+                        "display_name": profile.display_name,
+                        "instrument": profile.instrument,
+                        "level": profile.level,
+                        "goal": profile.goal,
+                    },
                 }
-                for connection in connections
+                for connection, profile in connection_rows
             ],
         }
 

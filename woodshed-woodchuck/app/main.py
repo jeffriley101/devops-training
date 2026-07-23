@@ -11,7 +11,10 @@ from .account_routes import (
     current_profile,
     router as account_router,
 )
-from .verifier_routes import router as verifier_router
+from .verifier_routes import (
+    current_verifier,
+    router as verifier_router,
+)
 from .db import SessionLocal
 from .content import (
     GOAL_OPTIONS,
@@ -81,6 +84,44 @@ def login_page(request: Request):
         request,
         "login.html",
         title="Sign In",
+        active_nav=None,
+    )
+
+
+@app.get("/trusted-verifiers/login")
+def trusted_verifier_login_page(request: Request):
+    with SessionLocal() as session:
+        verifier = current_verifier(request, session)
+
+        if verifier is not None:
+            return RedirectResponse(
+                url="/trusted-verifiers/dashboard",
+                status_code=303,
+            )
+
+    return _render(
+        request,
+        "trusted_verifier_login.html",
+        title="Trusted Verifier Sign In",
+        active_nav=None,
+    )
+
+
+@app.get("/trusted-verifiers/dashboard")
+def trusted_verifier_dashboard_page(request: Request):
+    with SessionLocal() as session:
+        verifier = current_verifier(request, session)
+
+        if verifier is None:
+            return RedirectResponse(
+                url="/trusted-verifiers/login",
+                status_code=303,
+            )
+
+    return _render(
+        request,
+        "trusted_verifier_dashboard.html",
+        title="Trusted Verifier Dashboard",
         active_nav=None,
     )
 
