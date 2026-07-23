@@ -1,0 +1,515 @@
+(function () {
+  const stateApi = window.WWState;
+
+  if (!stateApi) return;
+
+  function validPin(pin) {
+    return /^[0-9]{4}$/.test(pin);
+  }
+
+  async function responseMessage(response, fallback) {
+    try {
+      const payload = await response.json();
+
+      if (typeof payload.detail === "string") {
+        return payload.detail;
+      }
+    } catch (_error) {
+      // Use fallback below.
+    }
+
+    return fallback;
+  }
+
+  function applyAccountProfile(state, profile) {
+    state.account = {
+      ...(state.account || {}),
+      woodchuckId: profile.woodchuck_id,
+      authenticated: true,
+    };
+
+    state.profile = {
+      ...(state.profile || {}),
+      woodchuckName: profile.display_name,
+      instrument: profile.instrument,
+      level: profile.level,
+      goal: profile.goal,
+      createdAt:
+        state.profile && state.profile.createdAt
+          ? state.profile.createdAt
+          : new Date().toISOString(),
+    };
+
+    return state;
+  }
+
+  async function uploadState(state) {
+    const response = await fetch("/account/state", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(state),
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        await responseMessage(
+          response,
+          "The account was created, but the game could not be saved."
+        )
+      );
+    }
+
+    const payload = await response.json();
+
+    const latestState = stateApi.getState();
+    const latestAccount =
+      latestState.account && typeof latestState.account === "object"
+        ? latestState.account
+        : {};
+
+    const latestRevision =
+      Number.isInteger(payload.revision)
+        ? payload.revision
+        : Number.isInteger(latestAccount.serverRevision)
+          ? latestAccount.serverRevision
+          : 0;
+
+    latestState.account = {
+      ...latestAccount,
+      serverRevision: latestRevision,
+      lastSyncedAt:
+        payload.last_synced_at || new Date().toISOString(),
+    };
+
+    stateApi.saveState(latestState, { sync: false });
+
+    return payload;
+  }
+
+  function prefillCreateForm(form) {
+    const state = stateApi.getState();
+
+    const nameEl = form.querySelector("#woodchuck-name");
+    const instrumentEl = form.querySelector("#instrument");
+    const levelEl = form.querySelector("#level");
+    const goalEl = form.querySelector("#goal");
+
+    if (nameEl && state.profile.woodchuckName) {
+      nameEl.value = state.profile.woodchuckName;
+    }
+
+    if (instrumentEl && state.profile.instrument) {
+      instrumentEl.value = state.profile.instrument;
+    }
+
+    if (levelEl && state.profile.level) {
+      levelEl.value = state.profile.level;
+    }
+
+    if (goalEl && state.profile.goal) {
+      goalEl.value = state.profile.goal;
+    }
+  }
+
+  function wireCreateAccount() {
+    const form = document.getElementById("account-create-form");
+
+    if (!form) return;
+
+    const errorEl = document.getElementById("setup-error");
+    const successPanel = document.getElementById(
+      "account-created-panel"
+    );
+    const accountIdEl = document.getElementById(
+      "created-woodchuck-id"
+    );
+    const copyButton = document.getElementById(
+      "copy-woodchuck-id"
+    );
+    const copyFeedback = document.getElementById(
+      "copy-account-feedback"
+    );
+
+    prefillCreateForm(form);
+
+    form.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      errorEl.textContent = "";
+
+      const formData = new FormData(form);
+      const displayName = String(
+        formData.get("display_name") || ""
+      ).trim();
+      const instrument = String(
+        formData.get("instrument") || ""
+      ).trim();
+      const level = String(
+        formData.get("level") || ""
+      ).trim();
+      const goal = String(
+        formData.get("goal") || ""
+      ).trim();
+      const pin = String(formData.get("pin") || "").trim();
+
+      if (!displayName) {
+        errorEl.textContent = "Please name your Woodchuck.";
+        return;
+      }
+
+      if (!instrument || !level || !goal) {
+        errorEl.textContent =
+          "Please choose an instrument, level, and goal.";
+        return;
+      }
+
+      if (!validPin(pin)) {
+        errorEl.textContent =
+          "Your PIN must contain exactly four digits.";
+        return;
+      }
+
+      const submitButton = form.querySelector(
+        "button[type='submit']"
+      );
+
+      submitButton.disabled = true;
+      submitButton.textContent = "Creating Woodchuck...";
+
+      try {
+        const response = await fetch("/account/create", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!response.ok) {
+          throw new Error(
+            await responseMessage(
+              response,
+              "The Woodchuck account could not be created."
+            )
+          );
+        }
+
+        const payload = await response.json();
+        const profile = payload.profile;
+
+        const state = applyAccountProfile(
+          stateApi.getState(),
+          profile
+        );
+
+        stateApi.saveState(state, { sync: false });
+        await uploadState(state);
+
+        accountIdEl.textContent = profile.woodchuck_id;
+        successPanel.hidden = false;
+        form.hidden = true;
+
+        successPanel.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      } catch (error) {
+        errorEl.textContent =
+          error.message || "The account could not be created.";
+
+        submitButton.disabled = false;
+        submitButton.textContent =
+          "Create Persistent Woodchuck";
+      }
+    });
+
+    if (copyButton) {
+      copyButton.addEventListener("click", async function () {
+        const accountId = accountIdEl.textContent.trim();
+
+        if (!accountId) return;
+
+        try {
+          await navigator.clipboard.writeText(accountId);
+          copyFeedback.textContent = "Woodchuck ID copied.";
+        } catch (_error) {
+          copyFeedback.textContent =
+            `Write this down: ${accountId}`;
+        }
+      });
+    }
+  }
+
+  function wireLogin() {
+    const form = document.getElementById("account-login-form");
+
+    if (!form) return;
+
+    const errorEl = document.getElementById("login-error");
+
+    form.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      errorEl.textContent = "";
+
+      const formData = new FormData(form);
+      const woodchuckId = String(
+        formData.get("woodchuck_id") || ""
+      )
+        .trim()
+        .toUpperCase();
+      const pin = String(formData.get("pin") || "").trim();
+
+      if (!woodchuckId) {
+        errorEl.textContent = "Enter your Woodchuck ID.";
+        return;
+      }
+
+      if (!validPin(pin)) {
+        errorEl.textContent =
+          "Your PIN must contain exactly four digits.";
+        return;
+      }
+
+      formData.set("woodchuck_id", woodchuckId);
+
+      const submitButton = form.querySelector(
+        "button[type='submit']"
+      );
+
+      submitButton.disabled = true;
+      submitButton.textContent = "Restoring Woodshed...";
+
+      try {
+        const loginResponse = await fetch("/account/login", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!loginResponse.ok) {
+          throw new Error(
+            await responseMessage(
+              loginResponse,
+              "Woodchuck ID or PIN was not recognized."
+            )
+          );
+        }
+
+        const loginPayload = await loginResponse.json();
+        const profile = loginPayload.profile;
+
+        const stateResponse = await fetch("/account/state");
+
+        if (!stateResponse.ok) {
+          throw new Error(
+            await responseMessage(
+              stateResponse,
+              "The saved Woodshed could not be loaded."
+            )
+          );
+        }
+
+        const statePayload = await stateResponse.json();
+        let restoredState;
+
+        if (
+          statePayload.state &&
+          typeof statePayload.state === "object"
+        ) {
+          stateApi.saveState(statePayload.state, { sync: false });
+          restoredState = stateApi.getState();
+        } else {
+          restoredState = stateApi.resetState();
+        }
+
+        applyAccountProfile(restoredState, profile);
+
+        if (Number.isInteger(statePayload.revision)) {
+          restoredState.account.serverRevision =
+            statePayload.revision;
+        }
+
+        stateApi.saveState(restoredState, { sync: false });
+
+        if (!statePayload.state) {
+          await uploadState(restoredState);
+        }
+
+        window.location.assign("/home");
+      } catch (error) {
+        errorEl.textContent =
+          error.message || "The Woodshed could not be restored.";
+
+        submitButton.disabled = false;
+        submitButton.textContent = "Sign In";
+      }
+    });
+  }
+
+  wireCreateAccount();
+  wireLogin();
+})();
+
+(function () {
+  const stateApi = window.WWState;
+
+  if (!stateApi) return;
+
+  let syncTimer = null;
+  let syncInProgress = false;
+  let pendingSync = false;
+
+  function isPersistentAccount(state) {
+    return Boolean(
+      state &&
+      state.account &&
+      state.account.authenticated === true &&
+      state.account.woodchuckId
+    );
+  }
+
+  async function recoverFromConflict(localState) {
+    const backupKey =
+      `woodshedWoodchuckConflictBackup.${Date.now()}`;
+
+    window.localStorage.setItem(
+      backupKey,
+      JSON.stringify(localState)
+    );
+
+    console.warn(
+      "A stale Woodshed copy was backed up as:",
+      backupKey
+    );
+
+    const response = await fetch("/account/state", {
+      credentials: "same-origin",
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        `Could not restore server state: ${response.status}`
+      );
+    }
+
+    const payload = await response.json();
+
+    if (!payload.state || typeof payload.state !== "object") {
+      throw new Error("The server did not return a saved Woodshed.");
+    }
+
+    stateApi.saveState(payload.state, { sync: false });
+
+    const restoredState = stateApi.getState();
+
+    restoredState.account = {
+      ...(restoredState.account || {}),
+      authenticated: true,
+      serverRevision:
+        Number.isInteger(payload.revision)
+          ? payload.revision
+          : restoredState.account.serverRevision || 0,
+    };
+
+    stateApi.saveState(restoredState, { sync: false });
+
+    window.alert(
+      "This Woodshed was updated in another browser. " +
+      "The newest saved version will now load. " +
+      "A backup of this browser's older copy was kept."
+    );
+
+    window.location.reload();
+  }
+
+  async function syncStateToServer() {
+    const state = stateApi.getState();
+
+    if (!isPersistentAccount(state)) return;
+
+    if (syncInProgress) {
+      pendingSync = true;
+      return;
+    }
+
+    syncInProgress = true;
+    pendingSync = false;
+
+    try {
+      const response = await fetch("/account/state", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "same-origin",
+        body: JSON.stringify(state),
+      });
+
+      if (response.status === 401) {
+        state.account.authenticated = false;
+        stateApi.saveState(state, { sync: false });
+        return;
+      }
+
+      if (response.status === 409) {
+        pendingSync = false;
+        await recoverFromConflict(state);
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(`State sync failed with ${response.status}`);
+      }
+
+      const payload = await response.json();
+      const latestState = stateApi.getState();
+      const latestAccount =
+        latestState.account &&
+        typeof latestState.account === "object"
+          ? latestState.account
+          : {};
+
+      latestState.account = {
+        ...latestAccount,
+        serverRevision:
+          Number.isInteger(payload.revision)
+            ? payload.revision
+            : latestAccount.serverRevision || 0,
+        lastSyncedAt:
+          payload.last_synced_at || new Date().toISOString(),
+      };
+
+      stateApi.saveState(latestState, { sync: false });
+    } catch (error) {
+      console.warn("Woodshed account sync failed:", error);
+    } finally {
+      syncInProgress = false;
+
+      if (pendingSync) {
+        pendingSync = false;
+        scheduleSync(100);
+      }
+    }
+  }
+
+  function scheduleSync(delay = 500) {
+    window.clearTimeout(syncTimer);
+
+    syncTimer = window.setTimeout(function () {
+      syncStateToServer();
+    }, delay);
+  }
+
+  window.addEventListener("ww:state-saved", function (event) {
+    const state =
+      event.detail && event.detail.state
+        ? event.detail.state
+        : stateApi.getState();
+
+    if (!isPersistentAccount(state)) return;
+
+    scheduleSync();
+  });
+
+  window.WWAccountSync = {
+    syncNow: syncStateToServer,
+  };
+})();

@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="card">
+  <div class="section-head">
+    <p class="chip">Returning musician</p>
+    <h2>Sign In to Your Woodchuck</h2>
+    <p class="body-copy">
+      Use your Woodchuck ID and four-digit PIN to restore your Woodshed.
+    </p>
+  </div>
+
+  <div class="account-layout">
+    <form id="account-login-form" class="stack-form" novalidate>
+      <label for="login-woodchuck-id">Woodchuck ID</label>
+      <input
+        id="login-woodchuck-id"
+        name="woodchuck_id"
+        type="text"
+        maxlength="11"
+        placeholder="WC-ABCDEFGH"
+        autocomplete="username"
+        autocapitalize="characters"
+        required
+      />
+
+      <label for="login-pin">Four-digit PIN</label>
+      <input
+        id="login-pin"
+        name="pin"
+        type="password"
+        inputmode="numeric"
+        pattern="[0-9]{4}"
+        minlength="4"
+        maxlength="4"
+        autocomplete="current-password"
+        required
+      />
+
+      <p id="login-error" class="error-text" aria-live="polite"></p>
+
+      <button class="btn btn-primary" type="submit">
+        Sign In
+      </button>
+
+      <a class="btn btn-secondary" href="/setup">
+        Create a New Woodchuck
+      </a>
+    </form>
+
+    <aside class="mentor-card">
+      <div>
+        <p class="chip">Keep this safe</p>
+        <h3>Your Woodchuck ID</h3>
+        <p>
+          Your ID identifies your game. Your PIN unlocks it.
+          Do not post either one publicly.
+        </p>
+      </div>
+    </aside>
+  </div>
+</section>
+{% endblock %}

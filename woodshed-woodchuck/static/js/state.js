@@ -36,7 +36,13 @@
 
   function defaultState() {
     return {
-      version: 3,
+      version: 4,
+      account: {
+        woodchuckId: "",
+        authenticated: false,
+        serverRevision: 0,
+        lastSyncedAt: null,
+      },
       profile: {
         woodchuckName: "",
         instrument: "",
@@ -74,6 +80,21 @@
       },
       practiceLog: [],
       bandCamp: defaultBandCampState(),
+    };
+  }
+
+  function migrateAccount(account = {}) {
+    return {
+      woodchuckId:
+        typeof account.woodchuckId === "string"
+          ? account.woodchuckId
+          : "",
+      authenticated: account.authenticated === true,
+      serverRevision:
+        Number.isInteger(account.serverRevision)
+          ? account.serverRevision
+          : 0,
+      lastSyncedAt: account.lastSyncedAt || null,
     };
   }
 
@@ -124,13 +145,14 @@
     };
   }
 
-  function migrateToV3(parsed = {}) {
+  function migrateToV4(parsed = {}) {
     const base = defaultState();
 
     return {
       ...base,
       ...parsed,
-      version: 3,
+      version: 4,
+      account: migrateAccount(parsed.account || {}),
       profile: { ...base.profile, ...(parsed.profile || {}) },
       progress: migrateProgress(parsed.progress || {}),
       quest: { ...base.quest, ...(parsed.quest || {}) },
@@ -148,24 +170,32 @@
 
     if (!raw) {
       const fresh = defaultState();
-      saveState(fresh);
+      saveState(fresh, { sync: false });
       return fresh;
     }
 
     try {
       const parsed = JSON.parse(raw);
-      const migrated = migrateToV3(parsed);
-      saveState(migrated);
+      const migrated = migrateToV4(parsed);
+      saveState(migrated, { sync: false });
       return migrated;
     } catch (_err) {
       const reset = defaultState();
-      saveState(reset);
+      saveState(reset, { sync: false });
       return reset;
     }
   }
 
-  function saveState(state) {
+  function saveState(state, options = {}) {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+
+    if (options.sync !== false) {
+      window.dispatchEvent(
+        new CustomEvent("ww:state-saved", {
+          detail: { state },
+        })
+      );
+    }
   }
 
   function resetState() {
