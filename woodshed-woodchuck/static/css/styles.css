@@ -1284,3 +1284,463 @@ select {
   font-weight: 900;
   letter-spacing: 0.08em;
 }
+
+/* Mobile Woodshed layout cleanup */
+@media (max-width: 640px) {
+  body {
+    min-height: 100dvh;
+  }
+
+  .app-shell {
+    padding:
+      0.45rem
+      0.45rem
+      calc(5.4rem + env(safe-area-inset-bottom));
+  }
+
+  .card.woodshed-page {
+    padding: 0.65rem;
+    border-radius: 16px;
+  }
+
+  .woodshed-intro {
+    margin: 0 0 0.65rem;
+    font-size: 0.94rem;
+    line-height: 1.35;
+  }
+
+  .woodshed-scene {
+    min-height: 500px;
+    border-radius: 16px;
+  }
+
+  .woodshed-character-layer {
+    width: min(72%, 285px);
+    bottom: 0.65rem;
+  }
+
+  .woodshed-character-art {
+    width: 100%;
+    height: auto;
+    max-height: 300px;
+    object-fit: contain;
+  }
+
+  .woodshed-foreground {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 0.35rem;
+    min-height: 500px;
+    padding: 0.7rem;
+  }
+
+  .woodshed-object-column-center {
+    display: none;
+  }
+
+  .woodshed-object-column {
+    display: grid;
+    grid-template-rows: repeat(6, minmax(0, 1fr));
+    justify-content: stretch;
+    gap: 0.2rem;
+  }
+
+  .woodshed-object-column-left {
+    justify-items: start;
+  }
+
+  .woodshed-object-column-right {
+    justify-items: end;
+  }
+
+  .woodshed-object-column-left .shed-readout {
+    text-align: left;
+  }
+
+  .woodshed-object-column-right .shed-readout {
+    text-align: right;
+  }
+
+  .shed-readout {
+    max-width: 8.5rem;
+    font-size: 1rem;
+    line-height: 1.05;
+  }
+
+  .shed-readout-name {
+    font-size: 1.08rem;
+  }
+
+  .shed-readout-class {
+    font-size: 0.95rem;
+  }
+
+  .shed-icon-object,
+  .room-object {
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+  }
+
+  .shed-icon-object,
+  .room-object-icon {
+    font-size: 2.35rem;
+  }
+
+  .dandelion-count {
+    font-size: 0.95rem;
+  }
+
+  .main-nav {
+    gap: 0.4rem;
+    padding:
+      0.6rem
+      0.5rem
+      calc(0.6rem + env(safe-area-inset-bottom));
+  }
+
+  .nav-pill {
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: 9rem;
+    padding: 0.55rem 0.35rem;
+    font-size: 0.88rem;
+    text-align: center;
+  }
+}
+
+
+/* Keep both Woodshed object columns visible on phones */
+@media (max-width: 640px) {
+  .woodshed-foreground {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .woodshed-object-column-left {
+    grid-column: 1;
+    grid-row: 1;
+    width: 100%;
+    justify-self: stretch;
+    justify-items: start;
+  }
+
+  .woodshed-object-column-right {
+    grid-column: 2;
+    grid-row: 1;
+    width: 100%;
+    justify-self: stretch;
+    justify-items: end;
+  }
+
+  .woodshed-object-column-left > *,
+  .woodshed-object-column-right > * {
+    max-width: 100%;
+  }
+}
+
+/* Use the Woodshed artwork as the full room background */
+.woodshed-scene {
+  background-image: url("/static/img/woodchuck-home.png");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+  background-color: #8c633a;
+}
+
+/* The artwork now belongs to the scene itself, not a separate image layer */
+.woodshed-character-layer {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .woodshed-scene {
+    background-position: center top;
+    background-size: cover;
+  }
+}
+
+/* Spread Woodshed controls vertically across the mobile scene */
+@media (max-width: 640px) {
+  .woodshed-scene,
+  .woodshed-foreground {
+    min-height: 590px;
+  }
+
+  .woodshed-foreground {
+    padding: 1rem 0.75rem 1.2rem;
+  }
+
+  .woodshed-object-column {
+    grid-template-rows: repeat(6, auto);
+    align-content: space-between;
+    row-gap: 0;
+    height: 100%;
+  }
+}
+
+/* Correct mobile Woodshed vertical spacing */
+@media (max-width: 640px) {
+  .woodshed-scene,
+  .woodshed-foreground {
+    min-height: 620px;
+  }
+
+  .woodshed-object-column {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    height: 100%;
+    gap: 0;
+  }
+
+  .woodshed-object-column-left {
+    align-items: flex-start;
+  }
+
+  .woodshed-object-column-right {
+    align-items: flex-end;
+  }
+}
+
+/* Mobile SHED: show the full room and spread controls independently */
+@media (max-width: 640px) {
+  .woodshed-scene {
+    position: relative;
+    min-height: 620px;
+
+    background-image: url("/static/img/woodchuck-home.png");
+    background-repeat: no-repeat;
+    background-position: center center;
+    background-size: contain;
+    background-color: #9a7047;
+  }
+
+  .woodshed-foreground {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    padding: 1rem 0.75rem 1.25rem;
+
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .woodshed-object-column {
+    height: 100%;
+    min-height: 0;
+
+    display: grid;
+    grid-template-rows: repeat(6, minmax(0, 1fr));
+    align-items: center;
+  }
+
+  .woodshed-object-column-left {
+    grid-column: 1;
+    justify-items: start;
+  }
+
+  .woodshed-object-column-right {
+    grid-column: 2;
+    justify-items: end;
+  }
+}
+
+/* Mobile SHED artwork: return to the close-up, slightly less zoomed */
+@media (max-width: 640px) {
+  .woodshed-scene {
+    background-size: auto 92%;
+    background-position: center center;
+    background-repeat: no-repeat;
+  }
+}
+
+/* Mobile SHED: full-height left/right control columns */
+@media (max-width: 640px) {
+  .woodshed-foreground {
+    position: absolute !important;
+    inset: 0 !important;
+    width: 100%;
+    height: 100%;
+    min-height: 0 !important;
+    padding: 0 !important;
+    display: block !important;
+  }
+
+  .woodshed-object-column-left,
+  .woodshed-object-column-right {
+    position: absolute;
+    top: 1rem;
+    bottom: 1.25rem;
+    width: 42%;
+
+    display: flex !important;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 0;
+  }
+
+  .woodshed-object-column-left {
+    left: 0.65rem;
+    align-items: flex-start;
+  }
+
+  .woodshed-object-column-right {
+    right: 0.65rem;
+    left: auto;
+    align-items: flex-end;
+  }
+
+  .woodshed-object-column-left > * {
+    align-self: flex-start;
+  }
+
+  .woodshed-object-column-right > * {
+    align-self: flex-end;
+    margin-left: auto;
+  }
+
+  .woodshed-object-column-right .shed-readout {
+    text-align: right;
+  }
+}
+
+/* Mobile SHED fine-tuning */
+@media (max-width: 640px) {
+  .woodshed-scene {
+    background-size: auto 83%;
+    background-position: center center;
+  }
+
+  .woodshed-object-column-right {
+    right: 10%;
+  }
+}
+
+/* Mobile SHED: slightly smaller controls and clearer dandelion placement */
+@media (max-width: 640px) {
+  .shed-icon-object,
+  .room-object-icon {
+    font-size: 2.05rem;
+  }
+
+  .shed-icon-object,
+  .room-object {
+    min-width: 2.4rem;
+    min-height: 2.4rem;
+  }
+
+  .dandelion-object {
+    transform: translate(0.7rem, -0.45rem);
+  }
+
+  .dandelion-count {
+    font-size: 0.88rem;
+  }
+}
+
+/* Mobile SHED: explicit control positions */
+@media (max-width: 640px) {
+  .woodshed-object-column-left,
+  .woodshed-object-column-right {
+    top: 0 !important;
+    bottom: 0 !important;
+    height: 100% !important;
+    display: block !important;
+  }
+
+  .woodshed-object-column-left {
+    left: 0.6rem !important;
+  }
+
+  .woodshed-object-column-right {
+    right: 0.25rem !important;
+    left: auto !important;
+  }
+
+  .woodshed-object-column-left > *,
+  .woodshed-object-column-right > * {
+    position: absolute !important;
+  }
+
+  /* Left column */
+  #woodchuck-name-value {
+    top: 1rem;
+    left: 0;
+  }
+
+  #camp-level-value {
+    top: 18%;
+    left: 0;
+  }
+
+  #instrument-object {
+    top: 37%;
+    left: 0;
+  }
+
+  #level-value {
+    top: 57%;
+    left: 0;
+  }
+
+  .p-book-object {
+    top: 75%;
+    left: 0;
+  }
+
+  .quest-object {
+    bottom: 1rem;
+    left: 0;
+  }
+
+  /* Right column */
+  #streak-value {
+    top: 1rem;
+    right: 0;
+  }
+
+  #total-p-charts-value {
+    top: 18%;
+    right: 0;
+  }
+
+  .dandelion-object {
+    top: 43%;
+    right: 0;
+    transform: none !important;
+  }
+
+  .metronome-object {
+    top: 61%;
+    right: 0;
+  }
+
+  .tuner-object {
+    top: 78%;
+    right: 0;
+  }
+
+  .chair-object {
+    right: 0;
+    bottom: 1rem;
+  }
+
+  .shed-icon-object,
+  .room-object-icon {
+    font-size: 1.9rem;
+  }
+}
+
+/* Mobile SHED: reveal more space below the artwork without zooming it */
+@media (max-width: 640px) {
+  .woodshed-scene {
+    min-height: 700px;
+    background-size: auto 515px;
+    background-position: center top;
+  }
+
+  .woodshed-foreground {
+    height: 100%;
+  }
+}
