@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="card">
+  <div class="section-head">
+    <p class="chip">Trusted adult</p>
+    <h2>Verifier Sign In</h2>
+    <p class="body-copy">
+      Use your email address and four-digit verifier PIN.
+    </p>
+  </div>
+
+  <div class="account-layout">
+    <form
+      id="trusted-verifier-login-form"
+      class="stack-form"
+      novalidate
+    >
+      <label for="trusted-verifier-login-email">
+        Email address
+      </label>
+
+      <input
+        id="trusted-verifier-login-email"
+        name="email"
+        type="email"
+        maxlength="320"
+        autocomplete="username"
+        required
+      />
+
+      <label for="trusted-verifier-login-pin">
+        Four-digit PIN
+      </label>
+
+      <input
+        id="trusted-verifier-login-pin"
+        name="pin"
+        type="password"
+        inputmode="numeric"
+        pattern="[0-9]{4}"
+        minlength="4"
+        maxlength="4"
+        autocomplete="current-password"
+        required
+      />
+
+      <p
+        id="trusted-verifier-login-error"
+        class="error-text"
+        aria-live="polite"
+      ></p>
+
+      <button class="btn btn-primary" type="submit">
+        Sign In
+      </button>
+
+      <a class="btn btn-secondary" href="/">
+        Back
+      </a>
+    </form>
+
+    <aside class="mentor-card">
+      <div>
+        <p class="chip">Parents and teachers</p>
+        <h3>Your connected musicians</h3>
+        <p>
+          The dashboard shows the students who invited you as a
+          trusted verifier.
+        </p>
+      </div>
+    </aside>
+  </div>
+</section>
+{% endblock %}
+
+{% block page_scripts %}
+<script src="/static/js/trusted-verifier-login.js?v=1"></script>
+{% endblock %}

@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="card">
+  <div class="section-head">
+    <p class="chip">Trusted Verifier</p>
+    <h2 id="verifier-dashboard-title">
+      Your Musicians
+    </h2>
+
+    <p
+      id="verifier-dashboard-email"
+      class="body-copy"
+    ></p>
+  </div>
+
+  <div
+    id="verifier-student-list"
+    class="stack-form"
+    aria-live="polite"
+  >
+    <p class="body-copy">Loading connected musicians...</p>
+  </div>
+
+  <hr class="section-divider" />
+
+  <section aria-labelledby="verifier-pchart-heading">
+    <h3 id="verifier-pchart-heading">
+      P-Charts Awaiting Review
+    </h3>
+
+    <p class="body-copy">
+      Approve practice you can confirm, or reject a chart that
+      needs to be corrected and resubmitted.
+    </p>
+
+    <div
+      id="verifier-practice-chart-list"
+      class="stack-form"
+      aria-live="polite"
+    >
+      <p class="body-copy">Loading P-Charts...</p>
+    </div>
+
+    <p
+      id="verifier-practice-chart-feedback"
+      class="body-copy"
+      aria-live="polite"
+    ></p>
+  </section>
+
+  <p
+    id="verifier-dashboard-error"
+    class="error-text"
+    aria-live="polite"
+  ></p>
+
+  <div class="button-row">
+    <button
+      id="trusted-verifier-logout-button"
+      class="btn btn-secondary"
+      type="button"
+    >
+      Sign Out
+    </button>
+  </div>
+</section>
+{% endblock %}
+
+{% block page_scripts %}
+<script src="/static/js/trusted-verifier-dashboard.js?v=2"></script>
+{% endblock %}

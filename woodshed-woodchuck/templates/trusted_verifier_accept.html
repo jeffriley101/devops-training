@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section
+  class="card"
+  id="trusted-verifier-accept-page"
+  data-invitation-token="{{ invitation_token }}"
+>
+  <div class="section-head">
+    <p class="chip">Trusted Verifier Invitation</p>
+    <h2>Connect to a Woodchuck</h2>
+    <p class="body-copy">
+      Create or unlock your trusted-verifier account using your
+      name and four-digit PIN.
+    </p>
+  </div>
+
+  <div class="setup-layout">
+    <form
+      id="trusted-verifier-accept-form"
+      class="stack-form"
+      novalidate
+    >
+      <label for="verifier-display-name">Your name</label>
+      <input
+        id="verifier-display-name"
+        name="display_name"
+        type="text"
+        maxlength="100"
+        autocomplete="name"
+        required
+      />
+
+      <label for="verifier-pin">Four-digit PIN</label>
+      <input
+        id="verifier-pin"
+        name="pin"
+        type="password"
+        inputmode="numeric"
+        pattern="[0-9]{4}"
+        minlength="4"
+        maxlength="4"
+        autocomplete="current-password"
+        required
+      />
+
+      <p class="form-help">
+        New verifiers create a PIN. Returning verifiers enter their
+        existing PIN.
+      </p>
+
+      <p
+        id="trusted-verifier-accept-error"
+        class="error-text"
+        aria-live="polite"
+      ></p>
+
+      <button class="btn btn-primary" type="submit">
+        Accept Invitation
+      </button>
+    </form>
+
+    <aside class="mentor-card">
+      <div>
+        <p class="chip">Your role</p>
+        <h3>Help confirm practice</h3>
+        <p>
+          Connected verifiers may later review and validate practice
+          charts and verified contest entries.
+        </p>
+      </div>
+    </aside>
+  </div>
+
+  <section
+    id="trusted-verifier-accept-success"
+    class="success-callout mt-md"
+    aria-live="polite"
+    hidden
+  >
+    <h3>Connection Complete</h3>
+    <p id="trusted-verifier-accept-message"></p>
+
+    <div class="button-row">
+      <a
+        class="btn btn-primary"
+        href="/trusted-verifiers/dashboard"
+      >
+        Open Verifier Dashboard
+      </a>
+    </div>
+  </section>
+</section>
+{% endblock %}
+
+{% block page_scripts %}
+<script src="/static/js/trusted-verifier-accept.js?v=1"></script>
+{% endblock %}

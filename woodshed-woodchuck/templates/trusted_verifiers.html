@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="card">
+  <div class="section-head">
+    <p class="chip">Student account</p>
+    <h2>Trusted Verifiers</h2>
+    <p class="body-copy">
+      Connect up to three parents, guardians, teachers, coaches,
+      or other trusted adults to your Woodchuck.
+    </p>
+  </div>
+
+  <div class="setup-layout">
+    <section>
+      <h3>Invite a Trusted Verifier</h3>
+
+      <form
+        id="trusted-verifier-invite-form"
+        class="stack-form"
+        novalidate
+      >
+        <label for="trusted-verifier-email">
+          Adult's email address
+        </label>
+
+        <input
+          id="trusted-verifier-email"
+          name="email"
+          type="email"
+          maxlength="320"
+          placeholder="adult@example.com"
+          autocomplete="email"
+          required
+        />
+
+        <label for="trusted-verifier-role">
+          Their role
+        </label>
+
+        <select
+          id="trusted-verifier-role"
+          name="role"
+          required
+        >
+          <option value="">Choose a role</option>
+          <option value="parent">Parent</option>
+          <option value="guardian">Guardian</option>
+          <option value="band_director">Band director</option>
+          <option value="private_teacher">Private teacher</option>
+          <option value="coach">Coach</option>
+          <option value="other_trusted_adult">
+            Other trusted adult
+          </option>
+        </select>
+
+        <p
+          id="trusted-verifier-invite-error"
+          class="error-text"
+          aria-live="polite"
+        ></p>
+
+        <button class="btn btn-primary" type="submit">
+          Create Invitation
+        </button>
+      </form>
+
+      <section
+        id="trusted-verifier-invite-success"
+        class="success-callout mt-md"
+        aria-live="polite"
+        hidden
+      >
+        <h3>Invitation Created</h3>
+
+        <p>
+          Give this private invitation link to the trusted adult.
+        </p>
+
+        <p>
+          <code id="trusted-verifier-invite-link"></code>
+        </p>
+
+        <button
+          id="trusted-verifier-copy-link"
+          class="btn btn-secondary"
+          type="button"
+        >
+          Copy Invitation Link
+        </button>
+
+        <p
+          id="trusted-verifier-copy-feedback"
+          class="body-copy"
+        ></p>
+      </section>
+    </section>
+
+    <aside class="mentor-card">
+      <div>
+        <p class="chip">How verification works</p>
+        <h3>One adult can validate a P-Chart</h3>
+
+        <p>
+          A student may connect up to three trusted verifiers.
+          One connected verifier is enough to validate a
+          practice chart unless a future contest says otherwise.
+        </p>
+
+        <p>
+          Verifiers use their own email address and four-digit PIN.
+        </p>
+      </div>
+    </aside>
+  </div>
+
+  <hr class="section-divider" />
+
+  <section>
+    <h3>Connected Adults</h3>
+
+    <div
+      id="trusted-verifier-connection-list"
+      aria-live="polite"
+    >
+      <p class="body-copy">Loading connected adults...</p>
+    </div>
+  </section>
+
+  <hr class="section-divider" />
+
+  <section>
+    <h3>Invitations</h3>
+
+    <div
+      id="trusted-verifier-invitation-list"
+      aria-live="polite"
+    >
+      <p class="body-copy">Loading invitations...</p>
+    </div>
+  </section>
+
+  <div class="button-row">
+    <a class="btn btn-secondary" href="/home">
+      Back to the Woodshed
+    </a>
+  </div>
+</section>
+{% endblock %}
+
+{% block page_scripts %}
+<script src="/static/js/trusted-verifiers.js?v=3"></script>
+{% endblock %}
