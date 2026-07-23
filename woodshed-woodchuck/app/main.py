@@ -7,8 +7,12 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
-from .account_routes import router as account_router
+from .account_routes import (
+    current_profile,
+    router as account_router,
+)
 from .verifier_routes import router as verifier_router
+from .db import SessionLocal
 from .content import (
     GOAL_OPTIONS,
     INSTRUMENT_OPTIONS,
@@ -78,6 +82,39 @@ def login_page(request: Request):
         "login.html",
         title="Sign In",
         active_nav=None,
+    )
+
+
+@app.get("/trusted-verifiers/accept/{token}")
+def trusted_verifier_accept_page(
+    request: Request,
+    token: str,
+):
+    return _render(
+        request,
+        "trusted_verifier_accept.html",
+        title="Accept Trusted Verifier Invitation",
+        active_nav=None,
+        invitation_token=token,
+    )
+
+
+@app.get("/trusted-verifiers")
+def trusted_verifiers_page(request: Request):
+    with SessionLocal() as session:
+        profile = current_profile(request, session)
+
+        if profile is None:
+            return RedirectResponse(
+                url="/login",
+                status_code=303,
+            )
+
+    return _render(
+        request,
+        "trusted_verifiers.html",
+        title="Trusted Verifiers",
+        active_nav="home",
     )
 
 

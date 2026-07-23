@@ -186,8 +186,7 @@ def create_student_invitation(
             # Returned until outbound email delivery is implemented.
             "invitation_token": token,
             "accept_path": (
-                "/trusted-verifiers/invitations/"
-                f"{token}/accept"
+                f"/trusted-verifiers/accept/{token}"
             ),
         }
 
