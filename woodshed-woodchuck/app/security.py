@@ -78,3 +78,13 @@ def generate_woodchuck_id() -> str:
     )
 
     return f"WC-{random_part}"
+
+
+def generate_invitation_token() -> str:
+    """Create the secret token placed in an invitation link."""
+    return secrets.token_urlsafe(32)
+
+
+def hash_invitation_token(token: str) -> str:
+    """Create the deterministic hash stored in the database."""
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
