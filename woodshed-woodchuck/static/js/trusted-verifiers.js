@@ -55,7 +55,7 @@
     element,
     title,
     details,
-    action = null
+    actions = []
   ) => {
     const card = document.createElement("article");
     card.className = "mentor-card";
@@ -68,22 +68,46 @@
 
     card.append(heading, paragraph);
 
-    if (action) {
-      const button = document.createElement("button");
+    const actionList = Array.isArray(actions)
+      ? actions
+      : [actions];
 
-      button.className =
-        `btn ${action.className || "btn-secondary"}`;
-      button.type = "button";
-      button.textContent = action.label;
+    const visibleActions = actionList.filter(Boolean);
 
-      button.addEventListener("click", () => {
-        action.onClick(button);
+    if (visibleActions.length > 0) {
+      const buttonRow = document.createElement("div");
+      buttonRow.className = "button-row";
+
+      visibleActions.forEach((action) => {
+        const button = document.createElement("button");
+
+        button.className =
+          `btn ${action.className || "btn-secondary"}`;
+        button.type = "button";
+        button.textContent = action.label;
+
+        button.addEventListener("click", () => {
+          action.onClick(button);
+        });
+
+        buttonRow.appendChild(button);
       });
 
-      card.appendChild(button);
+      card.appendChild(buttonRow);
     }
 
     element.appendChild(card);
+  };
+
+  const showInvitationLink = (payload) => {
+    currentInvitationUrl = new URL(
+      payload.accept_path,
+      window.location.origin
+    ).toString();
+
+    inviteLink.textContent = currentInvitationUrl;
+    successPanel.hidden = false;
+    copyFeedback.textContent = "";
   };
 
   const runLifecycleAction = async (
@@ -125,6 +149,65 @@
     } catch (error) {
       errorText.textContent =
         error.message || "The change could not be completed.";
+    } finally {
+      button.disabled = false;
+    }
+  };
+
+  const runReissueAction = async (
+    button,
+    invitation
+  ) => {
+    const confirmed = window.confirm(
+      "Create a new private invitation link for " +
+      `${invitation.email}? The previous link will stop working.`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    button.disabled = true;
+    errorText.textContent = "";
+    copyFeedback.textContent = "";
+
+    try {
+      const response = await fetch(
+        (
+          "/trusted-verifiers/invitations/" +
+          invitation.id +
+          "/reissue"
+        ),
+        {
+          method: "POST",
+          credentials: "same-origin",
+        }
+      );
+
+      const payload = await response.json();
+
+      if (response.status === 401) {
+        window.location.assign("/login");
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          payload.detail ||
+          "The invitation link could not be reissued."
+        );
+      }
+
+      showInvitationLink(payload);
+
+      copyFeedback.textContent =
+        "New link created. The previous link no longer works.";
+
+      await loadVerifiers();
+    } catch (error) {
+      errorText.textContent =
+        error.message ||
+        "The invitation link could not be reissued.";
     } finally {
       button.disabled = false;
     }
@@ -207,22 +290,33 @@
           invitationList,
           invitation.email,
           `${roleLabel(invitation.role)} · Pending`,
-          {
-            label: "Cancel Invitation",
-            className: "btn-red",
-            onClick: (button) =>
-              runLifecycleAction(
-                button,
-                (
-                  "/trusted-verifiers/invitations/" +
-                  invitation.id
+          [
+            {
+              label: "Reissue Link",
+              className: "btn-secondary",
+              onClick: (button) =>
+                runReissueAction(
+                  button,
+                  invitation
                 ),
-                (
-                  `Cancel the invitation for ` +
-                  `${invitation.email}?`
-                )
-              ),
-          }
+            },
+            {
+              label: "Cancel Invitation",
+              className: "btn-red",
+              onClick: (button) =>
+                runLifecycleAction(
+                  button,
+                  (
+                    "/trusted-verifiers/invitations/" +
+                    invitation.id
+                  ),
+                  (
+                    `Cancel the invitation for ` +
+                    `${invitation.email}?`
+                  )
+                ),
+            },
+          ]
         );
       });
     }
@@ -253,13 +347,7 @@
         );
       }
 
-      currentInvitationUrl = new URL(
-        payload.accept_path,
-        window.location.origin
-      ).toString();
-
-      inviteLink.textContent = currentInvitationUrl;
-      successPanel.hidden = false;
+      showInvitationLink(payload);
       form.reset();
 
       await loadVerifiers();

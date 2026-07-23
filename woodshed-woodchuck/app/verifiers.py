@@ -227,6 +227,51 @@ def create_trusted_verifier_invitation(
     )
 
 
+def reissue_trusted_verifier_invitation(
+    session: Session,
+    *,
+    profile: WoodchuckProfile,
+    invitation_id: int,
+) -> CreatedInvitation:
+    if profile.id is None:
+        raise ValueError("The student account must be saved first.")
+
+    invitation = session.scalar(
+        select(TrustedVerifierInvitation).where(
+            TrustedVerifierInvitation.id == invitation_id,
+            TrustedVerifierInvitation.profile_id == profile.id,
+        )
+    )
+
+    if invitation is None:
+        raise LookupError("Invitation was not found.")
+
+    if invitation.status != "pending":
+        raise ValueError(
+            "Only pending invitations can receive a new link."
+        )
+
+    token = generate_invitation_token()
+    now = _utc_now()
+
+    invitation.token_hash = hash_invitation_token(token)
+    invitation.expires_at = now + INVITATION_LIFETIME
+
+    try:
+        session.commit()
+        session.refresh(invitation)
+    except IntegrityError as error:
+        session.rollback()
+        raise RuntimeError(
+            "The invitation link could not be reissued."
+        ) from error
+
+    return CreatedInvitation(
+        invitation=invitation,
+        token=token,
+    )
+
+
 def accept_trusted_verifier_invitation(
     session: Session,
     *,

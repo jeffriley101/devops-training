@@ -18,6 +18,7 @@ from .verifiers import (
     authenticate_trusted_verifier,
     count_reserved_verifier_slots,
     create_trusted_verifier_invitation,
+    reissue_trusted_verifier_invitation,
 )
 
 
@@ -286,6 +287,52 @@ def disconnect_student_verifier(
             "reserved_slots": count_reserved_verifier_slots(
                 session,
                 profile_id=profile.id,
+            ),
+        }
+
+
+@router.post("/invitations/{invitation_id}/reissue")
+def reissue_student_invitation(
+    request: Request,
+    invitation_id: int,
+):
+    with SessionLocal() as session:
+        profile = current_profile(request, session)
+
+        if profile is None:
+            raise HTTPException(
+                status_code=401,
+                detail="Student sign-in is required.",
+            )
+
+        try:
+            reissued = reissue_trusted_verifier_invitation(
+                session,
+                profile=profile,
+                invitation_id=invitation_id,
+            )
+        except LookupError as error:
+            raise HTTPException(
+                status_code=404,
+                detail=str(error),
+            ) from error
+        except ValueError as error:
+            raise HTTPException(
+                status_code=400,
+                detail=str(error),
+            ) from error
+
+        token = reissued.token
+
+        return {
+            "reissued": True,
+            "invitation": invitation_payload(
+                reissued.invitation
+            ),
+            # Returned until outbound email delivery is implemented.
+            "invitation_token": token,
+            "accept_path": (
+                f"/trusted-verifiers/accept/{token}"
             ),
         }
 
