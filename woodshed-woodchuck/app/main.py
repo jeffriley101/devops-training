@@ -8,6 +8,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
 from .account_routes import router as account_router
+from .verifier_routes import router as verifier_router
 from .content import (
     GOAL_OPTIONS,
     INSTRUMENT_OPTIONS,
@@ -37,6 +38,7 @@ app.add_middleware(
     https_only=SESSION_COOKIE_SECURE,
 )
 app.include_router(account_router)
+app.include_router(verifier_router)
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
