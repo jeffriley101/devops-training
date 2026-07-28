@@ -1745,33 +1745,76 @@ select {
   }
 }
 
-/* Phase 4C: tighter Android SHED icon spacing */
+/* Phase 4C: final Android SHED layout */
 @media (max-width: 640px) {
+  /* End the SHED scene with the artwork—no brown extension below it. */
+  .woodshed-scene {
+    min-height: 515px;
+    height: 515px;
+    background-size: auto 515px;
+    background-position: center top;
+    background-repeat: no-repeat;
+  }
+
+  .woodshed-foreground {
+    height: 515px;
+    min-height: 515px;
+  }
+
+  /* Left side */
+  #woodchuck-name-value {
+    top: 1rem;
+  }
+
+  #camp-level-value {
+    top: 16%;
+  }
+
   #instrument-object {
+    top: 10% !important;
+  }
+
+  #level-value {
     top: 35%;
   }
 
   .p-book-object {
-    top: 71%;
+    top: 55% !important;
   }
 
   .quest-object {
-    bottom: 2rem;
+    top: 78%;
+    bottom: auto;
+  }
+
+  /* Right side */
+  #streak-value {
+    top: 1rem;
+  }
+
+  #total-p-charts-value {
+    top: 9%;
   }
 
   .dandelion-object {
-    top: 40%;
+    top: 27%;
   }
 
   .metronome-object {
-    top: 57%;
+    top: 47%;
   }
 
   .tuner-object {
-    top: 72%;
+    top: 66%;
   }
 
   .chair-object {
-    bottom: 2rem;
+    top: 84%;
+    bottom: auto;
+  }
+
+  .shed-icon-object,
+  .room-object-icon {
+    font-size: 1.9rem;
   }
 }
