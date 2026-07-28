@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 
 from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
     Date,
     DateTime,
     ForeignKey,
@@ -510,21 +512,27 @@ class PracticeChartVerification(Base):
 
 class Season(Base):
     __tablename__ = "seasons"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('planned', 'active', 'closed')",
+            name="ck_season_status",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     key: Mapped[str] = mapped_column(
         String(100), unique=True, index=True, nullable=False
     )
-    name: Mapped[str | None] = mapped_column(String(150), nullable=True)
+    name: Mapped[str] = mapped_column(String(150), nullable=False)
     timezone: Mapped[str] = mapped_column(
-        String(64), default=SEASON_TIMEZONE, nullable=False
+        String(64),
+        default=SEASON_TIMEZONE,
+        server_default=SEASON_TIMEZONE,
+        nullable=False,
     )
-    starts_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    ends_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    starts_on: Mapped[date] = mapped_column(Date, nullable=False)
+    ends_on: Mapped[date | None] = mapped_column(Date, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
     )
@@ -535,14 +543,29 @@ class Season(Base):
 
 class Contest(Base):
     __tablename__ = "contests"
+    __table_args__ = (
+        CheckConstraint(
+            "metric_type IN ('practice_minutes', 'points')",
+            name="ck_contest_metric_type",
+        ),
+        CheckConstraint(
+            "subject_type IN ('student', 'instrument')",
+            name="ck_contest_subject_type",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     key: Mapped[str] = mapped_column(
         String(100), unique=True, index=True, nullable=False
     )
-    name: Mapped[str | None] = mapped_column(String(150), nullable=True)
-    category_key: Mapped[str | None] = mapped_column(
+    name: Mapped[str] = mapped_column(String(150), nullable=False)
+    metric_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    subject_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    crown_category: Mapped[str | None] = mapped_column(
         String(100), index=True, nullable=True
+    )
+    active: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default="1", nullable=False
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
@@ -560,6 +583,10 @@ class ContestWeek(Base):
             "week_start",
             name="uq_contest_week_season_start",
         ),
+        CheckConstraint(
+            "status IN ('open', 'pending', 'finalized')",
+            name="ck_contest_week_status",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -567,6 +594,17 @@ class ContestWeek(Base):
         ForeignKey("seasons.id", ondelete="CASCADE"), index=True, nullable=False
     )
     week_start: Mapped[date] = mapped_column(Date, index=True, nullable=False)
+    week_end: Mapped[date] = mapped_column(Date, nullable=False)
+    verification_deadline_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    finalize_after: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    finalized_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
     )
@@ -585,6 +623,18 @@ class ContestResult(Base):
             "subject_key",
             name="uq_contest_result_week_contest_division_subject",
         ),
+        CheckConstraint(
+            "division IN ('open', 'verified')",
+            name="ck_contest_result_division",
+        ),
+        CheckConstraint(
+            "subject_type IN ('student', 'instrument')",
+            name="ck_contest_result_subject_type",
+        ),
+        CheckConstraint(
+            "medal IN ('gold', 'silver', 'bronze')",
+            name="ck_contest_result_medal",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -599,20 +649,20 @@ class ContestResult(Base):
         nullable=False,
     )
     division: Mapped[str] = mapped_column(String(100), index=True, nullable=False)
+    subject_type: Mapped[str] = mapped_column(String(30), nullable=False)
     subject_key: Mapped[str] = mapped_column(String(100), index=True, nullable=False)
-    winner_profile_id: Mapped[int | None] = mapped_column(
+    profile_id: Mapped[int | None] = mapped_column(
         ForeignKey("woodchuck_profiles.id", ondelete="SET NULL"),
         index=True,
         nullable=True,
     )
-    finalized_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    instrument: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    display_name_snapshot: Mapped[str] = mapped_column(String(100), nullable=False)
+    score: Mapped[int] = mapped_column(Integer, nullable=False)
+    rank: Mapped[int] = mapped_column(Integer, nullable=False)
+    medal: Mapped[str] = mapped_column(String(20), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
     )
 
 
@@ -633,10 +683,16 @@ class RewardGrant(Base):
         index=True,
         nullable=False,
     )
+    contest_result_id: Mapped[int | None] = mapped_column(
+        ForeignKey("contest_results.id", ondelete="SET NULL"),
+        index=True,
+        nullable=True,
+    )
     source_key: Mapped[str] = mapped_column(String(150), index=True, nullable=False)
     reward_type: Mapped[str] = mapped_column(String(50), index=True, nullable=False)
-    amount: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
-    granted_at: Mapped[datetime] = mapped_column(
+    category_key: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    amount: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
     )
 
@@ -658,8 +714,10 @@ class CrownProgress(Base):
         nullable=False,
     )
     category_key: Mapped[str] = mapped_column(String(100), index=True, nullable=False)
-    wins: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    earned_at: Mapped[datetime | None] = mapped_column(
+    qualifying_wins: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0", nullable=False
+    )
+    crown_earned_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(

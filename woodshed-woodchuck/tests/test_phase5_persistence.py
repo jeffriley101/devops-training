@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, timezone
 
 import pytest
 from sqlalchemy import create_engine
@@ -156,15 +156,39 @@ def test_contest_uniqueness_constraints(
     session: Session,
     student: WoodchuckProfile,
 ) -> None:
-    season = Season(key="band-camp-2026")
-    contest = Contest(key="camp-commitment")
+    season = Season(
+        key="band-camp-2026",
+        name="Band Camp 2026",
+        starts_on=date(2026, 7, 27),
+        status="active",
+    )
+    contest = Contest(
+        key="camp-commitment",
+        name="Camp Commitment",
+        metric_type="practice_minutes",
+        subject_type="student",
+    )
     session.add_all([season, contest])
     session.commit()
 
     _assert_duplicate_rejected(
         session,
-        ContestWeek(season_id=season.id, week_start=date(2026, 7, 27)),
-        ContestWeek(season_id=season.id, week_start=date(2026, 7, 27)),
+        ContestWeek(
+            season_id=season.id,
+            week_start=date(2026, 7, 27),
+            week_end=date(2026, 8, 3),
+            verification_deadline_at=datetime(2026, 8, 4, tzinfo=timezone.utc),
+            finalize_after=datetime(2026, 8, 5, tzinfo=timezone.utc),
+            status="open",
+        ),
+        ContestWeek(
+            season_id=season.id,
+            week_start=date(2026, 7, 27),
+            week_end=date(2026, 8, 3),
+            verification_deadline_at=datetime(2026, 8, 4, tzinfo=timezone.utc),
+            finalize_after=datetime(2026, 8, 5, tzinfo=timezone.utc),
+            status="open",
+        ),
     )
 
     week = session.query(ContestWeek).one()
@@ -173,14 +197,26 @@ def test_contest_uniqueness_constraints(
         ContestResult(
             contest_week_id=week.id,
             contest_id=contest.id,
-            division="rookie",
-            subject_key="saxophone",
+            division="open",
+            subject_type="student",
+            subject_key=str(student.id),
+            profile_id=student.id,
+            display_name_snapshot=student.display_name,
+            score=120,
+            rank=1,
+            medal="gold",
         ),
         ContestResult(
             contest_week_id=week.id,
             contest_id=contest.id,
-            division="rookie",
-            subject_key="saxophone",
+            division="open",
+            subject_type="student",
+            subject_key=str(student.id),
+            profile_id=student.id,
+            display_name_snapshot=student.display_name,
+            score=120,
+            rank=1,
+            medal="gold",
         ),
     )
     _assert_duplicate_rejected(
@@ -189,11 +225,13 @@ def test_contest_uniqueness_constraints(
             profile_id=student.id,
             source_key="week:1:contest:1",
             reward_type="dandelion",
+            amount=1,
         ),
         RewardGrant(
             profile_id=student.id,
             source_key="week:1:contest:1",
             reward_type="dandelion",
+            amount=1,
         ),
     )
     _assert_duplicate_rejected(
@@ -201,3 +239,70 @@ def test_contest_uniqueness_constraints(
         CrownProgress(profile_id=student.id, category_key="commitment"),
         CrownProgress(profile_id=student.id, category_key="commitment"),
     )
+
+
+def test_season_and_contest_keys_are_unique(session: Session) -> None:
+    _assert_duplicate_rejected(
+        session,
+        Season(
+            key="band-camp-2026",
+            name="Band Camp",
+            starts_on=date(2026, 7, 27),
+            status="planned",
+        ),
+        Season(
+            key="band-camp-2026",
+            name="Duplicate",
+            starts_on=date(2026, 8, 3),
+            status="planned",
+        ),
+    )
+    _assert_duplicate_rejected(
+        session,
+        Contest(
+            key="commitment",
+            name="Commitment",
+            metric_type="practice_minutes",
+            subject_type="student",
+        ),
+        Contest(
+            key="commitment",
+            name="Duplicate",
+            metric_type="points",
+            subject_type="instrument",
+        ),
+    )
+
+
+def test_contest_models_match_approved_foundation() -> None:
+    expected_columns = {
+        Season: {
+            "id", "key", "name", "timezone", "starts_on", "ends_on",
+            "status", "created_at", "updated_at",
+        },
+        Contest: {
+            "id", "key", "name", "metric_type", "subject_type",
+            "crown_category", "active", "created_at", "updated_at",
+        },
+        ContestWeek: {
+            "id", "season_id", "week_start", "week_end",
+            "verification_deadline_at", "finalize_after", "status",
+            "finalized_at", "created_at", "updated_at",
+        },
+        ContestResult: {
+            "id", "contest_week_id", "contest_id", "division",
+            "subject_type", "subject_key", "profile_id", "instrument",
+            "display_name_snapshot", "score", "rank", "medal", "created_at",
+        },
+        RewardGrant: {
+            "id", "profile_id", "contest_result_id", "source_key",
+            "reward_type", "category_key", "amount", "created_at",
+        },
+        CrownProgress: {
+            "id", "profile_id", "category_key", "qualifying_wins",
+            "crown_earned_at", "created_at", "updated_at",
+        },
+    }
+
+    for model, columns in expected_columns.items():
+        assert set(model.__table__.columns.keys()) == columns
