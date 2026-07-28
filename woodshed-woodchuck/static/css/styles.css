@@ -1744,3 +1744,34 @@ select {
     height: 100%;
   }
 }
+
+/* Phase 4C: tighter Android SHED icon spacing */
+@media (max-width: 640px) {
+  #instrument-object {
+    top: 35%;
+  }
+
+  .p-book-object {
+    top: 71%;
+  }
+
+  .quest-object {
+    bottom: 2rem;
+  }
+
+  .dandelion-object {
+    top: 40%;
+  }
+
+  .metronome-object {
+    top: 57%;
+  }
+
+  .tuner-object {
+    top: 72%;
+  }
+
+  .chair-object {
+    bottom: 2rem;
+  }
+}
