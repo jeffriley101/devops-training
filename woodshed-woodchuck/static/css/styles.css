@@ -1818,3 +1818,245 @@ select {
     font-size: 1.9rem;
   }
 }
+/* Phase 4C: page-wide visual tidy */
+
+/* BOOK: metallic timer */
+.practice-timer-metal {
+  background:
+    linear-gradient(
+      145deg,
+      #d9dde0 0%,
+      #8b949b 32%,
+      #e7eaec 55%,
+      #737d84 100%
+    );
+  border: 3px solid #4e575d;
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 255, 255, 0.45),
+    inset 0 -8px 16px rgba(35, 40, 44, 0.24);
+  color: #172027;
+}
+
+.practice-timer-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 1rem;
+}
+
+.practice-timer-row .btn {
+  flex: 0 0 auto;
+  min-width: 9rem;
+}
+
+#practice-timer-display {
+  margin: 0;
+  min-width: 6ch;
+  font-family: "Courier New", monospace;
+  font-size: clamp(2rem, 6vw, 3.4rem);
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-align: left;
+  color: #11181d;
+  text-shadow: 0 1px rgba(255, 255, 255, 0.65);
+}
+
+/* BOOK: left-aligned checkbox list */
+.practice-detail-grid {
+  justify-items: start;
+  align-items: start;
+  text-align: left;
+}
+
+.practice-detail-grid label {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.55rem;
+  text-align: left;
+}
+
+.practice-detail-grid input[type="checkbox"] {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+/* BOOK: same-size vertical actions */
+.p-book-action-column {
+  width: min(100%, 22rem);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.7rem;
+}
+
+.p-book-action-column .btn {
+  width: 100%;
+  min-height: 3rem;
+}
+
+/* BOOK: antique pirate logbook */
+.pirate-logbook {
+  position: relative;
+  overflow: hidden;
+  padding: 1.5rem;
+  border: 5px double #4a2c18;
+  border-radius: 10px;
+  background:
+    linear-gradient(
+      rgba(255, 248, 215, 0.82),
+      rgba(219, 184, 116, 0.82)
+    ),
+    repeating-linear-gradient(
+      0deg,
+      transparent 0,
+      transparent 29px,
+      rgba(91, 57, 28, 0.15) 30px
+    );
+  color: #382310;
+  box-shadow:
+    inset 0 0 30px rgba(83, 47, 15, 0.34),
+    0 7px 15px rgba(45, 27, 14, 0.2);
+}
+
+.pirate-logbook::before {
+  content: "✦ Captain’s Practice Log ✦";
+  display: block;
+  margin-bottom: 1rem;
+  padding-bottom: 0.7rem;
+  border-bottom: 2px solid rgba(72, 40, 17, 0.55);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.35rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-align: center;
+}
+
+/* BOARD: centered public-events heading */
+.board-page {
+  background:
+    linear-gradient(rgba(112, 67, 35, 0.08), rgba(112, 67, 35, 0.08)),
+    #b77b45;
+  border-color: #6d4126;
+}
+
+.board-page > .section-head {
+  text-align: center;
+}
+
+.board-season-title {
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto 0.65rem;
+  padding: 0.55rem 2rem;
+  border: 3px double #5f3b21;
+  background: #f2dfb2;
+  color: #4a2a16;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(2rem, 6vw, 3.4rem);
+  letter-spacing: 0.08em;
+  text-align: center;
+  transform: rotate(-0.5deg);
+  box-shadow: 0 4px 8px rgba(55, 31, 15, 0.26);
+}
+
+/* BOARD: paper notices pinned to cork */
+.board-contest-card,
+.board-panel,
+.board-banner {
+  position: relative;
+  border: 1px solid #8a6a3e;
+  background:
+    linear-gradient(
+      165deg,
+      rgba(255, 253, 230, 0.98),
+      rgba(231, 215, 166, 0.98)
+    );
+  color: #332617;
+  box-shadow:
+    0 5px 10px rgba(61, 37, 21, 0.25),
+    inset 0 0 16px rgba(126, 91, 43, 0.1);
+}
+
+.board-contest-card:nth-child(even),
+.board-panel:nth-child(even) {
+  transform: rotate(0.35deg);
+}
+
+.board-contest-card:nth-child(odd),
+.board-panel:nth-child(odd) {
+  transform: rotate(-0.25deg);
+}
+
+.board-contest-card::before,
+.board-panel::before,
+.board-banner::before {
+  content: "";
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  width: 13px;
+  height: 13px;
+  border: 2px solid #7b1f18;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 35% 30%, #ffb2a8 0 12%, #c94235 30%, #751c17 75%);
+  box-shadow: 0 2px 3px rgba(35, 20, 12, 0.45);
+  transform: translateX(-50%);
+}
+
+.cork-paper {
+  padding-top: 1.7rem;
+}
+
+.weekly-top-five {
+  list-style-position: inside;
+}
+
+/* BOARD: lower practice layer becomes corkboard */
+.board-practice-section {
+  border: 10px ridge #6d3d20;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(255,255,255,0.08), transparent 20%),
+    radial-gradient(circle at 75% 40%, rgba(77,39,17,0.12), transparent 18%),
+    #a96e3c;
+  box-shadow:
+    inset 0 0 28px rgba(62, 31, 13, 0.38),
+    0 8px 16px rgba(49, 29, 16, 0.24);
+}
+
+.board-practice-section > .section-head,
+.board-practice-section > form,
+.board-practice-section > article,
+.board-practice-section > .button-row {
+  position: relative;
+  padding: 1rem;
+  background: #f3e5ba;
+  color: #352616;
+  box-shadow: 0 4px 9px rgba(55, 31, 15, 0.24);
+}
+
+/* SHOP */
+.shop-page .mentor-card {
+  padding-top: 1.5rem;
+}
+
+@media (max-width: 640px) {
+  .practice-timer-row {
+    gap: 0.7rem;
+  }
+
+  .practice-timer-row .btn {
+    min-width: 8rem;
+  }
+
+  #practice-timer-display {
+    font-size: 2.1rem;
+  }
+
+  .board-season-title {
+    width: 100%;
+    padding-inline: 0.75rem;
+  }
+}
