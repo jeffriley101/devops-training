@@ -25,7 +25,7 @@ MAX_DAILY_CREDITS = 75
 @dataclass(frozen=True)
 class CreatedPracticeChartRequest:
     chart: PracticeChart
-    verification: PracticeChartVerification
+    verification: PracticeChartVerification | None
 
 
 def normalize_practice_details(
@@ -68,7 +68,7 @@ def create_practice_chart_verification_request(
     session: Session,
     *,
     profile: WoodchuckProfile,
-    verifier_id: int,
+    verifier_id: int | None,
     practice_date: date,
     minutes: int,
     note: str = "",
@@ -117,18 +117,19 @@ def create_practice_chart_verification_request(
         practice_details
     )
 
-    connection = session.scalar(
-        select(StudentVerifierConnection).where(
-            StudentVerifierConnection.profile_id == profile.id,
-            StudentVerifierConnection.verifier_id == verifier_id,
-            StudentVerifierConnection.status == "accepted",
+    if verifier_id is not None:
+        connection = session.scalar(
+            select(StudentVerifierConnection).where(
+                StudentVerifierConnection.profile_id == profile.id,
+                StudentVerifierConnection.verifier_id == verifier_id,
+                StudentVerifierConnection.status == "accepted",
+            )
         )
-    )
 
-    if connection is None:
-        raise ValueError(
-            "That trusted verifier is not connected to this student."
-        )
+        if connection is None:
+            raise ValueError(
+                "That trusted verifier is not connected to this student."
+            )
 
     instrument = profile.instrument.strip()
 
@@ -151,18 +152,20 @@ def create_practice_chart_verification_request(
     session.add(chart)
     session.flush()
 
-    verification = PracticeChartVerification(
-        practice_chart_id=chart.id,
-        verifier_id=verifier_id,
-        status="pending",
-    )
-
-    session.add(verification)
+    verification = None
+    if verifier_id is not None:
+        verification = PracticeChartVerification(
+            practice_chart_id=chart.id,
+            verifier_id=verifier_id,
+            status="pending",
+        )
+        session.add(verification)
 
     try:
         session.commit()
         session.refresh(chart)
-        session.refresh(verification)
+        if verification is not None:
+            session.refresh(verification)
     except IntegrityError as error:
         session.rollback()
         raise RuntimeError(
@@ -255,4 +258,3 @@ def respond_to_practice_chart_verification(
         ) from error
 
     return verification
-
