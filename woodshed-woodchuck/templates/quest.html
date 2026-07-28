@@ -20,11 +20,6 @@
       </p>
     </div>
 
-    <div class="board-leader">
-      <small>Current Point Leader</small>
-      <strong id="board-leader-name">No camper yet</strong>
-      <span id="board-leader-points">0 points</span>
-    </div>
   </section>
 
   <div class="board-layout">
@@ -181,6 +176,29 @@
           role="tabpanel"
           aria-labelledby="contest-open-tab"
         >
+          <section class="contest-points-section" aria-labelledby="open-points-title">
+            <h4 id="open-points-title">Top Five Points Leaders</h4>
+            <div id="contest-open-position" class="contest-position-card">
+              <strong>Your Position</strong>
+              <span id="contest-open-position-message">Loading your position…</span>
+            </div>
+            <div class="contest-standings-table-wrap">
+              <table class="contest-standings-table contest-points-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Rank</th>
+                    <th scope="col">Woodchuck</th>
+                    <th scope="col">Points</th>
+                  </tr>
+                </thead>
+                <tbody id="contest-open-points"></tbody>
+              </table>
+            </div>
+            <p id="contest-open-points-empty" class="contest-empty-state hidden">
+              No Open points have been scored this week yet.
+            </p>
+          </section>
+
           <p class="contest-division-explanation">
             Open includes all submitted P-Charts.
           </p>
@@ -208,6 +226,29 @@
           aria-labelledby="contest-verified-tab"
           hidden
         >
+          <section class="contest-points-section" aria-labelledby="verified-points-title">
+            <h4 id="verified-points-title">Top Five Points Leaders</h4>
+            <div id="contest-verified-position" class="contest-position-card">
+              <strong>Your Position</strong>
+              <span id="contest-verified-position-message">Loading your position…</span>
+            </div>
+            <div class="contest-standings-table-wrap">
+              <table class="contest-standings-table contest-points-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Rank</th>
+                    <th scope="col">Woodchuck</th>
+                    <th scope="col">Points</th>
+                  </tr>
+                </thead>
+                <tbody id="contest-verified-points"></tbody>
+              </table>
+            </div>
+            <p id="contest-verified-points-empty" class="contest-empty-state hidden">
+              No Verified points have been scored this week yet.
+            </p>
+          </section>
+
           <p class="contest-division-explanation">
             Verified includes only approved P-Charts.
           </p>

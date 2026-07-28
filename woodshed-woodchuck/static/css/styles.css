@@ -1001,6 +1001,39 @@ select {
   font-size: 0.88rem;
 }
 
+.contest-points-section {
+  margin-bottom: 1rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 2px solid rgba(92, 63, 32, 0.35);
+}
+
+.contest-points-section h4 {
+  margin: 0 0 0.55rem;
+}
+
+.contest-position-card {
+  display: grid;
+  gap: 0.2rem;
+  margin-bottom: 0.65rem;
+  padding: 0.7rem;
+  color: #fff8e8;
+  background: #526b3f;
+  border: 2px solid #304725;
+  border-radius: 10px;
+  box-shadow: 0 3px 7px rgba(35, 27, 17, 0.22);
+}
+
+.contest-position-card strong {
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.contest-current-user-row {
+  font-weight: 900;
+  background: rgba(82, 107, 63, 0.16);
+}
+
 .contest-empty-state {
   padding: 0.7rem;
   text-align: center;

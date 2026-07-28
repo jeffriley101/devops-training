@@ -24,6 +24,10 @@ def test_board_contains_live_standings_markup() -> None:
     assert "Rank" in markup
     assert "Instrument" in markup
     assert "Practice Minutes" in markup
+    assert 'id="contest-open-points"' in markup
+    assert 'id="contest-verified-points"' in markup
+    assert "Top Five Points Leaders" in markup
+    assert "Your Position" in markup
 
 
 def test_board_preserves_placeholders_without_crown_progress() -> None:
@@ -63,3 +67,11 @@ def test_board_template_contains_no_private_account_fields() -> None:
         "verifier_email",
     ):
         assert private_field not in markup
+
+
+def test_fake_local_point_leader_is_not_presented() -> None:
+    markup = board_template()
+
+    assert "Current Point Leader" not in markup
+    assert 'id="board-leader-name"' not in markup
+    assert 'id="board-leader-points"' not in markup

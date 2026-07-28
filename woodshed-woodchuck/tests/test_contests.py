@@ -17,6 +17,7 @@ from app.contests import (
     current_contests_payload,
     ensure_band_camp_data,
     weekly_practice_by_instrument,
+    weekly_student_points,
 )
 from app.db import Base
 from app.models import (
@@ -275,12 +276,15 @@ def test_endpoint_requires_authentication_and_exposes_no_private_data(
         "verifier",
         "pin_hash",
         "woodchuck_id",
-        "display_name",
         "legal_name",
     ):
         assert private_field not in serialized
 
-    direct_payload = current_contests_payload(session, now=NOW)
+    direct_payload = current_contests_payload(
+        session,
+        now=NOW,
+        current_profile_id=profile.id,
+    )
     assert direct_payload["season"] == {
         "key": "band-camp-2026",
         "name": "Band Camp",
@@ -289,3 +293,191 @@ def test_endpoint_requires_authentication_and_exposes_no_private_data(
         "starts_on": "2026-07-27",
         "ends_on": None,
     }
+
+
+def test_student_points_rankings_and_current_user_position(
+    database: tuple[Session, sessionmaker[Session]],
+) -> None:
+    session, _ = database
+    _, _, contest_week = ensure_band_camp_data(session, now=NOW)
+    students = [
+        add_student(
+            session,
+            woodchuck_id=f"WC-POINT-{index}",
+            instrument="Saxophone",
+        )
+        for index in range(1, 8)
+    ]
+    students[0].display_name = "Alpha Chuck"
+    students[1].display_name = "Bravo Chuck"
+    students[2].display_name = "Charlie Chuck"
+    students[3].display_name = "Delta Chuck"
+    students[4].display_name = "Echo Chuck"
+    students[5].display_name = "Foxtrot Chuck"
+    students[6].display_name = "Golf Chuck"
+
+    for index, profile in enumerate(students):
+        point_count = 7 - index
+        for chart_index in range(point_count):
+            add_chart(
+                session,
+                profile=profile,
+                practice_date=date(2026, 7, 28),
+                minutes=10,
+                verification_status=(
+                    "approved" if chart_index < max(point_count - 1, 0) else None
+                ),
+            )
+    session.commit()
+
+    standings = weekly_student_points(
+        session,
+        contest_week=contest_week,
+        current_profile_id=students[5].id,
+    )
+
+    assert len(standings["open"]) == 6
+    assert standings["open"][-1] == {
+        "rank": 6,
+        "display_name": "Foxtrot Chuck",
+        "total_points": 2,
+        "is_current_user": True,
+    }
+    assert standings["current_user_position"]["open"] == {
+        "rank": 6,
+        "total_points": 2,
+        "points_behind_leader": 5,
+        "tied": False,
+        "in_top_five": False,
+        "has_score": True,
+    }
+    assert standings["current_user_position"]["verified"]["total_points"] == 1
+    assert all(
+        set(row) == {
+            "rank", "display_name", "total_points", "is_current_user"
+        }
+        for division in ("open", "verified")
+        for row in standings[division]
+    )
+
+
+def test_student_points_use_olympic_ties_and_separate_divisions(
+    database: tuple[Session, sessionmaker[Session]],
+) -> None:
+    session, _ = database
+    _, _, contest_week = ensure_band_camp_data(session, now=NOW)
+    alpha = add_student(session, woodchuck_id="WC-ALPHA", instrument="Flute")
+    beta = add_student(session, woodchuck_id="WC-BETA", instrument="Flute")
+    gamma = add_student(session, woodchuck_id="WC-GAMMA", instrument="Flute")
+    alpha.display_name = "Alpha"
+    beta.display_name = "Beta"
+    gamma.display_name = "Gamma"
+    for profile, statuses in (
+        (alpha, ("approved", "approved")),
+        (beta, ("approved", None)),
+        (gamma, (None,)),
+    ):
+        for status in statuses:
+            add_chart(
+                session,
+                profile=profile,
+                practice_date=date(2026, 7, 29),
+                minutes=15,
+                verification_status=status,
+            )
+    session.commit()
+
+    standings = weekly_student_points(
+        session,
+        contest_week=contest_week,
+        current_profile_id=beta.id,
+    )
+
+    assert [(row["rank"], row["display_name"], row["total_points"]) for row in standings["open"]] == [
+        (1, "Alpha", 2),
+        (1, "Beta", 2),
+        (3, "Gamma", 1),
+    ]
+    assert [(row["display_name"], row["total_points"]) for row in standings["verified"]] == [
+        ("Alpha", 2),
+        ("Beta", 1),
+    ]
+    assert standings["current_user_position"]["open"]["tied"] is True
+    assert standings["current_user_position"]["open"]["points_behind_leader"] == 0
+    assert standings["current_user_position"]["verified"]["points_behind_leader"] == 1
+
+
+def test_student_points_missing_score_and_name_use_safe_public_values(
+    database: tuple[Session, sessionmaker[Session]],
+) -> None:
+    session, _ = database
+    _, _, contest_week = ensure_band_camp_data(session, now=NOW)
+    leader = add_student(session, woodchuck_id="WC-LEADER", instrument="Tuba")
+    current = add_student(session, woodchuck_id="WC-CURRENT", instrument="Tuba")
+    leader.display_name = "   "
+    add_chart(
+        session,
+        profile=leader,
+        practice_date=date(2026, 7, 30),
+        minutes=20,
+    )
+    session.commit()
+
+    standings = weekly_student_points(
+        session,
+        contest_week=contest_week,
+        current_profile_id=current.id,
+    )
+
+    assert standings["open"][0]["display_name"] == "Woodchuck"
+    assert standings["current_user_position"]["open"] == {
+        "rank": None,
+        "total_points": 0,
+        "points_behind_leader": 1,
+        "tied": False,
+        "in_top_five": False,
+        "has_score": False,
+    }
+
+
+def test_points_api_exposes_only_public_leaderboard_fields(
+    database: tuple[Session, sessionmaker[Session]],
+) -> None:
+    session, _ = database
+    profile = add_student(
+        session,
+        woodchuck_id="WC-SECRET-ID",
+        instrument="Clarinet",
+    )
+    profile.display_name = "Public Chuck"
+    add_chart(
+        session,
+        profile=profile,
+        practice_date=date(2026, 7, 30),
+        minutes=25,
+        verification_status="approved",
+    )
+    session.commit()
+
+    payload = current_contests_payload(
+        session,
+        now=NOW,
+        current_profile_id=profile.id,
+    )
+    points = payload["standings"]["weekly-points-leaders"]
+    assert points["open"][0] == {
+        "rank": 1,
+        "display_name": "Public Chuck",
+        "total_points": 1,
+        "is_current_user": True,
+    }
+    serialized = repr(points).casefold()
+    for private_value in (
+        "wc-secret-id",
+        "pin_hash",
+        "email",
+        "verifier",
+        "profile_id",
+        "woodchuck_id",
+    ):
+        assert private_value not in serialized

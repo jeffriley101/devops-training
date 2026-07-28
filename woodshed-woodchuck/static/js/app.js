@@ -1027,8 +1027,6 @@
     if (!playerNameEl) return;
 
     const playerPointsEl = document.getElementById("board-player-points");
-    const leaderNameEl = document.getElementById("board-leader-name");
-    const leaderPointsEl = document.getElementById("board-leader-points");
 
     const hoursForm = document.getElementById("camp-hours-form");
     const hoursInput = document.getElementById("camp-hours");
@@ -1231,15 +1229,6 @@
 
       if (playerPointsEl) {
         playerPointsEl.textContent = String(points);
-      }
-
-      if (leaderNameEl) {
-        leaderNameEl.textContent = points > 0 ? name : "No camper yet";
-      }
-
-      if (leaderPointsEl) {
-        leaderPointsEl.textContent =
-          points === 1 ? "1 point" : `${points} points`;
       }
 
       if (hoursInput) {
@@ -1563,6 +1552,87 @@
       if (tableWrap) tableWrap.classList.toggle("hidden", isEmpty);
     }
 
+    function ordinal(rank) {
+      const remainder100 = rank % 100;
+      if (remainder100 >= 11 && remainder100 <= 13) return `${rank}th`;
+      if (rank % 10 === 1) return `${rank}st`;
+      if (rank % 10 === 2) return `${rank}nd`;
+      if (rank % 10 === 3) return `${rank}rd`;
+      return `${rank}th`;
+    }
+
+    function positionMessage(division, position) {
+      if (!position || position.has_score !== true) {
+        return division === "verified"
+          ? "No verified score yet."
+          : "No Open score yet.";
+      }
+      if (!Number.isInteger(position.rank) || position.rank < 1) {
+        return "Your position is unavailable.";
+      }
+      if (position.tied === true) {
+        return `You are tied for ${ordinal(position.rank)}.`;
+      }
+      if (position.rank === 1) {
+        return "You are in 1st place.";
+      }
+      if (
+        Number.isInteger(position.points_behind_leader) &&
+        position.points_behind_leader > 0
+      ) {
+        const points = position.points_behind_leader;
+        return `You are ${points} ${points === 1 ? "point" : "points"} behind the leader.`;
+      }
+      return `You are in ${ordinal(position.rank)} place.`;
+    }
+
+    function renderPointsDivision(division, rows, position) {
+      const body = document.getElementById(`contest-${division}-points`);
+      const emptyEl = document.getElementById(
+        `contest-${division}-points-empty`
+      );
+      const messageEl = document.getElementById(
+        `contest-${division}-position-message`
+      );
+      if (!body || !emptyEl || !messageEl) return;
+
+      body.replaceChildren();
+      const safeRows = Array.isArray(rows)
+        ? rows.filter((row) => (
+            row &&
+            Number.isInteger(row.rank) &&
+            row.rank > 0 &&
+            typeof row.display_name === "string" &&
+            row.display_name.trim() &&
+            Number.isInteger(row.total_points) &&
+            row.total_points >= 0 &&
+            typeof row.is_current_user === "boolean"
+          ))
+        : [];
+
+      safeRows.forEach((row) => {
+        const tableRow = document.createElement("tr");
+        if (row.is_current_user) {
+          tableRow.classList.add("contest-current-user-row");
+        }
+        const publicName = row.is_current_user
+          ? `${row.display_name} (You)`
+          : row.display_name;
+        [row.rank, publicName, row.total_points].forEach((value) => {
+          const cell = document.createElement("td");
+          cell.textContent = String(value);
+          tableRow.appendChild(cell);
+        });
+        body.appendChild(tableRow);
+      });
+
+      const tableWrap = body.closest(".contest-standings-table-wrap");
+      const isEmpty = safeRows.length === 0;
+      emptyEl.classList.toggle("hidden", !isEmpty);
+      if (tableWrap) tableWrap.classList.toggle("hidden", isEmpty);
+      messageEl.textContent = positionMessage(division, position);
+    }
+
     function showError(message) {
       if (loadingEl) loadingEl.classList.add("hidden");
       if (errorEl) {
@@ -1593,11 +1663,19 @@
         const standings = payload && payload.standings;
         const practiceStandings = standings &&
           standings["weekly-practice-by-instrument"];
+        const pointsStandings = standings &&
+          standings["weekly-points-leaders"];
         if (
           !week ||
           !practiceStandings ||
+          !pointsStandings ||
           !Array.isArray(practiceStandings.open) ||
-          !Array.isArray(practiceStandings.verified)
+          !Array.isArray(practiceStandings.verified) ||
+          !Array.isArray(pointsStandings.open) ||
+          !Array.isArray(pointsStandings.verified) ||
+          !pointsStandings.current_user_position ||
+          !pointsStandings.current_user_position.open ||
+          !pointsStandings.current_user_position.verified
         ) {
           showError("Band Camp standings could not be read.");
           return;
@@ -1625,6 +1703,16 @@
 
         renderDivision("open", practiceStandings.open);
         renderDivision("verified", practiceStandings.verified);
+        renderPointsDivision(
+          "open",
+          pointsStandings.open,
+          pointsStandings.current_user_position.open
+        );
+        renderPointsDivision(
+          "verified",
+          pointsStandings.verified,
+          pointsStandings.current_user_position.verified
+        );
         if (loadingEl) loadingEl.classList.add("hidden");
         if (errorEl) errorEl.classList.add("hidden");
         root.setAttribute("aria-busy", "false");

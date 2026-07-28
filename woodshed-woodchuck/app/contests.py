@@ -15,6 +15,7 @@ from .models import (
     PracticeChart,
     PracticeChartVerification,
     Season,
+    WoodchuckProfile,
 )
 
 
@@ -188,6 +189,137 @@ def weekly_practice_by_instrument(
     }
 
 
+def public_woodchuck_name(profile: WoodchuckProfile | None) -> str:
+    if profile is None:
+        return "Woodchuck"
+    display_name = " ".join(profile.display_name.split())
+    return display_name or "Woodchuck"
+
+
+def student_points_rows(
+    scores: dict[int, int],
+    profiles: dict[int, WoodchuckProfile],
+    *,
+    current_profile_id: int,
+) -> tuple[list[dict[str, object]], dict[str, object]]:
+    ordered = sorted(
+        scores.items(),
+        key=lambda item: (
+            -item[1],
+            public_woodchuck_name(profiles.get(item[0])).casefold(),
+            public_woodchuck_name(profiles.get(item[0])),
+        ),
+    )
+    all_rows: list[dict[str, object]] = []
+    previous_score: int | None = None
+    rank = 0
+    for position, (profile_id, total_points) in enumerate(ordered, start=1):
+        if total_points != previous_score:
+            rank = position
+            previous_score = total_points
+        all_rows.append(
+            {
+                "rank": rank,
+                "display_name": public_woodchuck_name(profiles.get(profile_id)),
+                "total_points": total_points,
+                "is_current_user": profile_id == current_profile_id,
+            }
+        )
+
+    current_index = next(
+        (
+            index
+            for index, row in enumerate(all_rows)
+            if row["is_current_user"]
+        ),
+        None,
+    )
+    current_row = all_rows[current_index] if current_index is not None else None
+    leader_points = int(all_rows[0]["total_points"]) if all_rows else 0
+    current_points = int(current_row["total_points"]) if current_row else 0
+    current_rank = int(current_row["rank"]) if current_row else None
+    tied = bool(
+        current_row
+        and sum(
+            row["total_points"] == current_row["total_points"]
+            for row in all_rows
+        ) > 1
+    )
+    in_top_five = current_index is not None and current_index < 5
+    visible_rows = all_rows[:5]
+    if current_row is not None and not in_top_five:
+        visible_rows.append(current_row)
+
+    return visible_rows, {
+        "rank": current_rank,
+        "total_points": current_points,
+        "points_behind_leader": max(leader_points - current_points, 0),
+        "tied": tied,
+        "in_top_five": in_top_five,
+        "has_score": current_row is not None,
+    }
+
+
+def weekly_student_points(
+    session: Session,
+    *,
+    contest_week: ContestWeek,
+    current_profile_id: int,
+) -> dict[str, object]:
+    charts = session.scalars(
+        select(PracticeChart).where(
+            PracticeChart.practice_date >= contest_week.week_start,
+            PracticeChart.practice_date < contest_week.week_end,
+        )
+    ).all()
+    chart_ids = [chart.id for chart in charts]
+    approved_chart_ids: set[int] = set()
+    if chart_ids:
+        approved_chart_ids = set(
+            session.scalars(
+                select(PracticeChartVerification.practice_chart_id).where(
+                    PracticeChartVerification.practice_chart_id.in_(chart_ids),
+                    PracticeChartVerification.status == "approved",
+                )
+            ).all()
+        )
+
+    open_scores: dict[int, int] = {}
+    verified_scores: dict[int, int] = {}
+    for chart in charts:
+        open_scores[chart.profile_id] = open_scores.get(chart.profile_id, 0) + 1
+        if chart.id in approved_chart_ids:
+            verified_scores[chart.profile_id] = (
+                verified_scores.get(chart.profile_id, 0) + 1
+            )
+
+    profile_ids = set(open_scores) | set(verified_scores)
+    profiles = {
+        profile.id: profile
+        for profile in session.scalars(
+            select(WoodchuckProfile).where(WoodchuckProfile.id.in_(profile_ids))
+        ).all()
+    } if profile_ids else {}
+    open_rows, open_position = student_points_rows(
+        open_scores,
+        profiles,
+        current_profile_id=current_profile_id,
+    )
+    verified_rows, verified_position = student_points_rows(
+        verified_scores,
+        profiles,
+        current_profile_id=current_profile_id,
+    )
+    return {
+        "open": open_rows,
+        "verified": verified_rows,
+        "current_user_position": {
+            "open": open_position,
+            "verified": verified_position,
+        },
+    }
+
+
 def utc_iso(value: datetime | None) -> str | None:
     if value is None:
         return None
@@ -200,11 +332,17 @@ def current_contests_payload(
     session: Session,
     *,
     now: datetime,
+    current_profile_id: int,
 ) -> dict[str, object]:
     season, contests, contest_week = ensure_band_camp_data(session, now=now)
     standings = weekly_practice_by_instrument(
         session,
         contest_week=contest_week,
+    )
+    points_standings = weekly_student_points(
+        session,
+        contest_week=contest_week,
+        current_profile_id=current_profile_id,
     )
     return {
         "season": {
@@ -235,6 +373,7 @@ def current_contests_payload(
             for contest in contests
         ],
         "standings": {
+            "weekly-points-leaders": points_standings,
             "weekly-practice-by-instrument": standings,
         },
     }
@@ -243,7 +382,8 @@ def current_contests_payload(
 @router.get("/current")
 def current_contests(request: Request) -> dict[str, object]:
     with SessionLocal() as session:
-        if current_profile(request, session) is None:
+        profile = current_profile(request, session)
+        if profile is None:
             raise HTTPException(
                 status_code=401,
                 detail="Student sign-in is required.",
@@ -251,4 +391,5 @@ def current_contests(request: Request) -> dict[str, object]:
         return current_contests_payload(
             session,
             now=datetime.now(timezone.utc),
+            current_profile_id=profile.id,
         )
