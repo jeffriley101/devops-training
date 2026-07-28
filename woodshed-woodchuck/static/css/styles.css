@@ -1767,23 +1767,23 @@ select {
   }
 
   #camp-level-value {
-    top: 16%;
+    top: 9%;
   }
 
   #instrument-object {
-    top: 10% !important;
+    top: 27% !important;
   }
 
   #level-value {
-    top: 35%;
+    top: 47%;
   }
 
   .p-book-object {
-    top: 55% !important;
+    top: 66% !important;
   }
 
   .quest-object {
-    top: 78%;
+    top: 84%;
     bottom: auto;
   }
 
