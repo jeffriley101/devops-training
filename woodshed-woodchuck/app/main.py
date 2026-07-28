@@ -16,6 +16,7 @@ from .verifier_routes import (
     router as verifier_router,
 )
 from .practice_chart_routes import router as practice_chart_router
+from .contests import router as contest_router
 from .db import SessionLocal
 from .content import (
     GOAL_OPTIONS,
@@ -48,6 +49,7 @@ app.add_middleware(
 app.include_router(account_router)
 app.include_router(verifier_router)
 app.include_router(practice_chart_router)
+app.include_router(contest_router)
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
