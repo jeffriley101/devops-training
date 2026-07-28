@@ -2,14 +2,46 @@
 
 {% block content %}
 <section class="card">
-  <article class="mentor-card" aria-label="Practice timer">
-    <p class="chip">Practice Timer</p>
-    <p id="practice-timer-display">00:00</p>
-    <div class="button-row">
-      <button id="practice-timer-start-btn" class="btn btn-secondary" type="button">Start Timer</button>
-      <button id="practice-timer-stop-btn" class="btn btn-red" type="button">Stop Timer</button>
+  <article class="mentor-card practice-timer-metal" aria-label="Practice timer">
+    <div class="practice-timer-row">
+      <button
+        id="practice-timer-toggle-btn"
+        class="btn btn-secondary"
+        type="button"
+      >
+        Start Timer
+      </button>
+
+      <p id="practice-timer-display">00:00</p>
     </div>
-    <p id="practice-timer-feedback" class="body-copy" aria-live="polite">Stop the timer to fill in your minutes. You can still change them before submitting.</p>
+
+    <button
+      id="practice-timer-start-btn"
+      class="hidden"
+      type="button"
+      tabindex="-1"
+      aria-hidden="true"
+    >
+      Start Timer
+    </button>
+
+    <button
+      id="practice-timer-stop-btn"
+      class="hidden"
+      type="button"
+      tabindex="-1"
+      aria-hidden="true"
+    >
+      Stop Timer
+    </button>
+
+    <p
+      id="practice-timer-feedback"
+      class="body-copy"
+      aria-live="polite"
+    >
+      Stop the timer to fill in your minutes. You can still change them before submitting.
+    </p>
   </article>
 
   <form id="p-book-form" class="stack-form mt-md" novalidate>
@@ -72,10 +104,10 @@
     <p id="p-book-error" class="error-text" aria-live="polite"></p>
     <p id="p-book-feedback" class="body-copy" aria-live="polite"></p>
 
-    <div class="button-row">
-      <button class="btn btn-green" type="submit">Submit to P-Book</button>
-      <button id="email-p-chart-btn" class="btn btn-red" type="button">Email P-Chart</button>
-      <button id="export-p-chart-btn" class="btn btn-secondary" type="button">Copy P-Chart</button>
+    <div class="p-book-action-column">
+      <button class="btn btn-green" type="submit">Submit</button>
+      <button id="export-p-chart-btn" class="btn btn-secondary" type="button">Copy</button>
+      <button id="email-p-chart-btn" class="btn btn-red" type="button">Email</button>
     </div>
 
     <details class="mentor-card">
@@ -121,11 +153,41 @@
     </article>
   </div>
 
-  <article class="mentor-card mt-md">
-    <p class="chip">P-Book</p>
+  <article class="mentor-card mt-md pirate-logbook">
     <div id="p-book-entries">
       <p>No practice charts logged yet.</p>
     </div>
   </article>
 </section>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const toggleButton = document.getElementById("practice-timer-toggle-btn");
+    const startButton = document.getElementById("practice-timer-start-btn");
+    const stopButton = document.getElementById("practice-timer-stop-btn");
+
+    if (!toggleButton || !startButton || !stopButton) {
+      return;
+    }
+
+    let timerRunning = false;
+
+    toggleButton.addEventListener("click", function () {
+      if (timerRunning) {
+        stopButton.click();
+        timerRunning = false;
+        toggleButton.textContent = "Start Timer";
+        toggleButton.classList.remove("btn-red");
+        toggleButton.classList.add("btn-secondary");
+      } else {
+        startButton.click();
+        timerRunning = true;
+        toggleButton.textContent = "Stop Timer";
+        toggleButton.classList.remove("btn-secondary");
+        toggleButton.classList.add("btn-red");
+      }
+    });
+  });
+</script>
+
 {% endblock %}

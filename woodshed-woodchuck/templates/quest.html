@@ -3,12 +3,11 @@
 {% block content %}
 <section class="card board-page">
   <div class="section-head">
-    <p class="chip">First Season</p>
-    <h2>Band Camp</h2>
-    <p class="body-copy">
-      Complete daily camp contests, earn dandelions, and get your
-      Woodchuck’s name on the Board.
-    </p>
+    <h2 class="board-season-title" aria-label="Band Camp">
+      <span>B</span><span>a</span><span>n</span><span>d</span>
+      <span class="letter-gap" aria-hidden="true"></span>
+      <span>C</span><span>a</span><span>m</span><span>p</span>
+    </h2>
   </div>
 
   <section class="board-banner">
@@ -140,6 +139,26 @@
         <ul id="past-winners-list" class="board-name-list">
           <li>No daily champion yet.</li>
         </ul>
+      </section>
+
+      <section class="board-panel cork-paper">
+        <h3>Open Weekly Practice Minutes by Instrument</h3>
+        <p class="body-copy">
+          Top five musicians from all submitted P-Charts.
+        </p>
+        <ol id="open-instrument-weekly-list" class="board-name-list weekly-top-five">
+          <li>Shared standings begin with Phase 5.</li>
+        </ol>
+      </section>
+
+      <section class="board-panel cork-paper">
+        <h3>Verified Weekly Practice Minutes by Instrument</h3>
+        <p class="body-copy">
+          Top five musicians whose charts were approved by a trusted verifier.
+        </p>
+        <ol id="verified-instrument-weekly-list" class="board-name-list weekly-top-five">
+          <li>Verified standings begin with Phase 5.</li>
+        </ol>
       </section>
 
       <section class="board-panel hall-of-champions">

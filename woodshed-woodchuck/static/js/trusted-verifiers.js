@@ -106,8 +106,41 @@
     ).toString();
 
     inviteLink.textContent = currentInvitationUrl;
+    inviteLink.href = currentInvitationUrl;
     successPanel.hidden = false;
     copyFeedback.textContent = "";
+  };
+
+  const openInvitationEmail = (
+    recipientEmail,
+    invitationRole
+  ) => {
+    const subject =
+      "Woodshed Woodchuck Trusted Verifier Invitation";
+
+    const message = [
+      "Hello,",
+      "",
+      "You have been invited to become a trusted verifier for a Woodshed Woodchuck student.",
+      "",
+      `Verifier role: ${roleLabel(invitationRole)}`,
+      "",
+      "Open this private link to accept the invitation and create your verifier PIN:",
+      currentInvitationUrl,
+      "",
+      "This invitation link is private. Please do not forward it.",
+      "",
+      "Thank you!"
+    ].join("\n");
+
+    const params = new URLSearchParams();
+    params.set("subject", subject);
+    params.set("body", message);
+
+    const mailtoUrl =
+      `mailto:${encodeURIComponent(recipientEmail)}?${params.toString()}`;
+
+    window.location.href = mailtoUrl;
   };
 
   const runLifecycleAction = async (
@@ -199,6 +232,10 @@
       }
 
       showInvitationLink(payload);
+      openInvitationEmail(
+        invitation.email,
+        invitation.role
+      );
 
       copyFeedback.textContent =
         "New link created. The previous link no longer works.";
@@ -330,11 +367,19 @@
     successPanel.hidden = true;
 
     try {
+      const formData = new FormData(form);
+      const recipientEmail = String(
+        formData.get("email") || ""
+      ).trim();
+      const invitationRole = String(
+        formData.get("role") || ""
+      ).trim();
+
       const response = await fetch(
         "/trusted-verifiers/invitations",
         {
           method: "POST",
-          body: new FormData(form),
+          body: formData,
           credentials: "same-origin",
         }
       );
@@ -348,6 +393,10 @@
       }
 
       showInvitationLink(payload);
+      openInvitationEmail(
+        recipientEmail,
+        invitationRole
+      );
       form.reset();
 
       await loadVerifiers();

@@ -74,11 +74,23 @@
         <h3>Invitation Created</h3>
 
         <p>
-          Give this private invitation link to the trusted adult.
+          Your email app should open with the adult's address,
+          message, and private invitation link filled in.
+          Press Send to deliver it.
         </p>
 
         <p>
-          <code id="trusted-verifier-invite-link"></code>
+          If the email app does not open, copy the link below
+          and send it manually.
+        </p>
+
+        <p>
+          <a
+            id="trusted-verifier-invite-link"
+            href="#"
+            target="_blank"
+            rel="noopener noreferrer"
+          ></a>
         </p>
 
         <button
@@ -149,5 +161,5 @@
 {% endblock %}
 
 {% block page_scripts %}
-<script src="/static/js/trusted-verifiers.js?v=3"></script>
+<script src="/static/js/trusted-verifiers.js?v=5"></script>
 {% endblock %}

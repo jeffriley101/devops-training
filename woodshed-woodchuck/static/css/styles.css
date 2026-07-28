@@ -2060,3 +2060,595 @@ select {
     padding-inline: 0.75rem;
   }
 }
+
+/* BOARD: kindergarten cutout season title */
+.board-season-title {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 0.12rem;
+  margin: 0 auto 1rem;
+  padding: 0.8rem 1rem;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  transform: none;
+}
+
+.board-season-title span:not(.letter-gap) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0.9em;
+  padding: 0.08em 0.16em;
+  border: 2px solid rgba(55, 35, 20, 0.45);
+  font-family: "Trebuchet MS", "Arial Rounded MT Bold", sans-serif;
+  font-size: clamp(2rem, 7vw, 4rem);
+  font-weight: 900;
+  line-height: 1;
+  color: #2f2419;
+  background: #f4d35e;
+  box-shadow: 2px 3px 0 rgba(60, 38, 20, 0.28);
+}
+
+.board-season-title span:nth-child(2n) {
+  background: #ee964b;
+  transform: rotate(3deg);
+}
+
+.board-season-title span:nth-child(3n) {
+  background: #f95738;
+  transform: rotate(-4deg);
+}
+
+.board-season-title span:nth-child(4n) {
+  background: #74c0fc;
+  transform: rotate(2deg);
+}
+
+.board-season-title span:nth-child(5n) {
+  background: #90be6d;
+  transform: rotate(-2deg);
+}
+
+.board-season-title .letter-gap {
+  width: 0.7em;
+}
+/* Phase 4C: BOOK final alignment and stereo button */
+
+/* Clean, left-aligned practice checkbox list */
+.practice-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: start;
+  justify-items: stretch;
+  gap: 0.65rem 1rem;
+  width: 100%;
+  text-align: left;
+}
+
+.practice-detail-grid label {
+  display: grid;
+  grid-template-columns: 1.25rem minmax(0, 1fr);
+  align-items: center;
+  justify-content: start;
+  gap: 0.45rem;
+  width: 100%;
+  margin: 0;
+  padding: 0.35rem 0;
+  text-align: left;
+  line-height: 1.25;
+}
+
+.practice-detail-grid input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  justify-self: start;
+}
+
+/* Metallic stereo-style timer control */
+#practice-timer-toggle-btn {
+  position: relative;
+  min-width: 10rem;
+  padding: 0.8rem 1.15rem;
+  border: 2px solid #353b3f;
+  border-radius: 8px;
+  background:
+    linear-gradient(
+      180deg,
+      #f4f6f7 0%,
+      #aeb5ba 18%,
+      #737b80 52%,
+      #cdd2d5 78%,
+      #686f74 100%
+    );
+  color: #15191c;
+  font-family: "Arial Black", "Trebuchet MS", sans-serif;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-shadow: 0 1px rgba(255, 255, 255, 0.7);
+  box-shadow:
+    inset 0 2px 1px rgba(255, 255, 255, 0.9),
+    inset 0 -3px 4px rgba(25, 29, 32, 0.45),
+    0 4px 0 #3d4347,
+    0 6px 9px rgba(24, 29, 32, 0.35);
+}
+
+#practice-timer-toggle-btn:hover {
+  filter: brightness(1.08);
+}
+
+#practice-timer-toggle-btn:active {
+  transform: translateY(3px);
+  box-shadow:
+    inset 0 2px 5px rgba(20, 24, 27, 0.55),
+    0 1px 0 #3d4347;
+}
+
+/* Stop state: retain the metal face with a red indicator */
+#practice-timer-toggle-btn.btn-red {
+  border-color: #49211e;
+  background:
+    radial-gradient(circle at 88% 50%, #ffb1a8 0 4%, #d33427 5% 9%, transparent 10%),
+    linear-gradient(
+      180deg,
+      #f4f6f7 0%,
+      #aeb5ba 18%,
+      #737b80 52%,
+      #cdd2d5 78%,
+      #686f74 100%
+    );
+  color: #42110d;
+}
+
+@media (max-width: 760px) {
+  .practice-detail-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 480px) {
+  .practice-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+/* Phase 4C: landing-page hero background */
+.welcome-hero {
+  position: relative;
+  min-height: 560px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  overflow: hidden;
+  padding: clamp(1rem, 4vw, 2rem);
+  background-image:
+    linear-gradient(
+      90deg,
+      rgba(42, 27, 17, 0.82) 0%,
+      rgba(42, 27, 17, 0.56) 42%,
+      rgba(42, 27, 17, 0.08) 72%
+    ),
+    url("/static/img/woodchuck-hero.png");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+}
+
+.welcome-hero-content {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 34rem);
+  padding: 1rem;
+  border-radius: 14px;
+  background: rgba(255, 247, 220, 0.83);
+  box-shadow: 0 6px 18px rgba(38, 24, 14, 0.28);
+  backdrop-filter: blur(2px);
+}
+
+.welcome-button-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.welcome-button-row .btn {
+  width: 100%;
+  min-height: 3.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .welcome-hero {
+    min-height: 540px;
+    align-items: flex-end;
+    background-position: center top;
+  }
+
+  .welcome-hero-content {
+    width: 100%;
+  }
+
+  .welcome-button-row {
+    grid-template-columns: 1fr;
+  }
+}
+/* Phase 4C: landing buttons directly over artwork */
+.welcome-hero {
+  min-height: 560px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(1rem, 4vw, 2rem);
+
+  background-image: url("/static/img/woodchuck-hero.png");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+}
+
+/* Remove the pale table so the artwork sits directly behind the buttons. */
+.welcome-hero-content {
+  width: min(100%, 34rem);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+/* Keep the buttons readable against the artwork. */
+.welcome-button-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.9rem;
+}
+
+.welcome-button-row .btn {
+  width: 100%;
+  min-height: 3.35rem;
+  box-shadow:
+    0 5px 10px rgba(20, 13, 8, 0.4),
+    inset 0 1px rgba(255, 255, 255, 0.3);
+}
+
+@media (max-width: 640px) {
+  .welcome-hero {
+    min-height: 540px;
+    padding: 1.25rem;
+    background-position: center top;
+  }
+}
+/* Phase 4C: landing artwork framing and bottom buttons */
+.welcome-hero {
+  min-height: 650px;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 1.25rem;
+
+  /* Show the entire illustration instead of cropping it with cover. */
+  background-size: contain;
+  background-position: center top;
+  background-repeat: no-repeat;
+  background-color: #21170f;
+}
+
+.welcome-hero-content {
+  width: min(100%, 34rem);
+  margin-top: auto;
+  padding: 0 0 0.5rem;
+}
+
+.welcome-button-row {
+  width: 100%;
+  margin-top: auto;
+}
+
+@media (max-width: 640px) {
+  .welcome-hero {
+    min-height: 620px;
+    align-items: flex-end;
+    padding: 1rem;
+    background-size: contain;
+    background-position: center top;
+  }
+
+  .welcome-hero-content {
+    padding-bottom: 0.25rem;
+  }
+}
+
+/* Phase 4C: rounded landing artwork */
+.welcome-hero {
+  overflow: hidden;
+  border: 3px solid rgba(91, 55, 28, 0.9);
+  border-radius: 28px;
+  box-shadow:
+    0 8px 18px rgba(35, 20, 11, 0.35),
+    inset 0 0 0 2px rgba(255, 240, 205, 0.18);
+}
+
+@media (max-width: 640px) {
+  .welcome-hero {
+    border-radius: 22px;
+  }
+}
+/* Phase 4C: directly rounded landing image */
+.welcome-hero {
+  position: relative !important;
+  overflow: hidden !important;
+  border-radius: 28px !important;
+  background-image: none !important;
+  background-color: #21170f;
+}
+
+.welcome-hero-art {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+
+  width: 100%;
+  height: 100%;
+
+  object-fit: cover;
+  object-position: center top;
+
+  border-radius: 25px;
+  clip-path: inset(0 round 25px);
+}
+
+.welcome-hero-content {
+  position: relative;
+  z-index: 1;
+  margin-top: auto;
+}
+
+@media (max-width: 640px) {
+  .welcome-hero {
+    border-radius: 22px !important;
+  }
+
+  .welcome-hero-art {
+    border-radius: 19px;
+    clip-path: inset(0 round 19px);
+  }
+}
+/* Phase 4C: taller landing art and left button stack */
+.welcome-hero {
+  min-height: 760px;
+  height: 760px;
+  align-items: flex-end;
+  justify-content: flex-start;
+  padding: 1.5rem;
+}
+
+.welcome-hero-art {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+}
+
+.welcome-hero-content {
+  width: 100%;
+  margin-top: auto;
+  margin-right: auto;
+  margin-left: 0;
+}
+
+.welcome-button-row {
+  width: min(50%, 19rem);
+  margin-right: auto;
+  margin-left: 0;
+}
+
+.welcome-button-row .btn {
+  width: 100%;
+}
+
+@media (max-width: 640px) {
+  .welcome-hero {
+    min-height: 700px;
+    height: 700px;
+    padding: 1rem;
+  }
+
+  .welcome-button-row {
+    width: 50%;
+    margin-right: auto;
+    margin-left: 0;
+  }
+
+  .welcome-button-row .btn {
+    min-height: 3rem;
+    padding-inline: 0.55rem;
+    font-size: 0.9rem;
+  }
+}
+/* Phase 4C: narrow right-aligned landing buttons */
+.welcome-hero-content {
+  width: 100%;
+  margin-top: auto;
+}
+
+.welcome-button-row {
+  width: 25%;
+  margin-right: 0;
+  margin-left: auto;
+}
+
+.welcome-button-row .btn {
+  width: 100%;
+  min-width: 0;
+  padding-inline: 0.45rem;
+  font-size: 0.88rem;
+  white-space: normal;
+}
+
+@media (max-width: 640px) {
+  .welcome-button-row {
+    width: 25%;
+    margin-right: 0;
+    margin-left: auto;
+  }
+
+  .welcome-button-row .btn {
+    padding-inline: 0.3rem;
+    font-size: 0.78rem;
+    line-height: 1.15;
+  }
+}
+/* Phase 4C: final landing framing adjustment */
+.welcome-hero {
+  min-height: 790px;
+  height: 790px;
+}
+
+/*
+ * Show slightly more of the lower artwork.
+ * Extend the image beyond the right edge to hide its white border.
+ */
+.welcome-hero-art {
+  inset: 0 auto 0 0;
+  width: calc(100% + 14px);
+  height: 100%;
+  max-width: none;
+  object-fit: cover;
+  object-position: 48% 18%;
+}
+
+/* Move the narrow button stack slightly upward and inward. */
+.welcome-button-row {
+  margin-right: 2rem;
+  margin-bottom: 2.25rem;
+  margin-left: auto;
+}
+
+@media (max-width: 640px) {
+  .welcome-hero {
+    min-height: 730px;
+    height: 730px;
+  }
+
+  .welcome-hero-art {
+    width: calc(100% + 10px);
+    object-position: 48% 16%;
+  }
+
+  .welcome-button-row {
+    margin-right: 0.8rem;
+    margin-bottom: 1.5rem;
+  }
+}
+/* Phase 4C: landing trim midpoint */
+.welcome-hero {
+  min-height: 775px;
+  height: 775px;
+}
+
+.welcome-button-row {
+  margin-bottom: 3rem;
+}
+
+@media (max-width: 640px) {
+  .welcome-hero {
+    min-height: 715px;
+    height: 715px;
+  }
+
+  .welcome-button-row {
+    margin-bottom: 2.1rem;
+  }
+}
+/* Phase 4C: slightly higher landing bottom trim */
+.welcome-hero {
+  min-height: 765px;
+  height: 765px;
+}
+
+@media (max-width: 640px) {
+  .welcome-hero {
+    min-height: 705px;
+    height: 705px;
+  }
+}
+/* Phase 4C: final landing edge trim */
+.welcome-hero {
+  min-height: 755px;
+  height: 755px;
+}
+
+/* Extend farther past the container to crop more from the right edge. */
+.welcome-hero-art {
+  width: calc(100% + 22px);
+}
+
+@media (max-width: 640px) {
+  .welcome-hero {
+    min-height: 695px;
+    height: 695px;
+  }
+
+  .welcome-hero-art {
+    width: calc(100% + 16px);
+  }
+}
+/* Phase 4C: landing edge trim final nudge */
+.welcome-hero {
+  min-height: 745px;
+  height: 745px;
+}
+
+.welcome-hero-art {
+  width: calc(100% + 30px);
+}
+
+@media (max-width: 640px) {
+  .welcome-hero {
+    min-height: 685px;
+    height: 685px;
+  }
+
+  .welcome-hero-art {
+    width: calc(100% + 22px);
+  }
+}
+
+/* Phase 4C: taller landing window without image shift */
+.welcome-hero {
+  min-height: 775px;
+  height: 775px;
+}
+
+@media (max-width: 640px) {
+  .welcome-hero {
+    min-height: 715px;
+    height: 715px;
+  }
+}
+/* Phase 4C: tiny landing image downward nudge */
+.welcome-hero-art {
+  object-position: 48% 16%;
+}
+
+@media (max-width: 640px) {
+  .welcome-hero-art {
+    object-position: 48% 14%;
+  }
+}
+
+/* Phase 4C: corrected tiny landing image nudge */
+.welcome-hero-art {
+  object-position: 48% 14%;
+}
+
+@media (max-width: 640px) {
+  .welcome-hero-art {
+    object-position: 48% 12%;
+  }
+}
