@@ -1675,7 +1675,7 @@ select {
   }
 
   #instrument-object {
-    top: 37%;
+    top: 10% !important;
     left: 0;
   }
 
