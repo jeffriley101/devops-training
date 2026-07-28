@@ -1455,6 +1455,188 @@
     }
   }
 
+  function wireBandCampStandings() {
+    const root = document.getElementById("band-camp-standings");
+    if (!root) return;
+
+    const loadingEl = document.getElementById(
+      "contest-standings-loading"
+    );
+    const errorEl = document.getElementById("contest-standings-error");
+    const weekRangeEl = document.getElementById("contest-week-range");
+    const weekStatusEl = document.getElementById("contest-week-status");
+    const tabs = [
+      document.getElementById("contest-open-tab"),
+      document.getElementById("contest-verified-tab"),
+    ].filter(Boolean);
+    const panels = {
+      open: document.getElementById("contest-open-panel"),
+      verified: document.getElementById("contest-verified-panel"),
+    };
+
+    function selectDivision(division, focusTab) {
+      tabs.forEach((tab) => {
+        const selected = tab.id === `contest-${division}-tab`;
+        tab.setAttribute("aria-selected", String(selected));
+        tab.tabIndex = selected ? 0 : -1;
+        if (selected && focusTab) tab.focus();
+      });
+
+      Object.entries(panels).forEach(([key, panel]) => {
+        if (!panel) return;
+        const selected = key === division;
+        panel.hidden = !selected;
+        panel.classList.toggle("hidden", !selected);
+      });
+    }
+
+    tabs.forEach((tab, index) => {
+      tab.addEventListener("click", function () {
+        selectDivision(tab.id.includes("verified") ? "verified" : "open", false);
+      });
+      tab.addEventListener("keydown", function (event) {
+        let nextIndex = null;
+        if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+          nextIndex = (index + 1) % tabs.length;
+        } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+          nextIndex = (index - 1 + tabs.length) % tabs.length;
+        } else if (event.key === "Home") {
+          nextIndex = 0;
+        } else if (event.key === "End") {
+          nextIndex = tabs.length - 1;
+        }
+        if (nextIndex === null) return;
+        event.preventDefault();
+        selectDivision(
+          tabs[nextIndex].id.includes("verified") ? "verified" : "open",
+          true
+        );
+      });
+    });
+
+    function formatContestDate(value) {
+      if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        return null;
+      }
+      const [year, month, day] = value.split("-").map(Number);
+      const parsed = new Date(year, month - 1, day);
+      if (Number.isNaN(parsed.getTime())) return null;
+      return parsed.toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+    }
+
+    function renderDivision(division, rows) {
+      const body = document.getElementById(
+        `contest-${division}-standings`
+      );
+      const emptyEl = document.getElementById(`contest-${division}-empty`);
+      if (!body || !emptyEl) return;
+
+      body.replaceChildren();
+      const safeRows = Array.isArray(rows)
+        ? rows.filter((row) => (
+            row &&
+            (typeof row.rank === "number" || typeof row.rank === "string") &&
+            typeof row.instrument === "string" &&
+            row.instrument.trim() &&
+            typeof row.total_minutes === "number" &&
+            Number.isFinite(row.total_minutes)
+          ))
+        : [];
+
+      safeRows.forEach((row) => {
+        const tableRow = document.createElement("tr");
+        [row.rank, row.instrument, row.total_minutes].forEach((value) => {
+          const cell = document.createElement("td");
+          cell.textContent = String(value);
+          tableRow.appendChild(cell);
+        });
+        body.appendChild(tableRow);
+      });
+
+      const tableWrap = body.closest(".contest-standings-table-wrap");
+      const isEmpty = safeRows.length === 0;
+      emptyEl.classList.toggle("hidden", !isEmpty);
+      if (tableWrap) tableWrap.classList.toggle("hidden", isEmpty);
+    }
+
+    function showError(message) {
+      if (loadingEl) loadingEl.classList.add("hidden");
+      if (errorEl) {
+        errorEl.textContent = message;
+        errorEl.classList.remove("hidden");
+      }
+      root.setAttribute("aria-busy", "false");
+    }
+
+    async function loadStandings() {
+      try {
+        const response = await fetch("/contests/current", {
+          method: "GET",
+          credentials: "same-origin",
+          headers: { Accept: "application/json" },
+        });
+        if (response.status === 401) {
+          showError("Sign in to view the current Band Camp standings.");
+          return;
+        }
+        if (!response.ok) {
+          showError("Band Camp standings are unavailable right now.");
+          return;
+        }
+
+        const payload = await response.json();
+        const week = payload && payload.current_week;
+        const standings = payload && payload.standings;
+        const practiceStandings = standings &&
+          standings["weekly-practice-by-instrument"];
+        if (
+          !week ||
+          !practiceStandings ||
+          !Array.isArray(practiceStandings.open) ||
+          !Array.isArray(practiceStandings.verified)
+        ) {
+          showError("Band Camp standings could not be read.");
+          return;
+        }
+
+        const startText = formatContestDate(week.week_start);
+        let endText = null;
+        if (typeof week.week_end === "string") {
+          const endDate = new Date(`${week.week_end}T12:00:00`);
+          if (!Number.isNaN(endDate.getTime())) {
+            endDate.setDate(endDate.getDate() - 1);
+            endText = endDate.toLocaleDateString(undefined, {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            });
+          }
+        }
+        if (weekRangeEl && startText && endText) {
+          weekRangeEl.textContent = `${startText} – ${endText}`;
+        }
+        if (weekStatusEl && typeof week.status === "string") {
+          weekStatusEl.textContent = week.status;
+        }
+
+        renderDivision("open", practiceStandings.open);
+        renderDivision("verified", practiceStandings.verified);
+        if (loadingEl) loadingEl.classList.add("hidden");
+        if (errorEl) errorEl.classList.add("hidden");
+        root.setAttribute("aria-busy", "false");
+      } catch (_error) {
+        showError("Band Camp standings are unavailable right now.");
+      }
+    }
+
+    selectDivision("open", false);
+    loadStandings();
+  }
+
   function wireStore(state) {
     const creditsEl = document.getElementById("store-credits-value");
     const equippedHeadEl = document.getElementById("equipped-head-value");
@@ -2266,6 +2448,7 @@
   wireMum(state);
   wireQuestForm(state);
   wireBandCamp(state);
+  wireBandCampStandings();
   wireStore(state);
   wirePBook(state);
 })();

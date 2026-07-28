@@ -122,31 +122,118 @@
     </section>
 
     <aside class="board-scoreboard">
+      <section
+        id="band-camp-standings"
+        class="board-panel board-standings-panel cork-paper"
+        aria-labelledby="band-camp-standings-title"
+        aria-busy="true"
+      >
+        <h3 id="band-camp-standings-title">Band Camp Standings</h3>
+        <p class="board-standings-heading">
+          Weekly Practice Minutes by Instrument
+        </p>
+        <p class="board-standings-week">
+          <span id="contest-week-range">Current week</span>
+          <span id="contest-week-status" class="chip">Loading</span>
+        </p>
+
+        <p id="contest-standings-loading" role="status">
+          Loading Band Camp standings…
+        </p>
+        <p
+          id="contest-standings-error"
+          class="error-text hidden"
+          role="alert"
+        ></p>
+
+        <div
+          id="contest-division-tabs"
+          class="contest-division-tabs"
+          role="tablist"
+          aria-label="Practice standings division"
+        >
+          <button
+            id="contest-open-tab"
+            class="contest-division-tab"
+            type="button"
+            role="tab"
+            aria-selected="true"
+            aria-controls="contest-open-panel"
+          >
+            Open
+          </button>
+          <button
+            id="contest-verified-tab"
+            class="contest-division-tab"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="contest-verified-panel"
+            tabindex="-1"
+          >
+            Verified
+          </button>
+        </div>
+
+        <div
+          id="contest-open-panel"
+          class="contest-division-panel"
+          role="tabpanel"
+          aria-labelledby="contest-open-tab"
+        >
+          <p class="contest-division-explanation">
+            Open includes all submitted P-Charts.
+          </p>
+          <div class="contest-standings-table-wrap">
+            <table class="contest-standings-table">
+              <thead>
+                <tr>
+                  <th scope="col">Rank</th>
+                  <th scope="col">Instrument</th>
+                  <th scope="col">Practice Minutes</th>
+                </tr>
+              </thead>
+              <tbody id="contest-open-standings"></tbody>
+            </table>
+          </div>
+          <p id="contest-open-empty" class="contest-empty-state hidden">
+            No practice has been logged this week yet.
+          </p>
+        </div>
+
+        <div
+          id="contest-verified-panel"
+          class="contest-division-panel hidden"
+          role="tabpanel"
+          aria-labelledby="contest-verified-tab"
+          hidden
+        >
+          <p class="contest-division-explanation">
+            Verified includes only approved P-Charts.
+          </p>
+          <div class="contest-standings-table-wrap">
+            <table class="contest-standings-table">
+              <thead>
+                <tr>
+                  <th scope="col">Rank</th>
+                  <th scope="col">Instrument</th>
+                  <th scope="col">Practice Minutes</th>
+                </tr>
+              </thead>
+              <tbody id="contest-verified-standings"></tbody>
+            </table>
+          </div>
+          <p id="contest-verified-empty" class="contest-empty-state hidden">
+            No verified practice has been approved this week yet.
+          </p>
+        </div>
+      </section>
+
       <section class="board-panel">
         <h3>Past Winners</h3>
         <ul id="past-winners-list" class="board-name-list">
           <li>No daily champion yet.</li>
         </ul>
-      </section>
-
-      <section class="board-panel cork-paper">
-        <h3>Open Weekly Practice Minutes by Instrument</h3>
-        <p class="body-copy">
-          Top five musicians from all submitted P-Charts.
-        </p>
-        <ol id="open-instrument-weekly-list" class="board-name-list weekly-top-five">
-          <li>Shared standings begin with Phase 5.</li>
-        </ol>
-      </section>
-
-      <section class="board-panel cork-paper">
-        <h3>Verified Weekly Practice Minutes by Instrument</h3>
-        <p class="body-copy">
-          Top five musicians whose charts were approved by a trusted verifier.
-        </p>
-        <ol id="verified-instrument-weekly-list" class="board-name-list weekly-top-five">
-          <li>Verified standings begin with Phase 5.</li>
-        </ol>
       </section>
 
       <section class="board-panel hall-of-champions">
