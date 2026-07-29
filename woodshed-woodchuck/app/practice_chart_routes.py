@@ -32,6 +32,7 @@ class PracticeChartCreate(BaseModel):
     practice_details: list[str] = Field(default_factory=list)
     source: str = "p-book"
     credits_awarded: int = 0
+    submission_key: str | None = Field(default=None, min_length=1, max_length=64)
 
 
 def verification_payload(
@@ -157,6 +158,7 @@ def create_student_practice_chart(
                 practice_details=submitted.practice_details,
                 source=submitted.source,
                 credits_awarded=submitted.credits_awarded,
+                submission_key=submitted.submission_key,
             )
         except ValueError as error:
             raise HTTPException(
@@ -183,7 +185,7 @@ def create_student_practice_chart(
         )
 
         return {
-            "created": True,
+            "created": created.created,
             "chart": chart_payload(
                 created.chart,
                 created.verification,

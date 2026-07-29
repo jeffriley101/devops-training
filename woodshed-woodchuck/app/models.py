@@ -385,6 +385,13 @@ class VerifierOrganizationMembership(Base):
 
 class PracticeChart(Base):
     __tablename__ = "practice_charts"
+    __table_args__ = (
+        UniqueConstraint(
+            "profile_id",
+            "submission_key",
+            name="uq_practice_chart_profile_submission",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(
         Integer,
@@ -431,6 +438,11 @@ class PracticeChart(Base):
         String(30),
         default="p-book",
         nullable=False,
+    )
+
+    submission_key: Mapped[str | None] = mapped_column(
+        String(64),
+        nullable=True,
     )
 
     credits_awarded: Mapped[int] = mapped_column(

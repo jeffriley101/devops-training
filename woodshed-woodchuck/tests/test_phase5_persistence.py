@@ -302,6 +302,11 @@ def test_contest_models_match_approved_foundation() -> None:
             "id", "profile_id", "category_key", "qualifying_wins",
             "crown_earned_at", "created_at", "updated_at",
         },
+        PracticeChart: {
+            "id", "profile_id", "practice_date", "minutes", "instrument",
+            "note", "practice_details", "source", "submission_key",
+            "credits_awarded", "created_at", "updated_at",
+        },
     }
 
     for model, columns in expected_columns.items():

@@ -262,3 +262,27 @@ def test_live_scoreboard_week_header_icons_and_status_are_present() -> None:
     assert "window.WWInstruments.getDefinition(row.instrument)" in javascript
     assert "definition.fallback_symbol" in javascript
     assert 'weekStatusEl.classList.add("hidden")' in javascript
+
+
+def test_completed_p_chart_posts_once_and_refreshes_history_and_standings() -> None:
+    javascript = (
+        Path(__file__).resolve().parents[1] / "static" / "js" / "app.js"
+    ).read_text(encoding="utf-8")
+
+    assert 'method: "POST"' in javascript
+    assert 'submission_key: submissionKey' in javascript
+    assert "verifierId: verifierId || null" in javascript
+    assert "if (submissionInFlight) return" in javascript
+    assert "pendingSubmissionKey = pendingSubmissionKey ||" in javascript
+    assert "await loadPersistentPracticeCharts()" in javascript
+    assert 'new CustomEvent("ww:p-chart-saved")' in javascript
+
+
+def test_draft_account_state_saving_does_not_call_chart_creation() -> None:
+    javascript = (
+        Path(__file__).resolve().parents[1] / "static" / "js" / "app.js"
+    ).read_text(encoding="utf-8")
+
+    submit_handler = javascript[javascript.index('form.addEventListener("submit"') :]
+    assert 'createPersistentPracticeChart({' in submit_handler
+    assert javascript.count('await createPersistentPracticeChart({') == 1

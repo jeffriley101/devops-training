@@ -12,6 +12,7 @@ from sqlalchemy.pool import StaticPool
 from starlette.requests import Request
 
 from app import contests as contest_module
+from app import practice_chart_routes as practice_chart_routes_module
 from app.account_routes import SESSION_PROFILE_ID
 from app.contests import (
     central_week_boundaries,
@@ -40,6 +41,7 @@ from app.models import (
     WoodchuckProfile,
     WoodchuckState,
 )
+from app.practice_chart_routes import PracticeChartCreate
 
 
 NOW = datetime(2026, 7, 28, 15, tzinfo=timezone.utc)
@@ -1201,3 +1203,72 @@ def test_crown_progress_endpoint_authentication_and_privacy(
         "legal_name", "email", "pin", "verifier",
     ):
         assert private_field not in serialized
+
+
+def test_open_p_chart_submission_is_idempotent_listed_and_updates_standings(
+    database: tuple[Session, sessionmaker[Session]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session, factory = database
+    profile = add_student(
+        session, woodchuck_id="WC-PERSIST-OPEN", instrument="Tuba"
+    )
+    session.commit()
+    monkeypatch.setattr(practice_chart_routes_module, "SessionLocal", factory)
+    request = request_with_session(profile.id)
+    submitted = PracticeChartCreate(
+        verifier_id=None,
+        practice_date=date(2026, 7, 29),
+        minutes=35,
+        note="Completed chart",
+        practice_details=["Long tones"],
+        credits_awarded=7,
+        submission_key="submission-open-001",
+    )
+
+    first = practice_chart_routes_module.create_student_practice_chart(
+        request, submitted
+    )
+    repeated = practice_chart_routes_module.create_student_practice_chart(
+        request, submitted
+    )
+
+    assert first["created"] is True
+    assert repeated["created"] is False
+    assert first["chart"]["id"] == repeated["chart"]["id"]
+    assert session.scalar(select(func.count()).select_from(PracticeChart)) == 1
+    history = practice_chart_routes_module.list_student_practice_charts(request)
+    assert len(history["charts"]) == 1
+    assert history["charts"][0]["minutes"] == 35
+    assert history["charts"][0]["instrument"] == "Tuba"
+    assert history["charts"][0]["verification"] is None
+
+    payload = current_contests_payload(
+        session, now=NOW, current_profile_id=profile.id
+    )
+    points = payload["standings"]["weekly-points-leaders"]
+    instruments = payload["standings"]["weekly-practice-by-instrument"]
+    assert points["open"][0]["total_points"] == 1
+    assert points["verified"] == []
+    assert instruments["open"] == [
+        {"rank": 1, "instrument": "Tuba", "total_minutes": 35}
+    ]
+    assert instruments["verified"] == []
+
+    profile.instrument = "Flute"
+    session.add(PracticeChartVerification(
+        practice_chart_id=first["chart"]["id"], verifier_id=None,
+        status="approved",
+    ))
+    session.commit()
+    approved_payload = current_contests_payload(
+        session, now=NOW, current_profile_id=profile.id
+    )
+    approved_points = approved_payload["standings"]["weekly-points-leaders"]
+    approved_instruments = approved_payload[
+        "standings"
+    ]["weekly-practice-by-instrument"]
+    assert approved_points["verified"][0]["total_points"] == 1
+    assert approved_instruments["verified"] == [
+        {"rank": 1, "instrument": "Tuba", "total_minutes": 35}
+    ]

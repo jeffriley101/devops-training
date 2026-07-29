@@ -2326,6 +2326,8 @@
     const pagesCountEl = document.getElementById("p-book-pages-count");
 
     const DANDELION_DAILY_CAP = 75;
+    let submissionInFlight = false;
+    let pendingSubmissionKey = null;
 
     function verifierRoleLabel(role) {
       return String(role || "")
@@ -2437,6 +2439,7 @@
       note,
       practiceDetails,
       creditsAwarded,
+      submissionKey,
     }) {
       const response = await fetch(
         "/practice-charts",
@@ -2454,6 +2457,7 @@
             practice_details: practiceDetails,
             source: "p-book",
             credits_awarded: creditsAwarded,
+            submission_key: submissionKey,
           }),
         }
       );
@@ -2467,7 +2471,7 @@
         );
       }
 
-      return payload.chart;
+      return payload;
     }
 
     async function loadPersistentPracticeCharts() {
@@ -2818,6 +2822,7 @@
 
     form.addEventListener("submit", async function (event) {
       event.preventDefault();
+      if (submissionInFlight) return;
       errorEl.textContent = "";
       feedbackEl.classList.remove("success-callout");
 
@@ -2861,53 +2866,31 @@
           ? verifierSelectEl.selectedOptions[0].textContent
           : "";
 
+      submissionInFlight = true;
       if (submitBtn) {
         submitBtn.disabled = true;
       }
 
       try {
-        const serverChart = verifierId
-          ? await createPersistentPracticeChart({
-              verifierId,
-              dateKey,
-              minutes,
-              note,
-              practiceDetails,
-              creditsAwarded: dandelionsEarned,
-            })
-          : null;
-
-        next.practiceLog.unshift({
+        pendingSubmissionKey = pendingSubmissionKey || (
+          window.crypto && typeof window.crypto.randomUUID === "function"
+            ? window.crypto.randomUUID()
+            : `${Date.now()}-${Math.random().toString(36).slice(2)}`
+        );
+        const createdPayload = await createPersistentPracticeChart({
+          verifierId: verifierId || null,
           dateKey,
           minutes,
           note,
           practiceDetails,
-          source: "p-book",
           creditsAwarded: dandelionsEarned,
-          loggedAt: new Date().toISOString(),
-          serverChartId: serverChart
-            ? serverChart.id
-            : null,
-          verificationStatus: serverChart
-            ? serverChart.verification.status
-            : "open",
-          verificationResponseNote: serverChart
-            ? serverChart.verification.response_note || ""
-            : "",
-          verifierId: serverChart
-            ? serverChart.verification.verifier_id
-            : null,
-          verifierName:
-            serverChart &&
-            serverChart.verification.verifier
-              ? (
-                  serverChart.verification.verifier
-                    .display_name || ""
-                )
-              : "",
+          submissionKey: pendingSubmissionKey,
         });
+        const serverChart = createdPayload && createdPayload.chart;
+        if (!serverChart || !Number.isInteger(serverChart.id)) {
+          throw new Error("The saved P-Chart response could not be read.");
+        }
 
-        next.practiceLog = next.practiceLog.slice(0, 100);
         next.progress.credits =
           (next.progress.credits || 0) +
           dandelionsEarned;
@@ -2915,17 +2898,18 @@
         stateApi.saveState(next);
         renderEntries(next);
         renderPBookSummary(next);
+        await loadPersistentPracticeCharts();
 
         feedbackEl.classList.add("success-callout");
 
-        feedbackEl.textContent = serverChart
+        feedbackEl.textContent = verifierId
           ? (
               `A new page was added and sent to ` +
               `${verifierName}. Verification is pending. ` +
               `+${dandelionsEarned} dandelions added.`
             )
           : (
-              `A new open page was added to this device. ` +
+              `A new Open P-Chart was saved. ` +
               `+${dandelionsEarned} dandelions added.`
             );
 
@@ -2936,6 +2920,7 @@
           checkbox.checked = false;
         });
 
+        pendingSubmissionKey = null;
         hydrateHome(next);
         window.dispatchEvent(new CustomEvent("ww:p-chart-saved"));
       } catch (error) {
@@ -2943,6 +2928,7 @@
           error.message ||
           "The P-Chart could not be submitted.";
       } finally {
+        submissionInFlight = false;
         if (submitBtn) {
           submitBtn.disabled = false;
         }

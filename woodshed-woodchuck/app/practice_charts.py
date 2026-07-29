@@ -26,6 +26,7 @@ MAX_DAILY_CREDITS = 75
 class CreatedPracticeChartRequest:
     chart: PracticeChart
     verification: PracticeChartVerification | None
+    created: bool = True
 
 
 def normalize_practice_details(
@@ -75,6 +76,7 @@ def create_practice_chart_verification_request(
     practice_details: list[str] | tuple[str, ...] | None = None,
     source: str = "p-book",
     credits_awarded: int = 0,
+    submission_key: str | None = None,
 ) -> CreatedPracticeChartRequest:
     if profile.id is None:
         raise ValueError("The student account must be saved first.")
@@ -117,6 +119,33 @@ def create_practice_chart_verification_request(
         practice_details
     )
 
+    if submission_key is not None:
+        if not isinstance(submission_key, str):
+            raise ValueError("The P-Chart submission key must be text.")
+        submission_key = submission_key.strip()
+        if not submission_key or len(submission_key) > 64:
+            raise ValueError(
+                "The P-Chart submission key must be between 1 and 64 characters."
+            )
+        existing_chart = session.scalar(
+            select(PracticeChart).where(
+                PracticeChart.profile_id == profile.id,
+                PracticeChart.submission_key == submission_key,
+            )
+        )
+        if existing_chart is not None:
+            existing_verification = session.scalar(
+                select(PracticeChartVerification).where(
+                    PracticeChartVerification.practice_chart_id
+                    == existing_chart.id
+                )
+            )
+            return CreatedPracticeChartRequest(
+                chart=existing_chart,
+                verification=existing_verification,
+                created=False,
+            )
+
     if verifier_id is not None:
         connection = session.scalar(
             select(StudentVerifierConnection).where(
@@ -147,6 +176,7 @@ def create_practice_chart_verification_request(
         practice_details=normalized_details,
         source=source,
         credits_awarded=credits_awarded,
+        submission_key=submission_key,
     )
 
     session.add(chart)
@@ -168,6 +198,25 @@ def create_practice_chart_verification_request(
             session.refresh(verification)
     except IntegrityError as error:
         session.rollback()
+        if submission_key is not None:
+            existing_chart = session.scalar(
+                select(PracticeChart).where(
+                    PracticeChart.profile_id == profile.id,
+                    PracticeChart.submission_key == submission_key,
+                )
+            )
+            if existing_chart is not None:
+                existing_verification = session.scalar(
+                    select(PracticeChartVerification).where(
+                        PracticeChartVerification.practice_chart_id
+                        == existing_chart.id
+                    )
+                )
+                return CreatedPracticeChartRequest(
+                    chart=existing_chart,
+                    verification=existing_verification,
+                    created=False,
+                )
         raise RuntimeError(
             "The P-Chart verification request could not be created."
         ) from error
