@@ -1730,6 +1730,208 @@
     loadStandings();
   }
 
+  function wirePastWinners() {
+    const root = document.getElementById("past-winners");
+    if (!root) return;
+
+    const loadingEl = document.getElementById("past-winners-loading");
+    const authEl = document.getElementById("past-winners-auth");
+    const emptyEl = document.getElementById("past-winners-empty");
+    const errorEl = document.getElementById("past-winners-error");
+    const contentEl = document.getElementById("past-winners-content");
+    const retryButton = document.getElementById("past-winners-retry");
+    const weekSelect = document.getElementById("past-winners-week");
+    const stateEls = [loadingEl, authEl, emptyEl, errorEl, contentEl];
+    const tabs = [
+      document.getElementById("past-winners-open-tab"),
+      document.getElementById("past-winners-verified-tab"),
+    ].filter(Boolean);
+    const panels = {
+      open: document.getElementById("past-winners-open-panel"),
+      verified: document.getElementById("past-winners-verified-panel"),
+    };
+    const medals = {
+      1: { key: "gold", emoji: "🥇", label: "Gold medal" },
+      2: { key: "silver", emoji: "🥈", label: "Silver medal" },
+      3: { key: "bronze", emoji: "🥉", label: "Bronze medal" },
+    };
+
+    function showState(element) {
+      stateEls.forEach((candidate) => {
+        if (candidate) candidate.classList.toggle("hidden", candidate !== element);
+      });
+      root.setAttribute("aria-busy", String(element === loadingEl));
+    }
+
+    function formatDate(value) {
+      if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        return null;
+      }
+      const [year, month, day] = value.split("-").map(Number);
+      const parsed = new Date(year, month - 1, day);
+      if (Number.isNaN(parsed.getTime())) return null;
+      return parsed.toLocaleDateString(undefined, {
+        month: "short", day: "numeric", year: "numeric",
+      });
+    }
+
+    function weekLabel(week) {
+      const start = formatDate(week.week_start);
+      const [year, month, day] = week.week_end.split("-").map(Number);
+      const sunday = new Date(year, month - 1, day);
+      sunday.setDate(sunday.getDate() - 1);
+      const end = Number.isNaN(sunday.getTime()) ? null :
+        sunday.toLocaleDateString(undefined, {
+          month: "short", day: "numeric", year: "numeric",
+        });
+      return start && end ? `${start} – ${end}` : week.week_start;
+    }
+
+    function selectDivision(division, focusTab) {
+      tabs.forEach((tab) => {
+        const selected = tab.id === `past-winners-${division}-tab`;
+        tab.setAttribute("aria-selected", String(selected));
+        tab.tabIndex = selected ? 0 : -1;
+        if (selected && focusTab) tab.focus();
+      });
+      Object.entries(panels).forEach(([key, panel]) => {
+        if (!panel) return;
+        const selected = key === division;
+        panel.hidden = !selected;
+        panel.classList.toggle("hidden", !selected);
+      });
+    }
+
+    tabs.forEach((tab, index) => {
+      tab.addEventListener("click", function () {
+        selectDivision(tab.id.includes("verified") ? "verified" : "open", false);
+      });
+      tab.addEventListener("keydown", function (event) {
+        let nextIndex = null;
+        if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+          nextIndex = (index + 1) % tabs.length;
+        } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+          nextIndex = (index - 1 + tabs.length) % tabs.length;
+        } else if (event.key === "Home") {
+          nextIndex = 0;
+        } else if (event.key === "End") {
+          nextIndex = tabs.length - 1;
+        }
+        if (nextIndex === null) return;
+        event.preventDefault();
+        selectDivision(
+          tabs[nextIndex].id.includes("verified") ? "verified" : "open", true
+        );
+      });
+    });
+
+    function renderContest(division, contestKey, results) {
+      const type = contestKey === "weekly-points-leaders" ? "points" : "instruments";
+      const rowsEl = document.getElementById(`past-winners-${division}-${type}`);
+      const noResultsEl = document.getElementById(
+        `past-winners-${division}-${type}-empty`
+      );
+      if (!rowsEl || !noResultsEl) return;
+      rowsEl.replaceChildren();
+      const rows = results.filter((result) => {
+        const medal = result && medals[result.rank];
+        const contest = result && result.contest;
+        const subject = result && (type === "points" ? result.display_name : result.instrument);
+        return medal && result.medal === medal.key &&
+          result.division === division && contest && contest.key === contestKey &&
+          typeof subject === "string" && subject.trim() &&
+          Number.isInteger(result.score) && result.score >= 0;
+      });
+
+      rows.forEach((result) => {
+        const medal = medals[result.rank];
+        const isStudent = type === "points";
+        const subject = isStudent ? result.display_name : result.instrument;
+        const row = document.createElement("article");
+        row.className = "medal-row";
+        const icon = document.createElement("span");
+        icon.className = "medal-row-icon";
+        icon.setAttribute("aria-hidden", "true");
+        icon.textContent = medal.emoji;
+        const subjectBlock = document.createElement("div");
+        subjectBlock.className = "medal-row-subject";
+        const name = document.createElement("strong");
+        name.textContent = isStudent ? subject : `🎵 ${subject}`;
+        const rank = document.createElement("small");
+        rank.textContent = `${medal.label} · Rank ${result.rank}`;
+        subjectBlock.append(name, rank);
+        const score = document.createElement("span");
+        score.className = "medal-row-score";
+        score.textContent = isStudent
+          ? `${result.score} ${result.score === 1 ? "point" : "points"}`
+          : `${result.score} min`;
+        row.append(icon, subjectBlock, score);
+        rowsEl.appendChild(row);
+      });
+      noResultsEl.classList.toggle("hidden", rows.length !== 0);
+    }
+
+    function renderResults(payload) {
+      const results = payload && Array.isArray(payload.results) ? payload.results : [];
+      ["open", "verified"].forEach((division) => {
+        renderContest(division, "weekly-points-leaders", results);
+        renderContest(division, "weekly-practice-by-instrument", results);
+      });
+    }
+
+    async function loadResults(weekStart) {
+      showState(loadingEl);
+      try {
+        const response = await fetch(
+          `/contests/weeks/${encodeURIComponent(weekStart)}/results`,
+          { credentials: "same-origin", headers: { Accept: "application/json" } }
+        );
+        if (response.status === 401) return showState(authEl);
+        if (!response.ok) return showState(errorEl);
+        renderResults(await response.json());
+        showState(contentEl);
+      } catch (_error) {
+        showState(errorEl);
+      }
+    }
+
+    async function loadWeeks() {
+      showState(loadingEl);
+      try {
+        const response = await fetch("/contests/weeks/finalized", {
+          credentials: "same-origin", headers: { Accept: "application/json" },
+        });
+        if (response.status === 401) return showState(authEl);
+        if (!response.ok) return showState(errorEl);
+        const payload = await response.json();
+        const weeks = payload && Array.isArray(payload.weeks)
+          ? payload.weeks.filter((week) => week &&
+              typeof week.week_start === "string" &&
+              typeof week.week_end === "string" &&
+              week.season && typeof week.season.name === "string")
+          : [];
+        if (!weeks.length) return showState(emptyEl);
+        weekSelect.replaceChildren();
+        weeks.forEach((week) => {
+          const option = document.createElement("option");
+          option.value = week.week_start;
+          option.textContent = `${weekLabel(week)} · ${week.season.name}`;
+          weekSelect.appendChild(option);
+        });
+        await loadResults(weeks[0].week_start);
+      } catch (_error) {
+        showState(errorEl);
+      }
+    }
+
+    weekSelect.addEventListener("change", function () {
+      loadResults(weekSelect.value);
+    });
+    retryButton.addEventListener("click", loadWeeks);
+    selectDivision("open", false);
+    loadWeeks();
+  }
+
   function wireStore(state) {
     const creditsEl = document.getElementById("store-credits-value");
     const equippedHeadEl = document.getElementById("equipped-head-value");
@@ -2542,6 +2744,7 @@
   wireQuestForm(state);
   wireBandCamp(state);
   wireBandCampStandings();
+  wirePastWinners();
   wireStore(state);
   wirePBook(state);
 })();

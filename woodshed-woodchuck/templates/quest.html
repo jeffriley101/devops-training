@@ -270,11 +270,91 @@
         </div>
       </section>
 
-      <section class="board-panel">
-        <h3>Past Winners</h3>
-        <ul id="past-winners-list" class="board-name-list">
-          <li>No daily champion yet.</li>
-        </ul>
+      <section
+        id="past-winners"
+        class="board-panel medal-board"
+        aria-labelledby="past-winners-title"
+        aria-busy="true"
+      >
+        <h3 id="past-winners-title">Past Winners</h3>
+        <p class="medal-board-intro">Final Band Camp podiums</p>
+
+        <div id="past-winners-loading" class="medal-board-state" role="status">
+          Loading Past Winners…
+        </div>
+        <div id="past-winners-auth" class="medal-board-state hidden" role="alert">
+          Sign in to view Past Winners.
+        </div>
+        <div id="past-winners-empty" class="medal-board-state hidden">
+          No finalized Band Camp weeks yet.
+        </div>
+        <div id="past-winners-error" class="medal-board-state hidden" role="alert">
+          <p>Past Winners could not be loaded.</p>
+          <button id="past-winners-retry" class="btn btn-secondary" type="button">
+            Retry
+          </button>
+        </div>
+
+        <div id="past-winners-content" class="hidden">
+          <label class="medal-week-label" for="past-winners-week">
+            Finalized week
+          </label>
+          <select id="past-winners-week" class="medal-week-select"></select>
+
+          <div
+            id="past-winners-division-tabs"
+            class="contest-division-tabs"
+            role="tablist"
+            aria-label="Past Winners division"
+          >
+            <button
+              id="past-winners-open-tab"
+              class="contest-division-tab"
+              type="button"
+              role="tab"
+              aria-selected="true"
+              aria-controls="past-winners-open-panel"
+            >
+              Open
+            </button>
+            <button
+              id="past-winners-verified-tab"
+              class="contest-division-tab"
+              type="button"
+              role="tab"
+              aria-selected="false"
+              aria-controls="past-winners-verified-panel"
+              tabindex="-1"
+            >
+              Verified
+            </button>
+          </div>
+
+          {% for division in ["open", "verified"] %}
+          <div
+            id="past-winners-{{ division }}-panel"
+            class="medal-division-panel{% if division == 'verified' %} hidden{% endif %}"
+            role="tabpanel"
+            aria-labelledby="past-winners-{{ division }}-tab"
+            {% if division == "verified" %}hidden{% endif %}
+          >
+            <section class="medal-contest" aria-labelledby="past-{{ division }}-points-title">
+              <h4 id="past-{{ division }}-points-title">Top Five Points Leaders</h4>
+              <div id="past-winners-{{ division }}-points" class="medal-rows"></div>
+              <p id="past-winners-{{ division }}-points-empty" class="contest-empty-state hidden">
+                No podium results for this contest and division.
+              </p>
+            </section>
+            <section class="medal-contest" aria-labelledby="past-{{ division }}-instruments-title">
+              <h4 id="past-{{ division }}-instruments-title">Weekly Practice Minutes by Instrument</h4>
+              <div id="past-winners-{{ division }}-instruments" class="medal-rows"></div>
+              <p id="past-winners-{{ division }}-instruments-empty" class="contest-empty-state hidden">
+                No podium results for this contest and division.
+              </p>
+            </section>
+          </div>
+          {% endfor %}
+        </div>
       </section>
 
       <section class="board-panel hall-of-champions">

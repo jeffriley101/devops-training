@@ -611,6 +611,32 @@ def contest_results_payload(
     }
 
 
+def finalized_weeks_payload(session: Session) -> dict[str, object]:
+    rows = session.execute(
+        select(ContestWeek, Season)
+        .join(Season, Season.id == ContestWeek.season_id)
+        .where(
+            ContestWeek.status == "finalized",
+            Season.key.like("band-camp-%"),
+        )
+        .order_by(
+            ContestWeek.week_start.desc(),
+            ContestWeek.finalized_at.desc(),
+        )
+    ).all()
+    return {
+        "weeks": [
+            {
+                "season": {"key": season.key, "name": season.name},
+                "week_start": contest_week.week_start.isoformat(),
+                "week_end": contest_week.week_end.isoformat(),
+                "finalized_at": utc_iso(contest_week.finalized_at),
+            }
+            for contest_week, season in rows
+        ]
+    }
+
+
 def current_contests_payload(
     session: Session,
     *,
@@ -700,18 +726,31 @@ def finalize_week_route(
         return contest_results_payload(session, contest_week)
 
 
+@router.get("/weeks/finalized")
+def finalized_contest_weeks(request: Request) -> dict[str, object]:
+    with SessionLocal() as session:
+        profile = current_profile(request, session)
+        if profile is None:
+            raise HTTPException(status_code=401, detail="Student sign-in is required.")
+        return finalized_weeks_payload(session)
+
+
 @router.get("/weeks/{week_start}/results")
 def contest_week_results(week_start: date, request: Request) -> dict[str, object]:
     with SessionLocal() as session:
         profile = current_profile(request, session)
         if profile is None:
             raise HTTPException(status_code=401, detail="Student sign-in is required.")
-        contest_week = session.scalar(select(ContestWeek).join(
-            Season, Season.id == ContestWeek.season_id
-        ).where(
-            ContestWeek.week_start == week_start,
-            Season.key == BAND_CAMP_KEY,
-        ))
+        contest_week = session.scalar(
+            select(ContestWeek)
+            .join(Season, Season.id == ContestWeek.season_id)
+            .where(
+                ContestWeek.week_start == week_start,
+                Season.key.like("band-camp-%"),
+                ContestWeek.status == "finalized",
+            )
+            .order_by(Season.starts_on.desc())
+        )
         if contest_week is None:
             raise HTTPException(status_code=404, detail="Contest week not found.")
         return contest_results_payload(session, contest_week)

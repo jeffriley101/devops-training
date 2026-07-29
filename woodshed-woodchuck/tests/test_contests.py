@@ -5,6 +5,7 @@ from datetime import date, datetime, timedelta, timezone
 
 import pytest
 from fastapi import HTTPException
+from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -19,10 +20,12 @@ from app.contests import (
     ensure_band_camp_data,
     finalize_contest_week,
     contest_results_payload,
+    finalized_weeks_payload,
     weekly_practice_by_instrument,
     weekly_student_points,
 )
 from app.db import Base
+from app.main import app
 from app.models import (
     Contest,
     ContestResult,
@@ -774,5 +777,119 @@ def test_manual_route_missing_invalid_token_and_results_authentication(
     with pytest.raises(HTTPException) as unauthorized:
         contest_module.contest_week_results(week.week_start, request_with_session())
     assert unauthorized.value.status_code == 401
+    week.status = "finalized"
+    week.finalized_at = FINAL_NOW
+    session.commit()
     payload = contest_module.contest_week_results(week.week_start, request_with_session(profile.id))
     assert set(payload) == {"week", "results"}
+
+
+def test_finalized_week_listing_is_newest_first_public_and_finalized_only(
+    database: tuple[Session, sessionmaker[Session]],
+) -> None:
+    session, _ = database
+    season, _, newest = ensure_band_camp_data(session, now=NOW)
+    older = ContestWeek(
+        season_id=season.id,
+        week_start=date(2026, 7, 20),
+        week_end=date(2026, 7, 27),
+        verification_deadline_at=datetime(2026, 7, 27, 17, tzinfo=timezone.utc),
+        finalize_after=datetime(2026, 7, 27, 17, 5, tzinfo=timezone.utc),
+        status="finalized",
+        finalized_at=datetime(2026, 7, 27, 18, tzinfo=timezone.utc),
+    )
+    open_week = ContestWeek(
+        season_id=season.id,
+        week_start=date(2026, 8, 3),
+        week_end=date(2026, 8, 10),
+        verification_deadline_at=datetime(2026, 8, 10, 17, tzinfo=timezone.utc),
+        finalize_after=datetime(2026, 8, 10, 17, 5, tzinfo=timezone.utc),
+        status="open",
+    )
+    newest.status = "finalized"
+    newest.finalized_at = FINAL_NOW
+    session.add_all([older, open_week])
+    session.commit()
+
+    payload = finalized_weeks_payload(session)
+
+    assert [week["week_start"] for week in payload["weeks"]] == [
+        "2026-07-27",
+        "2026-07-20",
+    ]
+    assert payload["weeks"][0] == {
+        "season": {"key": "band-camp-2026", "name": "Band Camp"},
+        "week_start": "2026-07-27",
+        "week_end": "2026-08-03",
+        "finalized_at": "2026-08-03T18:00:00+00:00",
+    }
+    serialized = repr(payload).casefold()
+    for private_field in (
+        "profile_id", "account_id", "woodchuck_id", "legal_name",
+        "email", "pin", "verifier", "season_id", "contest_week_id",
+    ):
+        assert private_field not in serialized
+
+
+def test_finalized_week_listing_requires_authentication_and_can_be_empty(
+    database: tuple[Session, sessionmaker[Session]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session, factory = database
+    profile = add_student(session, woodchuck_id="WC-WEEKS-AUTH", instrument="Flute")
+    session.commit()
+    monkeypatch.setattr(contest_module, "SessionLocal", factory)
+
+    with pytest.raises(HTTPException) as unauthorized:
+        contest_module.finalized_contest_weeks(request_with_session())
+    assert unauthorized.value.status_code == 401
+    assert contest_module.finalized_contest_weeks(
+        request_with_session(profile.id)
+    ) == {"weeks": []}
+
+
+def test_finalized_week_listing_static_route_requires_authentication() -> None:
+    response = TestClient(app).get("/contests/weeks/finalized")
+
+    assert response.status_code == 401
+    assert response.json() == {"detail": "Student sign-in is required."}
+
+
+def test_prior_finalized_band_camp_week_results_remain_browsable(
+    database: tuple[Session, sessionmaker[Session]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session, factory = database
+    profile = add_student(session, woodchuck_id="WC-PRIOR", instrument="Flute")
+    season = Season(
+        key="band-camp-2025", name="Band Camp 2025",
+        timezone="America/Chicago", starts_on=date(2025, 7, 28), status="closed",
+    )
+    contest = Contest(
+        key="historical-points", name="Historical Points",
+        metric_type="points", subject_type="student",
+    )
+    session.add_all([season, contest])
+    session.flush()
+    week = ContestWeek(
+        season_id=season.id, week_start=date(2025, 7, 28),
+        week_end=date(2025, 8, 4),
+        verification_deadline_at=datetime(2025, 8, 4, 17, tzinfo=timezone.utc),
+        finalize_after=datetime(2025, 8, 4, 17, 5, tzinfo=timezone.utc),
+        status="finalized", finalized_at=datetime(2025, 8, 4, 18, tzinfo=timezone.utc),
+    )
+    session.add(week)
+    session.flush()
+    session.add(ContestResult(
+        contest_week_id=week.id, contest_id=contest.id, division="open",
+        subject_type="student", subject_key=str(profile.id), profile_id=profile.id,
+        display_name_snapshot="Prior Winner", score=3, rank=1, medal="gold",
+    ))
+    session.commit()
+    monkeypatch.setattr(contest_module, "SessionLocal", factory)
+
+    payload = contest_module.contest_week_results(
+        week.week_start, request_with_session(profile.id)
+    )
+    assert payload["week"]["status"] == "finalized"
+    assert payload["results"][0]["display_name"] == "Prior Winner"
