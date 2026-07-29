@@ -1097,16 +1097,32 @@ select {
   font-size: 0.88rem;
 }
 
-.contest-points-section {
+.contest-points-section,
+.contest-camp-points-section {
   margin-bottom: 0.85rem;
 }
 
 .contest-points-section h4,
+.contest-camp-points-section h4,
 .contest-instrument-section h4 {
   margin: 0 0 0.55rem;
   color: #fff4c4;
   font-size: 0.95rem;
   letter-spacing: 0.02em;
+}
+
+.contest-camp-points-section {
+  padding-top: 0.8rem;
+  border-top: 2px solid rgba(255, 214, 107, 0.45);
+}
+
+.contest-camp-points-section .contest-division-explanation {
+  margin: -0.35rem 0 0.55rem;
+  color: #ffe6a5;
+}
+
+.contest-camp-points-list .contest-ranked-row {
+  border-left: 6px solid #a63d2f;
 }
 
 .contest-instrument-section {

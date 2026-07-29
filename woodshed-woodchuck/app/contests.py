@@ -7,13 +7,16 @@ from datetime import date, datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, HTTPException, Request
+from pydantic import BaseModel
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .account_routes import current_profile
 from .db import SessionLocal
 from .instruments import INSTRUMENTS_BY_LABEL
 from .models import (
+    CampPointAward,
     Contest,
     ContestResult,
     ContestWeek,
@@ -48,9 +51,23 @@ CONTEST_DEFINITIONS = (
         "subject_type": "instrument",
         "crown_category": None,
     },
+    {
+        "key": "weekly-camp-points",
+        "name": "Weekly Band Camp Points",
+        "metric_type": "points",
+        "subject_type": "student",
+        "crown_category": None,
+    },
 )
 
+CAMP_POINT_ACTIVITIES = frozenset({"hours", "care", "trivia", "marching"})
+
 router = APIRouter(prefix="/contests", tags=["contests"])
+
+
+class CampPointAwardCreate(BaseModel):
+    activity_type: str
+    activity_date: date
 
 
 def central_week_boundaries(
@@ -299,6 +316,78 @@ def weekly_student_points(
     }
 
 
+def _week_utc_bounds(contest_week: ContestWeek) -> tuple[datetime, datetime]:
+    return (
+        datetime.combine(contest_week.week_start, time.min, CENTRAL).astimezone(timezone.utc),
+        datetime.combine(contest_week.week_end, time.min, CENTRAL).astimezone(timezone.utc),
+    )
+
+
+def weekly_camp_points(
+    session: Session,
+    *,
+    contest_week: ContestWeek,
+    current_profile_id: int,
+) -> dict[str, object]:
+    start_at, end_at = _week_utc_bounds(contest_week)
+    awards = session.scalars(
+        select(CampPointAward).where(
+            CampPointAward.occurred_at >= start_at,
+            CampPointAward.occurred_at < end_at,
+        )
+    ).all()
+    scores: dict[int, int] = {}
+    for award in awards:
+        scores[award.profile_id] = scores.get(award.profile_id, 0) + award.points_awarded
+    profiles = {
+        profile.id: profile
+        for profile in session.scalars(
+            select(WoodchuckProfile).where(WoodchuckProfile.id.in_(scores))
+        ).all()
+    } if scores else {}
+    rows, position = student_points_rows(
+        scores, profiles, current_profile_id=current_profile_id
+    )
+    return {
+        "open": rows,
+        "current_user_position": {"open": position},
+    }
+
+
+def create_camp_point_award(
+    session: Session,
+    *,
+    profile: WoodchuckProfile,
+    activity_type: str,
+    activity_date: date,
+    now: datetime,
+) -> tuple[CampPointAward, bool]:
+    activity = activity_type.strip().casefold()
+    if activity not in CAMP_POINT_ACTIVITIES:
+        raise ValueError("Unsupported Band Camp point activity.")
+    if now.tzinfo is None or now.utcoffset() is None:
+        raise ValueError("The award time must be timezone-aware.")
+    if activity_date != now.astimezone(CENTRAL).date():
+        raise ValueError("Band Camp activities can only be recorded for today.")
+    duplicate_key = f"band-camp:{activity_date.isoformat()}:{activity}"
+    existing = session.scalar(select(CampPointAward).where(
+        CampPointAward.profile_id == profile.id,
+        CampPointAward.duplicate_key == duplicate_key,
+    ))
+    if existing is not None:
+        return existing, False
+    award = CampPointAward(
+        profile_id=profile.id,
+        activity_type=activity,
+        points_awarded=1,
+        occurred_at=now.astimezone(timezone.utc),
+        duplicate_key=duplicate_key,
+    )
+    session.add(award)
+    session.flush()
+    return award, True
+
+
 def utc_iso(value: datetime | None) -> str | None:
     if value is None:
         return None
@@ -453,7 +542,14 @@ def finalize_contest_week(
         raise RuntimeError("Band Camp contest definitions are missing.")
 
     charts, approved_ids = _charts_and_approved_ids(session, contest_week)
-    profile_ids = {chart.profile_id for chart in charts}
+    start_at, end_at = _week_utc_bounds(contest_week)
+    camp_awards = session.scalars(select(CampPointAward).where(
+        CampPointAward.occurred_at >= start_at,
+        CampPointAward.occurred_at < end_at,
+    )).all()
+    profile_ids = {chart.profile_id for chart in charts} | {
+        award.profile_id for award in camp_awards
+    }
     profiles = (
         {
             profile.id: profile
@@ -468,6 +564,7 @@ def finalize_contest_week(
     )
 
     point_scores = {"open": {}, "verified": {}}
+    camp_point_scores: dict[int, int] = {}
     instrument_totals = {"open": {}, "verified": {}}
     contributions: dict[tuple[str, str, int], int] = {}
     for chart in charts:
@@ -482,9 +579,14 @@ def finalize_contest_week(
                 totals[key] = (prior[0], prior[1] + chart.minutes)
                 contribution_key = (division, key, chart.profile_id)
                 contributions[contribution_key] = contributions.get(contribution_key, 0) + chart.minutes
+    for award in camp_awards:
+        camp_point_scores[award.profile_id] = (
+            camp_point_scores.get(award.profile_id, 0) + award.points_awarded
+        )
 
     points_contest = contests["weekly-points-leaders"]
     instrument_contest = contests["weekly-practice-by-instrument"]
+    camp_points_contest = contests["weekly-camp-points"]
     gold_results: dict[tuple[int, str], ContestResult] = {}
     winning_instruments: set[tuple[str, str]] = set()
     for division in ("open", "verified"):
@@ -517,6 +619,29 @@ def finalize_contest_week(
             ))
             if rank == 1:
                 winning_instruments.add((division, key))
+    camp_gold_results: list[tuple[int, ContestResult]] = []
+    for profile_id, display, score, rank in _ranked_student_scores(
+        camp_point_scores, profiles
+    ):
+        medal = medal_for_rank(rank)
+        if medal is None:
+            continue
+        result = ContestResult(
+            contest_week_id=contest_week.id,
+            contest_id=camp_points_contest.id,
+            division="open",
+            subject_type="student",
+            subject_key=str(profile_id),
+            profile_id=profile_id,
+            instrument=None,
+            display_name_snapshot=display,
+            score=score,
+            rank=rank,
+            medal=medal,
+        )
+        session.add(result)
+        if rank == 1:
+            camp_gold_results.append((profile_id, result))
     session.flush()
 
     rewarded_gold: set[int] = set()
@@ -559,6 +684,20 @@ def finalize_contest_week(
             progress.qualifying_wins += 1
             if progress.qualifying_wins >= 10 and progress.crown_earned_at is None:
                 progress.crown_earned_at = now_utc
+
+    for profile_id, result in camp_gold_results:
+        source = (
+            f"contest:{contest_week.week_start}:{camp_points_contest.key}:"
+            f"student:{profile_id}:gold"
+        )
+        if _grant_once(
+            session,
+            profile_id=profile_id,
+            result_id=result.id,
+            source_key=source,
+            reward_type="dandelion",
+        ):
+            _add_dandelion(session, profile_id)
 
     participation_winners: set[tuple[str, int]] = set()
     for winning_division, instrument_key in winning_instruments:
@@ -795,6 +934,11 @@ def current_contests_payload(
         contest_week=contest_week,
         current_profile_id=current_profile_id,
     )
+    camp_points_standings = weekly_camp_points(
+        session,
+        contest_week=contest_week,
+        current_profile_id=current_profile_id,
+    )
     return {
         "season": {
             "key": season.key,
@@ -826,6 +970,7 @@ def current_contests_payload(
         "standings": {
             "weekly-points-leaders": points_standings,
             "weekly-practice-by-instrument": standings,
+            "weekly-camp-points": camp_points_standings,
         },
     }
 
@@ -844,6 +989,50 @@ def current_contests(request: Request) -> dict[str, object]:
             now=datetime.now(timezone.utc),
             current_profile_id=profile.id,
         )
+
+
+@router.post("/camp-points/awards")
+def award_camp_points(
+    request: Request,
+    submitted: CampPointAwardCreate,
+) -> dict[str, object]:
+    with SessionLocal() as session:
+        profile = current_profile(request, session)
+        if profile is None:
+            raise HTTPException(status_code=401, detail="Student sign-in is required.")
+        now = datetime.now(timezone.utc)
+        try:
+            award, created = create_camp_point_award(
+                session,
+                profile=profile,
+                activity_type=submitted.activity_type,
+                activity_date=submitted.activity_date,
+                now=now,
+            )
+            session.commit()
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+        except IntegrityError:
+            session.rollback()
+            duplicate_key = (
+                f"band-camp:{submitted.activity_date.isoformat()}:"
+                f"{submitted.activity_type.strip().casefold()}"
+            )
+            award = session.scalar(select(CampPointAward).where(
+                CampPointAward.profile_id == profile.id,
+                CampPointAward.duplicate_key == duplicate_key,
+            ))
+            if award is None:
+                raise HTTPException(status_code=500, detail="Camp points could not be saved.")
+            created = False
+        return {
+            "created": created,
+            "award": {
+                "activity_type": award.activity_type,
+                "points_awarded": award.points_awarded,
+                "occurred_at": utc_iso(award.occurred_at),
+            },
+        }
 
 
 @router.post("/weeks/{week_start}/finalize")

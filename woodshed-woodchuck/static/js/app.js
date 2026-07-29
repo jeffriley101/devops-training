@@ -1133,6 +1133,32 @@
       return true;
     }
 
+    const campAwardsInFlight = new Set();
+
+    async function persistCampPoint(activityType) {
+      if (campAwardsInFlight.has(activityType)) return null;
+      campAwardsInFlight.add(activityType);
+      try {
+        const response = await fetch("/contests/camp-points/awards", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            activity_type: activityType,
+            activity_date: today,
+          }),
+        });
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload.detail || "Camp points could not be saved.");
+        }
+        window.dispatchEvent(new CustomEvent("ww:camp-points-saved"));
+        return payload;
+      } finally {
+        campAwardsInFlight.delete(activityType);
+      }
+    }
+
     function setButtonComplete(button, text) {
       if (!button) return;
 
@@ -1243,7 +1269,7 @@
     renderBoard(current);
 
     if (hoursForm) {
-      hoursForm.addEventListener("submit", function (event) {
+      hoursForm.addEventListener("submit", async function (event) {
         event.preventDefault();
 
         const next = prepareCurrentDay(stateApi.getState());
@@ -1257,10 +1283,16 @@
 
         if (hasAward(next, "hours")) return;
 
+        try {
+          await persistCampPoint("hours");
+        } catch (error) {
+          feedbackEl.textContent = error.message || "Camp points could not be saved.";
+          return;
+        }
+
         next.bandCamp.daily.hours = hours;
         awardContest(next, "hours");
         stateApi.saveState(next);
-
         feedbackEl.textContent =
           `${hours} camp hours added. +1 Camp Point and +1 dandelion.`;
 
@@ -1270,10 +1302,17 @@
     }
 
     if (careButton) {
-      careButton.addEventListener("click", function () {
+      careButton.addEventListener("click", async function () {
         const next = prepareCurrentDay(stateApi.getState());
 
         if (next.bandCamp.daily.careComplete) return;
+
+        try {
+          await persistCampPoint("care");
+        } catch (error) {
+          feedbackEl.textContent = error.message || "Camp points could not be saved.";
+          return;
+        }
 
         next.bandCamp.daily.careComplete = true;
         awardContest(next, "care");
@@ -1288,7 +1327,7 @@
     }
 
     if (triviaForm) {
-      triviaForm.addEventListener("submit", function (event) {
+      triviaForm.addEventListener("submit", async function (event) {
         event.preventDefault();
 
         const next = prepareCurrentDay(stateApi.getState());
@@ -1311,6 +1350,12 @@
         next.bandCamp.daily.triviaCorrect = isCorrect;
 
         if (isCorrect) {
+          try {
+            await persistCampPoint("trivia");
+          } catch (error) {
+            feedbackEl.textContent = error.message || "Camp points could not be saved.";
+            return;
+          }
           awardContest(next, "trivia");
           feedbackEl.textContent =
             "Correct! +1 Camp Point and +1 dandelion.";
@@ -1326,10 +1371,17 @@
     }
 
     if (marchingButton) {
-      marchingButton.addEventListener("click", function () {
+      marchingButton.addEventListener("click", async function () {
         const next = prepareCurrentDay(stateApi.getState());
 
         if (next.bandCamp.daily.marchingComplete) return;
+
+        try {
+          await persistCampPoint("marching");
+        } catch (error) {
+          feedbackEl.textContent = error.message || "Camp points could not be saved.";
+          return;
+        }
 
         next.bandCamp.daily.marchingComplete = true;
         awardContest(next, "marching");
@@ -1361,6 +1413,7 @@
     const weekStatusEl = document.getElementById("contest-week-status");
     let selectedDivision = "open";
     let requestInFlight = false;
+    let refreshQueued = false;
     const tabs = [
       document.getElementById("contest-open-tab"),
       document.getElementById("contest-verified-tab"),
@@ -1486,8 +1539,11 @@
       return `${rank}th`;
     }
 
-    function positionMessage(division, position) {
+    function positionMessage(division, position, campPoints = false) {
       if (!position || position.has_score !== true) {
+        if (campPoints) {
+          return "No Camp points yet · Complete a Band Camp activity to join the board.";
+        }
         return division === "verified"
           ? "No verified points yet · Approved P-Charts appear here."
           : "No Open points yet · Submit a P-Chart to join the board.";
@@ -1499,7 +1555,7 @@
         position.tied === true
           ? `Tied for ${ordinal(position.rank)}`
           : `Rank ${position.rank}`,
-        `${position.total_points} ${position.total_points === 1 ? "point" : "points"}`,
+        `${position.total_points} ${campPoints ? "Camp " : ""}${position.total_points === 1 ? "point" : "points"}`,
       ];
       if (position.rank === 1) {
         parts.push("Leading the board");
@@ -1511,13 +1567,14 @@
       return parts.join(" · ");
     }
 
-    function renderPointsDivision(division, rows, position) {
-      const list = document.getElementById(`contest-${division}-points`);
+    function renderPointsDivision(division, rows, position, kind = "points") {
+      const campPoints = kind === "camp-points";
+      const list = document.getElementById(`contest-${division}-${kind}`);
       const emptyEl = document.getElementById(
-        `contest-${division}-points-empty`
+        `contest-${division}-${kind}-empty`
       );
       const messageEl = document.getElementById(
-        `contest-${division}-position-message`
+        `contest-${division}-${campPoints ? "camp-position" : "position"}-message`
       );
       if (!list || !emptyEl || !messageEl) return;
 
@@ -1547,7 +1604,7 @@
           : row.display_name;
         rankedRow.setAttribute(
           "aria-label",
-          `Rank ${row.rank}, ${publicName}, ${row.total_points} points`
+          `Rank ${row.rank}, ${publicName}, ${row.total_points} ${campPoints ? "Camp points" : "P-Chart points"}`
         );
         const rank = document.createElement("span");
         rank.className = "contest-rank-badge";
@@ -1557,7 +1614,9 @@
         subject.textContent = publicName;
         const score = document.createElement("strong");
         score.className = "contest-ranked-score";
-        score.textContent = `${row.total_points} pts`;
+        score.textContent = campPoints
+          ? `${row.total_points} Camp ${row.total_points === 1 ? "point" : "points"}`
+          : `${row.total_points} pts`;
         rankedRow.append(rank, subject, score);
         list.appendChild(rankedRow);
       });
@@ -1565,7 +1624,7 @@
       const isEmpty = safeRows.length === 0;
       emptyEl.classList.toggle("hidden", !isEmpty);
       list.classList.toggle("hidden", isEmpty);
-      messageEl.textContent = positionMessage(division, position);
+      messageEl.textContent = positionMessage(division, position, campPoints);
     }
 
     function showError(message) {
@@ -1580,7 +1639,10 @@
     }
 
     async function loadStandings() {
-      if (requestInFlight) return;
+      if (requestInFlight) {
+        refreshQueued = true;
+        return;
+      }
       requestInFlight = true;
       root.setAttribute("aria-busy", "true");
       if (errorEl) errorEl.classList.add("hidden");
@@ -1612,6 +1674,8 @@
           standings["weekly-practice-by-instrument"];
         const pointsStandings = standings &&
           standings["weekly-points-leaders"];
+        const campPointsStandings = standings &&
+          standings["weekly-camp-points"];
         if (
           !week ||
           !practiceStandings ||
@@ -1622,7 +1686,11 @@
           !Array.isArray(pointsStandings.verified) ||
           !pointsStandings.current_user_position ||
           !pointsStandings.current_user_position.open ||
-          !pointsStandings.current_user_position.verified
+          !pointsStandings.current_user_position.verified ||
+          !campPointsStandings ||
+          !Array.isArray(campPointsStandings.open) ||
+          !campPointsStandings.current_user_position ||
+          !campPointsStandings.current_user_position.open
         ) {
           showError("Band Camp standings could not be read.");
           return;
@@ -1656,6 +1724,12 @@
           pointsStandings.verified,
           pointsStandings.current_user_position.verified
         );
+        renderPointsDivision(
+          "open",
+          campPointsStandings.open,
+          campPointsStandings.current_user_position.open,
+          "camp-points"
+        );
         selectDivision(selectedDivision, false);
         if (loadingEl) loadingEl.classList.add("hidden");
         if (errorEl) errorEl.classList.add("hidden");
@@ -1665,12 +1739,17 @@
         showError("Band Camp standings are unavailable right now.");
       } finally {
         requestInFlight = false;
+        if (refreshQueued) {
+          refreshQueued = false;
+          loadStandings();
+        }
       }
     }
 
     selectDivision("open", false);
     retryButton.addEventListener("click", loadStandings);
     window.addEventListener("ww:p-chart-saved", loadStandings);
+    window.addEventListener("ww:camp-points-saved", loadStandings);
     loadStandings();
   }
 
@@ -1770,7 +1849,11 @@
     });
 
     function renderContest(division, contestKey, results) {
-      const type = contestKey === "weekly-points-leaders" ? "points" : "instruments";
+      const type = contestKey === "weekly-points-leaders"
+        ? "points"
+        : contestKey === "weekly-camp-points"
+          ? "camp-points"
+          : "instruments";
       const rowsEl = document.getElementById(`past-winners-${division}-${type}`);
       const noResultsEl = document.getElementById(
         `past-winners-${division}-${type}-empty`
@@ -1780,7 +1863,7 @@
       const rows = results.filter((result) => {
         const medal = result && medals[result.rank];
         const contest = result && result.contest;
-        const subject = result && (type === "points" ? result.display_name : result.instrument);
+        const subject = result && (type === "instruments" ? result.instrument : result.display_name);
         return medal && result.medal === medal.key &&
           result.division === division && contest && contest.key === contestKey &&
           typeof subject === "string" && subject.trim() &&
@@ -1789,7 +1872,7 @@
 
       rows.forEach((result) => {
         const medal = medals[result.rank];
-        const isStudent = type === "points";
+        const isStudent = type !== "instruments";
         const subject = isStudent ? result.display_name : result.instrument;
         const row = document.createElement("article");
         row.className = "medal-row";
@@ -1806,9 +1889,11 @@
         subjectBlock.append(name, rank);
         const score = document.createElement("span");
         score.className = "medal-row-score";
-        score.textContent = isStudent
-          ? `${result.score} ${result.score === 1 ? "point" : "points"}`
-          : `${result.score} min`;
+        score.textContent = type === "camp-points"
+          ? `${result.score} Camp ${result.score === 1 ? "point" : "points"}`
+          : isStudent
+            ? `${result.score} ${result.score === 1 ? "point" : "points"}`
+            : `${result.score} min`;
         row.append(icon, subjectBlock, score);
         rowsEl.appendChild(row);
       });
@@ -1820,6 +1905,7 @@
       ["open", "verified"].forEach((division) => {
         renderContest(division, "weekly-points-leaders", results);
         renderContest(division, "weekly-practice-by-instrument", results);
+        renderContest(division, "weekly-camp-points", results);
       });
     }
 

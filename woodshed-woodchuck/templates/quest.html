@@ -194,6 +194,19 @@
             </p>
           </section>
 
+          <section class="contest-camp-points-section" aria-labelledby="open-camp-points-title">
+            <h4 id="open-camp-points-title">Weekly Band Camp Points</h4>
+            <p class="contest-division-explanation">Camp activities completed this week</p>
+            <div id="contest-open-camp-position" class="contest-position-card">
+              <strong>Your Position</strong>
+              <span id="contest-open-camp-position-message">Loading your position…</span>
+            </div>
+            <div id="contest-open-camp-points" class="contest-ranked-list contest-camp-points-list" role="list" aria-label="Open Band Camp points leaders"></div>
+            <p id="contest-open-camp-points-empty" class="contest-empty-state hidden">
+              No Camp points have been earned this week yet.
+            </p>
+          </section>
+
           <section class="contest-instrument-section" aria-labelledby="open-instruments-title">
             <h4 id="open-instruments-title">Weekly Practice Minutes by Instrument</h4>
             <p class="contest-division-explanation">All submitted P-Charts</p>
@@ -313,6 +326,13 @@
               <h4 id="past-{{ division }}-instruments-title">Weekly Practice Minutes by Instrument</h4>
               <div id="past-winners-{{ division }}-instruments" class="medal-rows"></div>
               <p id="past-winners-{{ division }}-instruments-empty" class="contest-empty-state hidden">
+                No podium results for this contest and division.
+              </p>
+            </section>
+            <section class="medal-contest" aria-labelledby="past-{{ division }}-camp-points-title">
+              <h4 id="past-{{ division }}-camp-points-title">Weekly Band Camp Points</h4>
+              <div id="past-winners-{{ division }}-camp-points" class="medal-rows"></div>
+              <p id="past-winners-{{ division }}-camp-points-empty" class="contest-empty-state hidden">
                 No podium results for this contest and division.
               </p>
             </section>

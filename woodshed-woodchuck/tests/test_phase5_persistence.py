@@ -10,6 +10,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.db import Base
 from app.models import (
+    CampPointAward,
     Contest,
     ContestResult,
     ContestWeek,
@@ -21,6 +22,13 @@ from app.models import (
     TrustedVerifier,
     WoodchuckProfile,
 )
+
+
+def test_camp_point_award_has_weekly_ledger_fields() -> None:
+    assert set(CampPointAward.__table__.columns.keys()) == {
+        "id", "profile_id", "activity_type", "points_awarded",
+        "occurred_at", "duplicate_key", "created_at",
+    }
 from app.practice_chart_routes import PracticeChartCreate, chart_payload
 from app.practice_charts import create_practice_chart_verification_request
 

@@ -26,10 +26,14 @@ from app.contests import (
     crown_progress_payload,
     weekly_practice_by_instrument,
     weekly_student_points,
+    weekly_camp_points,
+    create_camp_point_award,
+    CampPointAwardCreate,
 )
 from app.db import Base
 from app.main import app
 from app.models import (
+    CampPointAward,
     Contest,
     ContestResult,
     ContestWeek,
@@ -145,12 +149,110 @@ def test_band_camp_records_are_created_idempotently(
     assert first[0].id == second[0].id
     assert first[2].id == second[2].id
     assert session.scalar(select(func.count()).select_from(Season)) == 1
-    assert session.scalar(select(func.count()).select_from(Contest)) == 2
+    assert session.scalar(select(func.count()).select_from(Contest)) == 3
     assert session.scalar(select(func.count()).select_from(ContestWeek)) == 1
     assert {contest.key for contest in second[1]} == {
         "weekly-points-leaders",
         "weekly-practice-by-instrument",
+        "weekly-camp-points",
     }
+
+
+def test_camp_point_activities_persist_once_and_aggregate_separately(
+    database: tuple[Session, sessionmaker[Session]],
+) -> None:
+    session, _ = database
+    _, _, week = ensure_band_camp_data(session, now=NOW)
+    student = add_student(session, woodchuck_id="WC-CAMP-A", instrument="Tuba")
+    state_payload = {"bandCamp": {"totals": {"points": 27}}, "progress": {"credits": 9}}
+    session.add(WoodchuckState(
+        profile_id=student.id, state_json=deepcopy(state_payload), revision=3
+    ))
+    for activity in ("hours", "care", "trivia", "marching"):
+        award, created = create_camp_point_award(
+            session,
+            profile=student,
+            activity_type=activity,
+            activity_date=date(2026, 7, 28),
+            now=NOW,
+        )
+        assert created is True
+        assert award.points_awarded == 1
+    duplicate, created = create_camp_point_award(
+        session,
+        profile=student,
+        activity_type="trivia",
+        activity_date=date(2026, 7, 28),
+        now=NOW,
+    )
+    session.commit()
+
+    assert created is False
+    assert duplicate.activity_type == "trivia"
+    assert session.scalar(select(func.count()).select_from(CampPointAward)) == 4
+    standings = weekly_camp_points(
+        session, contest_week=week, current_profile_id=student.id
+    )
+    assert standings["open"] == [{
+        "rank": 1,
+        "display_name": "Student WC-CAMP-A",
+        "total_points": 4,
+        "is_current_user": True,
+    }]
+    assert standings["current_user_position"]["open"]["total_points"] == 4
+    assert "verified" not in standings
+    assert session.get(WoodchuckState, student.id).state_json == state_payload
+
+
+def test_camp_points_do_not_include_p_charts_or_practice_minutes(
+    database: tuple[Session, sessionmaker[Session]],
+) -> None:
+    session, _ = database
+    _, _, week = ensure_band_camp_data(session, now=NOW)
+    student = add_student(session, woodchuck_id="WC-CAMP-B", instrument="Flute")
+    add_chart(
+        session, profile=student, practice_date=date(2026, 7, 28), minutes=45
+    )
+    create_camp_point_award(
+        session, profile=student, activity_type="care",
+        activity_date=date(2026, 7, 28), now=NOW,
+    )
+    session.commit()
+
+    payload = current_contests_payload(
+        session, now=NOW, current_profile_id=student.id
+    )["standings"]
+    assert payload["weekly-points-leaders"]["open"][0]["total_points"] == 1
+    assert payload["weekly-practice-by-instrument"]["open"][0]["total_minutes"] == 45
+    assert payload["weekly-camp-points"]["open"][0]["total_points"] == 1
+
+
+def test_camp_point_award_endpoint_is_authenticated_idempotent_and_private(
+    database: tuple[Session, sessionmaker[Session]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session, factory = database
+    student = add_student(session, woodchuck_id="WC-CAMP-PRIVATE", instrument="Oboe")
+    session.commit()
+    monkeypatch.setattr(contest_module, "SessionLocal", factory)
+    submitted = CampPointAwardCreate(
+        activity_type="care",
+        activity_date=datetime.now(contest_module.CENTRAL).date(),
+    )
+
+    with pytest.raises(HTTPException) as unauthorized:
+        contest_module.award_camp_points(request_with_session(), submitted)
+    assert unauthorized.value.status_code == 401
+    first = contest_module.award_camp_points(request_with_session(student.id), submitted)
+    repeated = contest_module.award_camp_points(request_with_session(student.id), submitted)
+
+    assert first["created"] is True
+    assert repeated["created"] is False
+    assert first["award"]["points_awarded"] == 1
+    assert session.scalar(select(func.count()).select_from(CampPointAward)) == 1
+    serialized = repr(first).casefold()
+    for private in ("profile_id", "woodchuck_id", "wc-camp-private", "pin", "email", "verifier"):
+        assert private not in serialized
 
 
 def test_weekly_practice_divisions_and_boundaries(
@@ -591,6 +693,59 @@ def test_successful_finalization_medals_rewards_crown_and_idempotence(
     )
     crown = session.scalar(select(CrownProgress).where(CrownProgress.profile_id == alpha.id))
     assert crown is not None and crown.qualifying_wins == 1
+
+
+def test_camp_points_finalize_once_with_medals_reward_and_no_crown(
+    database: tuple[Session, sessionmaker[Session]],
+) -> None:
+    session, _ = database
+    week = ready_week(session)
+    gold = add_student(session, woodchuck_id="WC-CAMP-G", instrument="Flute")
+    silver = add_student(session, woodchuck_id="WC-CAMP-S", instrument="Oboe")
+    bronze = add_student(session, woodchuck_id="WC-CAMP-BR", instrument="Tuba")
+    for profile, activities in (
+        (gold, ("hours", "care", "trivia")),
+        (silver, ("hours", "care")),
+        (bronze, ("hours",)),
+    ):
+        for activity in activities:
+            create_camp_point_award(
+                session, profile=profile, activity_type=activity,
+                activity_date=date(2026, 7, 28), now=NOW,
+            )
+    session.commit()
+
+    finalize_contest_week(session, week_start=week.week_start, now=FINAL_NOW)
+    session.commit()
+    finalize_contest_week(
+        session, week_start=week.week_start, now=FINAL_NOW + timedelta(hours=1)
+    )
+    session.commit()
+
+    rows = session.scalars(select(ContestResult).join(Contest).where(
+        Contest.key == "weekly-camp-points"
+    ).order_by(ContestResult.rank)).all()
+    assert [(row.division, row.rank, row.medal, row.score) for row in rows] == [
+        ("open", 1, "gold", 3),
+        ("open", 2, "silver", 2),
+        ("open", 3, "bronze", 1),
+    ]
+    grants = session.scalars(select(RewardGrant).where(
+        RewardGrant.source_key.like("%:weekly-camp-points:%")
+    )).all()
+    assert [(grant.profile_id, grant.reward_type) for grant in grants] == [
+        (gold.id, "dandelion")
+    ]
+    assert session.scalar(select(CrownProgress).where(
+        CrownProgress.profile_id == gold.id
+    )) is None
+    results = contest_results_payload(session, week)["results"]
+    assert any(row["contest"]["key"] == "weekly-camp-points" for row in results)
+    hall = hall_of_champions_payload(session)
+    champion = next(
+        item for item in hall["students"] if item["display_name"] == gold.display_name
+    )
+    assert champion["medals"]["gold"] == 1
 
 
 def test_olympic_ties_and_open_verified_gold_pay_once(

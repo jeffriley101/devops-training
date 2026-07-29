@@ -522,6 +522,34 @@ class PracticeChartVerification(Base):
     )
 
 
+class CampPointAward(Base):
+    __tablename__ = "camp_point_awards"
+    __table_args__ = (
+        UniqueConstraint(
+            "profile_id",
+            "duplicate_key",
+            name="uq_camp_point_award_profile_key",
+        ),
+        CheckConstraint("points_awarded > 0", name="ck_camp_point_award_positive"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    profile_id: Mapped[int] = mapped_column(
+        ForeignKey("woodchuck_profiles.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    activity_type: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    points_awarded: Mapped[int] = mapped_column(Integer, nullable=False)
+    occurred_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, index=True
+    )
+    duplicate_key: Mapped[str] = mapped_column(String(100), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
+
+
 class Season(Base):
     __tablename__ = "seasons"
     __table_args__ = (

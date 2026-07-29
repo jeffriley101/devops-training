@@ -28,6 +28,10 @@ def test_board_contains_live_standings_markup() -> None:
     assert 'id="contest-verified-points"' in markup
     assert "Top Five Points Leaders" in markup
     assert "Weekly Practice Minutes by Instrument" in markup
+    assert "Weekly Band Camp Points" in markup
+    assert 'id="contest-open-camp-points"' in markup
+    assert 'id="contest-open-camp-position"' in markup
+    assert 'id="contest-verified-camp-points"' not in markup
     assert "Your Position" in markup
 
 
@@ -243,10 +247,40 @@ def test_live_scoreboard_switching_refresh_and_retry_are_wired() -> None:
     assert 'event.key === "ArrowRight"' in javascript
     assert 'event.key === "ArrowLeft"' in javascript
     assert "selectDivision(selectedDivision, false)" in javascript
-    assert "if (requestInFlight) return" in javascript
+    assert "if (requestInFlight) {" in javascript
+    assert "refreshQueued = true" in javascript
     assert 'retryButton.addEventListener("click", loadStandings)' in javascript
     assert 'window.addEventListener("ww:p-chart-saved", loadStandings)' in javascript
     assert 'window.dispatchEvent(new CustomEvent("ww:p-chart-saved"))' in javascript
+    assert 'window.addEventListener("ww:camp-points-saved", loadStandings)' in javascript
+
+
+def test_camp_point_actions_persist_and_guard_duplicate_clicks() -> None:
+    javascript = (
+        Path(__file__).resolve().parents[1] / "static" / "js" / "app.js"
+    ).read_text(encoding="utf-8")
+
+    assert 'fetch("/contests/camp-points/awards"' in javascript
+    assert "campAwardsInFlight.has(activityType)" in javascript
+    assert 'await persistCampPoint("hours")' in javascript
+    assert 'await persistCampPoint("care")' in javascript
+    assert 'await persistCampPoint("trivia")' in javascript
+    assert 'await persistCampPoint("marching")' in javascript
+    assert 'activity_date: today' in javascript
+    assert 'new CustomEvent("ww:camp-points-saved")' in javascript
+    assert 'standings["weekly-camp-points"]' in javascript
+    assert '"Camp points"' in javascript
+
+
+def test_past_winners_renders_weekly_camp_points() -> None:
+    markup = TestClient(app).get("/quest").text
+    javascript = (
+        Path(__file__).resolve().parents[1] / "static" / "js" / "app.js"
+    ).read_text(encoding="utf-8")
+
+    assert 'id="past-winners-open-camp-points"' in markup
+    assert 'id="past-winners-verified-camp-points"' in markup
+    assert 'renderContest(division, "weekly-camp-points", results)' in javascript
 
 
 def test_live_scoreboard_week_header_icons_and_status_are_present() -> None:
