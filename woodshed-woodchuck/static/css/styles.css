@@ -1243,6 +1243,113 @@ select {
     linear-gradient(180deg, #f1db9d, #d8b666);
 }
 
+.champions-filters {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.35rem;
+  margin: 0.7rem 0 1rem;
+}
+
+.champions-filter {
+  min-height: 44px;
+  padding: 0.5rem 0.35rem;
+  color: #3d2a18;
+  font: inherit;
+  font-weight: 900;
+  background: rgba(255, 248, 232, 0.72);
+  border: 2px solid #8a6a3e;
+  border-radius: 9px;
+  cursor: pointer;
+}
+
+.champions-filter[aria-pressed="true"] {
+  color: #fff8e8;
+  background: #526b3f;
+  border-color: #304725;
+}
+
+.champions-filter:focus-visible,
+.champions-show-all:focus-visible {
+  outline: 3px solid #1f5f8b;
+  outline-offset: 2px;
+}
+
+.champions-panel + .champions-panel {
+  margin-top: 1rem;
+  padding-top: 0.9rem;
+  border-top: 2px solid rgba(92, 63, 32, 0.35);
+}
+
+.champions-panel h4 {
+  margin: 0 0 0.6rem;
+}
+
+.champions-list {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.champion-card {
+  min-width: 0;
+  padding: 0.7rem;
+  background: rgba(255, 248, 232, 0.8);
+  border: 1px solid rgba(92, 63, 32, 0.34);
+  border-radius: 10px;
+}
+
+.champion-card-head {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.champion-card-head strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.champion-podium-total {
+  flex: none;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
+
+.champion-medals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.65rem;
+  margin-top: 0.5rem;
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
+.champion-crown,
+.champion-divisions {
+  margin: 0.5rem 0 0;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.champion-crown-earned {
+  color: #594000;
+}
+
+.champions-show-all {
+  width: 100%;
+  margin-top: 0.65rem;
+}
+
+@media (max-width: 420px) {
+  .hall-of-champions {
+    padding-inline: 0.65rem;
+  }
+
+  .champion-card-head {
+    align-items: flex-start;
+  }
+}
+
 .board-feedback {
   min-height: 1.35rem;
   margin: 1rem 0;

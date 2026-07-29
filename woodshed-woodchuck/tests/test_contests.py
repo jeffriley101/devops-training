@@ -21,6 +21,7 @@ from app.contests import (
     finalize_contest_week,
     contest_results_payload,
     finalized_weeks_payload,
+    hall_of_champions_payload,
     weekly_practice_by_instrument,
     weekly_student_points,
 )
@@ -893,3 +894,179 @@ def test_prior_finalized_band_camp_week_results_remain_browsable(
     )
     assert payload["week"]["status"] == "finalized"
     assert payload["results"][0]["display_name"] == "Prior Winner"
+
+
+def test_hall_aggregates_students_instruments_divisions_and_prior_seasons(
+    database: tuple[Session, sessionmaker[Session]],
+) -> None:
+    session, _ = database
+    current_season, contests, current_week = ensure_band_camp_data(session, now=NOW)
+    points = next(c for c in contests if c.key == "weekly-points-leaders")
+    instruments = next(c for c in contests if c.key == "weekly-practice-by-instrument")
+    prior_season = Season(
+        key="band-camp-2025", name="Band Camp 2025",
+        timezone="America/Chicago", starts_on=date(2025, 7, 28), status="closed",
+    )
+    session.add(prior_season)
+    session.flush()
+    prior_week = ContestWeek(
+        season_id=prior_season.id, week_start=date(2025, 7, 28),
+        week_end=date(2025, 8, 4),
+        verification_deadline_at=datetime(2025, 8, 4, 17, tzinfo=timezone.utc),
+        finalize_after=datetime(2025, 8, 4, 17, 5, tzinfo=timezone.utc),
+        status="finalized", finalized_at=datetime(2025, 8, 4, 18, tzinfo=timezone.utc),
+    )
+    current_week.status = "finalized"
+    current_week.finalized_at = FINAL_NOW
+    session.add(prior_week)
+    students = [
+        add_student(session, woodchuck_id=f"WC-HALL-{index}", instrument="Tuba")
+        for index in range(1, 4)
+    ]
+    session.flush()
+
+    def result(
+        *, week: ContestWeek, contest: Contest, division: str, medal: str,
+        rank: int, subject_key: str, snapshot: str,
+        profile: WoodchuckProfile | None = None, instrument: str | None = None,
+    ) -> ContestResult:
+        return ContestResult(
+            contest_week_id=week.id, contest_id=contest.id, division=division,
+            subject_type="student" if profile else "instrument",
+            subject_key=subject_key, profile_id=profile.id if profile else None,
+            instrument=instrument, display_name_snapshot=snapshot,
+            score=10, rank=rank, medal=medal,
+        )
+
+    session.add_all([
+        result(week=prior_week, contest=points, division="open", medal="gold",
+               rank=1, subject_key=str(students[0].id), snapshot="Old Name", profile=students[0]),
+        result(week=current_week, contest=points, division="verified", medal="silver",
+               rank=2, subject_key=str(students[0].id), snapshot="Shared Name", profile=students[0]),
+        result(week=current_week, contest=points, division="open", medal="bronze",
+               rank=3, subject_key=str(students[1].id), snapshot="Shared Name", profile=students[1]),
+        result(week=prior_week, contest=points, division="open", medal="gold",
+               rank=1, subject_key=str(students[2].id), snapshot="Alpha", profile=students[2]),
+        result(week=current_week, contest=points, division="verified", medal="gold",
+               rank=1, subject_key=str(students[2].id), snapshot="Alpha", profile=students[2]),
+        result(week=prior_week, contest=instruments, division="open", medal="gold",
+               rank=1, subject_key="flute", snapshot="Flute", instrument="Flute"),
+        result(week=current_week, contest=instruments, division="verified", medal="silver",
+               rank=2, subject_key="flute", snapshot="Flute", instrument="Flute"),
+        result(week=current_week, contest=instruments, division="open", medal="bronze",
+               rank=3, subject_key="saxophone", snapshot="Saxophone", instrument="Saxophone"),
+    ])
+    session.add_all([
+        CrownProgress(
+            profile_id=students[0].id,
+            category_key=points.crown_category or points.key,
+            qualifying_wins=7,
+        ),
+        CrownProgress(
+            profile_id=students[2].id,
+            category_key=points.crown_category or points.key,
+            qualifying_wins=10,
+            crown_earned_at=FINAL_NOW,
+        ),
+    ])
+    session.commit()
+
+    payload = hall_of_champions_payload(session)
+
+    assert [student["display_name"] for student in payload["students"]] == [
+        "Alpha", "Shared Name", "Shared Name"
+    ]
+    renamed = payload["students"][1]
+    assert renamed["medals"] == {"gold": 1, "silver": 1, "bronze": 0, "total": 2}
+    assert renamed["by_division"] == {
+        "open": {"gold": 1, "silver": 0, "bronze": 0, "total": 1},
+        "verified": {"gold": 0, "silver": 1, "bronze": 0, "total": 1},
+    }
+    assert renamed["divisions"] == ["open", "verified"]
+    assert renamed["crown"] == {
+        "qualifying_wins": 7, "target_wins": 10, "earned": False
+    }
+    assert payload["students"][0]["crown"] == {
+        "qualifying_wins": 10, "target_wins": 10, "earned": True
+    }
+    assert payload["instruments"][0] == {
+        "instrument_key": "flute",
+        "instrument_label": "Flute",
+        "instrument_icon": "🪈",
+        "medals": {"gold": 1, "silver": 1, "bronze": 0, "total": 2},
+        "by_division": {
+            "open": {"gold": 1, "silver": 0, "bronze": 0, "total": 1},
+            "verified": {"gold": 0, "silver": 1, "bronze": 0, "total": 1},
+        },
+        "divisions": ["open", "verified"],
+    }
+    assert current_season.key == "band-camp-2026"
+
+
+def test_hall_uses_persisted_instrument_snapshot_not_current_profile_instrument(
+    database: tuple[Session, sessionmaker[Session]],
+) -> None:
+    session, _ = database
+    _, contests, week = ensure_band_camp_data(session, now=NOW)
+    instrument_contest = next(
+        contest for contest in contests
+        if contest.key == "weekly-practice-by-instrument"
+    )
+    student = add_student(session, woodchuck_id="WC-HALL-INSTRUMENT", instrument="Tuba")
+    week.status = "finalized"
+    week.finalized_at = FINAL_NOW
+    session.add(ContestResult(
+        contest_week_id=week.id, contest_id=instrument_contest.id,
+        division="open", subject_type="instrument", subject_key="clarinet",
+        instrument="Clarinet", display_name_snapshot="Clarinet",
+        score=30, rank=1, medal="gold",
+    ))
+    student.instrument = "Saxophone"
+    session.commit()
+
+    payload = hall_of_champions_payload(session)
+    assert payload["instruments"][0]["instrument_label"] == "Clarinet"
+    assert "Saxophone" not in repr(payload["instruments"])
+
+
+def test_hall_empty_authentication_and_privacy(
+    database: tuple[Session, sessionmaker[Session]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session, factory = database
+    profile = add_student(session, woodchuck_id="WC-HALL-PRIVATE", instrument="Flute")
+    session.commit()
+    monkeypatch.setattr(contest_module, "SessionLocal", factory)
+
+    assert hall_of_champions_payload(session) == {"students": [], "instruments": []}
+    with pytest.raises(HTTPException) as unauthorized:
+        contest_module.hall_of_champions(request_with_session())
+    assert unauthorized.value.status_code == 401
+    payload = contest_module.hall_of_champions(request_with_session(profile.id))
+    serialized = repr(payload).casefold()
+    for private_field in (
+        "profile_id", "account_id", "woodchuck_id", "wc-hall-private",
+        "legal_name", "email", "pin", "verifier", "note", "p-chart",
+    ):
+        assert private_field not in serialized
+
+
+def test_hall_ranking_uses_gold_silver_bronze_then_public_name() -> None:
+    champions = [
+        {"display_name": "Zulu", "medals": {"gold": 1, "silver": 0, "bronze": 1}},
+        {"display_name": "Bravo", "medals": {"gold": 1, "silver": 1, "bronze": 0}},
+        {"display_name": "Alpha", "medals": {"gold": 1, "silver": 0, "bronze": 1}},
+        {"display_name": "Gold", "medals": {"gold": 2, "silver": 0, "bronze": 0}},
+    ]
+
+    ordered = sorted(champions, key=contest_module._champion_sort_key)
+
+    assert [champion["display_name"] for champion in ordered] == [
+        "Gold", "Bravo", "Alpha", "Zulu"
+    ]
+
+
+def test_hall_static_route_requires_authentication() -> None:
+    response = TestClient(app).get("/contests/hall-of-champions")
+
+    assert response.status_code == 401

@@ -117,3 +117,47 @@ def test_past_winners_javascript_handles_medals_ties_and_failures() -> None:
     assert "rows.forEach" in javascript
     assert "result.rank" in javascript
     assert "Past Winners could not be loaded." in board_template() + javascript
+
+
+def test_board_contains_hall_panels_filters_states_and_show_all() -> None:
+    markup = board_template()
+
+    for element_id in (
+        "hall-of-champions", "champions-loading", "champions-auth",
+        "champions-empty", "champions-error", "champions-retry",
+        "champions-division-filters", "student-champions-list",
+        "instrument-champions-list", "student-champions-show-all",
+        "instrument-champions-show-all",
+    ):
+        assert f'id="{element_id}"' in markup
+    for division in ("all", "open", "verified"):
+        assert f'data-champions-division="{division}"' in markup
+    assert "Student Champions" in markup
+    assert "Instrument Champions" in markup
+    assert "No finalized champions yet." in markup
+
+
+def test_hall_javascript_uses_top_ten_filters_medals_crown_and_retry() -> None:
+    javascript = (
+        Path(__file__).resolve().parents[1] / "static" / "js" / "app.js"
+    ).read_text(encoding="utf-8")
+
+    assert 'fetch("/contests/hall-of-champions"' in javascript
+    assert "ordered.slice(0, 10)" in javascript
+    assert 'division === "all"' in javascript
+    assert 'medalStat("🥇", "Gold"' in javascript
+    assert 'medalStat("🥈", "Silver"' in javascript
+    assert 'medalStat("🥉", "Bronze"' in javascript
+    assert "Permanent crown earned" in javascript
+    assert "champions-show-all" in javascript
+    assert 'retryButton.addEventListener("click", loadChampions)' in javascript
+
+
+def test_hall_preserves_existing_board_sections() -> None:
+    markup = board_template()
+
+    assert 'id="band-camp-standings"' in markup
+    assert 'id="contest-open-position"' in markup
+    assert 'id="contest-verified-position"' in markup
+    assert 'id="past-winners"' in markup
+    assert markup.index('id="hall-of-champions"') > markup.index('id="past-winners"')

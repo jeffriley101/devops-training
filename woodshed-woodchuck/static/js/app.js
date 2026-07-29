@@ -1932,6 +1932,212 @@
     loadWeeks();
   }
 
+  function wireHallOfChampions() {
+    const root = document.getElementById("hall-of-champions");
+    if (!root) return;
+
+    const loadingEl = document.getElementById("champions-loading");
+    const authEl = document.getElementById("champions-auth");
+    const emptyEl = document.getElementById("champions-empty");
+    const errorEl = document.getElementById("champions-error");
+    const contentEl = document.getElementById("champions-content");
+    const retryButton = document.getElementById("champions-retry");
+    const filterButtons = Array.from(
+      root.querySelectorAll("[data-champions-division]")
+    );
+    const stateEls = [loadingEl, authEl, emptyEl, errorEl, contentEl];
+    let champions = { students: [], instruments: [] };
+    let division = "all";
+    const expanded = { students: false, instruments: false };
+
+    function showState(element) {
+      stateEls.forEach((candidate) => {
+        if (candidate) candidate.classList.toggle("hidden", candidate !== element);
+      });
+      root.setAttribute("aria-busy", String(element === loadingEl));
+    }
+
+    function countsFor(champion) {
+      return division === "all"
+        ? champion.medals
+        : champion.by_division[division];
+    }
+
+    function championName(champion, type) {
+      return type === "students"
+        ? champion.display_name
+        : champion.instrument_label;
+    }
+
+    function sortedChampions(type) {
+      return champions[type]
+        .filter((champion) => countsFor(champion).total > 0)
+        .slice()
+        .sort((left, right) => {
+          const leftCounts = countsFor(left);
+          const rightCounts = countsFor(right);
+          return rightCounts.gold - leftCounts.gold ||
+            rightCounts.silver - leftCounts.silver ||
+            rightCounts.bronze - leftCounts.bronze ||
+            championName(left, type).localeCompare(championName(right, type), undefined, {
+              sensitivity: "base",
+            });
+        });
+    }
+
+    function medalStat(emoji, label, count) {
+      const stat = document.createElement("span");
+      const icon = document.createElement("span");
+      icon.setAttribute("aria-hidden", "true");
+      icon.textContent = emoji;
+      stat.append(icon, document.createTextNode(` ${label}: ${count}`));
+      return stat;
+    }
+
+    function renderType(type) {
+      const singular = type === "students" ? "student" : "instrument";
+      const list = document.getElementById(`${singular}-champions-list`);
+      const noResults = document.getElementById(`${singular}-champions-empty`);
+      const showAll = document.getElementById(`${singular}-champions-show-all`);
+      if (!list || !noResults || !showAll) return;
+      list.replaceChildren();
+      const ordered = sortedChampions(type);
+      const visible = expanded[type] ? ordered : ordered.slice(0, 10);
+
+      visible.forEach((champion) => {
+        const counts = countsFor(champion);
+        const card = document.createElement("article");
+        card.className = "champion-card";
+        const head = document.createElement("div");
+        head.className = "champion-card-head";
+        const name = document.createElement("strong");
+        name.textContent = type === "students"
+          ? champion.display_name
+          : `${champion.instrument_icon} ${champion.instrument_label}`;
+        const total = document.createElement("span");
+        total.className = "champion-podium-total";
+        total.textContent = `${counts.total} podium${counts.total === 1 ? "" : "s"}`;
+        head.append(name, total);
+
+        const medalRow = document.createElement("div");
+        medalRow.className = "champion-medals";
+        medalRow.append(
+          medalStat("🥇", "Gold", counts.gold),
+          medalStat("🥈", "Silver", counts.silver),
+          medalStat("🥉", "Bronze", counts.bronze)
+        );
+        card.append(head, medalRow);
+
+        if (type === "students") {
+          const crown = document.createElement("p");
+          crown.className = "champion-crown";
+          if (champion.crown.earned) {
+            crown.classList.add("champion-crown-earned");
+            crown.textContent = `👑 Permanent crown earned · ${champion.crown.qualifying_wins} qualifying wins`;
+          } else {
+            crown.textContent = `Crown progress: ${champion.crown.qualifying_wins} of ${champion.crown.target_wins} qualifying wins`;
+          }
+          card.appendChild(crown);
+        }
+
+        const represented = document.createElement("p");
+        represented.className = "champion-divisions";
+        represented.textContent = `Divisions represented: ${champion.divisions
+          .map((value) => value === "open" ? "Open" : "Verified")
+          .join(", ")}`;
+        card.appendChild(represented);
+        list.appendChild(card);
+      });
+
+      noResults.classList.toggle("hidden", ordered.length !== 0);
+      showAll.classList.toggle("hidden", expanded[type] || ordered.length <= 10);
+    }
+
+    function render() {
+      filterButtons.forEach((button) => {
+        button.setAttribute(
+          "aria-pressed",
+          String(button.dataset.championsDivision === division)
+        );
+      });
+      renderType("students");
+      renderType("instruments");
+    }
+
+    function validCounts(value) {
+      return value && ["gold", "silver", "bronze", "total"].every(
+        (key) => Number.isInteger(value[key]) && value[key] >= 0
+      );
+    }
+
+    function validChampion(champion, type) {
+      const name = type === "students"
+        ? champion && champion.display_name
+        : champion && champion.instrument_label;
+      return champion && typeof name === "string" && name.trim() &&
+        validCounts(champion.medals) && champion.by_division &&
+        validCounts(champion.by_division.open) &&
+        validCounts(champion.by_division.verified) &&
+        Array.isArray(champion.divisions) &&
+        (type === "instruments" || (
+          champion.crown &&
+          Number.isInteger(champion.crown.qualifying_wins) &&
+          champion.crown.qualifying_wins >= 0 &&
+          champion.crown.target_wins === 10 &&
+          typeof champion.crown.earned === "boolean"
+        ));
+    }
+
+    async function loadChampions() {
+      showState(loadingEl);
+      try {
+        const response = await fetch("/contests/hall-of-champions", {
+          credentials: "same-origin",
+          headers: { Accept: "application/json" },
+        });
+        if (response.status === 401) return showState(authEl);
+        if (!response.ok) return showState(errorEl);
+        const payload = await response.json();
+        champions = {
+          students: payload && Array.isArray(payload.students)
+            ? payload.students.filter((item) => validChampion(item, "students"))
+            : [],
+          instruments: payload && Array.isArray(payload.instruments)
+            ? payload.instruments.filter((item) => validChampion(item, "instruments"))
+            : [],
+        };
+        if (!champions.students.length && !champions.instruments.length) {
+          return showState(emptyEl);
+        }
+        render();
+        showState(contentEl);
+      } catch (_error) {
+        showState(errorEl);
+      }
+    }
+
+    filterButtons.forEach((button) => {
+      button.addEventListener("click", function () {
+        division = button.dataset.championsDivision;
+        expanded.students = false;
+        expanded.instruments = false;
+        render();
+      });
+    });
+    ["students", "instruments"].forEach((type) => {
+      const singular = type === "students" ? "student" : "instrument";
+      document.getElementById(`${singular}-champions-show-all`).addEventListener(
+        "click",
+        function () {
+          expanded[type] = true;
+          renderType(type);
+        }
+      );
+    });
+    retryButton.addEventListener("click", loadChampions);
+    loadChampions();
+  }
+
   function wireStore(state) {
     const creditsEl = document.getElementById("store-credits-value");
     const equippedHeadEl = document.getElementById("equipped-head-value");
@@ -2745,6 +2951,7 @@
   wireBandCamp(state);
   wireBandCampStandings();
   wirePastWinners();
+  wireHallOfChampions();
   wireStore(state);
   wirePBook(state);
 })();

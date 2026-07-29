@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from .account_routes import current_profile
 from .db import SessionLocal
+from .instruments import INSTRUMENTS_BY_LABEL
 from .models import (
     Contest,
     ContestResult,
@@ -637,6 +638,119 @@ def finalized_weeks_payload(session: Session) -> dict[str, object]:
     }
 
 
+def _empty_medal_counts() -> dict[str, int]:
+    return {"gold": 0, "silver": 0, "bronze": 0, "total": 0}
+
+
+def _increment_medal(counts: dict[str, int], medal: str) -> None:
+    counts[medal] += 1
+    counts["total"] += 1
+
+
+def _champion_sort_key(champion: dict[str, object]) -> tuple[object, ...]:
+    medals = champion["medals"]
+    name = champion.get("display_name", champion.get("instrument_label", ""))
+    return (
+        -medals["gold"],
+        -medals["silver"],
+        -medals["bronze"],
+        str(name).casefold(),
+        str(name),
+    )
+
+
+def hall_of_champions_payload(session: Session) -> dict[str, object]:
+    rows = session.scalars(
+        select(ContestResult)
+        .join(ContestWeek, ContestWeek.id == ContestResult.contest_week_id)
+        .join(Season, Season.id == ContestWeek.season_id)
+        .where(
+            ContestWeek.status == "finalized",
+            Season.key.like("band-camp-%"),
+        )
+        .order_by(ContestWeek.week_start.desc(), ContestResult.id.desc())
+    ).all()
+
+    students_by_profile: dict[int, dict[str, object]] = {}
+    instruments_by_key: dict[str, dict[str, object]] = {}
+    for result in rows:
+        if result.subject_type == "student" and result.profile_id is not None:
+            champion = students_by_profile.get(result.profile_id)
+            if champion is None:
+                champion = {
+                    "display_name": result.display_name_snapshot,
+                    "medals": _empty_medal_counts(),
+                    "by_division": {
+                        "open": _empty_medal_counts(),
+                        "verified": _empty_medal_counts(),
+                    },
+                    "divisions": set(),
+                }
+                students_by_profile[result.profile_id] = champion
+        elif result.subject_type == "instrument":
+            champion = instruments_by_key.get(result.subject_key)
+            if champion is None:
+                label = result.instrument or result.display_name_snapshot
+                definition = INSTRUMENTS_BY_LABEL.get(label.casefold())
+                champion = {
+                    "instrument_key": result.subject_key,
+                    "instrument_label": label,
+                    "instrument_icon": (
+                        definition["fallback_symbol"] if definition else "🎵"
+                    ),
+                    "medals": _empty_medal_counts(),
+                    "by_division": {
+                        "open": _empty_medal_counts(),
+                        "verified": _empty_medal_counts(),
+                    },
+                    "divisions": set(),
+                }
+                instruments_by_key[result.subject_key] = champion
+        else:
+            continue
+
+        _increment_medal(champion["medals"], result.medal)
+        _increment_medal(champion["by_division"][result.division], result.medal)
+        champion["divisions"].add(result.division)
+
+    points_contest = session.scalar(
+        select(Contest).where(Contest.key == "weekly-points-leaders")
+    )
+    crown_category = (
+        points_contest.crown_category or points_contest.key
+        if points_contest is not None
+        else "weekly-points-leaders"
+    )
+    profile_ids = list(students_by_profile)
+    crown_by_profile = {
+        progress.profile_id: progress
+        for progress in session.scalars(
+            select(CrownProgress).where(
+                CrownProgress.profile_id.in_(profile_ids),
+                CrownProgress.category_key == crown_category,
+            )
+        ).all()
+    } if profile_ids else {}
+
+    students: list[dict[str, object]] = []
+    for profile_id, champion in students_by_profile.items():
+        progress = crown_by_profile.get(profile_id)
+        champion["divisions"] = sorted(champion["divisions"])
+        champion["crown"] = {
+            "qualifying_wins": progress.qualifying_wins if progress else 0,
+            "target_wins": 10,
+            "earned": bool(progress and progress.crown_earned_at is not None),
+        }
+        students.append(champion)
+
+    instruments = list(instruments_by_key.values())
+    for champion in instruments:
+        champion["divisions"] = sorted(champion["divisions"])
+    students.sort(key=_champion_sort_key)
+    instruments.sort(key=_champion_sort_key)
+    return {"students": students, "instruments": instruments}
+
+
 def current_contests_payload(
     session: Session,
     *,
@@ -733,6 +847,15 @@ def finalized_contest_weeks(request: Request) -> dict[str, object]:
         if profile is None:
             raise HTTPException(status_code=401, detail="Student sign-in is required.")
         return finalized_weeks_payload(session)
+
+
+@router.get("/hall-of-champions")
+def hall_of_champions(request: Request) -> dict[str, object]:
+    with SessionLocal() as session:
+        profile = current_profile(request, session)
+        if profile is None:
+            raise HTTPException(status_code=401, detail="Student sign-in is required.")
+        return hall_of_champions_payload(session)
 
 
 @router.get("/weeks/{week_start}/results")

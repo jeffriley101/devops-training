@@ -357,11 +357,65 @@
         </div>
       </section>
 
-      <section class="board-panel hall-of-champions">
-        <h3>Hall of Champions</h3>
-        <ul id="champions-list" class="board-name-list">
-          <li>No crowns earned yet.</li>
-        </ul>
+      <section
+        id="hall-of-champions"
+        class="board-panel hall-of-champions"
+        aria-labelledby="hall-of-champions-title"
+        aria-busy="true"
+      >
+        <h3 id="hall-of-champions-title">Hall of Champions</h3>
+        <p>All-time Band Camp medal leaders</p>
+
+        <div id="champions-loading" class="medal-board-state" role="status">
+          Loading Hall of Champions…
+        </div>
+        <div id="champions-auth" class="medal-board-state hidden" role="alert">
+          Sign in to view the Hall of Champions.
+        </div>
+        <div id="champions-empty" class="medal-board-state hidden">
+          No finalized champions yet.
+        </div>
+        <div id="champions-error" class="medal-board-state hidden" role="alert">
+          <p>Hall of Champions could not be loaded.</p>
+          <button id="champions-retry" class="btn btn-secondary" type="button">
+            Retry
+          </button>
+        </div>
+
+        <div id="champions-content" class="hidden">
+          <div
+            id="champions-division-filters"
+            class="champions-filters"
+            role="group"
+            aria-label="Hall of Champions division"
+          >
+            <button class="champions-filter" type="button" data-champions-division="all" aria-pressed="true">All</button>
+            <button class="champions-filter" type="button" data-champions-division="open" aria-pressed="false">Open</button>
+            <button class="champions-filter" type="button" data-champions-division="verified" aria-pressed="false">Verified</button>
+          </div>
+
+          <section class="champions-panel" aria-labelledby="student-champions-title">
+            <h4 id="student-champions-title">Student Champions</h4>
+            <div id="student-champions-list" class="champions-list"></div>
+            <p id="student-champions-empty" class="contest-empty-state hidden">
+              No student champions in this division yet.
+            </p>
+            <button id="student-champions-show-all" class="btn btn-secondary champions-show-all hidden" type="button">
+              Show all students
+            </button>
+          </section>
+
+          <section class="champions-panel" aria-labelledby="instrument-champions-title">
+            <h4 id="instrument-champions-title">Instrument Champions</h4>
+            <div id="instrument-champions-list" class="champions-list"></div>
+            <p id="instrument-champions-empty" class="contest-empty-state hidden">
+              No instrument champions in this division yet.
+            </p>
+            <button id="instrument-champions-show-all" class="btn btn-secondary champions-show-all hidden" type="button">
+              Show all instruments
+            </button>
+          </section>
+        </div>
       </section>
     </aside>
   </div>
