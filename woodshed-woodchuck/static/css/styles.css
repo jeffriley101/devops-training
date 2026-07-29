@@ -1286,10 +1286,6 @@ select {
   border-radius: 8px;
 }
 
-.board-crown-progress {
-  background: linear-gradient(180deg, #f7e9bd, #e7cd8e);
-}
-
 @media (max-width: 420px) {
   .personal-crown-progress {
     padding-inline: 0.65rem;

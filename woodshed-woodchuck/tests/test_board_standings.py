@@ -31,12 +31,13 @@ def test_board_contains_live_standings_markup() -> None:
     assert "Your Position" in markup
 
 
-def test_board_preserves_past_winners_and_hall_with_crown_progress() -> None:
+def test_board_preserves_past_winners_and_hall_without_personal_crown() -> None:
     markup = board_template()
 
     assert "Past Winners" in markup
     assert "Hall of Champions" in markup
-    assert "Your Crown Progress" in markup
+    assert "Your Crown Progress" not in markup
+    assert "personal-crown-progress" not in markup
 
 
 def test_board_contains_loading_and_empty_states() -> None:
@@ -164,18 +165,17 @@ def test_hall_preserves_existing_board_sections() -> None:
     assert markup.index('id="hall-of-champions"') > markup.index('id="past-winners"')
 
 
-def test_shop_and_board_render_accessible_personal_crown_progress() -> None:
+def test_shop_renders_accessible_personal_crown_progress() -> None:
     board = board_template()
     shop = STORE_TEMPLATE_PATH.read_text(encoding="utf-8")
 
-    for markup in (board, shop):
-        assert 'class="personal-crown-meter"' in markup
-        assert 'aria-label="Crown progress: 0 of 10 qualifying wins"' in markup
-        assert "0 of 10 wins" in markup
-        assert "10 qualifying wins remain." in markup
-        assert "Gold wins in Weekly Points Leaders qualify" in markup
-        assert "Silver, Bronze, and instrument participation do not count" in markup
-    assert 'id="board-crown-title"' in board
+    assert 'class="personal-crown-meter"' in shop
+    assert 'aria-label="Crown progress: 0 of 10 qualifying wins"' in shop
+    assert "0 of 10 wins" in shop
+    assert "10 qualifying wins remain." in shop
+    assert "Gold wins in Weekly Points Leaders qualify" in shop
+    assert "Silver, Bronze, and instrument participation do not count" in shop
+    assert 'id="board-crown-title"' not in board
     assert 'id="shop-crown-title"' in shop
 
 
@@ -200,4 +200,21 @@ def test_crown_display_preserves_hall_live_standings_and_past_winners() -> None:
     assert 'id="contest-open-position"' in markup
     assert 'id="contest-verified-position"' in markup
     assert 'id="past-winners"' in markup
-    assert markup.index('id="board-crown-title"') < markup.index('id="past-winners"')
+    assert 'id="board-crown-title"' not in markup
+
+
+def test_rendered_pages_and_application_sources_have_no_conflict_markers() -> None:
+    markers = ("<" * 7, "=" * 7, ">" * 7)
+    client = TestClient(app)
+    for path in ("/", "/login", "/setup", "/home", "/p-book", "/quest", "/store"):
+        response = client.get(path)
+        assert response.status_code == 200
+        assert not any(marker in response.text for marker in markers)
+
+    root = Path(__file__).resolve().parents[1]
+    for directory in ("app", "templates", "static"):
+        for source in (root / directory).rglob("*"):
+            if source.suffix not in {".py", ".html", ".css", ".js"}:
+                continue
+            text = source.read_text(encoding="utf-8")
+            assert not any(marker in text for marker in markers), source
