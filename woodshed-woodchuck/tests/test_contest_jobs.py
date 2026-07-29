@@ -57,8 +57,11 @@ def test_command_interface_and_usage_exit_codes(
     )
 
     assert contest_jobs.main(["finalize_due_weeks"]) == 0
+    assert contest_jobs.main(["rollover_season"]) == 2
     assert contest_jobs.main([]) == 2
-    assert "python -m app.contest_jobs finalize_due_weeks" in capsys.readouterr().err
+    usage = capsys.readouterr().err
+    assert "python -m app.contest_jobs" in usage
+    assert "finalize_due_weeks" in usage and "rollover_season" in usage
 
 
 def add_week(

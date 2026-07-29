@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import argparse
 import re
 import sys
 from dataclasses import asdict, dataclass
@@ -12,12 +13,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from .contests import (
-    BAND_CAMP_KEY,
     CENTRAL,
     aware_utc,
     finalize_contest_week,
 )
 from .db import SessionLocal
+from .contest_seasons import rollover_season
 from .models import ContestWeek, Season
 
 
@@ -83,7 +84,7 @@ def _load_candidates(factory: sessionmaker[Session]) -> list[WeekCandidate]:
         rows = session.scalars(
             select(ContestWeek)
             .join(Season, Season.id == ContestWeek.season_id)
-            .where(Season.key == BAND_CAMP_KEY)
+            .where(Season.key.like("band-camp-%"))
             .order_by(ContestWeek.week_start)
         ).all()
         return [
@@ -163,13 +164,61 @@ def run_finalize_due_weeks(
 
 def main(argv: Sequence[str] | None = None) -> int:
     arguments = list(sys.argv[1:] if argv is None else argv)
-    if arguments != ["finalize_due_weeks"]:
+    if arguments == ["finalize_due_weeks"]:
+        exit_code, _summary = run_finalize_due_weeks()
+        return exit_code
+    if arguments and arguments[0] == "rollover_season":
+        parser = argparse.ArgumentParser(
+            prog="python -m app.contest_jobs rollover_season"
+        )
+        parser.add_argument("--source-key", required=True)
+        parser.add_argument("--next-key", required=True)
+        parser.add_argument("--next-name", required=True)
+        parser.add_argument("--start", required=True, type=date.fromisoformat)
+        parser.add_argument("--end", required=True, type=date.fromisoformat)
+        try:
+            submitted = parser.parse_args(arguments[1:])
+        except SystemExit as error:
+            return int(error.code)
+        now = datetime.now(timezone.utc)
+        _log(sys.stdout, "run_started", job="rollover_season", at=now.isoformat())
+        try:
+            with SessionLocal() as session:
+                with session.begin():
+                    result = rollover_season(
+                        session,
+                        source_key=submitted.source_key,
+                        next_key=submitted.next_key,
+                        next_name=submitted.next_name,
+                        next_starts_on=submitted.start,
+                        next_ends_on=submitted.end,
+                        now=now,
+                    )
+            _log(
+                sys.stdout,
+                "season_rollover_finished",
+                source_key=result.source_key,
+                next_key=result.next_key,
+                weeks=result.weeks_created,
+                created=result.created,
+            )
+            return 0
+        except Exception as error:
+            _log(
+                sys.stdout,
+                "season_rollover_failed",
+                source_key=submitted.source_key,
+                next_key=submitted.next_key,
+                exception_type=type(error).__name__,
+                message=_safe_error_message(error),
+            )
+            return 1
+    else:
         sys.stderr.write(
-            "Usage: python -m app.contest_jobs finalize_due_weeks\n"
+            "Usage: python -m app.contest_jobs "
+            "{finalize_due_weeks|rollover_season ...}\n"
         )
         return 2
-    exit_code, _summary = run_finalize_due_weeks()
-    return exit_code
 
 
 if __name__ == "__main__":

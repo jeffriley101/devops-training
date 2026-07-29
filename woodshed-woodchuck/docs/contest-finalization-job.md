@@ -25,3 +25,31 @@ cause.
 
 Never run destructive database resets, table recreation, or data-clearing
 commands as part of cron setup or recovery.
+
+## Season readiness and rollover
+
+While signed in, inspect the privacy-safe readiness payload at:
+
+```text
+GET /contests/seasons/status
+```
+
+Finalize every due week first, then confirm the season end date has passed and
+the readiness payload has no blocking reasons. Rollover requires explicit dates;
+the job never guesses them. The start must be a Monday, the inclusive end must
+be a Sunday, and the range must contain complete weeks.
+
+```bash
+python -m app.contest_jobs rollover_season \
+  --source-key band-camp-2026 \
+  --next-key band-camp-2027 \
+  --next-name "Band Camp 2027" \
+  --start 2027-07-26 \
+  --end 2027-08-08
+```
+
+`DATABASE_URL` is the only required deployment environment variable for the
+CLI. A successful rollover (including a safe exact rerun) exits `0`. A blocked
+or failed rollover exits nonzero and leaves the source season active with no
+partial next season. Never manually reset standings or delete historical
+seasons, weeks, results, rewards, Camp points, P-Charts, or crown progress.

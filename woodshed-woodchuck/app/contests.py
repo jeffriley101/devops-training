@@ -78,32 +78,28 @@ def central_week_boundaries(
 
     central_now = now.astimezone(CENTRAL)
     week_start = central_now.date() - timedelta(days=central_now.weekday())
-    week_end = week_start + timedelta(days=7)
-    deadline_central = datetime.combine(week_end, time(hour=12), CENTRAL)
-    verification_deadline_at = deadline_central.astimezone(timezone.utc)
-    finalize_after = verification_deadline_at + timedelta(minutes=5)
+    week_end, verification_deadline_at, finalize_after = contest_week_schedule(
+        week_start
+    )
     return week_start, week_end, verification_deadline_at, finalize_after
 
 
-def ensure_band_camp_data(
-    session: Session,
-    *,
-    now: datetime,
-) -> tuple[Season, list[Contest], ContestWeek]:
-    week_start, week_end, deadline, finalize_after = central_week_boundaries(now)
+def contest_week_schedule(
+    week_start: date,
+) -> tuple[date, datetime, datetime]:
+    if week_start.weekday() != 0:
+        raise ValueError("Contest weeks must start on Monday.")
+    week_end = week_start + timedelta(days=7)
+    deadline_central = datetime.combine(week_end, time(hour=12), CENTRAL)
+    verification_deadline_at = deadline_central.astimezone(timezone.utc)
+    return (
+        week_end,
+        verification_deadline_at,
+        verification_deadline_at + timedelta(minutes=5),
+    )
 
-    season = session.scalar(select(Season).where(Season.key == BAND_CAMP_KEY))
-    if season is None:
-        season = Season(
-            key=BAND_CAMP_KEY,
-            name=BAND_CAMP_NAME,
-            timezone=CENTRAL_TIMEZONE,
-            starts_on=BAND_CAMP_START,
-            status="active",
-        )
-        session.add(season)
-        session.flush()
 
+def ensure_contest_definitions(session: Session) -> list[Contest]:
     contests: list[Contest] = []
     for definition in CONTEST_DEFINITIONS:
         contest = session.scalar(
@@ -123,6 +119,59 @@ def ensure_band_camp_data(
             contest.name = definition["name"]
             contest.metric_type = definition["metric_type"]
         contests.append(contest)
+    return contests
+
+
+def ensure_band_camp_data(
+    session: Session,
+    *,
+    now: datetime,
+) -> tuple[Season, list[Contest], ContestWeek]:
+    week_start, week_end, deadline, finalize_after = central_week_boundaries(now)
+
+    central_today = now.astimezone(CENTRAL).date()
+    season = session.scalar(
+        select(Season).where(
+            Season.status == "active",
+            Season.key.like("band-camp-%"),
+            Season.starts_on <= central_today,
+            (Season.ends_on.is_(None) | (Season.ends_on >= central_today)),
+        ).order_by(Season.starts_on.desc())
+    )
+    if season is None:
+        season = session.scalar(select(Season).where(
+            Season.key == BAND_CAMP_KEY,
+            Season.status == "active",
+        ))
+    if season is None:
+        existing_legacy = session.scalar(
+            select(Season.id).where(Season.key == BAND_CAMP_KEY)
+        )
+        if existing_legacy is not None:
+            raise HTTPException(
+                status_code=409,
+                detail="No active Band Camp season covers the current date.",
+            )
+        season = Season(
+            key=BAND_CAMP_KEY,
+            name=BAND_CAMP_NAME,
+            timezone=CENTRAL_TIMEZONE,
+            starts_on=BAND_CAMP_START,
+            status="active",
+        )
+        session.add(season)
+        session.flush()
+
+    if (
+        central_today < season.starts_on
+        or (season.ends_on is not None and central_today > season.ends_on)
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="No active Band Camp season covers the current date.",
+        )
+
+    contests = ensure_contest_definitions(session)
 
     contest_week = session.scalar(
         select(ContestWeek).where(
@@ -548,7 +597,7 @@ def finalize_contest_week(
         .join(Season, Season.id == ContestWeek.season_id)
         .where(
             ContestWeek.week_start == week_start,
-            Season.key == BAND_CAMP_KEY,
+            Season.key.like("band-camp-%"),
         )
         .with_for_update()
     )
@@ -1119,6 +1168,17 @@ def current_crown_progress(request: Request) -> dict[str, object]:
         if profile is None:
             raise HTTPException(status_code=401, detail="Student sign-in is required.")
         return crown_progress_payload(session, profile_id=profile.id)
+
+
+@router.get("/seasons/status")
+def contest_season_status(request: Request) -> dict[str, object]:
+    from .contest_seasons import season_status_payload
+
+    with SessionLocal() as session:
+        profile = current_profile(request, session)
+        if profile is None:
+            raise HTTPException(status_code=401, detail="Student sign-in is required.")
+        return season_status_payload(session, now=datetime.now(timezone.utc))
 
 
 @router.get("/weeks/{week_start}/results")
