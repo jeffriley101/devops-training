@@ -26,6 +26,7 @@ from .content import (
     SAX_VIKING_MESSAGES,
     SAX_VIKING_WELCOME,
 )
+from .instruments import instrument_definition_payloads
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -72,6 +73,7 @@ def _render(request: Request, template_name: str, **context: object):
             "sax_viking_welcome": SAX_VIKING_WELCOME,
             "quest_pool": QUEST_POOL,
             "sax_viking_messages": SAX_VIKING_MESSAGES,
+            "instrument_definitions": instrument_definition_payloads(),
             **context,
         },
     )
@@ -189,7 +191,13 @@ def setup_submit(
 
 @app.get("/home")
 def home(request: Request):
-    return _render(request, "home.html", title="shed", active_nav="home")
+    return _render(
+        request,
+        "home.html",
+        title="shed",
+        active_nav="home",
+        instruments=INSTRUMENT_OPTIONS,
+    )
 
 
 @app.get("/p-book")

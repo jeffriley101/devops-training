@@ -3,10 +3,16 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Body, Form, HTTPException, Request
+from pydantic import BaseModel
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
-from .accounts import authenticate_woodchuck, create_woodchuck_profile
+from .accounts import (
+    authenticate_woodchuck,
+    create_woodchuck_profile,
+    update_profile_instrument,
+)
+from .instruments import INSTRUMENTS_BY_LABEL
 from .db import SessionLocal
 from .models import WoodchuckProfile, WoodchuckState
 
@@ -14,6 +20,10 @@ from .models import WoodchuckProfile, WoodchuckState
 router = APIRouter(prefix="/account", tags=["account"])
 
 SESSION_PROFILE_ID = "woodchuck_profile_id"
+
+
+class InstrumentUpdate(BaseModel):
+    instrument: str
 
 
 def profile_payload(profile: WoodchuckProfile) -> dict[str, object]:
@@ -120,6 +130,40 @@ def logout(request: Request):
     request.session.clear()
 
     return {"authenticated": False}
+
+
+@router.patch("/profile/instrument")
+def change_profile_instrument(
+    request: Request,
+    submitted: InstrumentUpdate,
+):
+    with SessionLocal() as session:
+        profile = current_profile(request, session)
+        if profile is None:
+            raise HTTPException(
+                status_code=401,
+                detail="Student sign-in is required.",
+            )
+        try:
+            updated = update_profile_instrument(
+                session,
+                profile=profile,
+                instrument=submitted.instrument,
+            )
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+        except RuntimeError as error:
+            raise HTTPException(
+                status_code=500,
+                detail="The instrument could not be changed.",
+            ) from error
+
+        definition = INSTRUMENTS_BY_LABEL[updated.instrument.casefold()]
+        return {
+            "updated": True,
+            "instrument": updated.instrument,
+            "instrument_definition": dict(definition),
+        }
 
 
 

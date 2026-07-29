@@ -177,8 +177,13 @@
     }
 
     if (instrumentObjectEl) {
-      instrumentObjectEl.title = instrument;
-      instrumentObjectEl.setAttribute("aria-label", instrument);
+      if (window.WWInstruments) {
+        window.WWInstruments.renderInstrument(instrumentObjectEl, instrument);
+      } else {
+        instrumentObjectEl.textContent = "♪";
+        instrumentObjectEl.title = instrument;
+        instrumentObjectEl.setAttribute("aria-label", instrument);
+      }
     }
 
     if (levelEl) {

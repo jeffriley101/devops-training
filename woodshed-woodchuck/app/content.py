@@ -1,14 +1,6 @@
 """Static content used by the Woodshed Woodchuck demo."""
 
-INSTRUMENT_OPTIONS = [
-    "Flute",
-    "Clarinet",
-    "Saxophone",
-    "Trumpet",
-    "Trombone",
-    "Tuba",
-    "Percussion",
-]
+from .instruments import INSTRUMENT_OPTIONS
 
 LEVEL_OPTIONS = ["Beginner", "Intermediate", "Advanced"]
 

@@ -5,6 +5,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .models import WoodchuckProfile
+from .instruments import normalize_supported_instrument
 from .security import generate_woodchuck_id, hash_pin, is_valid_pin, verify_pin
 
 
@@ -22,7 +23,7 @@ def create_woodchuck_profile(
     goal: str,
 ) -> WoodchuckProfile:
     display_name = display_name.strip()
-    instrument = instrument.strip()
+    instrument = normalize_supported_instrument(instrument)
     level = level.strip()
     goal = goal.strip()
 
@@ -57,6 +58,25 @@ def create_woodchuck_profile(
             session.rollback()
 
     raise RuntimeError("Unable to generate a unique Woodchuck ID.")
+
+
+def update_profile_instrument(
+    session: Session,
+    *,
+    profile: WoodchuckProfile,
+    instrument: str,
+) -> WoodchuckProfile:
+    normalized_instrument = normalize_supported_instrument(instrument)
+    profile.instrument = normalized_instrument
+
+    try:
+        session.commit()
+        session.refresh(profile)
+    except IntegrityError as error:
+        session.rollback()
+        raise RuntimeError("The instrument could not be changed.") from error
+
+    return profile
 
 
 def authenticate_woodchuck(

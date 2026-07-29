@@ -187,6 +187,46 @@ select {
   font-size: 1rem;
 }
 
+.shed-edit-profile-button {
+  border: 1px solid rgba(69, 48, 29, 0.24);
+  border-radius: 999px;
+  background: rgba(255, 250, 231, 0.9);
+  color: var(--brown);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+  min-height: 44px;
+  padding: 0.65rem 1rem;
+}
+
+.shed-edit-profile-button:hover,
+.shed-edit-profile-button:focus-visible {
+  background: #fff8d7;
+  box-shadow: 0 0 0 3px rgba(233, 176, 73, 0.28);
+}
+
+.shed-edit-profile-row {
+  display: flex;
+  justify-content: center;
+  margin: 0.75rem 0 1rem;
+}
+
+.shed-instrument-image {
+  display: block;
+  height: 1.45em;
+  max-width: 1.8em;
+  object-fit: contain;
+  width: auto;
+}
+
+.change-instrument-panel {
+  margin-bottom: 1rem;
+}
+
+.change-instrument-panel .section-head {
+  margin-bottom: 0.5rem;
+}
+
 .practice-detail-grid {
   display: grid;
   gap: 0.45rem;

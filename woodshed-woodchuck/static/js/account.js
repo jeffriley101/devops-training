@@ -343,8 +343,89 @@
     });
   }
 
+  function wireInstrumentChange() {
+    const openButton = document.getElementById(
+      "change-instrument-open-button"
+    );
+    const panel = document.getElementById("change-instrument-panel");
+    const form = document.getElementById("change-instrument-form");
+    const select = document.getElementById("change-instrument-select");
+    const cancelButton = document.getElementById(
+      "change-instrument-cancel-button"
+    );
+    const feedback = document.getElementById("change-instrument-feedback");
+    if (!openButton || !panel || !form || !select || !feedback) return;
+
+    function setPanelOpen(open) {
+      panel.hidden = !open;
+      panel.classList.toggle("hidden", !open);
+      openButton.setAttribute("aria-expanded", String(open));
+      if (open) {
+        const state = stateApi.getState();
+        select.value = state.profile.instrument || "";
+        feedback.textContent = "";
+        select.focus();
+      } else {
+        openButton.focus();
+      }
+    }
+
+    openButton.addEventListener("click", function () {
+      setPanelOpen(true);
+    });
+    if (cancelButton) {
+      cancelButton.addEventListener("click", function () {
+        setPanelOpen(false);
+      });
+    }
+
+    form.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      const instrument = select.value;
+      const submitButton = form.querySelector("button[type='submit']");
+      feedback.textContent = "Saving instrument…";
+      submitButton.disabled = true;
+
+      try {
+        const response = await fetch("/account/profile/instrument", {
+          method: "PATCH",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ instrument }),
+        });
+        if (!response.ok) {
+          throw new Error(
+            await responseMessage(
+              response,
+              "The instrument could not be changed."
+            )
+          );
+        }
+        const payload = await response.json();
+        const next = stateApi.getState();
+        next.profile.instrument = payload.instrument;
+        stateApi.saveState(next);
+
+        const instrumentObject = document.getElementById("instrument-object");
+        if (window.WWInstruments) {
+          window.WWInstruments.renderInstrument(
+            instrumentObject,
+            payload.instrument
+          );
+        }
+        feedback.textContent = `Instrument changed to ${payload.instrument}.`;
+      } catch (error) {
+        feedback.textContent =
+          error.message || "The instrument could not be changed.";
+      } finally {
+        submitButton.disabled = false;
+      }
+    });
+  }
+
   wireCreateAccount();
   wireLogin();
+  wireInstrumentChange();
 })();
 
 (function () {
