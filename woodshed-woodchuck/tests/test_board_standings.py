@@ -28,6 +28,10 @@ def test_board_contains_live_standings_markup() -> None:
     assert 'id="contest-open-points"' in markup
     assert 'id="contest-verified-points"' in markup
     assert "Top Five Minutes Leaders" in markup
+    assert 'aria-label="Open minutes leaders"' in markup
+    assert 'aria-label="Verified minutes leaders"' in markup
+    assert 'aria-label="Open points leaders"' not in markup
+    assert 'aria-label="Verified points leaders"' not in markup
     assert "Weekly Practice Minutes by Instrument" in markup
     assert "Weekly Band Camp Points" in markup
     assert 'id="contest-open-camp-points"' in markup
