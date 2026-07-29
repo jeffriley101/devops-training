@@ -1352,8 +1352,15 @@
       "contest-standings-loading"
     );
     const errorEl = document.getElementById("contest-standings-error");
+    const errorMessageEl = document.getElementById(
+      "contest-standings-error-message"
+    );
+    const retryButton = document.getElementById("contest-standings-retry");
     const weekRangeEl = document.getElementById("contest-week-range");
+    const weekContextEl = document.getElementById("contest-week-context");
     const weekStatusEl = document.getElementById("contest-week-status");
+    let selectedDivision = "open";
+    let requestInFlight = false;
     const tabs = [
       document.getElementById("contest-open-tab"),
       document.getElementById("contest-verified-tab"),
@@ -1364,6 +1371,7 @@
     };
 
     function selectDivision(division, focusTab) {
+      selectedDivision = division;
       tabs.forEach((tab) => {
         const selected = tab.id === `contest-${division}-tab`;
         tab.setAttribute("aria-selected", String(selected));
@@ -1377,6 +1385,9 @@
         panel.hidden = !selected;
         panel.classList.toggle("hidden", !selected);
       });
+      if (weekContextEl) {
+        weekContextEl.textContent = `${division === "open" ? "Open" : "Verified"} division`;
+      }
     }
 
     tabs.forEach((tab, index) => {
@@ -1418,38 +1429,52 @@
     }
 
     function renderDivision(division, rows) {
-      const body = document.getElementById(
+      const list = document.getElementById(
         `contest-${division}-standings`
       );
       const emptyEl = document.getElementById(`contest-${division}-empty`);
-      if (!body || !emptyEl) return;
+      if (!list || !emptyEl) return;
 
-      body.replaceChildren();
+      list.replaceChildren();
       const safeRows = Array.isArray(rows)
         ? rows.filter((row) => (
             row &&
-            (typeof row.rank === "number" || typeof row.rank === "string") &&
+            Number.isInteger(row.rank) && row.rank > 0 &&
             typeof row.instrument === "string" &&
             row.instrument.trim() &&
-            typeof row.total_minutes === "number" &&
-            Number.isFinite(row.total_minutes)
+            Number.isInteger(row.total_minutes) && row.total_minutes >= 0
           ))
         : [];
 
       safeRows.forEach((row) => {
-        const tableRow = document.createElement("tr");
-        [row.rank, row.instrument, row.total_minutes].forEach((value) => {
-          const cell = document.createElement("td");
-          cell.textContent = String(value);
-          tableRow.appendChild(cell);
-        });
-        body.appendChild(tableRow);
+        const rankedRow = document.createElement("article");
+        rankedRow.className = `contest-ranked-row contest-rank-${Math.min(row.rank, 4)}`;
+        rankedRow.setAttribute("role", "listitem");
+        rankedRow.setAttribute(
+          "aria-label",
+          `Rank ${row.rank}, ${row.instrument}, ${row.total_minutes} practice minutes`
+        );
+        const rank = document.createElement("span");
+        rank.className = "contest-rank-badge";
+        rank.textContent = String(row.rank);
+        const subject = document.createElement("span");
+        subject.className = "contest-ranked-subject";
+        const definition = window.WWInstruments &&
+          window.WWInstruments.getDefinition(row.instrument);
+        const icon = definition && definition.fallback_symbol
+          ? definition.fallback_symbol
+          : "♪";
+        subject.textContent = `${icon} ${row.instrument}`;
+        const score = document.createElement("strong");
+        score.className = "contest-ranked-score";
+        score.textContent = `${row.total_minutes} min`;
+        rankedRow.append(rank, subject, score);
+        list.appendChild(rankedRow);
       });
 
-      const tableWrap = body.closest(".contest-standings-table-wrap");
       const isEmpty = safeRows.length === 0;
       emptyEl.classList.toggle("hidden", !isEmpty);
-      if (tableWrap) tableWrap.classList.toggle("hidden", isEmpty);
+      list.classList.toggle("hidden", isEmpty);
     }
 
     function ordinal(rank) {
@@ -1464,39 +1489,39 @@
     function positionMessage(division, position) {
       if (!position || position.has_score !== true) {
         return division === "verified"
-          ? "No verified score yet."
-          : "No Open score yet.";
+          ? "No verified points yet · Approved P-Charts appear here."
+          : "No Open points yet · Submit a P-Chart to join the board.";
       }
       if (!Number.isInteger(position.rank) || position.rank < 1) {
         return "Your position is unavailable.";
       }
-      if (position.tied === true) {
-        return `You are tied for ${ordinal(position.rank)}.`;
-      }
+      const parts = [
+        position.tied === true
+          ? `Tied for ${ordinal(position.rank)}`
+          : `Rank ${position.rank}`,
+        `${position.total_points} ${position.total_points === 1 ? "point" : "points"}`,
+      ];
       if (position.rank === 1) {
-        return "You are in 1st place.";
+        parts.push("Leading the board");
+      } else if (Number.isInteger(position.points_behind_leader)) {
+        const behind = position.points_behind_leader;
+        parts.push(`${behind} ${behind === 1 ? "point" : "points"} behind leader`);
       }
-      if (
-        Number.isInteger(position.points_behind_leader) &&
-        position.points_behind_leader > 0
-      ) {
-        const points = position.points_behind_leader;
-        return `You are ${points} ${points === 1 ? "point" : "points"} behind the leader.`;
-      }
-      return `You are in ${ordinal(position.rank)} place.`;
+      if (position.in_top_five === false) parts.push("Outside Top Five");
+      return parts.join(" · ");
     }
 
     function renderPointsDivision(division, rows, position) {
-      const body = document.getElementById(`contest-${division}-points`);
+      const list = document.getElementById(`contest-${division}-points`);
       const emptyEl = document.getElementById(
         `contest-${division}-points-empty`
       );
       const messageEl = document.getElementById(
         `contest-${division}-position-message`
       );
-      if (!body || !emptyEl || !messageEl) return;
+      if (!list || !emptyEl || !messageEl) return;
 
-      body.replaceChildren();
+      list.replaceChildren();
       const safeRows = Array.isArray(rows)
         ? rows.filter((row) => (
             row &&
@@ -1511,38 +1536,60 @@
         : [];
 
       safeRows.forEach((row) => {
-        const tableRow = document.createElement("tr");
+        const rankedRow = document.createElement("article");
+        rankedRow.className = `contest-ranked-row contest-rank-${Math.min(row.rank, 4)}`;
+        rankedRow.setAttribute("role", "listitem");
         if (row.is_current_user) {
-          tableRow.classList.add("contest-current-user-row");
+          rankedRow.classList.add("contest-current-user-row");
         }
         const publicName = row.is_current_user
           ? `${row.display_name} (You)`
           : row.display_name;
-        [row.rank, publicName, row.total_points].forEach((value) => {
-          const cell = document.createElement("td");
-          cell.textContent = String(value);
-          tableRow.appendChild(cell);
-        });
-        body.appendChild(tableRow);
+        rankedRow.setAttribute(
+          "aria-label",
+          `Rank ${row.rank}, ${publicName}, ${row.total_points} points`
+        );
+        const rank = document.createElement("span");
+        rank.className = "contest-rank-badge";
+        rank.textContent = String(row.rank);
+        const subject = document.createElement("span");
+        subject.className = "contest-ranked-subject";
+        subject.textContent = publicName;
+        const score = document.createElement("strong");
+        score.className = "contest-ranked-score";
+        score.textContent = `${row.total_points} pts`;
+        rankedRow.append(rank, subject, score);
+        list.appendChild(rankedRow);
       });
 
-      const tableWrap = body.closest(".contest-standings-table-wrap");
       const isEmpty = safeRows.length === 0;
       emptyEl.classList.toggle("hidden", !isEmpty);
-      if (tableWrap) tableWrap.classList.toggle("hidden", isEmpty);
+      list.classList.toggle("hidden", isEmpty);
       messageEl.textContent = positionMessage(division, position);
     }
 
     function showError(message) {
       if (loadingEl) loadingEl.classList.add("hidden");
-      if (errorEl) {
-        errorEl.textContent = message;
-        errorEl.classList.remove("hidden");
+      if (errorMessageEl) errorMessageEl.textContent = message;
+      if (errorEl) errorEl.classList.remove("hidden");
+      if (weekStatusEl) {
+        weekStatusEl.textContent = "Unavailable";
+        weekStatusEl.classList.remove("hidden");
       }
       root.setAttribute("aria-busy", "false");
     }
 
     async function loadStandings() {
+      if (requestInFlight) return;
+      requestInFlight = true;
+      root.setAttribute("aria-busy", "true");
+      if (errorEl) errorEl.classList.add("hidden");
+      if (weekStatusEl) {
+        weekStatusEl.textContent = loadingEl && !loadingEl.classList.contains("hidden")
+          ? "Loading"
+          : "Refreshing";
+        weekStatusEl.classList.remove("hidden");
+      }
       try {
         const response = await fetch("/contests/current", {
           method: "GET",
@@ -1597,10 +1644,6 @@
         if (weekRangeEl && startText && endText) {
           weekRangeEl.textContent = `${startText} – ${endText}`;
         }
-        if (weekStatusEl && typeof week.status === "string") {
-          weekStatusEl.textContent = week.status;
-        }
-
         renderDivision("open", practiceStandings.open);
         renderDivision("verified", practiceStandings.verified);
         renderPointsDivision(
@@ -1613,15 +1656,21 @@
           pointsStandings.verified,
           pointsStandings.current_user_position.verified
         );
+        selectDivision(selectedDivision, false);
         if (loadingEl) loadingEl.classList.add("hidden");
         if (errorEl) errorEl.classList.add("hidden");
+        if (weekStatusEl) weekStatusEl.classList.add("hidden");
         root.setAttribute("aria-busy", "false");
       } catch (_error) {
         showError("Band Camp standings are unavailable right now.");
+      } finally {
+        requestInFlight = false;
       }
     }
 
     selectDivision("open", false);
+    retryButton.addEventListener("click", loadStandings);
+    window.addEventListener("ww:p-chart-saved", loadStandings);
     loadStandings();
   }
 
@@ -2888,6 +2937,7 @@
         });
 
         hydrateHome(next);
+        window.dispatchEvent(new CustomEvent("ww:p-chart-saved"));
       } catch (error) {
         errorEl.textContent =
           error.message ||

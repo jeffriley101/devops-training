@@ -123,23 +123,29 @@
         aria-labelledby="band-camp-standings-title"
         aria-busy="true"
       >
-        <h3 id="band-camp-standings-title">Band Camp Standings</h3>
-        <p class="board-standings-heading">
-          Weekly Practice Minutes by Instrument
-        </p>
-        <p class="board-standings-week">
-          <span id="contest-week-range">Current week</span>
-          <span id="contest-week-status" class="chip">Loading</span>
-        </p>
+        <header class="scoreboard-header">
+          <p class="scoreboard-kicker">Live competition board</p>
+          <h3 id="band-camp-standings-title">Band Camp Standings</h3>
+          <p class="board-standings-week">
+            <span id="contest-week-range">Current week</span>
+            <span id="contest-week-context">Open division</span>
+            <span id="contest-week-status" class="scoreboard-status">Loading</span>
+          </p>
+        </header>
 
-        <p id="contest-standings-loading" role="status">
+        <p id="contest-standings-loading" class="scoreboard-notice" role="status">
           Loading Band Camp standings…
         </p>
-        <p
+        <div
           id="contest-standings-error"
-          class="error-text hidden"
+          class="scoreboard-notice scoreboard-error hidden"
           role="alert"
-        ></p>
+        >
+          <p id="contest-standings-error-message"></p>
+          <button id="contest-standings-retry" class="btn btn-secondary" type="button">
+            Retry standings
+          </button>
+        </div>
 
         <div
           id="contest-division-tabs"
@@ -182,40 +188,19 @@
               <strong>Your Position</strong>
               <span id="contest-open-position-message">Loading your position…</span>
             </div>
-            <div class="contest-standings-table-wrap">
-              <table class="contest-standings-table contest-points-table">
-                <thead>
-                  <tr>
-                    <th scope="col">Rank</th>
-                    <th scope="col">Woodchuck</th>
-                    <th scope="col">Points</th>
-                  </tr>
-                </thead>
-                <tbody id="contest-open-points"></tbody>
-              </table>
-            </div>
+            <div id="contest-open-points" class="contest-ranked-list" role="list" aria-label="Open points leaders"></div>
             <p id="contest-open-points-empty" class="contest-empty-state hidden">
-              No Open points have been scored this week yet.
+              No P-Charts have been submitted this week yet.
             </p>
           </section>
 
-          <p class="contest-division-explanation">
-            Open includes all submitted P-Charts.
-          </p>
-          <div class="contest-standings-table-wrap">
-            <table class="contest-standings-table">
-              <thead>
-                <tr>
-                  <th scope="col">Rank</th>
-                  <th scope="col">Instrument</th>
-                  <th scope="col">Practice Minutes</th>
-                </tr>
-              </thead>
-              <tbody id="contest-open-standings"></tbody>
-            </table>
-          </div>
+          <section class="contest-instrument-section" aria-labelledby="open-instruments-title">
+            <h4 id="open-instruments-title">Weekly Practice Minutes by Instrument</h4>
+            <p class="contest-division-explanation">All submitted P-Charts</p>
+            <div id="contest-open-standings" class="contest-ranked-list" role="list" aria-label="Open instrument standings"></div>
+          </section>
           <p id="contest-open-empty" class="contest-empty-state hidden">
-            No practice has been logged this week yet.
+            No P-Charts have been submitted this week yet. Log practice to start the board.
           </p>
         </div>
 
@@ -232,40 +217,19 @@
               <strong>Your Position</strong>
               <span id="contest-verified-position-message">Loading your position…</span>
             </div>
-            <div class="contest-standings-table-wrap">
-              <table class="contest-standings-table contest-points-table">
-                <thead>
-                  <tr>
-                    <th scope="col">Rank</th>
-                    <th scope="col">Woodchuck</th>
-                    <th scope="col">Points</th>
-                  </tr>
-                </thead>
-                <tbody id="contest-verified-points"></tbody>
-              </table>
-            </div>
+            <div id="contest-verified-points" class="contest-ranked-list" role="list" aria-label="Verified points leaders"></div>
             <p id="contest-verified-points-empty" class="contest-empty-state hidden">
-              No Verified points have been scored this week yet.
+              No verified P-Charts have been approved this week yet.
             </p>
           </section>
 
-          <p class="contest-division-explanation">
-            Verified includes only approved P-Charts.
-          </p>
-          <div class="contest-standings-table-wrap">
-            <table class="contest-standings-table">
-              <thead>
-                <tr>
-                  <th scope="col">Rank</th>
-                  <th scope="col">Instrument</th>
-                  <th scope="col">Practice Minutes</th>
-                </tr>
-              </thead>
-              <tbody id="contest-verified-standings"></tbody>
-            </table>
-          </div>
+          <section class="contest-instrument-section" aria-labelledby="verified-instruments-title">
+            <h4 id="verified-instruments-title">Weekly Practice Minutes by Instrument</h4>
+            <p class="contest-division-explanation">Approved P-Charts only</p>
+            <div id="contest-verified-standings" class="contest-ranked-list" role="list" aria-label="Verified instrument standings"></div>
+          </section>
           <p id="contest-verified-empty" class="contest-empty-state hidden">
-            No verified practice has been approved this week yet.
+            No verified P-Charts have been approved this week yet.
           </p>
         </div>
       </section>

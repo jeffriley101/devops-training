@@ -22,12 +22,12 @@ def test_board_contains_live_standings_markup() -> None:
     assert 'id="contest-verified-tab"' in markup
     assert 'aria-selected="true"' in markup
     assert 'role="tabpanel"' in markup
-    assert "Rank" in markup
-    assert "Instrument" in markup
-    assert "Practice Minutes" in markup
+    assert 'class="contest-ranked-list"' in markup
+    assert 'role="list"' in markup
     assert 'id="contest-open-points"' in markup
     assert 'id="contest-verified-points"' in markup
     assert "Top Five Points Leaders" in markup
+    assert "Weekly Practice Minutes by Instrument" in markup
     assert "Your Position" in markup
 
 
@@ -45,8 +45,10 @@ def test_board_contains_loading_and_empty_states() -> None:
 
     assert 'id="contest-standings-loading"' in markup
     assert "Loading Band Camp standings" in markup
-    assert "No practice has been logged this week yet." in markup
-    assert "No verified practice has been approved this week yet." in markup
+    assert "No P-Charts have been submitted this week yet." in markup
+    assert "No verified P-Charts have been approved this week yet." in markup
+    assert 'id="contest-standings-error"' in markup
+    assert 'id="contest-standings-retry"' in markup
 
 
 def test_board_authentication_behavior_is_unchanged() -> None:
@@ -218,3 +220,45 @@ def test_rendered_pages_and_application_sources_have_no_conflict_markers() -> No
                 continue
             text = source.read_text(encoding="utf-8")
             assert not any(marker in text for marker in markers), source
+
+
+def test_live_scoreboard_javascript_uses_actual_ranks_and_preserves_ties() -> None:
+    javascript = (
+        Path(__file__).resolve().parents[1] / "static" / "js" / "app.js"
+    ).read_text(encoding="utf-8")
+
+    assert "rank.textContent = String(row.rank)" in javascript
+    assert "`Rank ${row.rank}, ${publicName}" in javascript
+    assert "`Rank ${row.rank}, ${row.instrument}" in javascript
+    assert "Math.min(row.rank, 4)" in javascript
+    assert "position.tied === true" in javascript
+    assert "position.in_top_five === false" in javascript
+
+
+def test_live_scoreboard_switching_refresh_and_retry_are_wired() -> None:
+    javascript = (
+        Path(__file__).resolve().parents[1] / "static" / "js" / "app.js"
+    ).read_text(encoding="utf-8")
+
+    assert 'event.key === "ArrowRight"' in javascript
+    assert 'event.key === "ArrowLeft"' in javascript
+    assert "selectDivision(selectedDivision, false)" in javascript
+    assert "if (requestInFlight) return" in javascript
+    assert 'retryButton.addEventListener("click", loadStandings)' in javascript
+    assert 'window.addEventListener("ww:p-chart-saved", loadStandings)' in javascript
+    assert 'window.dispatchEvent(new CustomEvent("ww:p-chart-saved"))' in javascript
+
+
+def test_live_scoreboard_week_header_icons_and_status_are_present() -> None:
+    markup = board_template()
+    javascript = (
+        Path(__file__).resolve().parents[1] / "static" / "js" / "app.js"
+    ).read_text(encoding="utf-8")
+
+    assert 'id="contest-week-range"' in markup
+    assert 'id="contest-week-context"' in markup
+    assert 'id="contest-week-status"' in markup
+    assert "endDate.setDate(endDate.getDate() - 1)" in javascript
+    assert "window.WWInstruments.getDefinition(row.instrument)" in javascript
+    assert "definition.fallback_symbol" in javascript
+    assert 'weekStatusEl.classList.add("hidden")' in javascript
