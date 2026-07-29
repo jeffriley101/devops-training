@@ -199,6 +199,7 @@ def home(request: Request):
         title="shed",
         active_nav="home",
         instruments=INSTRUMENT_OPTIONS,
+        levels=LEVEL_OPTIONS,
     )
 
 

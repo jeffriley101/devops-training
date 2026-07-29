@@ -219,6 +219,25 @@
     }
   }
 
+  async function refreshPracticeStreak() {
+    const streakEl = document.getElementById("streak-value");
+    if (!streakEl) return;
+    try {
+      const response = await fetch("/practice-charts/streak", {
+        credentials: "same-origin", cache: "no-store",
+      });
+      if (!response.ok) return;
+      const payload = await response.json();
+      if (!Number.isInteger(payload.streak) || payload.streak < 0) return;
+      const next = stateApi.getState();
+      next.progress.streak = payload.streak;
+      stateApi.saveState(next);
+      hydrateHome(next);
+    } catch (_error) {
+      // Retain the last known server-derived value while offline.
+    }
+  }
+
   function updateStreak(progress, today) {
     if (progress.lastCompletedDate === today) return;
 
@@ -1585,7 +1604,7 @@
       const messageEl = document.getElementById(
         `contest-${division}-${campPoints ? "camp-position" : "position"}-message`
       );
-      if (!list || !emptyEl || !messageEl) return;
+      if (!list || !emptyEl) return;
 
       list.replaceChildren();
       const safeRows = Array.isArray(rows)
@@ -1634,7 +1653,9 @@
       const isEmpty = safeRows.length === 0;
       emptyEl.classList.toggle("hidden", !isEmpty);
       list.classList.toggle("hidden", isEmpty);
-      messageEl.textContent = positionMessage(division, position, campPoints);
+      if (messageEl) {
+        messageEl.textContent = positionMessage(division, position, campPoints);
+      }
     }
 
     function showError(message) {
@@ -2417,6 +2438,10 @@
     const verifierSelectEl = document.getElementById("p-book-verifier");
     const verifierHelpEl = document.getElementById("p-book-verifier-help");
     const submitBtn = form.querySelector("button[type='submit']");
+    const openDialog = document.getElementById("open-chart-confirmation");
+    const submitOpenBtn = document.getElementById("submit-open-chart");
+    const chooseVerifierBtn = document.getElementById("choose-chart-verifier");
+    const cancelOpenBtn = document.getElementById("cancel-open-chart");
 
     const totalMinutesEl = document.getElementById("p-book-total-minutes");
     const practiceDaysEl = document.getElementById("p-book-practice-days");
@@ -2425,6 +2450,22 @@
     const DANDELION_DAILY_CAP = 75;
     let submissionInFlight = false;
     let pendingSubmissionKey = null;
+    let openSubmissionConfirmed = false;
+
+    if (openDialog && submitOpenBtn && chooseVerifierBtn && cancelOpenBtn) {
+      submitOpenBtn.addEventListener("click", function () {
+        openSubmissionConfirmed = true;
+        openDialog.close();
+        form.requestSubmit();
+      });
+      chooseVerifierBtn.addEventListener("click", function () {
+        openDialog.close();
+        verifierSelectEl.focus();
+      });
+      cancelOpenBtn.addEventListener("click", function () {
+        openDialog.close();
+      });
+    }
 
     function verifierRoleLabel(role) {
       return String(role || "")
@@ -2510,7 +2551,7 @@
               )
             : (
                 "No trusted verifiers are connected yet. " +
-                "This chart can still be saved on this device."
+                "This chart can still be saved as Open."
               );
         }
       } catch (error) {
@@ -2963,6 +3004,11 @@
           ? verifierSelectEl.selectedOptions[0].textContent
           : "";
 
+      if (!verifierId && !openSubmissionConfirmed && openDialog) {
+        if (!openDialog.open) openDialog.showModal();
+        return;
+      }
+
       submissionInFlight = true;
       if (submitBtn) {
         submitBtn.disabled = true;
@@ -2991,6 +3037,9 @@
         next.progress.credits =
           (next.progress.credits || 0) +
           dandelionsEarned;
+        if (Number.isInteger(createdPayload.streak)) {
+          next.progress.streak = createdPayload.streak;
+        }
 
         stateApi.saveState(next);
         renderEntries(next);
@@ -3025,6 +3074,7 @@
           error.message ||
           "The P-Chart could not be submitted.";
       } finally {
+        openSubmissionConfirmed = false;
         submissionInFlight = false;
         if (submitBtn) {
           submitBtn.disabled = false;
@@ -3077,6 +3127,7 @@
 
   wireSetupForm(state);
   hydrateHome(state);
+  refreshPracticeStreak();
   wireMetronome();
   wireTuner();
   wireMum(state);

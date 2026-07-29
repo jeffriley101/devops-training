@@ -149,6 +149,8 @@
     >
       Change Instrument
     </button>
+    <button id="change-name-open-button" class="shed-edit-profile-button" type="button" aria-controls="change-name-panel" aria-expanded="false">Change Name</button>
+    <button id="change-level-open-button" class="shed-edit-profile-button" type="button" aria-controls="change-level-panel" aria-expanded="false">Change Level</button>
   </div>
 
   <section
@@ -188,6 +190,28 @@
           Cancel
         </button>
       </div>
+    </form>
+  </section>
+
+  <section id="change-name-panel" class="mentor-card change-profile-panel hidden" aria-labelledby="change-name-title" hidden>
+    <div class="section-head"><p class="chip">Edit Profile</p><h2 id="change-name-title">Change Name</h2></div>
+    <p>Your public Woodchuck name may be changed once every 24 hours.</p>
+    <form id="change-name-form" class="stack-form">
+      <label for="change-name-input">Public Woodchuck name</label>
+      <input id="change-name-input" name="display_name" maxlength="50" required />
+      <p id="change-name-feedback" class="body-copy" role="status" aria-live="polite"></p>
+      <div class="button-row"><button class="btn btn-primary" type="submit">Save Name</button><button class="btn btn-secondary" type="button" data-close-profile-panel>Cancel</button></div>
+    </form>
+  </section>
+
+  <section id="change-level-panel" class="mentor-card change-profile-panel hidden" aria-labelledby="change-level-title" hidden>
+    <div class="section-head"><p class="chip">Edit Profile</p><h2 id="change-level-title">Change Level</h2></div>
+    <p>Your level may be changed once every 30 days.</p>
+    <form id="change-level-form" class="stack-form">
+      <label for="change-level-select">Current level</label>
+      <select id="change-level-select" name="level" required>{% for item in levels %}<option value="{{ item }}">{{ item }}</option>{% endfor %}</select>
+      <p id="change-level-feedback" class="body-copy" role="status" aria-live="polite"></p>
+      <div class="button-row"><button class="btn btn-primary" type="submit">Save Level</button><button class="btn btn-secondary" type="button" data-close-profile-panel>Cancel</button></div>
     </form>
   </section>
 
@@ -380,12 +404,6 @@
       I'm ready to practice
     </button>
   </section>
-
-  <p class="support-line">
-    <a href="/trusted-verifiers">
-      Manage Trusted Verifiers
-    </a>
-  </p>
 
   <p class="support-line">
     <a

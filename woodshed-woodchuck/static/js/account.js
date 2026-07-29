@@ -427,9 +427,68 @@
     });
   }
 
+  function wireProfileChange({ kind, endpoint, stateKey, payloadKey }) {
+    const openButton = document.getElementById(`change-${kind}-open-button`);
+    const panel = document.getElementById(`change-${kind}-panel`);
+    const form = document.getElementById(`change-${kind}-form`);
+    const input = form && form.querySelector("input, select");
+    const feedback = document.getElementById(`change-${kind}-feedback`);
+    if (!openButton || !panel || !form || !input || !feedback) return;
+
+    function close() {
+      panel.hidden = true;
+      panel.classList.add("hidden");
+      openButton.setAttribute("aria-expanded", "false");
+      openButton.focus();
+    }
+    openButton.addEventListener("click", function () {
+      input.value = stateApi.getState().profile[stateKey] || "";
+      feedback.textContent = "";
+      feedback.classList.remove("error-text");
+      panel.hidden = false;
+      panel.classList.remove("hidden");
+      openButton.setAttribute("aria-expanded", "true");
+      input.focus();
+    });
+    panel.querySelectorAll("[data-close-profile-panel]").forEach((button) => {
+      button.addEventListener("click", close);
+    });
+    form.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      const button = form.querySelector("button[type='submit']");
+      feedback.classList.remove("error-text");
+      feedback.textContent = "Saving…";
+      button.disabled = true;
+      try {
+        const response = await fetch(endpoint, {
+          method: "PATCH", credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ [payloadKey]: input.value.trim() }),
+        });
+        if (!response.ok) {
+          throw new Error(await responseMessage(response, `The ${kind} could not be changed.`));
+        }
+        const payload = await response.json();
+        const next = stateApi.getState();
+        next.profile[stateKey] = payload[payloadKey];
+        stateApi.saveState(next);
+        feedback.textContent = `${kind === "name" ? "Name" : "Level"} changed successfully.`;
+        const display = document.getElementById(kind === "name" ? "woodchuck-name-value" : "profile-level-value");
+        if (display) display.textContent = payload[payloadKey];
+      } catch (error) {
+        feedback.classList.add("error-text");
+        feedback.textContent = error.message || `The ${kind} could not be changed.`;
+      } finally {
+        button.disabled = false;
+      }
+    });
+  }
+
   wireCreateAccount();
   wireLogin();
   wireInstrumentChange();
+  wireProfileChange({ kind: "name", endpoint: "/account/profile/name", stateKey: "woodchuckName", payloadKey: "display_name" });
+  wireProfileChange({ kind: "level", endpoint: "/account/profile/level", stateKey: "level", payloadKey: "level" });
 })();
 
 (function () {

@@ -97,17 +97,19 @@
       <option value="">Loading trusted verifiers...</option>
     </select>
 
+    <a class="btn btn-secondary p-book-verifier-manage" href="/trusted-verifiers">Manage Trusted Verifiers</a>
+
     <p id="p-book-verifier-help" class="body-copy">
-      Leave this blank to save an open P-Chart on this device.
+      Leave this blank to save an Open P-Chart to your account.
     </p>
 
     <p id="p-book-error" class="error-text" aria-live="polite"></p>
     <p id="p-book-feedback" class="body-copy" aria-live="polite"></p>
 
     <div class="p-book-action-column">
-      <button class="btn btn-green" type="submit">Submit</button>
-      <button id="export-p-chart-btn" class="btn btn-secondary" type="button">Copy</button>
-      <button id="email-p-chart-btn" class="btn btn-red" type="button">Email</button>
+      <button class="btn btn-green" type="submit">Submit to Log Book</button>
+      <button id="export-p-chart-btn" class="btn btn-book-copy" type="button">Copy to Clipboard</button>
+      <button id="email-p-chart-btn" class="btn btn-red" type="button">Email Your Chart</button>
     </div>
 
     <details class="mentor-card">
@@ -135,6 +137,15 @@
       <datalist id="parent-email-options"></datalist>
     </details>
   </form>
+
+  <dialog id="open-chart-confirmation" class="p-book-submit-dialog" aria-labelledby="open-chart-confirmation-title">
+    <h2 id="open-chart-confirmation-title">Submit as Open only, or choose a trusted verifier?</h2>
+    <div class="button-row">
+      <button id="submit-open-chart" class="btn btn-green" type="button">Submit Open</button>
+      <button id="choose-chart-verifier" class="btn btn-secondary" type="button">Choose Verifier</button>
+      <button id="cancel-open-chart" class="btn btn-secondary" type="button">Cancel</button>
+    </div>
+  </dialog>
 
   <hr class="section-divider" />
 

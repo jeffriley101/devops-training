@@ -207,8 +207,14 @@ select {
 
 .shed-edit-profile-row {
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
+  gap: 0.55rem;
   margin: 0.75rem 0 1rem;
+}
+
+@media (max-width: 420px) {
+  .shed-edit-profile-button { flex: 1 1 9rem; }
 }
 
 .shed-instrument-image {
@@ -1107,8 +1113,11 @@ select {
 .contest-instrument-section h4 {
   margin: 0 0 0.55rem;
   color: #fff4c4;
-  font-size: 0.95rem;
-  letter-spacing: 0.02em;
+  font-size: clamp(1.05rem, 3.5vw, 1.3rem);
+  font-weight: 950;
+  line-height: 1.15;
+  letter-spacing: 0.035em;
+  overflow-wrap: anywhere;
 }
 
 .contest-camp-points-section {
@@ -2471,6 +2480,29 @@ select {
   width: 100%;
   min-height: 3rem;
 }
+
+.btn-book-copy {
+  color: #f7fcff;
+  background: linear-gradient(145deg, #367ca5, #1f5578);
+  border-color: #173f5b;
+}
+
+.btn-book-copy:hover,
+.btn-book-copy:focus-visible {
+  background: linear-gradient(145deg, #438db8, #276789);
+}
+
+.p-book-verifier-manage { width: min(100%, 22rem); }
+
+.p-book-submit-dialog {
+  width: min(92vw, 32rem);
+  border: 3px solid #6d4126;
+  border-radius: 12px;
+  color: #332617;
+  background: #fff3c7;
+}
+
+.p-book-submit-dialog::backdrop { background: rgba(24, 13, 8, 0.68); }
 
 /* BOOK: antique pirate logbook */
 .pirate-logbook {
