@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Contest Administration · Woodshed Woodchuck</title>
+  <link rel="stylesheet" href="/static/css/styles.css?v=45" />
+</head>
+<body class="contest-admin-page">
+  <main class="contest-admin-shell">
+    <header class="contest-admin-header">
+      <p class="scoreboard-kicker">Protected operations</p>
+      <h1>Band Camp Contest Administration</h1>
+      <p>Finalization and season rollover only. Historical results cannot be edited here.</p>
+    </header>
+
+    {% if flash %}
+    <div class="contest-admin-message contest-admin-message-{{ flash.kind }}" role="status">
+      {{ flash.message }}
+    </div>
+    {% endif %}
+
+    <section class="contest-admin-grid" aria-label="Contest status">
+      <article class="contest-admin-card">
+        <h2>Active Season</h2>
+        {% if status.active_season %}
+        <dl class="contest-admin-facts">
+          <div><dt>Season</dt><dd>{{ status.active_season.name }}</dd></div>
+          <div><dt>Key</dt><dd>{{ status.active_season.key }}</dd></div>
+          <div><dt>Status</dt><dd>{{ status.active_season.status }}</dd></div>
+          <div><dt>Dates</dt><dd>{{ status.active_season.starts_on }} – {{ status.active_season.ends_on or "Not set" }}</dd></div>
+          <div><dt>Open weeks</dt><dd>{{ status.active_season.open_weeks }}</dd></div>
+          <div><dt>Finalized weeks</dt><dd>{{ status.active_season.finalized_weeks }}</dd></div>
+          <div><dt>Total weeks</dt><dd>{{ status.active_season.total_weeks }}</dd></div>
+        </dl>
+        {% else %}
+        <p>No active Band Camp season.</p>
+        {% endif %}
+      </article>
+
+      <article class="contest-admin-card">
+        <h2>Current Contest Week</h2>
+        {% if status.current_week %}
+        <dl class="contest-admin-facts">
+          <div><dt>Week</dt><dd>{{ status.current_week.week_start }} – {{ status.current_week.week_end }}</dd></div>
+          <div><dt>Status</dt><dd>{{ status.current_week.status }}</dd></div>
+          <div><dt>Verification deadline</dt><dd>{{ status.current_week.verification_deadline_at }}</dd></div>
+          <div><dt>Finalize after</dt><dd>{{ status.current_week.finalize_after }}</dd></div>
+          <div><dt>Finalized at</dt><dd>{{ status.current_week.finalized_at or "Not finalized" }}</dd></div>
+          <div><dt>Finalization due</dt><dd>{{ "Yes" if status.finalization_due else "No" }}</dd></div>
+        </dl>
+        {% else %}
+        <p>No contest week is available.</p>
+        {% endif %}
+      </article>
+
+      <article class="contest-admin-card">
+        <h2>Rollover Readiness</h2>
+        <p><strong>{{ "Allowed" if status.rollover_allowed else "Blocked" }}</strong></p>
+        {% if status.blocking_reasons %}
+        <ul>
+          {% for reason in status.blocking_reasons %}<li>{{ reason }}</li>{% endfor %}
+        </ul>
+        {% else %}
+        <p>No source-season blockers. Explicit next-season values are still required.</p>
+        {% endif %}
+      </article>
+
+      <article class="contest-admin-card">
+        <h2>Latest Finalization Job</h2>
+        {% if status.latest_job_outcome %}
+        <dl class="contest-admin-facts">
+          <div><dt>Run at</dt><dd>{{ status.latest_job_outcome.at }}</dd></div>
+          <div><dt>Finalized</dt><dd>{{ status.latest_job_outcome.finalized }}</dd></div>
+          <div><dt>Skipped</dt><dd>{{ status.latest_job_outcome.skipped }}</dd></div>
+          <div><dt>Failed</dt><dd>{{ status.latest_job_outcome.failed }}</dd></div>
+          <div><dt>Exit code</dt><dd>{{ status.latest_job_outcome.exit_code }}</dd></div>
+        </dl>
+        {% else %}
+        <p>No automatic-finalization outcome is available in this process. Check structured cron logs.</p>
+        {% endif %}
+      </article>
+    </section>
+
+    <section class="contest-admin-actions" aria-labelledby="finalization-actions-title">
+      <h2 id="finalization-actions-title">Finalization Actions</h2>
+      <div class="contest-admin-button-row">
+        <form method="post" action="/contests/admin/finalize-current">
+          <button class="btn btn-primary" type="submit">Finalize this week</button>
+        </form>
+        <form method="post" action="/contests/admin/finalize-due">
+          <button class="btn btn-primary" type="submit">Finalize all due weeks</button>
+        </form>
+        <form method="post" action="/contests/admin/readiness">
+          <button class="btn btn-secondary" type="submit">Check rollover readiness</button>
+        </form>
+      </div>
+    </section>
+
+    <section class="contest-admin-actions" aria-labelledby="rollover-action-title">
+      <h2 id="rollover-action-title">Explicit Season Rollover</h2>
+      <p>Rollover closes the active season only after all safety checks pass. Type <strong>ROLL OVER</strong> to confirm.</p>
+      <form class="contest-admin-rollover-form" method="post" action="/contests/admin/rollover">
+        <label>Source season key
+          <input name="source_key" required value="{{ status.active_season.key if status.active_season else '' }}" autocomplete="off" />
+        </label>
+        <label>Next season key
+          <input name="next_key" required placeholder="band-camp-2027" autocomplete="off" />
+        </label>
+        <label>Next season name
+          <input name="next_name" required placeholder="Band Camp 2027" autocomplete="off" />
+        </label>
+        <label>Start date (Monday)
+          <input name="next_start" type="date" required />
+        </label>
+        <label>End date (Sunday)
+          <input name="next_end" type="date" required />
+        </label>
+        <label>Confirmation text
+          <input name="confirmation" required aria-describedby="rollover-confirmation-help" autocomplete="off" />
+        </label>
+        <p id="rollover-confirmation-help">This action never deletes or resets historical data.</p>
+        <button class="btn btn-primary" type="submit">Run season rollover</button>
+      </form>
+    </section>
+  </main>
+</body>
+</html>

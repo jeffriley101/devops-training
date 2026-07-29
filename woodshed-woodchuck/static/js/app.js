@@ -177,8 +177,13 @@
     }
 
     if (instrumentObjectEl) {
-      instrumentObjectEl.title = instrument;
-      instrumentObjectEl.setAttribute("aria-label", instrument);
+      if (window.WWInstruments) {
+        window.WWInstruments.renderInstrument(instrumentObjectEl, instrument);
+      } else {
+        instrumentObjectEl.textContent = "♪";
+        instrumentObjectEl.title = instrument;
+        instrumentObjectEl.setAttribute("aria-label", instrument);
+      }
     }
 
     if (levelEl) {
@@ -1015,20 +1020,11 @@
     "March in place while clapping a steady four-beat pulse.",
   ];
 
-  const BAND_CAMP_CROWNS = {
-    hours: "Camp Commitment Crown",
-    care: "Instrument Care Crown",
-    trivia: "Trivia Crown",
-    marching: "Marching Challenge Crown",
-  };
-
   function wireBandCamp(state) {
     const playerNameEl = document.getElementById("board-player-name");
     if (!playerNameEl) return;
 
     const playerPointsEl = document.getElementById("board-player-points");
-    const leaderNameEl = document.getElementById("board-leader-name");
-    const leaderPointsEl = document.getElementById("board-leader-points");
 
     const hoursForm = document.getElementById("camp-hours-form");
     const hoursInput = document.getElementById("camp-hours");
@@ -1054,15 +1050,6 @@
       "marching-challenge-status"
     );
 
-    const crownHoursEl = document.getElementById("crown-hours");
-    const crownCareEl = document.getElementById("crown-care");
-    const crownTriviaEl = document.getElementById("crown-trivia");
-    const crownMarchingEl = document.getElementById("crown-marching");
-
-    const pastWinnersList = document.getElementById(
-      "past-winners-list"
-    );
-    const championsList = document.getElementById("champions-list");
     const feedbackEl = document.getElementById("board-feedback");
 
     const today = stateApi.localDateKey();
@@ -1103,25 +1090,6 @@
       return current.bandCamp.daily.awarded.includes(contestKey);
     }
 
-    function addCrownIfEarned(current, contestKey) {
-      const wins = current.bandCamp.totals.wins[contestKey] || 0;
-
-      if (wins < 10) return;
-
-      const alreadyEarned = current.bandCamp.champions.some(
-        (entry) => entry.contest === contestKey
-      );
-
-      if (alreadyEarned) return;
-
-      current.bandCamp.champions.unshift({
-        contest: contestKey,
-        crown: BAND_CAMP_CROWNS[contestKey],
-        name: playerName(current),
-        earnedAt: today,
-      });
-    }
-
     function addDailyWinnerIfComplete(current) {
       const requiredContests = [
         "hours",
@@ -1160,10 +1128,35 @@
       current.bandCamp.totals.wins[contestKey] += 1;
       current.progress.credits += 1;
 
-      addCrownIfEarned(current, contestKey);
       addDailyWinnerIfComplete(current);
 
       return true;
+    }
+
+    const campAwardsInFlight = new Set();
+
+    async function persistCampPoint(activityType) {
+      if (campAwardsInFlight.has(activityType)) return null;
+      campAwardsInFlight.add(activityType);
+      try {
+        const response = await fetch("/contests/camp-points/awards", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            activity_type: activityType,
+            activity_date: today,
+          }),
+        });
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload.detail || "Camp points could not be saved.");
+        }
+        window.dispatchEvent(new CustomEvent("ww:camp-points-saved"));
+        return payload;
+      } finally {
+        campAwardsInFlight.delete(activityType);
+      }
     }
 
     function setButtonComplete(button, text) {
@@ -1171,30 +1164,6 @@
 
       button.disabled = true;
       button.textContent = text;
-    }
-
-    function renderNameList(listEl, entries, emptyText, formatter) {
-      if (!listEl) return;
-
-      listEl.replaceChildren();
-
-      if (!entries.length) {
-        const item = document.createElement("li");
-        item.textContent = emptyText;
-        listEl.appendChild(item);
-        return;
-      }
-
-      entries.forEach((entry) => {
-        const item = document.createElement("li");
-        item.textContent = formatter(entry);
-        listEl.appendChild(item);
-      });
-    }
-
-    function crownText(wins, crownEarned) {
-      const progress = `${Math.min(wins, 10)}/10`;
-      return crownEarned ? `${progress} 👑` : progress;
     }
 
     function renderTriviaOptions(current) {
@@ -1223,23 +1192,12 @@
     function renderBoard(current) {
       const name = playerName(current);
       const points = current.bandCamp.totals.points;
-      const wins = current.bandCamp.totals.wins;
       const daily = current.bandCamp.daily;
-      const champions = current.bandCamp.champions;
 
       playerNameEl.textContent = name;
 
       if (playerPointsEl) {
         playerPointsEl.textContent = String(points);
-      }
-
-      if (leaderNameEl) {
-        leaderNameEl.textContent = points > 0 ? name : "No camper yet";
-      }
-
-      if (leaderPointsEl) {
-        leaderPointsEl.textContent =
-          points === 1 ? "1 point" : `${points} points`;
       }
 
       if (hoursInput) {
@@ -1305,56 +1263,13 @@
         marchingStatusEl.textContent = "Not completed today";
       }
 
-      if (crownHoursEl) {
-        crownHoursEl.textContent = crownText(
-          wins.hours,
-          champions.some((entry) => entry.contest === "hours")
-        );
-      }
-
-      if (crownCareEl) {
-        crownCareEl.textContent = crownText(
-          wins.care,
-          champions.some((entry) => entry.contest === "care")
-        );
-      }
-
-      if (crownTriviaEl) {
-        crownTriviaEl.textContent = crownText(
-          wins.trivia,
-          champions.some((entry) => entry.contest === "trivia")
-        );
-      }
-
-      if (crownMarchingEl) {
-        crownMarchingEl.textContent = crownText(
-          wins.marching,
-          champions.some((entry) => entry.contest === "marching")
-        );
-      }
-
-      renderNameList(
-        pastWinnersList,
-        current.bandCamp.pastWinners,
-        "No daily champion yet.",
-        (entry) =>
-          `${entry.name} — ${entry.dateKey} — ${entry.points} points`
-      );
-
-      renderNameList(
-        championsList,
-        champions,
-        "No crowns earned yet.",
-        (entry) =>
-          `${entry.name} — ${entry.crown} — ${entry.earnedAt}`
-      );
     }
 
     let current = prepareCurrentDay(stateApi.getState());
     renderBoard(current);
 
     if (hoursForm) {
-      hoursForm.addEventListener("submit", function (event) {
+      hoursForm.addEventListener("submit", async function (event) {
         event.preventDefault();
 
         const next = prepareCurrentDay(stateApi.getState());
@@ -1368,10 +1283,16 @@
 
         if (hasAward(next, "hours")) return;
 
+        try {
+          await persistCampPoint("hours");
+        } catch (error) {
+          feedbackEl.textContent = error.message || "Camp points could not be saved.";
+          return;
+        }
+
         next.bandCamp.daily.hours = hours;
         awardContest(next, "hours");
         stateApi.saveState(next);
-
         feedbackEl.textContent =
           `${hours} camp hours added. +1 Camp Point and +1 dandelion.`;
 
@@ -1381,10 +1302,17 @@
     }
 
     if (careButton) {
-      careButton.addEventListener("click", function () {
+      careButton.addEventListener("click", async function () {
         const next = prepareCurrentDay(stateApi.getState());
 
         if (next.bandCamp.daily.careComplete) return;
+
+        try {
+          await persistCampPoint("care");
+        } catch (error) {
+          feedbackEl.textContent = error.message || "Camp points could not be saved.";
+          return;
+        }
 
         next.bandCamp.daily.careComplete = true;
         awardContest(next, "care");
@@ -1399,7 +1327,7 @@
     }
 
     if (triviaForm) {
-      triviaForm.addEventListener("submit", function (event) {
+      triviaForm.addEventListener("submit", async function (event) {
         event.preventDefault();
 
         const next = prepareCurrentDay(stateApi.getState());
@@ -1422,6 +1350,12 @@
         next.bandCamp.daily.triviaCorrect = isCorrect;
 
         if (isCorrect) {
+          try {
+            await persistCampPoint("trivia");
+          } catch (error) {
+            feedbackEl.textContent = error.message || "Camp points could not be saved.";
+            return;
+          }
           awardContest(next, "trivia");
           feedbackEl.textContent =
             "Correct! +1 Camp Point and +1 dandelion.";
@@ -1437,10 +1371,17 @@
     }
 
     if (marchingButton) {
-      marchingButton.addEventListener("click", function () {
+      marchingButton.addEventListener("click", async function () {
         const next = prepareCurrentDay(stateApi.getState());
 
         if (next.bandCamp.daily.marchingComplete) return;
+
+        try {
+          await persistCampPoint("marching");
+        } catch (error) {
+          feedbackEl.textContent = error.message || "Camp points could not be saved.";
+          return;
+        }
 
         next.bandCamp.daily.marchingComplete = true;
         awardContest(next, "marching");
@@ -1453,6 +1394,893 @@
         hydrateHome(next);
       });
     }
+  }
+
+  function wireBandCampStandings() {
+    const root = document.getElementById("band-camp-standings");
+    if (!root) return;
+
+    const loadingEl = document.getElementById(
+      "contest-standings-loading"
+    );
+    const errorEl = document.getElementById("contest-standings-error");
+    const errorMessageEl = document.getElementById(
+      "contest-standings-error-message"
+    );
+    const retryButton = document.getElementById("contest-standings-retry");
+    const weekRangeEl = document.getElementById("contest-week-range");
+    const weekContextEl = document.getElementById("contest-week-context");
+    const weekStatusEl = document.getElementById("contest-week-status");
+    let selectedDivision = "open";
+    let requestInFlight = false;
+    let refreshQueued = false;
+    const tabs = [
+      document.getElementById("contest-open-tab"),
+      document.getElementById("contest-verified-tab"),
+    ].filter(Boolean);
+    const panels = {
+      open: document.getElementById("contest-open-panel"),
+      verified: document.getElementById("contest-verified-panel"),
+    };
+
+    function selectDivision(division, focusTab) {
+      selectedDivision = division;
+      tabs.forEach((tab) => {
+        const selected = tab.id === `contest-${division}-tab`;
+        tab.setAttribute("aria-selected", String(selected));
+        tab.tabIndex = selected ? 0 : -1;
+        if (selected && focusTab) tab.focus();
+      });
+
+      Object.entries(panels).forEach(([key, panel]) => {
+        if (!panel) return;
+        const selected = key === division;
+        panel.hidden = !selected;
+        panel.classList.toggle("hidden", !selected);
+      });
+      if (weekContextEl) {
+        weekContextEl.textContent = `${division === "open" ? "Open" : "Verified"} division`;
+      }
+    }
+
+    tabs.forEach((tab, index) => {
+      tab.addEventListener("click", function () {
+        selectDivision(tab.id.includes("verified") ? "verified" : "open", false);
+      });
+      tab.addEventListener("keydown", function (event) {
+        let nextIndex = null;
+        if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+          nextIndex = (index + 1) % tabs.length;
+        } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+          nextIndex = (index - 1 + tabs.length) % tabs.length;
+        } else if (event.key === "Home") {
+          nextIndex = 0;
+        } else if (event.key === "End") {
+          nextIndex = tabs.length - 1;
+        }
+        if (nextIndex === null) return;
+        event.preventDefault();
+        selectDivision(
+          tabs[nextIndex].id.includes("verified") ? "verified" : "open",
+          true
+        );
+      });
+    });
+
+    function formatContestDate(value) {
+      if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        return null;
+      }
+      const [year, month, day] = value.split("-").map(Number);
+      const parsed = new Date(year, month - 1, day);
+      if (Number.isNaN(parsed.getTime())) return null;
+      return parsed.toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+    }
+
+    function renderDivision(division, rows) {
+      const list = document.getElementById(
+        `contest-${division}-standings`
+      );
+      const emptyEl = document.getElementById(`contest-${division}-empty`);
+      if (!list || !emptyEl) return;
+
+      list.replaceChildren();
+      const safeRows = Array.isArray(rows)
+        ? rows.filter((row) => (
+            row &&
+            Number.isInteger(row.rank) && row.rank > 0 &&
+            typeof row.instrument === "string" &&
+            row.instrument.trim() &&
+            Number.isInteger(row.total_minutes) && row.total_minutes >= 0
+          ))
+        : [];
+
+      safeRows.forEach((row) => {
+        const teamName = window.WWInstruments &&
+          window.WWInstruments.teamLabel(row.instrument);
+        const rankedRow = document.createElement("article");
+        rankedRow.className = `contest-ranked-row contest-rank-${Math.min(row.rank, 4)}`;
+        rankedRow.setAttribute("role", "listitem");
+        rankedRow.setAttribute(
+          "aria-label",
+          `Rank ${row.rank}, ${teamName || row.instrument}, ${row.total_minutes} practice minutes`
+        );
+        const rank = document.createElement("span");
+        rank.className = "contest-rank-badge";
+        rank.textContent = String(row.rank);
+        const subject = document.createElement("span");
+        subject.className = "contest-ranked-subject";
+        const definition = window.WWInstruments &&
+          window.WWInstruments.getDefinition(row.instrument);
+        const icon = definition && definition.fallback_symbol
+          ? definition.fallback_symbol
+          : "♪";
+        subject.textContent = `${icon} ${teamName || row.instrument}`;
+        const score = document.createElement("strong");
+        score.className = "contest-ranked-score";
+        score.textContent = `${row.total_minutes} min`;
+        rankedRow.append(rank, subject, score);
+        list.appendChild(rankedRow);
+      });
+
+      const isEmpty = safeRows.length === 0;
+      emptyEl.classList.toggle("hidden", !isEmpty);
+      list.classList.toggle("hidden", isEmpty);
+    }
+
+    function ordinal(rank) {
+      const remainder100 = rank % 100;
+      if (remainder100 >= 11 && remainder100 <= 13) return `${rank}th`;
+      if (rank % 10 === 1) return `${rank}st`;
+      if (rank % 10 === 2) return `${rank}nd`;
+      if (rank % 10 === 3) return `${rank}rd`;
+      return `${rank}th`;
+    }
+
+    function positionMessage(division, position, campPoints = false) {
+      if (!position || position.has_score !== true) {
+        if (campPoints) {
+          return "No Camp points yet · Complete a Band Camp activity to join the board.";
+        }
+        return division === "verified"
+          ? "No verified minutes yet · Approved P-Charts appear here."
+          : "No Open minutes yet · Submit a P-Chart to join the board.";
+      }
+      if (!Number.isInteger(position.rank) || position.rank < 1) {
+        return "Your position is unavailable.";
+      }
+      const score = campPoints ? position.total_points : position.total_minutes;
+      const behind = campPoints
+        ? position.points_behind_leader
+        : position.minutes_behind_leader;
+      const parts = [
+        position.tied === true
+          ? `Tied for ${ordinal(position.rank)}`
+          : `Rank ${position.rank}`,
+        campPoints
+          ? `${score} Camp ${score === 1 ? "point" : "points"}`
+          : `${score} min`,
+      ];
+      if (position.rank === 1) {
+        parts.push("Leading the board");
+      } else if (Number.isInteger(behind)) {
+        parts.push(campPoints
+          ? `${behind} Camp ${behind === 1 ? "point" : "points"} behind leader`
+          : `${behind} min behind leader`);
+      }
+      if (position.in_top_five === false) parts.push("Outside Top Five");
+      return parts.join(" · ");
+    }
+
+    function renderPointsDivision(division, rows, position, kind = "points") {
+      const campPoints = kind === "camp-points";
+      const list = document.getElementById(`contest-${division}-${kind}`);
+      const emptyEl = document.getElementById(
+        `contest-${division}-${kind}-empty`
+      );
+      const messageEl = document.getElementById(
+        `contest-${division}-${campPoints ? "camp-position" : "position"}-message`
+      );
+      if (!list || !emptyEl || !messageEl) return;
+
+      list.replaceChildren();
+      const safeRows = Array.isArray(rows)
+        ? rows.filter((row) => (
+            row &&
+            Number.isInteger(row.rank) &&
+            row.rank > 0 &&
+            typeof row.display_name === "string" &&
+            row.display_name.trim() &&
+            Number.isInteger(campPoints ? row.total_points : row.total_minutes) &&
+            (campPoints ? row.total_points : row.total_minutes) >= 0 &&
+            typeof row.is_current_user === "boolean"
+          ))
+        : [];
+
+      safeRows.forEach((row) => {
+        const scoreValue = campPoints ? row.total_points : row.total_minutes;
+        const rankedRow = document.createElement("article");
+        rankedRow.className = `contest-ranked-row contest-rank-${Math.min(row.rank, 4)}`;
+        rankedRow.setAttribute("role", "listitem");
+        if (row.is_current_user) {
+          rankedRow.classList.add("contest-current-user-row");
+        }
+        const publicName = row.is_current_user
+          ? `${row.display_name} (You)`
+          : row.display_name;
+        rankedRow.setAttribute(
+          "aria-label",
+          `Rank ${row.rank}, ${publicName}, ${scoreValue} ${campPoints ? "Camp points" : "practice minutes"}`
+        );
+        const rank = document.createElement("span");
+        rank.className = "contest-rank-badge";
+        rank.textContent = String(row.rank);
+        const subject = document.createElement("span");
+        subject.className = "contest-ranked-subject";
+        subject.textContent = publicName;
+        const score = document.createElement("strong");
+        score.className = "contest-ranked-score";
+        score.textContent = campPoints
+          ? `${scoreValue} Camp ${scoreValue === 1 ? "point" : "points"}`
+          : `${scoreValue} min`;
+        rankedRow.append(rank, subject, score);
+        list.appendChild(rankedRow);
+      });
+
+      const isEmpty = safeRows.length === 0;
+      emptyEl.classList.toggle("hidden", !isEmpty);
+      list.classList.toggle("hidden", isEmpty);
+      messageEl.textContent = positionMessage(division, position, campPoints);
+    }
+
+    function showError(message) {
+      if (loadingEl) loadingEl.classList.add("hidden");
+      if (errorMessageEl) errorMessageEl.textContent = message;
+      if (errorEl) errorEl.classList.remove("hidden");
+      if (weekStatusEl) {
+        weekStatusEl.textContent = "Unavailable";
+        weekStatusEl.classList.remove("hidden");
+      }
+      root.setAttribute("aria-busy", "false");
+    }
+
+    async function loadStandings() {
+      if (requestInFlight) {
+        refreshQueued = true;
+        return;
+      }
+      requestInFlight = true;
+      root.setAttribute("aria-busy", "true");
+      if (errorEl) errorEl.classList.add("hidden");
+      if (weekStatusEl) {
+        weekStatusEl.textContent = loadingEl && !loadingEl.classList.contains("hidden")
+          ? "Loading"
+          : "Refreshing";
+        weekStatusEl.classList.remove("hidden");
+      }
+      try {
+        const response = await fetch("/contests/current", {
+          method: "GET",
+          credentials: "same-origin",
+          headers: { Accept: "application/json" },
+        });
+        if (response.status === 401) {
+          showError("Sign in to view the current Band Camp standings.");
+          return;
+        }
+        if (!response.ok) {
+          showError("Band Camp standings are unavailable right now.");
+          return;
+        }
+
+        const payload = await response.json();
+        const week = payload && payload.current_week;
+        const standings = payload && payload.standings;
+        const practiceStandings = standings &&
+          standings["weekly-practice-by-instrument"];
+        const pointsStandings = standings &&
+          standings["weekly-points-leaders"];
+        const campPointsStandings = standings &&
+          standings["weekly-camp-points"];
+        if (
+          !week ||
+          !practiceStandings ||
+          !pointsStandings ||
+          !Array.isArray(practiceStandings.open) ||
+          !Array.isArray(practiceStandings.verified) ||
+          !Array.isArray(pointsStandings.open) ||
+          !Array.isArray(pointsStandings.verified) ||
+          !pointsStandings.current_user_position ||
+          !pointsStandings.current_user_position.open ||
+          !pointsStandings.current_user_position.verified ||
+          !campPointsStandings ||
+          !Array.isArray(campPointsStandings.open) ||
+          !campPointsStandings.current_user_position ||
+          !campPointsStandings.current_user_position.open
+        ) {
+          showError("Band Camp standings could not be read.");
+          return;
+        }
+
+        const startText = formatContestDate(week.week_start);
+        let endText = null;
+        if (typeof week.week_end === "string") {
+          const endDate = new Date(`${week.week_end}T12:00:00`);
+          if (!Number.isNaN(endDate.getTime())) {
+            endDate.setDate(endDate.getDate() - 1);
+            endText = endDate.toLocaleDateString(undefined, {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+            });
+          }
+        }
+        if (weekRangeEl && startText && endText) {
+          weekRangeEl.textContent = `${startText} – ${endText}`;
+        }
+        renderDivision("open", practiceStandings.open);
+        renderDivision("verified", practiceStandings.verified);
+        renderPointsDivision(
+          "open",
+          pointsStandings.open,
+          pointsStandings.current_user_position.open
+        );
+        renderPointsDivision(
+          "verified",
+          pointsStandings.verified,
+          pointsStandings.current_user_position.verified
+        );
+        renderPointsDivision(
+          "open",
+          campPointsStandings.open,
+          campPointsStandings.current_user_position.open,
+          "camp-points"
+        );
+        selectDivision(selectedDivision, false);
+        if (loadingEl) loadingEl.classList.add("hidden");
+        if (errorEl) errorEl.classList.add("hidden");
+        if (weekStatusEl) weekStatusEl.classList.add("hidden");
+        root.setAttribute("aria-busy", "false");
+      } catch (_error) {
+        showError("Band Camp standings are unavailable right now.");
+      } finally {
+        requestInFlight = false;
+        if (refreshQueued) {
+          refreshQueued = false;
+          loadStandings();
+        }
+      }
+    }
+
+    selectDivision("open", false);
+    retryButton.addEventListener("click", loadStandings);
+    window.addEventListener("ww:p-chart-saved", loadStandings);
+    window.addEventListener("ww:camp-points-saved", loadStandings);
+    loadStandings();
+  }
+
+  function wirePastWinners() {
+    const root = document.getElementById("past-winners");
+    if (!root) return;
+
+    const loadingEl = document.getElementById("past-winners-loading");
+    const authEl = document.getElementById("past-winners-auth");
+    const emptyEl = document.getElementById("past-winners-empty");
+    const errorEl = document.getElementById("past-winners-error");
+    const contentEl = document.getElementById("past-winners-content");
+    const retryButton = document.getElementById("past-winners-retry");
+    const weekSelect = document.getElementById("past-winners-week");
+    const stateEls = [loadingEl, authEl, emptyEl, errorEl, contentEl];
+    const tabs = [
+      document.getElementById("past-winners-open-tab"),
+      document.getElementById("past-winners-verified-tab"),
+    ].filter(Boolean);
+    const panels = {
+      open: document.getElementById("past-winners-open-panel"),
+      verified: document.getElementById("past-winners-verified-panel"),
+    };
+    const medals = {
+      1: { key: "gold", emoji: "🥇", label: "Gold medal" },
+      2: { key: "silver", emoji: "🥈", label: "Silver medal" },
+      3: { key: "bronze", emoji: "🥉", label: "Bronze medal" },
+    };
+
+    function showState(element) {
+      stateEls.forEach((candidate) => {
+        if (candidate) candidate.classList.toggle("hidden", candidate !== element);
+      });
+      root.setAttribute("aria-busy", String(element === loadingEl));
+    }
+
+    function formatDate(value) {
+      if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+        return null;
+      }
+      const [year, month, day] = value.split("-").map(Number);
+      const parsed = new Date(year, month - 1, day);
+      if (Number.isNaN(parsed.getTime())) return null;
+      return parsed.toLocaleDateString(undefined, {
+        month: "short", day: "numeric", year: "numeric",
+      });
+    }
+
+    function weekLabel(week) {
+      const start = formatDate(week.week_start);
+      const [year, month, day] = week.week_end.split("-").map(Number);
+      const sunday = new Date(year, month - 1, day);
+      sunday.setDate(sunday.getDate() - 1);
+      const end = Number.isNaN(sunday.getTime()) ? null :
+        sunday.toLocaleDateString(undefined, {
+          month: "short", day: "numeric", year: "numeric",
+        });
+      return start && end ? `${start} – ${end}` : week.week_start;
+    }
+
+    function selectDivision(division, focusTab) {
+      tabs.forEach((tab) => {
+        const selected = tab.id === `past-winners-${division}-tab`;
+        tab.setAttribute("aria-selected", String(selected));
+        tab.tabIndex = selected ? 0 : -1;
+        if (selected && focusTab) tab.focus();
+      });
+      Object.entries(panels).forEach(([key, panel]) => {
+        if (!panel) return;
+        const selected = key === division;
+        panel.hidden = !selected;
+        panel.classList.toggle("hidden", !selected);
+      });
+    }
+
+    tabs.forEach((tab, index) => {
+      tab.addEventListener("click", function () {
+        selectDivision(tab.id.includes("verified") ? "verified" : "open", false);
+      });
+      tab.addEventListener("keydown", function (event) {
+        let nextIndex = null;
+        if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+          nextIndex = (index + 1) % tabs.length;
+        } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+          nextIndex = (index - 1 + tabs.length) % tabs.length;
+        } else if (event.key === "Home") {
+          nextIndex = 0;
+        } else if (event.key === "End") {
+          nextIndex = tabs.length - 1;
+        }
+        if (nextIndex === null) return;
+        event.preventDefault();
+        selectDivision(
+          tabs[nextIndex].id.includes("verified") ? "verified" : "open", true
+        );
+      });
+    });
+
+    function renderContest(division, contestKey, results) {
+      const type = contestKey === "weekly-points-leaders"
+        ? "points"
+        : contestKey === "weekly-camp-points"
+          ? "camp-points"
+          : "instruments";
+      const rowsEl = document.getElementById(`past-winners-${division}-${type}`);
+      const noResultsEl = document.getElementById(
+        `past-winners-${division}-${type}-empty`
+      );
+      if (!rowsEl || !noResultsEl) return;
+      rowsEl.replaceChildren();
+      const rows = results.filter((result) => {
+        const medal = result && medals[result.rank];
+        const contest = result && result.contest;
+        const subject = result && (type === "instruments" ? result.instrument : result.display_name);
+        return medal && result.medal === medal.key &&
+          result.division === division && contest && contest.key === contestKey &&
+          typeof subject === "string" && subject.trim() &&
+          Number.isInteger(result.score) && result.score >= 0;
+      });
+
+      rows.forEach((result) => {
+        const medal = medals[result.rank];
+        const isStudent = type !== "instruments";
+        const subject = isStudent ? result.display_name : result.instrument;
+        const row = document.createElement("article");
+        row.className = "medal-row";
+        const icon = document.createElement("span");
+        icon.className = "medal-row-icon";
+        icon.setAttribute("aria-hidden", "true");
+        icon.textContent = medal.emoji;
+        const subjectBlock = document.createElement("div");
+        subjectBlock.className = "medal-row-subject";
+        const name = document.createElement("strong");
+        const teamName = !isStudent && window.WWInstruments
+          ? window.WWInstruments.teamLabel(subject)
+          : null;
+        name.textContent = isStudent ? subject : `🎵 ${teamName || subject}`;
+        const rank = document.createElement("small");
+        rank.textContent = `${medal.label} · Rank ${result.rank}`;
+        subjectBlock.append(name, rank);
+        const score = document.createElement("span");
+        score.className = "medal-row-score";
+        score.textContent = type === "camp-points"
+          ? `${result.score} Camp ${result.score === 1 ? "point" : "points"}`
+          : `${result.score} min`;
+        row.append(icon, subjectBlock, score);
+        rowsEl.appendChild(row);
+      });
+      noResultsEl.classList.toggle("hidden", rows.length !== 0);
+    }
+
+    function renderResults(payload) {
+      const results = payload && Array.isArray(payload.results) ? payload.results : [];
+      ["open", "verified"].forEach((division) => {
+        renderContest(division, "weekly-points-leaders", results);
+        renderContest(division, "weekly-practice-by-instrument", results);
+        renderContest(division, "weekly-camp-points", results);
+      });
+    }
+
+    async function loadResults(weekStart) {
+      showState(loadingEl);
+      try {
+        const response = await fetch(
+          `/contests/weeks/${encodeURIComponent(weekStart)}/results`,
+          { credentials: "same-origin", headers: { Accept: "application/json" } }
+        );
+        if (response.status === 401) return showState(authEl);
+        if (!response.ok) return showState(errorEl);
+        renderResults(await response.json());
+        showState(contentEl);
+      } catch (_error) {
+        showState(errorEl);
+      }
+    }
+
+    async function loadWeeks() {
+      showState(loadingEl);
+      try {
+        const response = await fetch("/contests/weeks/finalized", {
+          credentials: "same-origin", headers: { Accept: "application/json" },
+        });
+        if (response.status === 401) return showState(authEl);
+        if (!response.ok) return showState(errorEl);
+        const payload = await response.json();
+        const weeks = payload && Array.isArray(payload.weeks)
+          ? payload.weeks.filter((week) => week &&
+              typeof week.week_start === "string" &&
+              typeof week.week_end === "string" &&
+              week.season && typeof week.season.name === "string")
+          : [];
+        if (!weeks.length) return showState(emptyEl);
+        weekSelect.replaceChildren();
+        weeks.forEach((week) => {
+          const option = document.createElement("option");
+          option.value = week.week_start;
+          option.textContent = `${weekLabel(week)} · ${week.season.name}`;
+          weekSelect.appendChild(option);
+        });
+        await loadResults(weeks[0].week_start);
+      } catch (_error) {
+        showState(errorEl);
+      }
+    }
+
+    weekSelect.addEventListener("change", function () {
+      loadResults(weekSelect.value);
+    });
+    retryButton.addEventListener("click", loadWeeks);
+    selectDivision("open", false);
+    loadWeeks();
+  }
+
+  function wireHallOfChampions() {
+    const root = document.getElementById("hall-of-champions");
+    if (!root) return;
+
+    const loadingEl = document.getElementById("champions-loading");
+    const authEl = document.getElementById("champions-auth");
+    const emptyEl = document.getElementById("champions-empty");
+    const errorEl = document.getElementById("champions-error");
+    const contentEl = document.getElementById("champions-content");
+    const retryButton = document.getElementById("champions-retry");
+    const filterButtons = Array.from(
+      root.querySelectorAll("[data-champions-division]")
+    );
+    const stateEls = [loadingEl, authEl, emptyEl, errorEl, contentEl];
+    let champions = { students: [], instruments: [] };
+    let division = "all";
+    const expanded = { students: false, instruments: false };
+
+    function showState(element) {
+      stateEls.forEach((candidate) => {
+        if (candidate) candidate.classList.toggle("hidden", candidate !== element);
+      });
+      root.setAttribute("aria-busy", String(element === loadingEl));
+    }
+
+    function countsFor(champion) {
+      return division === "all"
+        ? champion.medals
+        : champion.by_division[division];
+    }
+
+    function championName(champion, type) {
+      return type === "students"
+        ? champion.display_name
+        : (window.WWInstruments.teamLabel(champion.instrument_label) || champion.instrument_label);
+    }
+
+    function sortedChampions(type) {
+      return champions[type]
+        .filter((champion) => countsFor(champion).total > 0)
+        .slice()
+        .sort((left, right) => {
+          const leftCounts = countsFor(left);
+          const rightCounts = countsFor(right);
+          return rightCounts.gold - leftCounts.gold ||
+            rightCounts.silver - leftCounts.silver ||
+            rightCounts.bronze - leftCounts.bronze ||
+            championName(left, type).localeCompare(championName(right, type), undefined, {
+              sensitivity: "base",
+            });
+        });
+    }
+
+    function medalStat(emoji, label, count) {
+      const stat = document.createElement("span");
+      const icon = document.createElement("span");
+      icon.setAttribute("aria-hidden", "true");
+      icon.textContent = emoji;
+      stat.append(icon, document.createTextNode(` ${label}: ${count}`));
+      return stat;
+    }
+
+    function renderType(type) {
+      const singular = type === "students" ? "student" : "instrument";
+      const list = document.getElementById(`${singular}-champions-list`);
+      const noResults = document.getElementById(`${singular}-champions-empty`);
+      const showAll = document.getElementById(`${singular}-champions-show-all`);
+      if (!list || !noResults || !showAll) return;
+      list.replaceChildren();
+      const ordered = sortedChampions(type);
+      const visible = expanded[type] ? ordered : ordered.slice(0, 10);
+
+      visible.forEach((champion) => {
+        const counts = countsFor(champion);
+        const card = document.createElement("article");
+        card.className = "champion-card";
+        const head = document.createElement("div");
+        head.className = "champion-card-head";
+        const name = document.createElement("strong");
+        name.textContent = type === "students"
+          ? champion.display_name
+          : `${champion.instrument_icon} ${window.WWInstruments.teamLabel(champion.instrument_label) || champion.instrument_label}`;
+        const total = document.createElement("span");
+        total.className = "champion-podium-total";
+        total.textContent = `${counts.total} podium${counts.total === 1 ? "" : "s"}`;
+        head.append(name, total);
+
+        const medalRow = document.createElement("div");
+        medalRow.className = "champion-medals";
+        medalRow.append(
+          medalStat("🥇", "Gold", counts.gold),
+          medalStat("🥈", "Silver", counts.silver),
+          medalStat("🥉", "Bronze", counts.bronze)
+        );
+        card.append(head, medalRow);
+
+        if (type === "students") {
+          const crown = document.createElement("p");
+          crown.className = "champion-crown";
+          if (champion.crown.earned) {
+            crown.classList.add("champion-crown-earned");
+            crown.textContent = `👑 Permanent crown earned · ${champion.crown.qualifying_wins} qualifying wins`;
+          } else {
+            crown.textContent = `Crown progress: ${champion.crown.qualifying_wins} of ${champion.crown.target_wins} qualifying wins`;
+          }
+          card.appendChild(crown);
+        }
+
+        const represented = document.createElement("p");
+        represented.className = "champion-divisions";
+        represented.textContent = `Divisions represented: ${champion.divisions
+          .map((value) => value === "open" ? "Open" : "Verified")
+          .join(", ")}`;
+        card.appendChild(represented);
+        list.appendChild(card);
+      });
+
+      noResults.classList.toggle("hidden", ordered.length !== 0);
+      showAll.classList.toggle("hidden", expanded[type] || ordered.length <= 10);
+    }
+
+    function render() {
+      filterButtons.forEach((button) => {
+        button.setAttribute(
+          "aria-pressed",
+          String(button.dataset.championsDivision === division)
+        );
+      });
+      renderType("students");
+      renderType("instruments");
+    }
+
+    function validCounts(value) {
+      return value && ["gold", "silver", "bronze", "total"].every(
+        (key) => Number.isInteger(value[key]) && value[key] >= 0
+      );
+    }
+
+    function validChampion(champion, type) {
+      const name = type === "students"
+        ? champion && champion.display_name
+        : champion && champion.instrument_label;
+      return champion && typeof name === "string" && name.trim() &&
+        validCounts(champion.medals) && champion.by_division &&
+        validCounts(champion.by_division.open) &&
+        validCounts(champion.by_division.verified) &&
+        Array.isArray(champion.divisions) &&
+        (type === "instruments" || (
+          champion.crown &&
+          Number.isInteger(champion.crown.qualifying_wins) &&
+          champion.crown.qualifying_wins >= 0 &&
+          champion.crown.target_wins === 10 &&
+          typeof champion.crown.earned === "boolean"
+        ));
+    }
+
+    async function loadChampions() {
+      showState(loadingEl);
+      try {
+        const response = await fetch("/contests/hall-of-champions", {
+          credentials: "same-origin",
+          headers: { Accept: "application/json" },
+        });
+        if (response.status === 401) return showState(authEl);
+        if (!response.ok) return showState(errorEl);
+        const payload = await response.json();
+        champions = {
+          students: payload && Array.isArray(payload.students)
+            ? payload.students.filter((item) => validChampion(item, "students"))
+            : [],
+          instruments: payload && Array.isArray(payload.instruments)
+            ? payload.instruments.filter((item) => validChampion(item, "instruments"))
+            : [],
+        };
+        if (!champions.students.length && !champions.instruments.length) {
+          return showState(emptyEl);
+        }
+        render();
+        showState(contentEl);
+      } catch (_error) {
+        showState(errorEl);
+      }
+    }
+
+    filterButtons.forEach((button) => {
+      button.addEventListener("click", function () {
+        division = button.dataset.championsDivision;
+        expanded.students = false;
+        expanded.instruments = false;
+        render();
+      });
+    });
+    ["students", "instruments"].forEach((type) => {
+      const singular = type === "students" ? "student" : "instrument";
+      document.getElementById(`${singular}-champions-show-all`).addEventListener(
+        "click",
+        function () {
+          expanded[type] = true;
+          renderType(type);
+        }
+      );
+    });
+    retryButton.addEventListener("click", loadChampions);
+    loadChampions();
+  }
+
+  function wirePersonalCrownProgress() {
+    const roots = Array.from(
+      document.querySelectorAll(".personal-crown-progress")
+    );
+    if (!roots.length) return;
+
+    function showError(message) {
+      roots.forEach((root) => {
+        const loading = root.querySelector(".personal-crown-loading");
+        const error = root.querySelector(".personal-crown-error");
+        const content = root.querySelector(".personal-crown-content");
+        loading.classList.add("hidden");
+        content.classList.add("hidden");
+        error.textContent = message;
+        error.classList.remove("hidden");
+        root.setAttribute("aria-busy", "false");
+      });
+    }
+
+    function earnedDate(value) {
+      if (typeof value !== "string") return null;
+      const parsed = new Date(value);
+      if (Number.isNaN(parsed.getTime())) return null;
+      return parsed.toLocaleDateString(undefined, {
+        month: "long", day: "numeric", year: "numeric",
+      });
+    }
+
+    function render(progress) {
+      roots.forEach((root) => {
+        const loading = root.querySelector(".personal-crown-loading");
+        const error = root.querySelector(".personal-crown-error");
+        const content = root.querySelector(".personal-crown-content");
+        const status = root.querySelector(".personal-crown-status");
+        const count = root.querySelector(".personal-crown-count strong");
+        const meter = root.querySelector(".personal-crown-meter");
+        const remaining = root.querySelector(".personal-crown-remaining");
+        const date = root.querySelector(".personal-crown-earned-date");
+        const wins = progress.qualifying_wins;
+        const target = progress.target_wins;
+
+        count.textContent = `${wins} of ${target} wins`;
+        meter.value = Math.min(wins, target);
+        meter.textContent = `${wins} of ${target} qualifying wins`;
+        meter.setAttribute(
+          "aria-label",
+          `Crown progress: ${wins} of ${target} qualifying wins`
+        );
+        if (progress.earned) {
+          status.textContent = "👑 Permanent crown earned";
+          status.classList.add("personal-crown-earned");
+          remaining.textContent = "Permanent achievement — progress never resets.";
+          const formattedDate = earnedDate(progress.earned_at);
+          date.textContent = formattedDate ? `Earned ${formattedDate}` : "";
+          date.classList.toggle("hidden", !formattedDate);
+        } else {
+          status.textContent = "Keep going toward your permanent crown.";
+          status.classList.remove("personal-crown-earned");
+          const winsRemaining = progress.remaining_wins;
+          remaining.textContent = `${winsRemaining} qualifying ${winsRemaining === 1 ? "win" : "wins"} remain.`;
+          date.textContent = "";
+          date.classList.add("hidden");
+        }
+        loading.classList.add("hidden");
+        error.classList.add("hidden");
+        content.classList.remove("hidden");
+        root.setAttribute("aria-busy", "false");
+      });
+    }
+
+    async function loadProgress() {
+      try {
+        const response = await fetch("/contests/crown-progress", {
+          credentials: "same-origin",
+          headers: { Accept: "application/json" },
+        });
+        if (response.status === 401) {
+          showError("Sign in to view your crown progress.");
+          return;
+        }
+        if (!response.ok) {
+          showError("Crown progress is unavailable right now.");
+          return;
+        }
+        const payload = await response.json();
+        if (!payload ||
+            !Number.isInteger(payload.qualifying_wins) ||
+            payload.qualifying_wins < 0 ||
+            payload.target_wins !== 10 ||
+            !Number.isInteger(payload.remaining_wins) ||
+            payload.remaining_wins < 0 ||
+            typeof payload.earned !== "boolean") {
+          showError("Crown progress could not be read.");
+          return;
+        }
+        render(payload);
+      } catch (_error) {
+        showError("Crown progress is unavailable right now.");
+      }
+    }
+
+    loadProgress();
   }
 
   function wireStore(state) {
@@ -1595,6 +2423,8 @@
     const pagesCountEl = document.getElementById("p-book-pages-count");
 
     const DANDELION_DAILY_CAP = 75;
+    let submissionInFlight = false;
+    let pendingSubmissionKey = null;
 
     function verifierRoleLabel(role) {
       return String(role || "")
@@ -1706,6 +2536,7 @@
       note,
       practiceDetails,
       creditsAwarded,
+      submissionKey,
     }) {
       const response = await fetch(
         "/practice-charts",
@@ -1723,6 +2554,7 @@
             practice_details: practiceDetails,
             source: "p-book",
             credits_awarded: creditsAwarded,
+            submission_key: submissionKey,
           }),
         }
       );
@@ -1736,7 +2568,7 @@
         );
       }
 
-      return payload.chart;
+      return payload;
     }
 
     async function loadPersistentPracticeCharts() {
@@ -2087,6 +2919,7 @@
 
     form.addEventListener("submit", async function (event) {
       event.preventDefault();
+      if (submissionInFlight) return;
       errorEl.textContent = "";
       feedbackEl.classList.remove("success-callout");
 
@@ -2130,53 +2963,31 @@
           ? verifierSelectEl.selectedOptions[0].textContent
           : "";
 
+      submissionInFlight = true;
       if (submitBtn) {
         submitBtn.disabled = true;
       }
 
       try {
-        const serverChart = verifierId
-          ? await createPersistentPracticeChart({
-              verifierId,
-              dateKey,
-              minutes,
-              note,
-              practiceDetails,
-              creditsAwarded: dandelionsEarned,
-            })
-          : null;
-
-        next.practiceLog.unshift({
+        pendingSubmissionKey = pendingSubmissionKey || (
+          window.crypto && typeof window.crypto.randomUUID === "function"
+            ? window.crypto.randomUUID()
+            : `${Date.now()}-${Math.random().toString(36).slice(2)}`
+        );
+        const createdPayload = await createPersistentPracticeChart({
+          verifierId: verifierId || null,
           dateKey,
           minutes,
           note,
           practiceDetails,
-          source: "p-book",
           creditsAwarded: dandelionsEarned,
-          loggedAt: new Date().toISOString(),
-          serverChartId: serverChart
-            ? serverChart.id
-            : null,
-          verificationStatus: serverChart
-            ? serverChart.verification.status
-            : "open",
-          verificationResponseNote: serverChart
-            ? serverChart.verification.response_note || ""
-            : "",
-          verifierId: serverChart
-            ? serverChart.verification.verifier_id
-            : null,
-          verifierName:
-            serverChart &&
-            serverChart.verification.verifier
-              ? (
-                  serverChart.verification.verifier
-                    .display_name || ""
-                )
-              : "",
+          submissionKey: pendingSubmissionKey,
         });
+        const serverChart = createdPayload && createdPayload.chart;
+        if (!serverChart || !Number.isInteger(serverChart.id)) {
+          throw new Error("The saved P-Chart response could not be read.");
+        }
 
-        next.practiceLog = next.practiceLog.slice(0, 100);
         next.progress.credits =
           (next.progress.credits || 0) +
           dandelionsEarned;
@@ -2184,17 +2995,18 @@
         stateApi.saveState(next);
         renderEntries(next);
         renderPBookSummary(next);
+        await loadPersistentPracticeCharts();
 
         feedbackEl.classList.add("success-callout");
 
-        feedbackEl.textContent = serverChart
+        feedbackEl.textContent = verifierId
           ? (
               `A new page was added and sent to ` +
               `${verifierName}. Verification is pending. ` +
               `+${dandelionsEarned} dandelions added.`
             )
           : (
-              `A new open page was added to this device. ` +
+              `A new Open P-Chart was saved. ` +
               `+${dandelionsEarned} dandelions added.`
             );
 
@@ -2205,12 +3017,15 @@
           checkbox.checked = false;
         });
 
+        pendingSubmissionKey = null;
         hydrateHome(next);
+        window.dispatchEvent(new CustomEvent("ww:p-chart-saved"));
       } catch (error) {
         errorEl.textContent =
           error.message ||
           "The P-Chart could not be submitted.";
       } finally {
+        submissionInFlight = false;
         if (submitBtn) {
           submitBtn.disabled = false;
         }
@@ -2266,6 +3081,10 @@
   wireMum(state);
   wireQuestForm(state);
   wireBandCamp(state);
+  wireBandCampStandings();
+  wirePastWinners();
+  wireHallOfChampions();
+  wirePersonalCrownProgress();
   wireStore(state);
   wirePBook(state);
 })();

@@ -15,16 +15,11 @@
       <p class="board-kicker">Get your name on the Board</p>
       <h3 id="board-player-name">Your Woodchuck</h3>
       <p>
-        Camp Points:
+        Career Band Camp Points:
         <strong id="board-player-points">0</strong>
       </p>
     </div>
 
-    <div class="board-leader">
-      <small>Current Point Leader</small>
-      <strong id="board-leader-name">No camper yet</strong>
-      <span id="board-leader-points">0 points</span>
-    </div>
   </section>
 
   <div class="board-layout">
@@ -122,38 +117,289 @@
     </section>
 
     <aside class="board-scoreboard">
-      <section class="board-panel">
-        <h3>Past Winners</h3>
-        <ul id="past-winners-list" class="board-name-list">
-          <li>No daily champion yet.</li>
-        </ul>
-      </section>
+      <section
+        id="band-camp-standings"
+        class="board-panel board-standings-panel cork-paper"
+        aria-labelledby="band-camp-standings-title"
+        aria-busy="true"
+      >
+        <header class="scoreboard-header">
+          <p class="scoreboard-kicker">Live competition board</p>
+          <h3 id="band-camp-standings-title">Band Camp Standings</h3>
+          <p class="board-standings-week">
+            <span id="contest-week-range">Current week</span>
+            <span id="contest-week-context">Open division</span>
+            <span id="contest-week-status" class="scoreboard-status">Loading</span>
+          </p>
+        </header>
 
-      <section class="board-panel cork-paper">
-        <h3>Open Weekly Practice Minutes by Instrument</h3>
-        <p class="body-copy">
-          Top five musicians from all submitted P-Charts.
+        <p id="contest-standings-loading" class="scoreboard-notice" role="status">
+          Loading Band Camp standings…
         </p>
-        <ol id="open-instrument-weekly-list" class="board-name-list weekly-top-five">
-          <li>Shared standings begin with Phase 5.</li>
-        </ol>
+        <div
+          id="contest-standings-error"
+          class="scoreboard-notice scoreboard-error hidden"
+          role="alert"
+        >
+          <p id="contest-standings-error-message"></p>
+          <button id="contest-standings-retry" class="btn btn-secondary" type="button">
+            Retry standings
+          </button>
+        </div>
+
+        <div
+          id="contest-division-tabs"
+          class="contest-division-tabs"
+          role="tablist"
+          aria-label="Practice standings division"
+        >
+          <button
+            id="contest-open-tab"
+            class="contest-division-tab"
+            type="button"
+            role="tab"
+            aria-selected="true"
+            aria-controls="contest-open-panel"
+          >
+            Open
+          </button>
+          <button
+            id="contest-verified-tab"
+            class="contest-division-tab"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="contest-verified-panel"
+            tabindex="-1"
+          >
+            Verified
+          </button>
+        </div>
+
+        <div
+          id="contest-open-panel"
+          class="contest-division-panel"
+          role="tabpanel"
+          aria-labelledby="contest-open-tab"
+        >
+          <section class="contest-points-section" aria-labelledby="open-points-title">
+            <h4 id="open-points-title">Top Five Minutes Leaders</h4>
+            <div id="contest-open-position" class="contest-position-card">
+              <strong>Your Position</strong>
+              <span id="contest-open-position-message">Loading your position…</span>
+            </div>
+            <div id="contest-open-points" class="contest-ranked-list" role="list" aria-label="Open minutes leaders"></div>
+            <p id="contest-open-points-empty" class="contest-empty-state hidden">
+              No P-Charts have been submitted this week yet.
+            </p>
+          </section>
+
+          <section class="contest-camp-points-section" aria-labelledby="open-camp-points-title">
+            <h4 id="open-camp-points-title">Weekly Band Camp Points</h4>
+            <p class="contest-division-explanation">Camp activities completed this week</p>
+            <div id="contest-open-camp-position" class="contest-position-card">
+              <strong>Your Position</strong>
+              <span id="contest-open-camp-position-message">Loading your position…</span>
+            </div>
+            <div id="contest-open-camp-points" class="contest-ranked-list contest-camp-points-list" role="list" aria-label="Open Band Camp points leaders"></div>
+            <p id="contest-open-camp-points-empty" class="contest-empty-state hidden">
+              No Camp points have been earned this week yet.
+            </p>
+          </section>
+
+          <section class="contest-instrument-section" aria-labelledby="open-instruments-title">
+            <h4 id="open-instruments-title">Weekly Practice Minutes by Instrument</h4>
+            <p class="contest-division-explanation">All submitted P-Charts</p>
+            <div id="contest-open-standings" class="contest-ranked-list" role="list" aria-label="Open instrument standings"></div>
+          </section>
+          <p id="contest-open-empty" class="contest-empty-state hidden">
+            No P-Charts have been submitted this week yet. Log practice to start the board.
+          </p>
+        </div>
+
+        <div
+          id="contest-verified-panel"
+          class="contest-division-panel hidden"
+          role="tabpanel"
+          aria-labelledby="contest-verified-tab"
+          hidden
+        >
+          <section class="contest-points-section" aria-labelledby="verified-points-title">
+            <h4 id="verified-points-title">Top Five Minutes Leaders</h4>
+            <div id="contest-verified-position" class="contest-position-card">
+              <strong>Your Position</strong>
+              <span id="contest-verified-position-message">Loading your position…</span>
+            </div>
+            <div id="contest-verified-points" class="contest-ranked-list" role="list" aria-label="Verified minutes leaders"></div>
+            <p id="contest-verified-points-empty" class="contest-empty-state hidden">
+              No verified P-Charts have been approved this week yet.
+            </p>
+          </section>
+
+          <section class="contest-instrument-section" aria-labelledby="verified-instruments-title">
+            <h4 id="verified-instruments-title">Weekly Practice Minutes by Instrument</h4>
+            <p class="contest-division-explanation">Approved P-Charts only</p>
+            <div id="contest-verified-standings" class="contest-ranked-list" role="list" aria-label="Verified instrument standings"></div>
+          </section>
+          <p id="contest-verified-empty" class="contest-empty-state hidden">
+            No verified P-Charts have been approved this week yet.
+          </p>
+        </div>
       </section>
 
-      <section class="board-panel cork-paper">
-        <h3>Verified Weekly Practice Minutes by Instrument</h3>
-        <p class="body-copy">
-          Top five musicians whose charts were approved by a trusted verifier.
-        </p>
-        <ol id="verified-instrument-weekly-list" class="board-name-list weekly-top-five">
-          <li>Verified standings begin with Phase 5.</li>
-        </ol>
+      <section
+        id="past-winners"
+        class="board-panel medal-board"
+        aria-labelledby="past-winners-title"
+        aria-busy="true"
+      >
+        <h3 id="past-winners-title">Past Winners</h3>
+        <p class="medal-board-intro">Final Band Camp podiums</p>
+
+        <div id="past-winners-loading" class="medal-board-state" role="status">
+          Loading Past Winners…
+        </div>
+        <div id="past-winners-auth" class="medal-board-state hidden" role="alert">
+          Sign in to view Past Winners.
+        </div>
+        <div id="past-winners-empty" class="medal-board-state hidden">
+          No finalized Band Camp weeks yet.
+        </div>
+        <div id="past-winners-error" class="medal-board-state hidden" role="alert">
+          <p>Past Winners could not be loaded.</p>
+          <button id="past-winners-retry" class="btn btn-secondary" type="button">
+            Retry
+          </button>
+        </div>
+
+        <div id="past-winners-content" class="hidden">
+          <label class="medal-week-label" for="past-winners-week">
+            Finalized week
+          </label>
+          <select id="past-winners-week" class="medal-week-select"></select>
+
+          <div
+            id="past-winners-division-tabs"
+            class="contest-division-tabs"
+            role="tablist"
+            aria-label="Past Winners division"
+          >
+            <button
+              id="past-winners-open-tab"
+              class="contest-division-tab"
+              type="button"
+              role="tab"
+              aria-selected="true"
+              aria-controls="past-winners-open-panel"
+            >
+              Open
+            </button>
+            <button
+              id="past-winners-verified-tab"
+              class="contest-division-tab"
+              type="button"
+              role="tab"
+              aria-selected="false"
+              aria-controls="past-winners-verified-panel"
+              tabindex="-1"
+            >
+              Verified
+            </button>
+          </div>
+
+          {% for division in ["open", "verified"] %}
+          <div
+            id="past-winners-{{ division }}-panel"
+            class="medal-division-panel{% if division == 'verified' %} hidden{% endif %}"
+            role="tabpanel"
+            aria-labelledby="past-winners-{{ division }}-tab"
+            {% if division == "verified" %}hidden{% endif %}
+          >
+            <section class="medal-contest" aria-labelledby="past-{{ division }}-points-title">
+              <h4 id="past-{{ division }}-points-title">Top Five Minutes Leaders</h4>
+              <div id="past-winners-{{ division }}-points" class="medal-rows"></div>
+              <p id="past-winners-{{ division }}-points-empty" class="contest-empty-state hidden">
+                No podium results for this contest and division.
+              </p>
+            </section>
+            <section class="medal-contest" aria-labelledby="past-{{ division }}-instruments-title">
+              <h4 id="past-{{ division }}-instruments-title">Weekly Practice Minutes by Instrument</h4>
+              <div id="past-winners-{{ division }}-instruments" class="medal-rows"></div>
+              <p id="past-winners-{{ division }}-instruments-empty" class="contest-empty-state hidden">
+                No podium results for this contest and division.
+              </p>
+            </section>
+            <section class="medal-contest" aria-labelledby="past-{{ division }}-camp-points-title">
+              <h4 id="past-{{ division }}-camp-points-title">Weekly Band Camp Points</h4>
+              <div id="past-winners-{{ division }}-camp-points" class="medal-rows"></div>
+              <p id="past-winners-{{ division }}-camp-points-empty" class="contest-empty-state hidden">
+                No podium results for this contest and division.
+              </p>
+            </section>
+          </div>
+          {% endfor %}
+        </div>
       </section>
 
-      <section class="board-panel hall-of-champions">
-        <h3>Hall of Champions</h3>
-        <ul id="champions-list" class="board-name-list">
-          <li>No crowns earned yet.</li>
-        </ul>
+      <section
+        id="hall-of-champions"
+        class="board-panel hall-of-champions"
+        aria-labelledby="hall-of-champions-title"
+        aria-busy="true"
+      >
+        <h3 id="hall-of-champions-title">Hall of Champions</h3>
+        <p>All-time Band Camp medal leaders</p>
+
+        <div id="champions-loading" class="medal-board-state" role="status">
+          Loading Hall of Champions…
+        </div>
+        <div id="champions-auth" class="medal-board-state hidden" role="alert">
+          Sign in to view the Hall of Champions.
+        </div>
+        <div id="champions-empty" class="medal-board-state hidden">
+          No finalized champions yet.
+        </div>
+        <div id="champions-error" class="medal-board-state hidden" role="alert">
+          <p>Hall of Champions could not be loaded.</p>
+          <button id="champions-retry" class="btn btn-secondary" type="button">
+            Retry
+          </button>
+        </div>
+
+        <div id="champions-content" class="hidden">
+          <div
+            id="champions-division-filters"
+            class="champions-filters"
+            role="group"
+            aria-label="Hall of Champions division"
+          >
+            <button class="champions-filter" type="button" data-champions-division="all" aria-pressed="true">All</button>
+            <button class="champions-filter" type="button" data-champions-division="open" aria-pressed="false">Open</button>
+            <button class="champions-filter" type="button" data-champions-division="verified" aria-pressed="false">Verified</button>
+          </div>
+
+          <section class="champions-panel" aria-labelledby="student-champions-title">
+            <h4 id="student-champions-title">Student Champions</h4>
+            <div id="student-champions-list" class="champions-list"></div>
+            <p id="student-champions-empty" class="contest-empty-state hidden">
+              No student champions in this division yet.
+            </p>
+            <button id="student-champions-show-all" class="btn btn-secondary champions-show-all hidden" type="button">
+              Show all students
+            </button>
+          </section>
+
+          <section class="champions-panel" aria-labelledby="instrument-champions-title">
+            <h4 id="instrument-champions-title">Instrument Champions</h4>
+            <div id="instrument-champions-list" class="champions-list"></div>
+            <p id="instrument-champions-empty" class="contest-empty-state hidden">
+              No instrument champions in this division yet.
+            </p>
+            <button id="instrument-champions-show-all" class="btn btn-secondary champions-show-all hidden" type="button">
+              Show all instruments
+            </button>
+          </section>
+        </div>
       </section>
     </aside>
   </div>

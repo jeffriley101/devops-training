@@ -25,13 +25,14 @@ router = APIRouter(
 
 
 class PracticeChartCreate(BaseModel):
-    verifier_id: int = Field(gt=0)
+    verifier_id: int | None = Field(default=None, gt=0)
     practice_date: date
     minutes: int
     note: str = ""
     practice_details: list[str] = Field(default_factory=list)
     source: str = "p-book"
     credits_awarded: int = 0
+    submission_key: str | None = Field(default=None, min_length=1, max_length=64)
 
 
 def verification_payload(
@@ -63,7 +64,7 @@ def verification_payload(
 
 def chart_payload(
     chart: PracticeChart,
-    verification: PracticeChartVerification,
+    verification: PracticeChartVerification | None,
     verifier: TrustedVerifier | None,
 ) -> dict[str, object]:
     return {
@@ -76,9 +77,10 @@ def chart_payload(
         "source": chart.source,
         "credits_awarded": chart.credits_awarded,
         "created_at": chart.created_at.isoformat(),
-        "verification": verification_payload(
-            verification,
-            verifier,
+        "verification": (
+            verification_payload(verification, verifier)
+            if verification is not None
+            else None
         ),
     }
 
@@ -100,7 +102,7 @@ def list_student_practice_charts(request: Request):
                 PracticeChartVerification,
                 TrustedVerifier,
             )
-            .join(
+            .outerjoin(
                 PracticeChartVerification,
                 PracticeChartVerification.practice_chart_id
                 == PracticeChart.id,
@@ -156,6 +158,7 @@ def create_student_practice_chart(
                 practice_details=submitted.practice_details,
                 source=submitted.source,
                 credits_awarded=submitted.credits_awarded,
+                submission_key=submitted.submission_key,
             )
         except ValueError as error:
             raise HTTPException(
@@ -176,12 +179,13 @@ def create_student_practice_chart(
                 TrustedVerifier,
                 created.verification.verifier_id,
             )
-            if created.verification.verifier_id is not None
+            if created.verification is not None
+            and created.verification.verifier_id is not None
             else None
         )
 
         return {
-            "created": True,
+            "created": created.created,
             "chart": chart_payload(
                 created.chart,
                 created.verification,

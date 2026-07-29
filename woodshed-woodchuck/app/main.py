@@ -16,6 +16,8 @@ from .verifier_routes import (
     router as verifier_router,
 )
 from .practice_chart_routes import router as practice_chart_router
+from .contests import router as contest_router
+from .contest_admin import router as contest_admin_router
 from .db import SessionLocal
 from .content import (
     GOAL_OPTIONS,
@@ -25,6 +27,7 @@ from .content import (
     SAX_VIKING_MESSAGES,
     SAX_VIKING_WELCOME,
 )
+from .instruments import instrument_definition_payloads
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -48,6 +51,8 @@ app.add_middleware(
 app.include_router(account_router)
 app.include_router(verifier_router)
 app.include_router(practice_chart_router)
+app.include_router(contest_router)
+app.include_router(contest_admin_router)
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
@@ -70,6 +75,7 @@ def _render(request: Request, template_name: str, **context: object):
             "sax_viking_welcome": SAX_VIKING_WELCOME,
             "quest_pool": QUEST_POOL,
             "sax_viking_messages": SAX_VIKING_MESSAGES,
+            "instrument_definitions": instrument_definition_payloads(),
             **context,
         },
     )
@@ -187,7 +193,13 @@ def setup_submit(
 
 @app.get("/home")
 def home(request: Request):
-    return _render(request, "home.html", title="shed", active_nav="home")
+    return _render(
+        request,
+        "home.html",
+        title="shed",
+        active_nav="home",
+        instruments=INSTRUMENT_OPTIONS,
+    )
 
 
 @app.get("/p-book")

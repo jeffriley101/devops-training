@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-labelledby="title">
+  <title id="title">Clarinet</title>
+  <g transform="rotate(-38 48 48)" stroke="#2a2119" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M45 12h6l2 10-2 48-6 0-2-48z" fill="#3b3026" stroke-width="3"/>
+    <path d="M43 71h10l7 12H36z" fill="#8b5a2b" stroke-width="3"/>
+    <path d="M44 22h9M43 34h10M43 47h10M43 60h9" fill="none" stroke="#d7b56d" stroke-width="3"/>
+    <circle cx="40" cy="31" r="2.5" fill="#d7b56d"/><circle cx="56" cy="43" r="2.5" fill="#d7b56d"/><circle cx="40" cy="55" r="2.5" fill="#d7b56d"/>
+    <path d="M45 12l2-6h5l-1 6" fill="#d7b56d" stroke-width="3"/>
+  </g>
+</svg>

@@ -36,7 +36,7 @@
           aria-label="Instrument"
           title="Instrument"
         >
-          🎷
+          ♪
         </div>
 
         <div
@@ -138,6 +138,53 @@
       </div>
     </div>
   </div>
+
+  <div class="shed-edit-profile-row">
+    <button
+      id="change-instrument-open-button"
+      class="shed-edit-profile-button"
+      type="button"
+      aria-controls="change-instrument-panel"
+      aria-expanded="false"
+    >
+      Change Instrument
+    </button>
+  </div>
+
+  <section
+    id="change-instrument-panel"
+    class="mentor-card change-instrument-panel hidden"
+    aria-labelledby="change-instrument-title"
+    hidden
+  >
+    <div class="section-head">
+      <p class="chip">Edit Profile</p>
+      <h2 id="change-instrument-title">Change Instrument</h2>
+    </div>
+    <p>
+      Changing instruments will not erase your practice history, dandelions,
+      streaks, contest results, verifier connections, medals, or crowns.
+    </p>
+    <form id="change-instrument-form" class="stack-form">
+      <label for="change-instrument-select">Current instrument</label>
+      <select id="change-instrument-select" name="instrument" required>
+        {% for item in instruments %}
+        <option value="{{ item }}">{{ item }}</option>
+        {% endfor %}
+      </select>
+      <p id="change-instrument-feedback" class="body-copy" aria-live="polite"></p>
+      <div class="button-row">
+        <button class="btn btn-primary" type="submit">Save Instrument</button>
+        <button
+          id="change-instrument-cancel-button"
+          class="btn btn-secondary"
+          type="button"
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
+  </section>
 
   <section
     id="metronome-panel"
