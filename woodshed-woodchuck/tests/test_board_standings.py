@@ -6,6 +6,7 @@ from app.main import app
 
 
 TEMPLATE_PATH = Path(__file__).resolve().parents[1] / "templates" / "quest.html"
+STORE_TEMPLATE_PATH = Path(__file__).resolve().parents[1] / "templates" / "store.html"
 
 
 def board_template() -> str:
@@ -30,12 +31,12 @@ def test_board_contains_live_standings_markup() -> None:
     assert "Your Position" in markup
 
 
-def test_board_preserves_placeholders_without_crown_progress() -> None:
+def test_board_preserves_past_winners_and_hall_with_crown_progress() -> None:
     markup = board_template()
 
     assert "Past Winners" in markup
     assert "Hall of Champions" in markup
-    assert "Crown Progress" not in markup
+    assert "Your Crown Progress" in markup
 
 
 def test_board_contains_loading_and_empty_states() -> None:
@@ -161,3 +162,42 @@ def test_hall_preserves_existing_board_sections() -> None:
     assert 'id="contest-verified-position"' in markup
     assert 'id="past-winners"' in markup
     assert markup.index('id="hall-of-champions"') > markup.index('id="past-winners"')
+
+
+def test_shop_and_board_render_accessible_personal_crown_progress() -> None:
+    board = board_template()
+    shop = STORE_TEMPLATE_PATH.read_text(encoding="utf-8")
+
+    for markup in (board, shop):
+        assert 'class="personal-crown-meter"' in markup
+        assert 'aria-label="Crown progress: 0 of 10 qualifying wins"' in markup
+        assert "0 of 10 wins" in markup
+        assert "10 qualifying wins remain." in markup
+        assert "Gold wins in Weekly Points Leaders qualify" in markup
+        assert "Silver, Bronze, and instrument participation do not count" in markup
+    assert 'id="board-crown-title"' in board
+    assert 'id="shop-crown-title"' in shop
+
+
+def test_crown_javascript_handles_earned_unearned_date_and_above_ten() -> None:
+    javascript = (
+        Path(__file__).resolve().parents[1] / "static" / "js" / "app.js"
+    ).read_text(encoding="utf-8")
+
+    assert 'fetch("/contests/crown-progress"' in javascript
+    assert "Math.min(wins, target)" in javascript
+    assert "Permanent crown earned" in javascript
+    assert "progress never resets" in javascript
+    assert "qualifying ${winsRemaining === 1 ? \"win\" : \"wins\"} remain" in javascript
+    assert "Earned ${formattedDate}" in javascript
+
+
+def test_crown_display_preserves_hall_live_standings_and_past_winners() -> None:
+    markup = board_template()
+
+    assert 'id="hall-of-champions"' in markup
+    assert 'id="band-camp-standings"' in markup
+    assert 'id="contest-open-position"' in markup
+    assert 'id="contest-verified-position"' in markup
+    assert 'id="past-winners"' in markup
+    assert markup.index('id="board-crown-title"') < markup.index('id="past-winners"')

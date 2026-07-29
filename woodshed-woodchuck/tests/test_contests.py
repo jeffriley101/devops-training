@@ -22,6 +22,7 @@ from app.contests import (
     contest_results_payload,
     finalized_weeks_payload,
     hall_of_champions_payload,
+    crown_progress_payload,
     weekly_practice_by_instrument,
     weekly_student_points,
 )
@@ -1070,3 +1071,133 @@ def test_hall_static_route_requires_authentication() -> None:
     response = TestClient(app).get("/contests/hall-of-champions")
 
     assert response.status_code == 401
+
+
+def test_crown_progress_defaults_to_zero_without_creating_a_row(
+    database: tuple[Session, sessionmaker[Session]],
+) -> None:
+    session, _ = database
+    ensure_band_camp_data(session, now=NOW)
+    profile = add_student(session, woodchuck_id="WC-CROWN-ZERO", instrument="Flute")
+    session.commit()
+
+    payload = crown_progress_payload(session, profile_id=profile.id)
+
+    assert payload == {
+        "qualifying_wins": 0,
+        "target_wins": 10,
+        "remaining_wins": 10,
+        "earned": False,
+        "earned_at": None,
+    }
+    assert session.scalar(select(func.count()).select_from(CrownProgress)) == 0
+
+
+@pytest.mark.parametrize(
+    ("wins", "earned_at", "remaining", "earned"),
+    [
+        (7, None, 3, False),
+        (9, None, 1, False),
+        (10, FINAL_NOW, 0, True),
+        (12, FINAL_NOW, 0, True),
+    ],
+)
+def test_crown_progress_partial_earned_and_above_target(
+    database: tuple[Session, sessionmaker[Session]],
+    wins: int,
+    earned_at: datetime | None,
+    remaining: int,
+    earned: bool,
+) -> None:
+    session, _ = database
+    _, contests, _ = ensure_band_camp_data(session, now=NOW)
+    points = next(c for c in contests if c.key == "weekly-points-leaders")
+    profile = add_student(
+        session, woodchuck_id=f"WC-CROWN-{wins}", instrument="Flute"
+    )
+    progress = CrownProgress(
+        profile_id=profile.id,
+        category_key=points.crown_category or points.key,
+        qualifying_wins=wins,
+        crown_earned_at=earned_at,
+    )
+    session.add(progress)
+    session.commit()
+    original_earned_at = progress.crown_earned_at
+
+    payload = crown_progress_payload(session, profile_id=profile.id)
+
+    assert payload["qualifying_wins"] == wins
+    assert payload["remaining_wins"] == remaining
+    assert payload["earned"] is earned
+    assert payload["earned_at"] == (
+        "2026-08-03T18:00:00+00:00" if earned_at else None
+    )
+    session.refresh(progress)
+    assert progress.qualifying_wins == wins
+    assert (
+        contest_module.aware_utc(progress.crown_earned_at)
+        if progress.crown_earned_at else None
+    ) == (
+        contest_module.aware_utc(original_earned_at)
+        if original_earned_at else None
+    )
+
+
+def test_nonqualifying_medals_and_participation_do_not_change_crown_progress(
+    database: tuple[Session, sessionmaker[Session]],
+) -> None:
+    session, _ = database
+    _, contests, week = ensure_band_camp_data(session, now=NOW)
+    points = next(c for c in contests if c.key == "weekly-points-leaders")
+    instruments = next(c for c in contests if c.key == "weekly-practice-by-instrument")
+    profile = add_student(session, woodchuck_id="WC-NONQUALIFY", instrument="Flute")
+    week.status = "finalized"
+    week.finalized_at = FINAL_NOW
+    session.add_all([
+        ContestResult(
+            contest_week_id=week.id, contest_id=points.id, division="open",
+            subject_type="student", subject_key=str(profile.id), profile_id=profile.id,
+            display_name_snapshot="Nonqualifier", score=2, rank=2, medal="silver",
+        ),
+        ContestResult(
+            contest_week_id=week.id, contest_id=instruments.id, division="open",
+            subject_type="instrument", subject_key="flute", instrument="Flute",
+            display_name_snapshot="Flute", score=20, rank=3, medal="bronze",
+        ),
+    ])
+    session.flush()
+    session.add(RewardGrant(
+        profile_id=profile.id, source_key="participation-only",
+        reward_type="dandelion", amount=1,
+    ))
+    session.commit()
+
+    assert crown_progress_payload(session, profile_id=profile.id)[
+        "qualifying_wins"
+    ] == 0
+    assert session.scalar(select(func.count()).select_from(CrownProgress)) == 0
+
+
+def test_crown_progress_endpoint_authentication_and_privacy(
+    database: tuple[Session, sessionmaker[Session]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session, factory = database
+    profile = add_student(session, woodchuck_id="WC-CROWN-PRIVATE", instrument="Flute")
+    session.commit()
+    monkeypatch.setattr(contest_module, "SessionLocal", factory)
+
+    with pytest.raises(HTTPException) as unauthorized:
+        contest_module.current_crown_progress(request_with_session())
+    assert unauthorized.value.status_code == 401
+    payload = contest_module.current_crown_progress(request_with_session(profile.id))
+    assert set(payload) == {
+        "qualifying_wins", "target_wins", "remaining_wins", "earned", "earned_at"
+    }
+    serialized = repr(payload).casefold()
+    for private_field in (
+        "profile_id", "account_id", "woodchuck_id", "wc-crown-private",
+        "legal_name", "email", "pin", "verifier",
+    ):
+        assert private_field not in serialized

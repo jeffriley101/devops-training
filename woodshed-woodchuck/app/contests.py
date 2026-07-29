@@ -751,6 +751,34 @@ def hall_of_champions_payload(session: Session) -> dict[str, object]:
     return {"students": students, "instruments": instruments}
 
 
+def crown_progress_payload(
+    session: Session, *, profile_id: int
+) -> dict[str, object]:
+    points_contest = session.scalar(
+        select(Contest).where(Contest.key == "weekly-points-leaders")
+    )
+    crown_category = (
+        points_contest.crown_category or points_contest.key
+        if points_contest is not None
+        else "weekly-points-leaders"
+    )
+    progress = session.scalar(
+        select(CrownProgress).where(
+            CrownProgress.profile_id == profile_id,
+            CrownProgress.category_key == crown_category,
+        )
+    )
+    qualifying_wins = progress.qualifying_wins if progress is not None else 0
+    earned_at = progress.crown_earned_at if progress is not None else None
+    return {
+        "qualifying_wins": qualifying_wins,
+        "target_wins": 10,
+        "remaining_wins": max(10 - qualifying_wins, 0),
+        "earned": earned_at is not None,
+        "earned_at": utc_iso(earned_at),
+    }
+
+
 def current_contests_payload(
     session: Session,
     *,
@@ -856,6 +884,15 @@ def hall_of_champions(request: Request) -> dict[str, object]:
         if profile is None:
             raise HTTPException(status_code=401, detail="Student sign-in is required.")
         return hall_of_champions_payload(session)
+
+
+@router.get("/crown-progress")
+def current_crown_progress(request: Request) -> dict[str, object]:
+    with SessionLocal() as session:
+        profile = current_profile(request, session)
+        if profile is None:
+            raise HTTPException(status_code=401, detail="Student sign-in is required.")
+        return crown_progress_payload(session, profile_id=profile.id)
 
 
 @router.get("/weeks/{week_start}/results")

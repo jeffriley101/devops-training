@@ -1020,13 +1020,6 @@
     "March in place while clapping a steady four-beat pulse.",
   ];
 
-  const BAND_CAMP_CROWNS = {
-    hours: "Camp Commitment Crown",
-    care: "Instrument Care Crown",
-    trivia: "Trivia Crown",
-    marching: "Marching Challenge Crown",
-  };
-
   function wireBandCamp(state) {
     const playerNameEl = document.getElementById("board-player-name");
     if (!playerNameEl) return;
@@ -1057,15 +1050,6 @@
       "marching-challenge-status"
     );
 
-    const crownHoursEl = document.getElementById("crown-hours");
-    const crownCareEl = document.getElementById("crown-care");
-    const crownTriviaEl = document.getElementById("crown-trivia");
-    const crownMarchingEl = document.getElementById("crown-marching");
-
-    const pastWinnersList = document.getElementById(
-      "past-winners-list"
-    );
-    const championsList = document.getElementById("champions-list");
     const feedbackEl = document.getElementById("board-feedback");
 
     const today = stateApi.localDateKey();
@@ -1106,25 +1090,6 @@
       return current.bandCamp.daily.awarded.includes(contestKey);
     }
 
-    function addCrownIfEarned(current, contestKey) {
-      const wins = current.bandCamp.totals.wins[contestKey] || 0;
-
-      if (wins < 10) return;
-
-      const alreadyEarned = current.bandCamp.champions.some(
-        (entry) => entry.contest === contestKey
-      );
-
-      if (alreadyEarned) return;
-
-      current.bandCamp.champions.unshift({
-        contest: contestKey,
-        crown: BAND_CAMP_CROWNS[contestKey],
-        name: playerName(current),
-        earnedAt: today,
-      });
-    }
-
     function addDailyWinnerIfComplete(current) {
       const requiredContests = [
         "hours",
@@ -1163,7 +1128,6 @@
       current.bandCamp.totals.wins[contestKey] += 1;
       current.progress.credits += 1;
 
-      addCrownIfEarned(current, contestKey);
       addDailyWinnerIfComplete(current);
 
       return true;
@@ -1174,30 +1138,6 @@
 
       button.disabled = true;
       button.textContent = text;
-    }
-
-    function renderNameList(listEl, entries, emptyText, formatter) {
-      if (!listEl) return;
-
-      listEl.replaceChildren();
-
-      if (!entries.length) {
-        const item = document.createElement("li");
-        item.textContent = emptyText;
-        listEl.appendChild(item);
-        return;
-      }
-
-      entries.forEach((entry) => {
-        const item = document.createElement("li");
-        item.textContent = formatter(entry);
-        listEl.appendChild(item);
-      });
-    }
-
-    function crownText(wins, crownEarned) {
-      const progress = `${Math.min(wins, 10)}/10`;
-      return crownEarned ? `${progress} 👑` : progress;
     }
 
     function renderTriviaOptions(current) {
@@ -1226,9 +1166,7 @@
     function renderBoard(current) {
       const name = playerName(current);
       const points = current.bandCamp.totals.points;
-      const wins = current.bandCamp.totals.wins;
       const daily = current.bandCamp.daily;
-      const champions = current.bandCamp.champions;
 
       playerNameEl.textContent = name;
 
@@ -1299,49 +1237,6 @@
         marchingStatusEl.textContent = "Not completed today";
       }
 
-      if (crownHoursEl) {
-        crownHoursEl.textContent = crownText(
-          wins.hours,
-          champions.some((entry) => entry.contest === "hours")
-        );
-      }
-
-      if (crownCareEl) {
-        crownCareEl.textContent = crownText(
-          wins.care,
-          champions.some((entry) => entry.contest === "care")
-        );
-      }
-
-      if (crownTriviaEl) {
-        crownTriviaEl.textContent = crownText(
-          wins.trivia,
-          champions.some((entry) => entry.contest === "trivia")
-        );
-      }
-
-      if (crownMarchingEl) {
-        crownMarchingEl.textContent = crownText(
-          wins.marching,
-          champions.some((entry) => entry.contest === "marching")
-        );
-      }
-
-      renderNameList(
-        pastWinnersList,
-        current.bandCamp.pastWinners,
-        "No daily champion yet.",
-        (entry) =>
-          `${entry.name} — ${entry.dateKey} — ${entry.points} points`
-      );
-
-      renderNameList(
-        championsList,
-        champions,
-        "No crowns earned yet.",
-        (entry) =>
-          `${entry.name} — ${entry.crown} — ${entry.earnedAt}`
-      );
     }
 
     let current = prepareCurrentDay(stateApi.getState());
@@ -2136,6 +2031,110 @@
     });
     retryButton.addEventListener("click", loadChampions);
     loadChampions();
+  }
+
+  function wirePersonalCrownProgress() {
+    const roots = Array.from(
+      document.querySelectorAll(".personal-crown-progress")
+    );
+    if (!roots.length) return;
+
+    function showError(message) {
+      roots.forEach((root) => {
+        const loading = root.querySelector(".personal-crown-loading");
+        const error = root.querySelector(".personal-crown-error");
+        const content = root.querySelector(".personal-crown-content");
+        loading.classList.add("hidden");
+        content.classList.add("hidden");
+        error.textContent = message;
+        error.classList.remove("hidden");
+        root.setAttribute("aria-busy", "false");
+      });
+    }
+
+    function earnedDate(value) {
+      if (typeof value !== "string") return null;
+      const parsed = new Date(value);
+      if (Number.isNaN(parsed.getTime())) return null;
+      return parsed.toLocaleDateString(undefined, {
+        month: "long", day: "numeric", year: "numeric",
+      });
+    }
+
+    function render(progress) {
+      roots.forEach((root) => {
+        const loading = root.querySelector(".personal-crown-loading");
+        const error = root.querySelector(".personal-crown-error");
+        const content = root.querySelector(".personal-crown-content");
+        const status = root.querySelector(".personal-crown-status");
+        const count = root.querySelector(".personal-crown-count strong");
+        const meter = root.querySelector(".personal-crown-meter");
+        const remaining = root.querySelector(".personal-crown-remaining");
+        const date = root.querySelector(".personal-crown-earned-date");
+        const wins = progress.qualifying_wins;
+        const target = progress.target_wins;
+
+        count.textContent = `${wins} of ${target} wins`;
+        meter.value = Math.min(wins, target);
+        meter.textContent = `${wins} of ${target} qualifying wins`;
+        meter.setAttribute(
+          "aria-label",
+          `Crown progress: ${wins} of ${target} qualifying wins`
+        );
+        if (progress.earned) {
+          status.textContent = "👑 Permanent crown earned";
+          status.classList.add("personal-crown-earned");
+          remaining.textContent = "Permanent achievement — progress never resets.";
+          const formattedDate = earnedDate(progress.earned_at);
+          date.textContent = formattedDate ? `Earned ${formattedDate}` : "";
+          date.classList.toggle("hidden", !formattedDate);
+        } else {
+          status.textContent = "Keep going toward your permanent crown.";
+          status.classList.remove("personal-crown-earned");
+          const winsRemaining = progress.remaining_wins;
+          remaining.textContent = `${winsRemaining} qualifying ${winsRemaining === 1 ? "win" : "wins"} remain.`;
+          date.textContent = "";
+          date.classList.add("hidden");
+        }
+        loading.classList.add("hidden");
+        error.classList.add("hidden");
+        content.classList.remove("hidden");
+        root.setAttribute("aria-busy", "false");
+      });
+    }
+
+    async function loadProgress() {
+      try {
+        const response = await fetch("/contests/crown-progress", {
+          credentials: "same-origin",
+          headers: { Accept: "application/json" },
+        });
+        if (response.status === 401) {
+          showError("Sign in to view your crown progress.");
+          return;
+        }
+        if (!response.ok) {
+          showError("Crown progress is unavailable right now.");
+          return;
+        }
+        const payload = await response.json();
+        if (!payload ||
+            !Number.isInteger(payload.qualifying_wins) ||
+            payload.qualifying_wins < 0 ||
+            payload.target_wins !== 10 ||
+            !Number.isInteger(payload.remaining_wins) ||
+            payload.remaining_wins < 0 ||
+            typeof payload.earned !== "boolean") {
+          showError("Crown progress could not be read.");
+          return;
+        }
+        render(payload);
+      } catch (_error) {
+        showError("Crown progress is unavailable right now.");
+      }
+    }
+
+    loadProgress();
   }
 
   function wireStore(state) {
@@ -2952,6 +2951,7 @@
   wireBandCampStandings();
   wirePastWinners();
   wireHallOfChampions();
+  wirePersonalCrownProgress();
   wireStore(state);
   wirePBook(state);
 })();
