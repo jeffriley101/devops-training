@@ -40,6 +40,11 @@ class WeekCandidate:
 
 
 EMAIL_PATTERN = re.compile(r"\b[^\s@]+@[^\s@]+\.[^\s@]+\b")
+_latest_finalize_outcome: dict[str, object] | None = None
+
+
+def latest_finalize_outcome() -> dict[str, object] | None:
+    return dict(_latest_finalize_outcome) if _latest_finalize_outcome else None
 
 
 def _log(stream: TextIO, event: str, **fields: object) -> None:
@@ -61,7 +66,7 @@ def _safe_error_message(error: Exception) -> str:
     return message[:300]
 
 
-def _candidate_reason(candidate: WeekCandidate, now: datetime) -> str | None:
+def candidate_reason(candidate: WeekCandidate, now: datetime) -> str | None:
     if candidate.status == "finalized":
         return "already_finalized"
     if candidate.status != "open":
@@ -106,18 +111,19 @@ def run_finalize_due_weeks(
     stream: TextIO = sys.stdout,
     finalizer: Callable[..., ContestWeek] = finalize_contest_week,
 ) -> tuple[int, JobSummary]:
+    global _latest_finalize_outcome
     run_now = now or datetime.now(timezone.utc)
     if run_now.tzinfo is None or run_now.utcoffset() is None:
         raise ValueError("The job time must be timezone-aware.")
 
     _log(stream, "run_started", job="finalize_due_weeks", at=run_now.isoformat())
     candidates = _load_candidates(session_factory)
-    due = [candidate for candidate in candidates if _candidate_reason(candidate, run_now) is None]
+    due = [candidate for candidate in candidates if candidate_reason(candidate, run_now) is None]
     _log(stream, "due_weeks_found", count=len(due))
 
     skipped = 0
     for candidate in candidates:
-        reason = _candidate_reason(candidate, run_now)
+        reason = candidate_reason(candidate, run_now)
         if reason is None:
             continue
         skipped += 1
@@ -159,6 +165,11 @@ def run_finalize_due_weeks(
         due=len(due), finalized=finalized, skipped=skipped, failed=failed
     )
     _log(stream, "run_finished", **asdict(summary))
+    _latest_finalize_outcome = {
+        "at": run_now.isoformat(),
+        "exit_code": 1 if failed else 0,
+        **asdict(summary),
+    }
     return (1 if failed else 0), summary
 
 
