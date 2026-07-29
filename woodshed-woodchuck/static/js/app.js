@@ -3063,7 +3063,8 @@
         params.set("subject", subject);
         params.set("body", exportText);
 
-        const mailtoUrl = `mailto:${encodeURIComponent(teacherEmail)}?${params.toString()}`;
+        const mailtoQuery = params.toString().replace(/\+/g, "%20");
+        const mailtoUrl = `mailto:${encodeURIComponent(teacherEmail)}?${mailtoQuery}`;
         window.location.href = mailtoUrl;
       });
     }

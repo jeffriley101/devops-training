@@ -247,6 +247,10 @@ def test_authenticated_instrument_api_returns_only_public_instrument_data(
 
     assert set(payload) == {"updated", "instrument", "instrument_definition"}
     assert payload["instrument"] == "Tuba"
+    with factory() as session:
+        persisted = session.get(WoodchuckProfile, profile_id)
+        assert persisted is not None
+        assert persisted.instrument == "Tuba"
     serialized = repr(payload).casefold()
     for private_value in (
         "wc-private",

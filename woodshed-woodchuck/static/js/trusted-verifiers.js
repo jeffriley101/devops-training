@@ -137,8 +137,12 @@
     params.set("subject", subject);
     params.set("body", message);
 
+    // URLSearchParams uses form encoding, where spaces become "+". Some
+    // mail clients do not form-decode mailto query strings, so use the
+    // URI-safe space spelling. A real plus remains encoded as "%2B".
+    const mailtoQuery = params.toString().replace(/\+/g, "%20");
     const mailtoUrl =
-      `mailto:${encodeURIComponent(recipientEmail)}?${params.toString()}`;
+      `mailto:${encodeURIComponent(recipientEmail)}?${mailtoQuery}`;
 
     window.location.href = mailtoUrl;
   };

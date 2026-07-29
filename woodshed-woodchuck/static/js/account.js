@@ -364,6 +364,7 @@
         const state = stateApi.getState();
         select.value = state.profile.instrument || "";
         feedback.textContent = "";
+        feedback.classList.remove("error-text");
         select.focus();
       } else {
         openButton.focus();
@@ -384,6 +385,7 @@
       const instrument = select.value;
       const submitButton = form.querySelector("button[type='submit']");
       feedback.textContent = "Saving instrument…";
+      feedback.classList.remove("error-text");
       submitButton.disabled = true;
 
       try {
@@ -415,8 +417,10 @@
         }
         feedback.textContent = `Instrument changed to ${payload.instrument}.`;
       } catch (error) {
-        feedback.textContent =
-          error.message || "The instrument could not be changed.";
+        feedback.classList.add("error-text");
+        feedback.textContent = error instanceof TypeError
+          ? "The instrument could not be changed. Check your connection and try again."
+          : error.message || "The instrument could not be changed. Please try again.";
       } finally {
         submitButton.disabled = false;
       }

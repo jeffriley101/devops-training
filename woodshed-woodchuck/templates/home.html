@@ -172,7 +172,12 @@
         <option value="{{ item }}">{{ item }}</option>
         {% endfor %}
       </select>
-      <p id="change-instrument-feedback" class="body-copy" aria-live="polite"></p>
+      <p
+        id="change-instrument-feedback"
+        class="body-copy"
+        role="status"
+        aria-live="polite"
+      ></p>
       <div class="button-row">
         <button class="btn btn-primary" type="submit">Save Instrument</button>
         <button
