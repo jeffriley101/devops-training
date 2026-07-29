@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from copy import deepcopy
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 from fastapi import HTTPException
@@ -16,21 +17,28 @@ from app.contests import (
     current_contests,
     current_contests_payload,
     ensure_band_camp_data,
+    finalize_contest_week,
+    contest_results_payload,
     weekly_practice_by_instrument,
     weekly_student_points,
 )
 from app.db import Base
 from app.models import (
     Contest,
+    ContestResult,
     ContestWeek,
+    CrownProgress,
     PracticeChart,
     PracticeChartVerification,
+    RewardGrant,
     Season,
     WoodchuckProfile,
+    WoodchuckState,
 )
 
 
 NOW = datetime(2026, 7, 28, 15, tzinfo=timezone.utc)
+FINAL_NOW = datetime(2026, 8, 3, 18, tzinfo=timezone.utc)
 
 
 @pytest.fixture
@@ -481,3 +489,290 @@ def test_points_api_exposes_only_public_leaderboard_fields(
         "woodchuck_id",
     ):
         assert private_value not in serialized
+
+
+def ready_week(session: Session) -> ContestWeek:
+    _, _, week = ensure_band_camp_data(session, now=NOW)
+    week.verification_deadline_at = FINAL_NOW - timedelta(minutes=10)
+    week.finalize_after = FINAL_NOW - timedelta(minutes=5)
+    session.commit()
+    return week
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("week_end", date(2026, 8, 4), "has not ended"),
+        ("verification_deadline_at", FINAL_NOW, "deadline has not passed"),
+        ("finalize_after", FINAL_NOW, "time has not passed"),
+    ],
+)
+def test_finalization_timing_gates(
+    database: tuple[Session, sessionmaker[Session]],
+    field: str,
+    value: object,
+    message: str,
+) -> None:
+    session, _ = database
+    week = ready_week(session)
+    setattr(week, field, value)
+    session.commit()
+
+    with pytest.raises(HTTPException, match=message) as blocked:
+        finalize_contest_week(session, week_start=week.week_start, now=FINAL_NOW)
+
+    assert blocked.value.status_code == 409
+    assert week.status == "open"
+
+
+def test_finalization_requires_timezone_aware_now(
+    database: tuple[Session, sessionmaker[Session]],
+) -> None:
+    session, _ = database
+    week = ready_week(session)
+    with pytest.raises(ValueError, match="timezone-aware"):
+        finalize_contest_week(
+            session, week_start=week.week_start, now=FINAL_NOW.replace(tzinfo=None)
+        )
+
+
+def test_successful_finalization_medals_rewards_crown_and_idempotence(
+    database: tuple[Session, sessionmaker[Session]],
+) -> None:
+    session, _ = database
+    week = ready_week(session)
+    alpha = add_student(session, woodchuck_id="WC-FINAL-A", instrument="Flute")
+    beta = add_student(session, woodchuck_id="WC-FINAL-B", instrument="Clarinet")
+    gamma = add_student(session, woodchuck_id="WC-FINAL-C", instrument="Oboe")
+    delta = add_student(session, woodchuck_id="WC-FINAL-D", instrument="Bassoon")
+    for profile, count in ((alpha, 4), (beta, 3), (gamma, 2), (delta, 1)):
+        for _ in range(count):
+            add_chart(
+                session, profile=profile, practice_date=date(2026, 7, 29),
+                minutes=5, verification_status="approved" if profile != beta else None,
+            )
+    session.commit()
+
+    finalized = finalize_contest_week(session, week_start=week.week_start, now=FINAL_NOW)
+    session.commit()
+    first_results = [(r.id, r.rank, r.medal, r.score) for r in session.scalars(
+        select(ContestResult).order_by(ContestResult.id)
+    )]
+    first_grants = session.scalar(select(func.count()).select_from(RewardGrant))
+
+    finalize_contest_week(
+        session, week_start=week.week_start, now=FINAL_NOW + timedelta(hours=1)
+    )
+    session.commit()
+
+    assert finalized.status == "finalized"
+    assert finalized.finalized_at == FINAL_NOW
+    assert first_results == [(r.id, r.rank, r.medal, r.score) for r in session.scalars(
+        select(ContestResult).order_by(ContestResult.id)
+    )]
+    assert session.scalar(select(func.count()).select_from(RewardGrant)) == first_grants
+    point_results = session.scalars(select(ContestResult).join(Contest).where(
+        Contest.key == "weekly-points-leaders", ContestResult.division == "open"
+    ).order_by(ContestResult.rank)).all()
+    assert [(r.rank, r.medal) for r in point_results] == [
+        (1, "gold"), (2, "silver"), (3, "bronze")
+    ]
+    assert not any(
+        grant.profile_id in {beta.id, gamma.id}
+        and grant.source_key.endswith("gold")
+        for grant in session.scalars(select(RewardGrant))
+    )
+    crown = session.scalar(select(CrownProgress).where(CrownProgress.profile_id == alpha.id))
+    assert crown is not None and crown.qualifying_wins == 1
+
+
+def test_olympic_ties_and_open_verified_gold_pay_once(
+    database: tuple[Session, sessionmaker[Session]],
+) -> None:
+    session, _ = database
+    week = ready_week(session)
+    students = [
+        add_student(session, woodchuck_id=f"WC-TIED-{i}", instrument="Flute")
+        for i in range(3)
+    ]
+    for profile, count in zip(students, (2, 2, 1)):
+        for _ in range(count):
+            add_chart(session, profile=profile, practice_date=date(2026, 7, 30),
+                      minutes=5, verification_status="approved")
+    session.commit()
+    finalize_contest_week(session, week_start=week.week_start, now=FINAL_NOW)
+    session.commit()
+
+    rows = session.scalars(select(ContestResult).join(Contest).where(
+        Contest.key == "weekly-points-leaders", ContestResult.division == "open"
+    ).order_by(ContestResult.id)).all()
+    assert [(r.rank, r.medal) for r in rows] == [(1, "gold"), (1, "gold"), (3, "bronze")]
+    for student in students[:2]:
+        gold_grants = session.scalars(select(RewardGrant).where(
+            RewardGrant.profile_id == student.id,
+            RewardGrant.source_key.like("%:gold"),
+        )).all()
+        assert {grant.reward_type for grant in gold_grants} == {"dandelion", "crown_win"}
+        assert len(gold_grants) == 2
+        crown = session.scalar(select(CrownProgress).where(CrownProgress.profile_id == student.id))
+        assert crown is not None and crown.qualifying_wins == 1
+
+
+def test_tenth_win_sets_crown_once_and_progress_never_resets(
+    database: tuple[Session, sessionmaker[Session]],
+) -> None:
+    session, _ = database
+    week = ready_week(session)
+    student = add_student(session, woodchuck_id="WC-CROWN-10", instrument="Tuba")
+    contest = session.scalar(select(Contest).where(Contest.key == "weekly-points-leaders"))
+    assert contest is not None
+    session.add(CrownProgress(
+        profile_id=student.id, category_key=contest.crown_category or contest.key,
+        qualifying_wins=9,
+    ))
+    add_chart(session, profile=student, practice_date=date(2026, 7, 31), minutes=5)
+    session.commit()
+    finalize_contest_week(session, week_start=week.week_start, now=FINAL_NOW)
+    session.commit()
+    progress = session.scalar(select(CrownProgress).where(CrownProgress.profile_id == student.id))
+    assert progress is not None
+    earned_at = progress.crown_earned_at
+    assert progress.qualifying_wins == 10
+    assert contest_module.aware_utc(earned_at) == FINAL_NOW
+    finalize_contest_week(session, week_start=week.week_start, now=FINAL_NOW + timedelta(days=1))
+    session.commit()
+    assert progress.qualifying_wins == 10 and progress.crown_earned_at == earned_at
+
+
+def test_instrument_participation_threshold_and_division_deduplication(
+    database: tuple[Session, sessionmaker[Session]],
+) -> None:
+    session, _ = database
+    week = ready_week(session)
+    eligible = add_student(session, woodchuck_id="WC-PART-15", instrument="Flute")
+    short = add_student(session, woodchuck_id="WC-PART-14", instrument="Flute")
+    rival = add_student(session, woodchuck_id="WC-PART-R", instrument="Oboe")
+    add_chart(session, profile=eligible, practice_date=date(2026, 8, 1), minutes=15,
+              verification_status="approved")
+    add_chart(session, profile=short, practice_date=date(2026, 8, 1), minutes=14,
+              verification_status="approved")
+    add_chart(session, profile=rival, practice_date=date(2026, 8, 1), minutes=10,
+              verification_status="approved")
+    session.commit()
+    finalize_contest_week(session, week_start=week.week_start, now=FINAL_NOW)
+    session.commit()
+
+    participation = session.scalars(select(RewardGrant).where(
+        RewardGrant.source_key.like("%:participant:%")
+    )).all()
+    assert [(grant.profile_id, grant.amount) for grant in participation] == [(eligible.id, 1)]
+    assert all(grant.reward_type == "dandelion" and grant.category_key is None for grant in participation)
+
+
+def test_failure_rolls_back_every_finalization_change(
+    database: tuple[Session, sessionmaker[Session]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session, _ = database
+    week = ready_week(session)
+    student = add_student(session, woodchuck_id="WC-ROLLBACK", instrument="Flute")
+    session.add(WoodchuckState(profile_id=student.id, state_json={"progress": {"credits": 7}}, revision=4))
+    add_chart(session, profile=student, practice_date=date(2026, 8, 2), minutes=20)
+    session.commit()
+    before_state = deepcopy(session.get(WoodchuckState, student.id).state_json)
+    session.commit()
+
+    def fail_reward(*args: object, **kwargs: object) -> None:
+        raise RuntimeError("forced reward failure")
+
+    monkeypatch.setattr(contest_module, "_add_dandelion", fail_reward)
+    with pytest.raises(RuntimeError, match="forced"):
+        with session.begin():
+            finalize_contest_week(session, week_start=week.week_start, now=FINAL_NOW)
+
+    assert session.scalar(select(func.count()).select_from(ContestResult)) == 0
+    assert session.scalar(select(func.count()).select_from(RewardGrant)) == 0
+    assert session.scalar(select(func.count()).select_from(CrownProgress)) == 0
+    assert session.get(ContestWeek, week.id).status == "open"
+    assert session.get(WoodchuckState, student.id).state_json == before_state
+
+
+def test_results_are_immutable_private_and_preserve_historical_data(
+    database: tuple[Session, sessionmaker[Session]],
+) -> None:
+    session, _ = database
+    week = ready_week(session)
+    student = add_student(session, woodchuck_id="WC-SECRET-HIST", instrument="Flute")
+    student.display_name = "Original Public Name"
+    chart = add_chart(session, profile=student, practice_date=date(2026, 8, 2), minutes=20,
+                      verification_status="approved")
+    session.commit()
+    finalize_contest_week(session, week_start=week.week_start, now=FINAL_NOW)
+    session.commit()
+    before = contest_results_payload(session, week)
+    counts = {model: session.scalar(select(func.count()).select_from(model)) for model in (
+        WoodchuckProfile, PracticeChart, PracticeChartVerification, Season, ContestWeek
+    )}
+
+    student.display_name = "Changed Later"
+    chart.minutes = 999
+    verification = session.scalar(select(PracticeChartVerification).where(
+        PracticeChartVerification.practice_chart_id == chart.id
+    ))
+    assert verification is not None
+    verification.status = "rejected"
+    session.commit()
+    after = contest_results_payload(session, week)
+
+    assert after == before
+    serialized = repr(after).casefold()
+    assert "original public name" in serialized
+    for private in ("profile_id", "account_id", "woodchuck_id", "wc-secret-hist", "email", "pin", "verifier"):
+        assert private not in serialized
+    assert {model: session.scalar(select(func.count()).select_from(model)) for model in counts} == counts
+
+
+def test_manual_route_missing_invalid_token_and_results_authentication(
+    database: tuple[Session, sessionmaker[Session]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session, factory = database
+    week = ready_week(session)
+    profile = add_student(session, woodchuck_id="WC-AUTH", instrument="Flute")
+    session.commit()
+    monkeypatch.setattr(contest_module, "SessionLocal", factory)
+    request = request_with_session(profile.id)
+    request.scope["method"] = "POST"
+
+    monkeypatch.delenv("CONTEST_ADMIN_TOKEN", raising=False)
+    with pytest.raises(HTTPException) as missing:
+        contest_module.finalize_week_route(week.week_start, request)
+    assert missing.value.status_code == 503
+
+    monkeypatch.setenv("CONTEST_ADMIN_TOKEN", "correct-token")
+    with pytest.raises(HTTPException) as invalid:
+        contest_module.finalize_week_route(week.week_start, request)
+    assert invalid.value.status_code == 403
+
+    authorized_request = request_with_session(profile.id)
+    authorized_request.scope["method"] = "POST"
+    authorized_request.scope["headers"] = [
+        (b"x-contest-admin-token", b"correct-token")
+    ]
+    monkeypatch.setattr(
+        contest_module,
+        "finalize_contest_week",
+        lambda active_session, *, week_start, now: active_session.get(
+            ContestWeek, week.id
+        ),
+    )
+    authorized_payload = contest_module.finalize_week_route(
+        week.week_start, authorized_request
+    )
+    assert authorized_payload["week"]["week_start"] == week.week_start.isoformat()
+
+    with pytest.raises(HTTPException) as unauthorized:
+        contest_module.contest_week_results(week.week_start, request_with_session())
+    assert unauthorized.value.status_code == 401
+    payload = contest_module.contest_week_results(week.week_start, request_with_session(profile.id))
+    assert set(payload) == {"week", "results"}
