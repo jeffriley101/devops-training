@@ -39,8 +39,8 @@ CENTRAL = ZoneInfo(CENTRAL_TIMEZONE)
 CONTEST_DEFINITIONS = (
     {
         "key": "weekly-points-leaders",
-        "name": "Top Five Points Leaders",
-        "metric_type": "points",
+        "name": "Top Five Minutes Leaders",
+        "metric_type": "practice_minutes",
         "subject_type": "student",
         "crown_category": "weekly-points-leaders",
     },
@@ -119,6 +119,9 @@ def ensure_band_camp_data(
                 active=True,
             )
             session.add(contest)
+        else:
+            contest.name = definition["name"]
+            contest.metric_type = definition["metric_type"]
         contests.append(contest)
 
     contest_week = session.scalar(
@@ -208,11 +211,13 @@ def public_woodchuck_name(profile: WoodchuckProfile | None) -> str:
     return display_name or "Woodchuck"
 
 
-def student_points_rows(
+def student_score_rows(
     scores: dict[int, int],
     profiles: dict[int, WoodchuckProfile],
     *,
     current_profile_id: int,
+    score_key: str,
+    behind_key: str,
 ) -> tuple[list[dict[str, object]], dict[str, object]]:
     ordered = sorted(
         scores.items(),
@@ -225,15 +230,15 @@ def student_points_rows(
     all_rows: list[dict[str, object]] = []
     previous_score: int | None = None
     rank = 0
-    for position, (profile_id, total_points) in enumerate(ordered, start=1):
-        if total_points != previous_score:
+    for position, (profile_id, score) in enumerate(ordered, start=1):
+        if score != previous_score:
             rank = position
-            previous_score = total_points
+            previous_score = score
         all_rows.append(
             {
                 "rank": rank,
                 "display_name": public_woodchuck_name(profiles.get(profile_id)),
-                "total_points": total_points,
+                score_key: score,
                 "is_current_user": profile_id == current_profile_id,
             }
         )
@@ -247,13 +252,13 @@ def student_points_rows(
         None,
     )
     current_row = all_rows[current_index] if current_index is not None else None
-    leader_points = int(all_rows[0]["total_points"]) if all_rows else 0
-    current_points = int(current_row["total_points"]) if current_row else 0
+    leader_score = int(all_rows[0][score_key]) if all_rows else 0
+    current_score = int(current_row[score_key]) if current_row else 0
     current_rank = int(current_row["rank"]) if current_row else None
     tied = bool(
         current_row
         and sum(
-            row["total_points"] == current_row["total_points"]
+            row[score_key] == current_row[score_key]
             for row in all_rows
         ) > 1
     )
@@ -264,12 +269,42 @@ def student_points_rows(
 
     return visible_rows, {
         "rank": current_rank,
-        "total_points": current_points,
-        "points_behind_leader": max(leader_points - current_points, 0),
+        score_key: current_score,
+        behind_key: max(leader_score - current_score, 0),
         "tied": tied,
         "in_top_five": in_top_five,
         "has_score": current_row is not None,
     }
+
+
+def student_points_rows(
+    scores: dict[int, int],
+    profiles: dict[int, WoodchuckProfile],
+    *,
+    current_profile_id: int,
+) -> tuple[list[dict[str, object]], dict[str, object]]:
+    return student_score_rows(
+        scores,
+        profiles,
+        current_profile_id=current_profile_id,
+        score_key="total_points",
+        behind_key="points_behind_leader",
+    )
+
+
+def student_minutes_rows(
+    scores: dict[int, int],
+    profiles: dict[int, WoodchuckProfile],
+    *,
+    current_profile_id: int,
+) -> tuple[list[dict[str, object]], dict[str, object]]:
+    return student_score_rows(
+        scores,
+        profiles,
+        current_profile_id=current_profile_id,
+        score_key="total_minutes",
+        behind_key="minutes_behind_leader",
+    )
 
 
 def weekly_student_points(
@@ -283,10 +318,12 @@ def weekly_student_points(
     open_scores: dict[int, int] = {}
     verified_scores: dict[int, int] = {}
     for chart in charts:
-        open_scores[chart.profile_id] = open_scores.get(chart.profile_id, 0) + 1
+        open_scores[chart.profile_id] = (
+            open_scores.get(chart.profile_id, 0) + chart.minutes
+        )
         if chart.id in approved_chart_ids:
             verified_scores[chart.profile_id] = (
-                verified_scores.get(chart.profile_id, 0) + 1
+                verified_scores.get(chart.profile_id, 0) + chart.minutes
             )
 
     profile_ids = set(open_scores) | set(verified_scores)
@@ -296,12 +333,12 @@ def weekly_student_points(
             select(WoodchuckProfile).where(WoodchuckProfile.id.in_(profile_ids))
         ).all()
     } if profile_ids else {}
-    open_rows, open_position = student_points_rows(
+    open_rows, open_position = student_minutes_rows(
         open_scores,
         profiles,
         current_profile_id=current_profile_id,
     )
-    verified_rows, verified_position = student_points_rows(
+    verified_rows, verified_position = student_minutes_rows(
         verified_scores,
         profiles,
         current_profile_id=current_profile_id,
@@ -572,7 +609,7 @@ def finalize_contest_week(
         key, display = normalize_instrument(chart.instrument)
         for division in divisions:
             scores = point_scores[division]
-            scores[chart.profile_id] = scores.get(chart.profile_id, 0) + 1
+            scores[chart.profile_id] = scores.get(chart.profile_id, 0) + chart.minutes
             if key:
                 totals = instrument_totals[division]
                 prior = totals.get(key, (display, 0))

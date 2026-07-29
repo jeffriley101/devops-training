@@ -52,9 +52,17 @@
       : fallback;
   }
 
+  function teamLabel(label) {
+    const definition = getDefinition(label);
+    return definition && typeof definition.team_label === "string"
+      ? definition.team_label
+      : `The ${label}`;
+  }
+
   window.WWInstruments = {
     definitions,
     getDefinition,
+    teamLabel,
     renderInstrument,
   };
 })();

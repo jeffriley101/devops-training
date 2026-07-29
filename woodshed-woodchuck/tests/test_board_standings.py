@@ -3,6 +3,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.instruments import INSTRUMENT_DEFINITIONS
 
 
 TEMPLATE_PATH = Path(__file__).resolve().parents[1] / "templates" / "quest.html"
@@ -26,7 +27,7 @@ def test_board_contains_live_standings_markup() -> None:
     assert 'role="list"' in markup
     assert 'id="contest-open-points"' in markup
     assert 'id="contest-verified-points"' in markup
-    assert "Top Five Points Leaders" in markup
+    assert "Top Five Minutes Leaders" in markup
     assert "Weekly Practice Minutes by Instrument" in markup
     assert "Weekly Band Camp Points" in markup
     assert 'id="contest-open-camp-points"' in markup
@@ -99,7 +100,7 @@ def test_board_contains_past_winners_medal_board_states_and_navigation() -> None
     assert "No finalized Band Camp weeks yet." in markup
     assert "No podium results for this contest and division." in markup
     assert "Weekly Practice Minutes by Instrument" in markup
-    assert "Top Five Points Leaders" in markup
+    assert "Top Five Minutes Leaders" in markup
 
 
 def test_past_winners_keeps_live_board_standings_intact() -> None:
@@ -179,7 +180,7 @@ def test_shop_renders_accessible_personal_crown_progress() -> None:
     assert 'aria-label="Crown progress: 0 of 10 qualifying wins"' in shop
     assert "0 of 10 wins" in shop
     assert "10 qualifying wins remain." in shop
-    assert "Gold wins in Weekly Points Leaders qualify" in shop
+    assert "Gold wins in Top Five Minutes Leaders qualify" in shop
     assert "Silver, Bronze, and instrument participation do not count" in shop
     assert 'id="board-crown-title"' not in board
     assert 'id="shop-crown-title"' in shop
@@ -233,10 +234,34 @@ def test_live_scoreboard_javascript_uses_actual_ranks_and_preserves_ties() -> No
 
     assert "rank.textContent = String(row.rank)" in javascript
     assert "`Rank ${row.rank}, ${publicName}" in javascript
-    assert "`Rank ${row.rank}, ${row.instrument}" in javascript
+    assert "`Rank ${row.rank}, ${teamName || row.instrument}" in javascript
     assert "Math.min(row.rank, 4)" in javascript
     assert "position.tied === true" in javascript
     assert "position.in_top_five === false" in javascript
+    assert ': `${scoreValue} min`' in javascript
+    assert ': `${behind} min behind leader`' in javascript
+
+
+def test_instrument_standings_use_collective_team_labels() -> None:
+    javascript = (
+        Path(__file__).resolve().parents[1] / "static" / "js" / "app.js"
+    ).read_text(encoding="utf-8")
+    instruments = (
+        Path(__file__).resolve().parents[1] / "app" / "instruments.py"
+    ).read_text(encoding="utf-8")
+
+    assert "WWInstruments.teamLabel(row.instrument)" in javascript
+    assert "WWInstruments.teamLabel(subject)" in javascript
+    assert "WWInstruments.teamLabel(champion.instrument_label)" in javascript
+    for team_label in (
+        "The Clarinets", "The Tubas", "The Percussion",
+        "The Drum Majors", "The Color Guard",
+    ):
+        assert f'team_label="{team_label}"' in instruments
+    assert all(
+        isinstance(item["team_label"], str) and item["team_label"].startswith("The ")
+        for item in INSTRUMENT_DEFINITIONS
+    )
 
 
 def test_live_scoreboard_switching_refresh_and_retry_are_wired() -> None:

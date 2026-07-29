@@ -156,6 +156,11 @@ def test_band_camp_records_are_created_idempotently(
         "weekly-practice-by-instrument",
         "weekly-camp-points",
     }
+    minutes = next(
+        contest for contest in second[1] if contest.key == "weekly-points-leaders"
+    )
+    assert minutes.name == "Top Five Minutes Leaders"
+    assert minutes.metric_type == "practice_minutes"
 
 
 def test_camp_point_activities_persist_once_and_aggregate_separately(
@@ -222,7 +227,7 @@ def test_camp_points_do_not_include_p_charts_or_practice_minutes(
     payload = current_contests_payload(
         session, now=NOW, current_profile_id=student.id
     )["standings"]
-    assert payload["weekly-points-leaders"]["open"][0]["total_points"] == 1
+    assert payload["weekly-points-leaders"]["open"][0]["total_minutes"] == 45
     assert payload["weekly-practice-by-instrument"]["open"][0]["total_minutes"] == 45
     assert payload["weekly-camp-points"]["open"][0]["total_points"] == 1
 
@@ -457,21 +462,21 @@ def test_student_points_rankings_and_current_user_position(
     assert standings["open"][-1] == {
         "rank": 6,
         "display_name": "Foxtrot Chuck",
-        "total_points": 2,
+        "total_minutes": 20,
         "is_current_user": True,
     }
     assert standings["current_user_position"]["open"] == {
         "rank": 6,
-        "total_points": 2,
-        "points_behind_leader": 5,
+        "total_minutes": 20,
+        "minutes_behind_leader": 50,
         "tied": False,
         "in_top_five": False,
         "has_score": True,
     }
-    assert standings["current_user_position"]["verified"]["total_points"] == 1
+    assert standings["current_user_position"]["verified"]["total_minutes"] == 10
     assert all(
         set(row) == {
-            "rank", "display_name", "total_points", "is_current_user"
+            "rank", "display_name", "total_minutes", "is_current_user"
         }
         for division in ("open", "verified")
         for row in standings[division]
@@ -510,18 +515,18 @@ def test_student_points_use_olympic_ties_and_separate_divisions(
         current_profile_id=beta.id,
     )
 
-    assert [(row["rank"], row["display_name"], row["total_points"]) for row in standings["open"]] == [
-        (1, "Alpha", 2),
-        (1, "Beta", 2),
-        (3, "Gamma", 1),
+    assert [(row["rank"], row["display_name"], row["total_minutes"]) for row in standings["open"]] == [
+        (1, "Alpha", 30),
+        (1, "Beta", 30),
+        (3, "Gamma", 15),
     ]
-    assert [(row["display_name"], row["total_points"]) for row in standings["verified"]] == [
-        ("Alpha", 2),
-        ("Beta", 1),
+    assert [(row["display_name"], row["total_minutes"]) for row in standings["verified"]] == [
+        ("Alpha", 30),
+        ("Beta", 15),
     ]
     assert standings["current_user_position"]["open"]["tied"] is True
-    assert standings["current_user_position"]["open"]["points_behind_leader"] == 0
-    assert standings["current_user_position"]["verified"]["points_behind_leader"] == 1
+    assert standings["current_user_position"]["open"]["minutes_behind_leader"] == 0
+    assert standings["current_user_position"]["verified"]["minutes_behind_leader"] == 15
 
 
 def test_student_points_missing_score_and_name_use_safe_public_values(
@@ -549,8 +554,8 @@ def test_student_points_missing_score_and_name_use_safe_public_values(
     assert standings["open"][0]["display_name"] == "Woodchuck"
     assert standings["current_user_position"]["open"] == {
         "rank": None,
-        "total_points": 0,
-        "points_behind_leader": 1,
+        "total_minutes": 0,
+        "minutes_behind_leader": 20,
         "tied": False,
         "in_top_five": False,
         "has_score": False,
@@ -585,7 +590,7 @@ def test_points_api_exposes_only_public_leaderboard_fields(
     assert points["open"][0] == {
         "rank": 1,
         "display_name": "Public Chuck",
-        "total_points": 1,
+        "total_minutes": 25,
         "is_current_user": True,
     }
     serialized = repr(points).casefold()
@@ -686,6 +691,7 @@ def test_successful_finalization_medals_rewards_crown_and_idempotence(
     assert [(r.rank, r.medal) for r in point_results] == [
         (1, "gold"), (2, "silver"), (3, "bronze")
     ]
+    assert [result.score for result in point_results] == [20, 15, 10]
     assert not any(
         grant.profile_id in {beta.id, gamma.id}
         and grant.source_key.endswith("gold")
@@ -693,6 +699,42 @@ def test_successful_finalization_medals_rewards_crown_and_idempotence(
     )
     crown = session.scalar(select(CrownProgress).where(CrownProgress.profile_id == alpha.id))
     assert crown is not None and crown.qualifying_wins == 1
+
+
+def test_existing_finalized_student_scores_are_not_rewritten(
+    database: tuple[Session, sessionmaker[Session]],
+) -> None:
+    session, _ = database
+    _, contests, week = ensure_band_camp_data(session, now=NOW)
+    student = add_student(session, woodchuck_id="WC-HIST-MIN", instrument="Flute")
+    contest = next(item for item in contests if item.key == "weekly-points-leaders")
+    week.status = "finalized"
+    week.finalized_at = FINAL_NOW
+    historical = ContestResult(
+        contest_week_id=week.id,
+        contest_id=contest.id,
+        division="open",
+        subject_type="student",
+        subject_key=str(student.id),
+        profile_id=student.id,
+        display_name_snapshot="Historical Woodchuck",
+        score=3,
+        rank=1,
+        medal="gold",
+    )
+    session.add(historical)
+    session.commit()
+
+    current_contests_payload(session, now=NOW, current_profile_id=student.id)
+    session.refresh(historical)
+
+    assert historical.score == 3
+    assert historical.rank == 1
+    assert historical.medal == "gold"
+    assert contest_results_payload(session, week)["results"][0]["contest"] == {
+        "key": "weekly-points-leaders",
+        "name": "Top Five Minutes Leaders",
+    }
 
 
 def test_camp_points_finalize_once_with_medals_reward_and_no_crown(
@@ -1403,7 +1445,7 @@ def test_open_p_chart_submission_is_idempotent_listed_and_updates_standings(
     )
     points = payload["standings"]["weekly-points-leaders"]
     instruments = payload["standings"]["weekly-practice-by-instrument"]
-    assert points["open"][0]["total_points"] == 1
+    assert points["open"][0]["total_minutes"] == 35
     assert points["verified"] == []
     assert instruments["open"] == [
         {"rank": 1, "instrument": "Tuba", "total_minutes": 35}
@@ -1423,7 +1465,7 @@ def test_open_p_chart_submission_is_idempotent_listed_and_updates_standings(
     approved_instruments = approved_payload[
         "standings"
     ]["weekly-practice-by-instrument"]
-    assert approved_points["verified"][0]["total_points"] == 1
+    assert approved_points["verified"][0]["total_minutes"] == 35
     assert approved_instruments["verified"] == [
         {"rank": 1, "instrument": "Tuba", "total_minutes": 35}
     ]

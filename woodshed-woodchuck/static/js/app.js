@@ -1500,12 +1500,14 @@
         : [];
 
       safeRows.forEach((row) => {
+        const teamName = window.WWInstruments &&
+          window.WWInstruments.teamLabel(row.instrument);
         const rankedRow = document.createElement("article");
         rankedRow.className = `contest-ranked-row contest-rank-${Math.min(row.rank, 4)}`;
         rankedRow.setAttribute("role", "listitem");
         rankedRow.setAttribute(
           "aria-label",
-          `Rank ${row.rank}, ${row.instrument}, ${row.total_minutes} practice minutes`
+          `Rank ${row.rank}, ${teamName || row.instrument}, ${row.total_minutes} practice minutes`
         );
         const rank = document.createElement("span");
         rank.className = "contest-rank-badge";
@@ -1517,7 +1519,7 @@
         const icon = definition && definition.fallback_symbol
           ? definition.fallback_symbol
           : "♪";
-        subject.textContent = `${icon} ${row.instrument}`;
+        subject.textContent = `${icon} ${teamName || row.instrument}`;
         const score = document.createElement("strong");
         score.className = "contest-ranked-score";
         score.textContent = `${row.total_minutes} min`;
@@ -1545,23 +1547,30 @@
           return "No Camp points yet · Complete a Band Camp activity to join the board.";
         }
         return division === "verified"
-          ? "No verified points yet · Approved P-Charts appear here."
-          : "No Open points yet · Submit a P-Chart to join the board.";
+          ? "No verified minutes yet · Approved P-Charts appear here."
+          : "No Open minutes yet · Submit a P-Chart to join the board.";
       }
       if (!Number.isInteger(position.rank) || position.rank < 1) {
         return "Your position is unavailable.";
       }
+      const score = campPoints ? position.total_points : position.total_minutes;
+      const behind = campPoints
+        ? position.points_behind_leader
+        : position.minutes_behind_leader;
       const parts = [
         position.tied === true
           ? `Tied for ${ordinal(position.rank)}`
           : `Rank ${position.rank}`,
-        `${position.total_points} ${campPoints ? "Camp " : ""}${position.total_points === 1 ? "point" : "points"}`,
+        campPoints
+          ? `${score} Camp ${score === 1 ? "point" : "points"}`
+          : `${score} min`,
       ];
       if (position.rank === 1) {
         parts.push("Leading the board");
-      } else if (Number.isInteger(position.points_behind_leader)) {
-        const behind = position.points_behind_leader;
-        parts.push(`${behind} ${behind === 1 ? "point" : "points"} behind leader`);
+      } else if (Number.isInteger(behind)) {
+        parts.push(campPoints
+          ? `${behind} Camp ${behind === 1 ? "point" : "points"} behind leader`
+          : `${behind} min behind leader`);
       }
       if (position.in_top_five === false) parts.push("Outside Top Five");
       return parts.join(" · ");
@@ -1586,13 +1595,14 @@
             row.rank > 0 &&
             typeof row.display_name === "string" &&
             row.display_name.trim() &&
-            Number.isInteger(row.total_points) &&
-            row.total_points >= 0 &&
+            Number.isInteger(campPoints ? row.total_points : row.total_minutes) &&
+            (campPoints ? row.total_points : row.total_minutes) >= 0 &&
             typeof row.is_current_user === "boolean"
           ))
         : [];
 
       safeRows.forEach((row) => {
+        const scoreValue = campPoints ? row.total_points : row.total_minutes;
         const rankedRow = document.createElement("article");
         rankedRow.className = `contest-ranked-row contest-rank-${Math.min(row.rank, 4)}`;
         rankedRow.setAttribute("role", "listitem");
@@ -1604,7 +1614,7 @@
           : row.display_name;
         rankedRow.setAttribute(
           "aria-label",
-          `Rank ${row.rank}, ${publicName}, ${row.total_points} ${campPoints ? "Camp points" : "P-Chart points"}`
+          `Rank ${row.rank}, ${publicName}, ${scoreValue} ${campPoints ? "Camp points" : "practice minutes"}`
         );
         const rank = document.createElement("span");
         rank.className = "contest-rank-badge";
@@ -1615,8 +1625,8 @@
         const score = document.createElement("strong");
         score.className = "contest-ranked-score";
         score.textContent = campPoints
-          ? `${row.total_points} Camp ${row.total_points === 1 ? "point" : "points"}`
-          : `${row.total_points} pts`;
+          ? `${scoreValue} Camp ${scoreValue === 1 ? "point" : "points"}`
+          : `${scoreValue} min`;
         rankedRow.append(rank, subject, score);
         list.appendChild(rankedRow);
       });
@@ -1883,7 +1893,10 @@
         const subjectBlock = document.createElement("div");
         subjectBlock.className = "medal-row-subject";
         const name = document.createElement("strong");
-        name.textContent = isStudent ? subject : `🎵 ${subject}`;
+        const teamName = !isStudent && window.WWInstruments
+          ? window.WWInstruments.teamLabel(subject)
+          : null;
+        name.textContent = isStudent ? subject : `🎵 ${teamName || subject}`;
         const rank = document.createElement("small");
         rank.textContent = `${medal.label} · Rank ${result.rank}`;
         subjectBlock.append(name, rank);
@@ -1891,9 +1904,7 @@
         score.className = "medal-row-score";
         score.textContent = type === "camp-points"
           ? `${result.score} Camp ${result.score === 1 ? "point" : "points"}`
-          : isStudent
-            ? `${result.score} ${result.score === 1 ? "point" : "points"}`
-            : `${result.score} min`;
+          : `${result.score} min`;
         row.append(icon, subjectBlock, score);
         rowsEl.appendChild(row);
       });
@@ -1996,7 +2007,7 @@
     function championName(champion, type) {
       return type === "students"
         ? champion.display_name
-        : champion.instrument_label;
+        : (window.WWInstruments.teamLabel(champion.instrument_label) || champion.instrument_label);
     }
 
     function sortedChampions(type) {
@@ -2043,7 +2054,7 @@
         const name = document.createElement("strong");
         name.textContent = type === "students"
           ? champion.display_name
-          : `${champion.instrument_icon} ${champion.instrument_label}`;
+          : `${champion.instrument_icon} ${window.WWInstruments.teamLabel(champion.instrument_label) || champion.instrument_label}`;
         const total = document.createElement("span");
         total.className = "champion-podium-total";
         total.textContent = `${counts.total} podium${counts.total === 1 ? "" : "s"}`;
