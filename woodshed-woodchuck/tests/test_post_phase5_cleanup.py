@@ -95,8 +95,8 @@ def test_shed_book_and_board_cleanup_markup_and_behavior() -> None:
 
     assert "Manage Trusted Verifiers" not in home
     assert book.index("Manage Trusted Verifiers") > book.index('id="p-book-verifier"')
-    for label in ("Change Instrument", "Change Name", "Change Level"):
-        assert label in home
+    for trigger in ("woodchuck-name-value", "level-value", "instrument-object"):
+        assert f'id="{trigger}"' in home
     for label in ("Submit to Log Book", "Copy to Clipboard", "Email Your Chart"):
         assert label in book
     assert "btn-book-copy" in book and ".btn-book-copy" in css

@@ -13,13 +13,17 @@
 
     <div class="woodshed-foreground" aria-label="Clickable Woodshed objects">
       <div class="woodshed-object-column woodshed-object-column-left">
-        <div
+        <button
           id="woodchuck-name-value"
-          class="shed-readout shed-readout-name"
-          title="Woodchuck name"
+          class="shed-readout shed-readout-name shed-profile-field"
+          type="button"
+          aria-controls="change-name-panel"
+          aria-expanded="false"
+          aria-label="Change Woodchuck name"
+          title="Change Woodchuck name"
         >
           Name your Woodchuck
-        </div>
+        </button>
 
         <div
           id="camp-level-value"
@@ -29,23 +33,29 @@
           Chuckling
         </div>
 
-        <div
+        <button
           id="instrument-object"
-          class="shed-icon-object"
-          role="img"
-          aria-label="Instrument"
-          title="Instrument"
+          class="shed-icon-object shed-profile-field"
+          type="button"
+          aria-controls="change-instrument-panel"
+          aria-expanded="false"
+          aria-label="Change instrument"
+          title="Change instrument"
         >
           ♪
-        </div>
+        </button>
 
-        <div
+        <button
           id="level-value"
-          class="shed-readout shed-readout-level"
-          title="Level"
+          class="shed-readout shed-readout-level shed-profile-field"
+          type="button"
+          aria-controls="change-level-panel"
+          aria-expanded="false"
+          aria-label="Change student level"
+          title="Change student level"
         >
-          #1
-        </div>
+          Beginner
+        </button>
 
         <a
           id="p-book"
@@ -137,20 +147,6 @@
         </button>
       </div>
     </div>
-  </div>
-
-  <div class="shed-edit-profile-row">
-    <button
-      id="change-instrument-open-button"
-      class="shed-edit-profile-button"
-      type="button"
-      aria-controls="change-instrument-panel"
-      aria-expanded="false"
-    >
-      Change Instrument
-    </button>
-    <button id="change-name-open-button" class="shed-edit-profile-button" type="button" aria-controls="change-name-panel" aria-expanded="false">Change Name</button>
-    <button id="change-level-open-button" class="shed-edit-profile-button" type="button" aria-controls="change-level-panel" aria-expanded="false">Change Level</button>
   </div>
 
   <section
@@ -311,7 +307,7 @@
     </div>
 
     <p id="metronome-status" class="metronome-status" aria-live="polite">
-      Stopped at 100 BPM. Beat one is accented.
+      Stopped at 100 BPM.
     </p>
   </section>
 
@@ -405,14 +401,5 @@
     </button>
   </section>
 
-  <p class="support-line">
-    <a
-      href="https://venmo.com/u/jeffriley101"
-      target="_blank"
-      rel="noopener noreferrer"
-    >
-      Please Support the Shed Project!
-    </a>
-  </p>
 </section>
 {% endblock %}

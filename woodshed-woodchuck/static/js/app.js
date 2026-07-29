@@ -2,6 +2,23 @@
   const stateApi = window.WWState;
   if (!stateApi) return;
 
+  function celebrateSuccess(origin) {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const burst = document.createElement("div");
+    burst.className = "success-confetti";
+    burst.setAttribute("aria-hidden", "true");
+    const colors = ["#f4d35e", "#ee964b", "#f95738", "#74c0fc", "#90be6d"];
+    for (let index = 0; index < 24; index += 1) {
+      const piece = document.createElement("span");
+      piece.style.setProperty("--confetti-x", `${(index % 8) * 12 - 42}vw`);
+      piece.style.setProperty("--confetti-delay", `${(index % 6) * 30}ms`);
+      piece.style.backgroundColor = colors[index % colors.length];
+      burst.appendChild(piece);
+    }
+    document.body.appendChild(burst);
+    window.setTimeout(() => burst.remove(), 1400);
+  }
+
   function parseJsonFromId(id, fallback) {
     const el = document.getElementById(id);
     if (!el) return fallback;
@@ -164,12 +181,15 @@
 
     const dandelions = state.progress.credits ?? 0;
     const streak = state.progress.streak ?? 0;
-    const gameLevel = state.progress.level ?? 1;
     const instrument = state.profile.instrument || "Instrument not set";
 
     if (woodchuckNameEl) {
       woodchuckNameEl.textContent =
         state.profile.woodchuckName || "Name your Woodchuck";
+      woodchuckNameEl.setAttribute(
+        "aria-label",
+        `Change Woodchuck name. Current name: ${state.profile.woodchuckName || "not set"}`
+      );
     }
 
     if (campLevelEl) {
@@ -184,11 +204,20 @@
         instrumentObjectEl.title = instrument;
         instrumentObjectEl.setAttribute("aria-label", instrument);
       }
+      instrumentObjectEl.setAttribute(
+        "aria-label",
+        `Change instrument. Current instrument: ${instrument}`
+      );
+      instrumentObjectEl.title = "Change instrument";
     }
 
     if (levelEl) {
-      levelEl.textContent = `#${gameLevel}`;
-      levelEl.setAttribute("aria-label", `Level ${gameLevel}`);
+      const profileLevel = state.profile.level || "Level not set";
+      levelEl.textContent = profileLevel;
+      levelEl.setAttribute(
+        "aria-label",
+        `Change student level. Current level: ${profileLevel}`
+      );
     }
 
     if (streakEl) {
@@ -728,7 +757,7 @@
 
       if (status && !isRunning) {
         status.textContent =
-          `Stopped at ${bpm} BPM. Beat one is accented.`;
+          `Stopped at ${bpm} BPM.`;
       }
     }
 
@@ -758,18 +787,14 @@
         if (!isRunning) return;
 
         beatNumber.textContent = String(beat + 1);
-        pulse.classList.remove("is-active", "is-accent");
+        pulse.classList.remove("is-active");
 
         void pulse.offsetWidth;
 
         pulse.classList.add("is-active");
 
-        if (beat === 0) {
-          pulse.classList.add("is-accent");
-        }
-
         queueVisualUpdate(function () {
-          pulse.classList.remove("is-active", "is-accent");
+          pulse.classList.remove("is-active");
         }, 110);
       }, delay);
     }
@@ -779,17 +804,12 @@
 
       const oscillator = audioContext.createOscillator();
       const gain = audioContext.createGain();
-      const isAccent = beat === 0;
-
       oscillator.type = "sine";
-      oscillator.frequency.setValueAtTime(
-        isAccent ? 1250 : 850,
-        scheduledTime
-      );
+      oscillator.frequency.setValueAtTime(850, scheduledTime);
 
       gain.gain.setValueAtTime(0.0001, scheduledTime);
       gain.gain.exponentialRampToValueAtTime(
-        isAccent ? 0.24 : 0.14,
+        0.14,
         scheduledTime + 0.003
       );
       gain.gain.exponentialRampToValueAtTime(
@@ -849,7 +869,7 @@
 
       if (status) {
         status.textContent =
-          `Playing at ${bpm} BPM. Beat one is accented.`;
+          `Playing at ${bpm} BPM.`;
       }
     }
 
@@ -864,7 +884,7 @@
       clearVisualTimers();
 
       if (pulse) {
-        pulse.classList.remove("is-active", "is-accent");
+        pulse.classList.remove("is-active");
       }
 
       if (beatNumber) {
@@ -876,7 +896,7 @@
 
       if (status) {
         status.textContent =
-          `Stopped at ${bpm} BPM. Beat one is accented.`;
+          `Stopped at ${bpm} BPM.`;
       }
     }
 
@@ -1370,7 +1390,10 @@
 
         if (isCorrect) {
           try {
-            await persistCampPoint("trivia");
+            const persistedAward = await persistCampPoint("trivia");
+            if (persistedAward && persistedAward.created === true) {
+              celebrateSuccess(triviaForm);
+            }
           } catch (error) {
             feedbackEl.textContent = error.message || "Camp points could not be saved.";
             return;
@@ -2414,6 +2437,46 @@
     renderStore(ensureInventoryShape(state));
   }
 
+  function wireShopPolish() {
+    const door = document.getElementById("practice-room-door");
+    const panel = document.getElementById("practice-room-panel");
+    if (door && panel) {
+      door.addEventListener("click", function () {
+        const opening = panel.hidden;
+        panel.hidden = !opening;
+        panel.classList.toggle("hidden", !opening);
+        door.setAttribute("aria-expanded", String(opening));
+        if (opening) panel.querySelector("h3").focus({ preventScroll: true });
+      });
+    }
+
+    const qrButton = document.getElementById("shop-qr-copy");
+    const qrStatus = document.getElementById("shop-qr-status");
+    if (qrButton && qrStatus) {
+      qrButton.addEventListener("click", async function () {
+        const address = qrButton.dataset.publicSiteUrl;
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(address);
+          } else {
+            const fallback = document.createElement("textarea");
+            fallback.value = address;
+            fallback.setAttribute("readonly", "");
+            fallback.className = "sr-only";
+            document.body.appendChild(fallback);
+            fallback.select();
+            const copied = document.execCommand("copy");
+            fallback.remove();
+            if (!copied) throw new Error("Clipboard unavailable");
+          }
+          qrStatus.textContent = "Website address copied";
+        } catch (_error) {
+          qrStatus.textContent = `Copy this website address: ${address}`;
+        }
+      });
+    }
+  }
+
   function wirePBook(state) {
     const form = document.getElementById("p-book-form");
     if (!form) return;
@@ -3033,6 +3096,9 @@
         if (!serverChart || !Number.isInteger(serverChart.id)) {
           throw new Error("The saved P-Chart response could not be read.");
         }
+        if (createdPayload.created === true) {
+          celebrateSuccess(form);
+        }
 
         next.progress.credits =
           (next.progress.credits || 0) +
@@ -3138,5 +3204,6 @@
   wireHallOfChampions();
   wirePersonalCrownProgress();
   wireStore(state);
+  wireShopPolish();
   wirePBook(state);
 })();

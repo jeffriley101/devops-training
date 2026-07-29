@@ -35,6 +35,8 @@ def create_woodchuck_profile(
 
     if not instrument or not level or not goal:
         raise ValueError("Instrument, level, and goal are required.")
+    if level not in LEVEL_OPTIONS:
+        raise ValueError("Choose a supported level.")
 
     if not is_valid_pin(pin):
         raise ValueError("PIN must contain exactly four digits.")
@@ -154,6 +156,8 @@ def update_profile_level(
     now: datetime | None = None,
 ) -> WoodchuckProfile:
     value = level.strip()
+    if value == profile.level:
+        return profile
     if value not in LEVEL_OPTIONS:
         raise ValueError("Choose a supported level.")
     return _update_profile_field(

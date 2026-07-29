@@ -1,5 +1,11 @@
 import os
+import base64
+from io import BytesIO
 from pathlib import Path
+from urllib.parse import urlsplit, urlunsplit
+
+import qrcode
+import qrcode.image.svg
 
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import RedirectResponse
@@ -79,6 +85,23 @@ def _render(request: Request, template_name: str, **context: object):
             **context,
         },
     )
+
+
+def public_site_url(request: Request) -> str:
+    candidate = os.getenv("PUBLIC_BASE_URL", "").strip() or str(request.base_url)
+    parsed = urlsplit(candidate)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise ValueError("PUBLIC_BASE_URL must be an absolute HTTP or HTTPS URL.")
+    path = parsed.path.rstrip("/") + "/"
+    return urlunsplit((parsed.scheme, parsed.netloc, path, "", ""))
+
+
+def qr_data_uri(value: str) -> str:
+    image = qrcode.make(value, image_factory=qrcode.image.svg.SvgPathImage)
+    output = BytesIO()
+    image.save(output)
+    encoded = base64.b64encode(output.getvalue()).decode("ascii")
+    return f"data:image/svg+xml;base64,{encoded}"
 
 
 @app.get("/")
@@ -215,4 +238,8 @@ def quest(request: Request):
 
 @app.get("/store")
 def store(request: Request):
-    return _render(request, "store.html", title="shop", active_nav="store")
+    site_url = public_site_url(request)
+    return _render(
+        request, "store.html", title="shop", active_nav="store",
+        public_site_url=site_url, public_site_qr=qr_data_uri(site_url),
+    )

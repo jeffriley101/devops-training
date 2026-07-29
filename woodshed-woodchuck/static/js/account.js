@@ -345,7 +345,7 @@
 
   function wireInstrumentChange() {
     const openButton = document.getElementById(
-      "change-instrument-open-button"
+      "instrument-object"
     );
     const panel = document.getElementById("change-instrument-panel");
     const form = document.getElementById("change-instrument-form");
@@ -414,6 +414,11 @@
             instrumentObject,
             payload.instrument
           );
+          instrumentObject.setAttribute(
+            "aria-label",
+            `Change instrument. Current instrument: ${payload.instrument}`
+          );
+          instrumentObject.title = "Change instrument";
         }
         feedback.textContent = `Instrument changed to ${payload.instrument}.`;
       } catch (error) {
@@ -427,8 +432,8 @@
     });
   }
 
-  function wireProfileChange({ kind, endpoint, stateKey, payloadKey }) {
-    const openButton = document.getElementById(`change-${kind}-open-button`);
+  function wireProfileChange({ kind, endpoint, stateKey, payloadKey, triggerId }) {
+    const openButton = document.getElementById(triggerId);
     const panel = document.getElementById(`change-${kind}-panel`);
     const form = document.getElementById(`change-${kind}-form`);
     const input = form && form.querySelector("input, select");
@@ -442,7 +447,11 @@
       openButton.focus();
     }
     openButton.addEventListener("click", function () {
-      input.value = stateApi.getState().profile[stateKey] || "";
+      const currentValue = stateApi.getState().profile[stateKey] || "";
+      if (input instanceof HTMLSelectElement && currentValue && !Array.from(input.options).some((option) => option.value === currentValue)) {
+        input.prepend(new Option(`${currentValue} (current saved level)`, currentValue));
+      }
+      input.value = currentValue;
       feedback.textContent = "";
       feedback.classList.remove("error-text");
       panel.hidden = false;
@@ -473,8 +482,13 @@
         next.profile[stateKey] = payload[payloadKey];
         stateApi.saveState(next);
         feedback.textContent = `${kind === "name" ? "Name" : "Level"} changed successfully.`;
-        const display = document.getElementById(kind === "name" ? "woodchuck-name-value" : "profile-level-value");
-        if (display) display.textContent = payload[payloadKey];
+        openButton.textContent = payload[payloadKey];
+        openButton.setAttribute(
+          "aria-label",
+          kind === "name"
+            ? `Change Woodchuck name. Current name: ${payload[payloadKey]}`
+            : `Change student level. Current level: ${payload[payloadKey]}`
+        );
       } catch (error) {
         feedback.classList.add("error-text");
         feedback.textContent = error.message || `The ${kind} could not be changed.`;
@@ -487,8 +501,8 @@
   wireCreateAccount();
   wireLogin();
   wireInstrumentChange();
-  wireProfileChange({ kind: "name", endpoint: "/account/profile/name", stateKey: "woodchuckName", payloadKey: "display_name" });
-  wireProfileChange({ kind: "level", endpoint: "/account/profile/level", stateKey: "level", payloadKey: "level" });
+  wireProfileChange({ kind: "name", endpoint: "/account/profile/name", stateKey: "woodchuckName", payloadKey: "display_name", triggerId: "woodchuck-name-value" });
+  wireProfileChange({ kind: "level", endpoint: "/account/profile/level", stateKey: "level", payloadKey: "level", triggerId: "level-value" });
 })();
 
 (function () {
