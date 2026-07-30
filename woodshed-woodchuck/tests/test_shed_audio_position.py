@@ -1,41 +1,76 @@
 from pathlib import Path
 
+from fastapi.testclient import TestClient
+
+from app.main import app
+
 
 ROOT = Path(__file__).resolve().parents[1]
-BASE = (ROOT / "templates/base.html").read_text()
-CSS = (ROOT / "static/css/styles.css").read_text()
+BASE = (ROOT / "templates/base.html").read_text(encoding="utf-8")
+CSS = (ROOT / "static/css/styles.css").read_text(encoding="utf-8")
 
 
-def test_only_shed_receives_the_sound_positioning_hook() -> None:
-    assert '<body{% if active_nav == "home" %} class="shed-screen"{% endif %}>' in BASE
-    assert 'class="sound-effects-controls"' in BASE
-    assert 'aria-label="Sound Effects On. Open settings."' in BASE
-    assert CSS.count(".shed-screen .sound-effects-controls") == 2
-    assert ".board-page .sound-effects-controls" not in CSS
+def shared_sound_block() -> str:
+    start = CSS.index("/* Main pages share a predictable lower launcher")
+    return CSS[start:CSS.index("/* Plunge Burrow prototype", start)]
+
+
+def test_four_main_pages_receive_one_shared_positioning_hook() -> None:
+    client = TestClient(app)
+    for path in ("/home", "/p-book", "/quest", "/store"):
+        response = client.get(path)
+        assert response.status_code == 200
+        assert '<body class="main-app-page' in response.text
+        assert 'class="sound-effects-controls"' in response.text
+
+    assert '<body{% if page_class %} class="{{ page_class }}"{% endif %}>' in BASE
+    assert CSS.count(".main-app-page .sound-effects-controls") == 1
+    assert ".shed-screen .sound-effects-controls" not in CSS
     assert ".shop-page .sound-effects-controls" not in CSS
+    assert ".board-page .sound-effects-controls" not in CSS
 
 
-def test_shed_button_uses_lower_safe_edge_and_panel_opens_upward() -> None:
-    start = CSS.index("/* SHED keeps Sound Effects")
-    shed = CSS[start:]
-    controls = shed[shed.index(".shed-screen .sound-effects-controls {"):shed.index(".shed-screen .sound-effects-button {")]
-    panel = shed[shed.index(".shed-screen .sound-effects-panel {"):shed.index("@media (max-width: 640px)")]
+def test_shared_launcher_uses_lower_safe_edge_and_panel_opens_upward() -> None:
+    shared = shared_sound_block()
+    controls = shared[shared.index(".main-app-page .sound-effects-controls {"):shared.index(".main-app-page .sound-effects-button {")]
+    button = shared[shared.index(".main-app-page .sound-effects-button {"):shared.index(".main-app-page .sound-effects-panel {")]
+    panel = shared[shared.index(".main-app-page .sound-effects-panel {"):]
+
     assert "top: auto" in controls
-    assert "bottom: calc(4.75rem + env(safe-area-inset-bottom))" in controls
     assert "right: max(0.75rem, env(safe-area-inset-right))" in controls
+    assert "bottom: calc(4.75rem + env(safe-area-inset-bottom))" in controls
+    assert "width: 2.75rem" in button and "height: 2.75rem" in button
     assert "top: auto" in panel and "bottom: 3.15rem" in panel
+    assert "max-height: calc(100vh - 10rem)" in panel
+    assert "overflow-y: auto" in panel
     assert "width: min(14rem, calc(100vw - 1.4rem))" in CSS
+    assert "overflow-x" not in shared
 
 
-def test_shed_mobile_avoids_top_right_and_retains_44px_target() -> None:
-    start = CSS.index("/* SHED keeps Sound Effects")
-    shed = CSS[start:]
-    mobile_start = shed.index("@media (max-width: 640px)")
-    mobile = shed[mobile_start:shed.index("\n}", mobile_start) + 2]
-    assert "top:" not in mobile
-    assert "bottom: calc(4.5rem + env(safe-area-inset-bottom))" in mobile
-    assert "right: max(0.65rem, env(safe-area-inset-right))" in mobile
-    button = shed[shed.index(".shed-screen .sound-effects-button {"):shed.index(".shed-screen .sound-effects-panel {")]
-    assert "width: 2.75rem" in button
-    assert "height: 2.75rem" in button
-    assert "overflow-x" not in shed
+def test_shared_placement_keeps_page_content_and_accessibility_intact() -> None:
+    templates = {
+        "SHED": (ROOT / "templates/home.html").read_text(encoding="utf-8"),
+        "BOOK": (ROOT / "templates/p_book.html").read_text(encoding="utf-8"),
+        "BOARD": (ROOT / "templates/quest.html").read_text(encoding="utf-8"),
+        "SHOP": (ROOT / "templates/store.html").read_text(encoding="utf-8"),
+    }
+    assert 'id="streak-value"' in templates["SHED"]
+    assert "practice-timer" in templates["BOOK"] and "Submit" in templates["BOOK"]
+    assert "Bonus Challenge" in templates["BOARD"] and "plunge-burrow-button" in templates["BOARD"]
+    assert 'data-shop-panel-content="clothing"' in templates["SHOP"]
+    assert "Hats and hoodies" in templates["SHOP"]
+    assert 'aria-label="Sound Effects On. Open settings."' in BASE
+    assert 'aria-controls="sound-effects-panel"' in BASE
+    assert ".sound-effects-button:focus-visible" in CSS
+
+
+def test_utility_pages_do_not_receive_main_page_positioning() -> None:
+    client = TestClient(app)
+    for path in ("/", "/login", "/setup", "/plunge-burrow"):
+        response = client.get(path)
+        assert response.status_code == 200
+        assert '<body class="main-app-page' not in response.text
+    assert "main-app-page" not in (ROOT / "templates/contest_admin.html").read_text(encoding="utf-8")
+    main_source = (ROOT / "app/main.py").read_text(encoding="utf-8")
+    trusted = main_source[main_source.index("def trusted_verifiers_page"):main_source.index("@app.get(\"/setup\")")]
+    assert 'page_class="main-app-page"' in trusted  # Preserves its pre-existing lower placement.

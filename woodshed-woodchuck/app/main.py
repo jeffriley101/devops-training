@@ -201,6 +201,9 @@ def trusted_verifiers_page(request: Request):
         "trusted_verifiers.html",
         title="Trusted Verifiers",
         active_nav="home",
+        # This page already shared SHED's fixed navigation and lower sound
+        # position; retain that existing utility-page behavior.
+        page_class="main-app-page",
     )
 
 
@@ -246,6 +249,7 @@ def home(request: Request):
         "home.html",
         title="shed",
         active_nav="home",
+        page_class="main-app-page shed-screen",
         instruments=INSTRUMENT_OPTIONS,
         levels=LEVEL_OPTIONS,
         member_since=member_since,
@@ -254,12 +258,18 @@ def home(request: Request):
 
 @app.get("/p-book")
 def p_book(request: Request):
-    return _render(request, "p_book.html", title="book", active_nav="p_book")
+    return _render(
+        request, "p_book.html", title="book", active_nav="p_book",
+        page_class="main-app-page",
+    )
 
 
 @app.get("/quest")
 def quest(request: Request):
-    return _render(request, "quest.html", title="board", active_nav="quest")
+    return _render(
+        request, "quest.html", title="board", active_nav="quest",
+        page_class="main-app-page",
+    )
 
 
 @app.get("/plunge-burrow")
@@ -277,6 +287,7 @@ def store(request: Request):
     site_url = public_site_url(request)
     return _render(
         request, "store.html", title="shop", active_nav="store",
+        page_class="main-app-page",
         public_site_url=site_url, public_site_qr=qr_data_uri(site_url),
         practice_definition=PRACTICE_DEFINITION,
         art_submission_mailto=art_submission_mailto(),
