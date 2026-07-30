@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from datetime import datetime, timezone
+import json
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Body, Form, HTTPException, Request
@@ -88,9 +89,22 @@ def create_account(
     instrument: str = Form(...),
     level: str = Form(...),
     goal: str = Form(...),
+    initial_state: str = Form(...),
 ):
     with SessionLocal() as session:
+        existing_profile = current_profile(request, session)
+        if existing_profile is not None:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "A Woodchuck is already signed in. Use its existing "
+                    "Woodchuck ID and PIN instead of creating another account."
+                ),
+            )
         try:
+            submitted_state = json.loads(initial_state)
+            if not isinstance(submitted_state, dict):
+                raise ValueError("Initial account state must be an object.")
             profile = create_woodchuck_profile(
                 session,
                 display_name=display_name,
@@ -98,15 +112,50 @@ def create_account(
                 instrument=instrument,
                 level=level,
                 goal=goal,
+                commit=False,
             )
+            authoritative_state = deepcopy(submitted_state)
+            account = dict(authoritative_state.get("account") or {})
+            account.update({
+                "woodchuckId": profile.woodchuck_id,
+                "authenticated": True,
+                "serverRevision": 0,
+                "lastSyncedAt": None,
+            })
+            authoritative_state["account"] = account
+            browser_profile = dict(authoritative_state.get("profile") or {})
+            browser_profile.update({
+                "woodchuckName": profile.display_name,
+                "instrument": profile.instrument,
+                "level": profile.level,
+                "goal": profile.goal,
+                "createdAt": profile.created_at.isoformat(),
+            })
+            authoritative_state["profile"] = browser_profile
+            session.add(WoodchuckState(
+                profile_id=profile.id,
+                state_json=authoritative_state,
+                revision=0,
+            ))
+            session.commit()
         except ValueError as exc:
+            session.rollback()
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except Exception:
+            session.rollback()
+            raise
 
         request.session[SESSION_PROFILE_ID] = profile.id
 
         return {
             "authenticated": True,
             "profile": profile_payload(profile),
+            "credentials": {
+                "woodchuck_id": profile.woodchuck_id,
+                "pin": pin,
+            },
+            "state": authoritative_state,
+            "revision": 0,
         }
 
 

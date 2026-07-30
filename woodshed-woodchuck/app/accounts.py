@@ -24,6 +24,7 @@ def create_woodchuck_profile(
     instrument: str,
     level: str,
     goal: str,
+    commit: bool = True,
 ) -> WoodchuckProfile:
     display_name = display_name.strip()
     instrument = normalize_supported_instrument(instrument)
@@ -54,8 +55,11 @@ def create_woodchuck_profile(
         session.add(profile)
 
         try:
-            session.commit()
-            session.refresh(profile)
+            if commit:
+                session.commit()
+                session.refresh(profile)
+            else:
+                session.flush()
             return profile
         except IntegrityError:
             # An ID collision is extremely unlikely, but generate another

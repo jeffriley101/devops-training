@@ -39,7 +39,121 @@ def test_page_initialization_and_server_hydration_do_not_request_state_put() -> 
     assert "stateApi.saveState(next, { sync: false });\n        renderEntries(next);" in javascript
     assert "saveState(restored, { sync: false })" in state_js
     assert 'method: "PUT"' not in javascript
-    assert account_js.count('method: "PUT"') == 2  # explicit account creation + sync
+    assert account_js.count('method: "PUT"') == 2  # missing-state login + sync
+    create_flow = account_js[
+        account_js.index("function wireCreateAccount"):
+        account_js.index("function wireLogin")
+    ]
+    assert 'method: "PUT"' not in create_flow
+    assert "await uploadState" not in create_flow
+    assert 'formData.set(\n          "initial_state"' in create_flow
+    assert "stateApi.saveState(state, { sync: false })" in create_flow
+    assert "serverRevision" in create_flow
+
+
+def test_create_atomically_returns_authoritative_state_and_credentials(
+    monkeypatch,
+) -> None:
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(engine)
+    sessions = sessionmaker(bind=engine, expire_on_commit=False)
+    monkeypatch.setattr(account_routes, "SessionLocal", sessions)
+    request = Request({
+        "type": "http", "method": "POST", "path": "/account/create",
+        "headers": [], "query_string": b"", "session": {},
+    })
+    browser_state = {
+        "account": {
+            "woodchuckId": "WC-OTHER",
+            "authenticated": True,
+            "serverRevision": 12,
+        },
+        "profile": {"woodchuckName": "Someone Else"},
+        "progress": {"credits": 9},
+    }
+
+    result = account_routes.create_account(
+        request,
+        display_name="New Chuck",
+        pin="2468",
+        instrument="Flute",
+        level="Beginner",
+        goal="Practice every day",
+        initial_state=json.dumps(browser_state),
+    )
+
+    assert result["authenticated"] is True
+    assert result["revision"] == 0
+    assert result["credentials"] == {
+        "woodchuck_id": result["profile"]["woodchuck_id"],
+        "pin": "2468",
+    }
+    assert result["state"]["account"] == {
+        "woodchuckId": result["profile"]["woodchuck_id"],
+        "authenticated": True,
+        "serverRevision": 0,
+        "lastSyncedAt": None,
+    }
+    assert result["state"]["profile"]["woodchuckName"] == "New Chuck"
+    assert result["state"]["progress"]["credits"] == 9
+    with sessions() as session:
+        assert len(session.query(WoodchuckProfile).all()) == 1
+        assert len(session.query(WoodchuckState).all()) == 1
+        saved = session.query(WoodchuckState).one()
+        assert saved.revision == 0
+        assert saved.state_json == result["state"]
+
+
+def test_create_success_ui_shows_id_and_pin_without_redundant_save() -> None:
+    account_js = (ROOT / "static/js/account.js").read_text(encoding="utf-8")
+    setup = (ROOT / "templates/setup.html").read_text(encoding="utf-8")
+    create_flow = account_js[
+        account_js.index("function wireCreateAccount"):
+        account_js.index("function wireLogin")
+    ]
+    assert 'id="created-woodchuck-id"' in setup
+    assert 'id="created-pin"' in setup
+    assert "payload.credentials.pin" in create_flow
+    assert "successPanel.hidden = false" in create_flow
+    assert 'fetch("/account/create"' in create_flow
+    assert 'fetch("/account/state"' not in create_flow
+
+
+def test_repeated_create_does_not_create_a_second_account(monkeypatch) -> None:
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(engine)
+    sessions = sessionmaker(bind=engine, expire_on_commit=False)
+    monkeypatch.setattr(account_routes, "SessionLocal", sessions)
+    request = Request({
+        "type": "http", "method": "POST", "path": "/account/create",
+        "headers": [], "query_string": b"", "session": {},
+    })
+    fields = {
+        "display_name": "New Chuck", "pin": "2468", "instrument": "Flute",
+        "level": "Beginner", "goal": "Practice every day",
+        "initial_state": json.dumps({"progress": {"credits": 0}}),
+    }
+    account_routes.create_account(request, **fields)
+
+    try:
+        account_routes.create_account(request, **fields)
+    except Exception as error:
+        assert getattr(error, "status_code", None) == 400
+        assert "already signed in" in str(getattr(error, "detail", ""))
+    else:
+        raise AssertionError("A repeated create should be rejected")
+
+    with sessions() as session:
+        assert len(session.query(WoodchuckProfile).all()) == 1
+        assert len(session.query(WoodchuckState).all()) == 1
 
 
 def test_programmatic_controls_do_not_save_but_real_edit_saves_once() -> None:

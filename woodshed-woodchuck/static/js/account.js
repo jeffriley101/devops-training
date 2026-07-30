@@ -43,45 +43,26 @@
   async function uploadState(state) {
     const response = await fetch("/account/state", {
       method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(state),
     });
 
     if (!response.ok) {
       throw new Error(
-        await responseMessage(
-          response,
-          "The account was created, but the game could not be saved."
-        )
+        await responseMessage(response, "The game could not be saved.")
       );
     }
 
     const payload = await response.json();
-
     const latestState = stateApi.getState();
-    const latestAccount =
-      latestState.account && typeof latestState.account === "object"
-        ? latestState.account
-        : {};
-
-    const latestRevision =
-      Number.isInteger(payload.revision)
-        ? payload.revision
-        : Number.isInteger(latestAccount.serverRevision)
-          ? latestAccount.serverRevision
-          : 0;
-
     latestState.account = {
-      ...latestAccount,
-      serverRevision: latestRevision,
-      lastSyncedAt:
-        payload.last_synced_at || new Date().toISOString(),
+      ...(latestState.account || {}),
+      serverRevision: Number.isInteger(payload.revision)
+        ? payload.revision
+        : latestState.account.serverRevision || 0,
+      lastSyncedAt: payload.last_synced_at || new Date().toISOString(),
     };
-
     stateApi.saveState(latestState, { sync: false });
-
     return payload;
   }
 
@@ -122,6 +103,7 @@
     const accountIdEl = document.getElementById(
       "created-woodchuck-id"
     );
+    const accountPinEl = document.getElementById("created-pin");
     const copyButton = document.getElementById(
       "copy-woodchuck-id"
     );
@@ -175,6 +157,10 @@
       submitButton.textContent = "Creating Woodchuck...";
 
       try {
+        formData.set(
+          "initial_state",
+          JSON.stringify(stateApi.getState())
+        );
         const response = await fetch("/account/create", {
           method: "POST",
           body: formData,
@@ -191,16 +177,24 @@
 
         const payload = await response.json();
         const profile = payload.profile;
+        const state = payload.state;
 
-        const state = applyAccountProfile(
-          stateApi.getState(),
-          profile
-        );
+        if (!state || typeof state !== "object") {
+          throw new Error("The server did not return the new Woodshed.");
+        }
 
+        state.account = {
+          ...(state.account || {}),
+          serverRevision: Number.isInteger(payload.revision)
+            ? payload.revision
+            : 0,
+        };
         stateApi.saveState(state, { sync: false });
-        await uploadState(state);
 
         accountIdEl.textContent = profile.woodchuck_id;
+        if (accountPinEl) {
+          accountPinEl.textContent = payload.credentials.pin;
+        }
         successPanel.hidden = false;
         form.hidden = true;
 
