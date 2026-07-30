@@ -154,6 +154,12 @@ def test_metronome_has_one_unaccented_sound() -> None:
     assert "Beat one is accented" not in javascript + home
     assert ".metronome-pulse.is-accent" not in css
     assert "setValueAtTime(850, scheduledTime)" in javascript
+    assert 'id="metronome-pulse"' in home
+    assert "metronome-pulse.is-active" in css
+    assert "metronome-beat-number" not in home + javascript
+    assert "beatNumber" not in javascript
+    assert "currentBeat" not in javascript
+    assert "(currentBeat + 1) % 4" not in javascript
 
 
 def test_bonus_challenge_and_success_confetti_hooks() -> None:

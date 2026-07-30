@@ -15,6 +15,10 @@
       <p class="board-kicker">Get your name on the Board</p>
       <h3 id="board-player-name">Your Woodchuck</h3>
       <p>
+        This Week’s Camp Points:
+        <strong id="board-player-weekly-points">0</strong>
+      </p>
+      <p>
         Career Band Camp Points:
         <strong id="board-player-points">0</strong>
       </p>
@@ -32,26 +36,11 @@
         <div class="board-activity-body">
         <span class="board-contest-icon" aria-hidden="true">⛺</span>
         <div>
-          <p>Complete this daily bonus for its existing Camp reward. Actual practice time comes from submitted P-Charts and appears in This Week’s Practice and Career Practice.</p>
-
-          <form id="camp-hours-form" class="board-inline-form">
-            <label class="sr-only" for="camp-hours">Band camp hours</label>
-            <input
-              id="camp-hours"
-              type="number"
-              min="0.25"
-              step="0.25"
-              placeholder="Hours"
-              required
-            />
-            <button
-              id="camp-hours-button"
-              class="btn btn-primary"
-              type="submit"
-            >
-              Add to Board
-            </button>
-          </form>
+          <label class="camp-hours-checkbox-label" for="camp-hours-checkbox">
+            <input id="camp-hours-checkbox" type="checkbox" />
+            <span>Were you at band camp or mini-camp today?</span>
+          </label>
+          <p>Actual practice time comes from submitted P-Charts and appears in This Week’s Practice and Career Practice.</p>
 
           <small id="camp-hours-status">Not completed today</small>
         </div>

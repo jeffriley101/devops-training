@@ -318,6 +318,34 @@ def test_completed_band_camp_activities_use_server_backed_disclosures() -> None:
     assert 'content: "▶"' in css
 
 
+def test_board_weekly_points_and_hours_checkbox_contract() -> None:
+    root = Path(__file__).resolve().parents[1]
+    markup = (root / "templates" / "quest.html").read_text(encoding="utf-8")
+    javascript = (root / "static" / "js" / "app.js").read_text(encoding="utf-8")
+    css = (root / "static" / "css" / "styles.css").read_text(encoding="utf-8")
+    weekly = markup.index("This Week’s Camp Points:")
+    career = markup.index("Career Band Camp Points:")
+    hours_panel = markup[
+        markup.index('id="camp-hours-activity"'):
+        markup.index('id="instrument-care-activity"')
+    ]
+
+    assert weekly < career
+    assert 'id="board-player-weekly-points">0</strong>' in markup
+    assert "Were you at band camp or mini-camp today?" in hours_panel
+    assert 'id="camp-hours-checkbox" type="checkbox"' in hours_panel
+    assert 'for="camp-hours-checkbox"' in hours_panel
+    assert 'type="number"' not in hours_panel
+    assert "Added to Board" not in hours_panel + javascript
+    assert '.camp-hours-checkbox-label input[type="checkbox"]' in css
+    assert "width: 2rem" in css and "height: 2rem" in css
+    assert 'const persistedAward = await persistCampPoint("hours")' in javascript
+    assert "persistedAward.created === true" in javascript
+    assert "hoursCheckbox.checked = false" in javascript
+    assert "hoursActivity.open = true" in javascript
+    assert 'serverConfirmedAwards.has("hours")' in javascript
+
+
 def test_past_winners_renders_weekly_camp_points() -> None:
     markup = TestClient(app).get("/quest").text
     javascript = (

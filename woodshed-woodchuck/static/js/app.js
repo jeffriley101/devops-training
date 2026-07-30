@@ -680,9 +680,6 @@
       "metronome-bpm-readout"
     );
     const pulse = document.getElementById("metronome-pulse");
-    const beatNumber = document.getElementById(
-      "metronome-beat-number"
-    );
     const status = document.getElementById("metronome-status");
 
     if (
@@ -703,7 +700,6 @@
     let audioContext = null;
     let schedulerTimer = null;
     let nextBeatTime = 0;
-    let currentBeat = 0;
     let isRunning = false;
     let tapTimes = [];
     const visualTimers = new Set();
@@ -773,8 +769,8 @@
       visualTimers.clear();
     }
 
-    function showBeat(beat, scheduledTime) {
-      if (!audioContext || !pulse || !beatNumber) return;
+    function showBeat(scheduledTime) {
+      if (!audioContext || !pulse) return;
 
       const delay = Math.max(
         0,
@@ -784,7 +780,6 @@
       queueVisualUpdate(function () {
         if (!isRunning) return;
 
-        beatNumber.textContent = String(beat + 1);
         pulse.classList.remove("is-active");
 
         void pulse.offsetWidth;
@@ -797,7 +792,7 @@
       }, delay);
     }
 
-    function playClick(beat, scheduledTime) {
+    function playClick(scheduledTime) {
       if (!audioContext) return;
 
       const oscillator = audioContext.createOscillator();
@@ -821,7 +816,7 @@
       oscillator.start(scheduledTime);
       oscillator.stop(scheduledTime + 0.06);
 
-      showBeat(beat, scheduledTime);
+      showBeat(scheduledTime);
     }
 
     function scheduler() {
@@ -831,10 +826,9 @@
         nextBeatTime <
         audioContext.currentTime + 0.1
       ) {
-        playClick(currentBeat, nextBeatTime);
+        playClick(nextBeatTime);
 
         nextBeatTime += 60 / bpm;
-        currentBeat = (currentBeat + 1) % 4;
       }
     }
 
@@ -856,7 +850,6 @@
       }
 
       isRunning = true;
-      currentBeat = 0;
       nextBeatTime = audioContext.currentTime + 0.05;
 
       scheduler();
@@ -883,10 +876,6 @@
 
       if (pulse) {
         pulse.classList.remove("is-active");
-      }
-
-      if (beatNumber) {
-        beatNumber.textContent = "1";
       }
 
       startButton.textContent = "Start";
@@ -1062,10 +1051,11 @@
     if (!playerNameEl) return;
 
     const playerPointsEl = document.getElementById("board-player-points");
+    const playerWeeklyPointsEl = document.getElementById(
+      "board-player-weekly-points"
+    );
 
-    const hoursForm = document.getElementById("camp-hours-form");
-    const hoursInput = document.getElementById("camp-hours");
-    const hoursButton = document.getElementById("camp-hours-button");
+    const hoursCheckbox = document.getElementById("camp-hours-checkbox");
     const hoursStatusEl = document.getElementById("camp-hours-status");
     const hoursActivity = document.getElementById("camp-hours-activity");
     const hoursSummaryEl = document.getElementById("camp-hours-summary");
@@ -1201,6 +1191,12 @@
         if (payload.award && payload.award.activity_type) {
           serverConfirmedAwards.add(payload.award.activity_type);
         }
+        if (playerWeeklyPointsEl && Number.isInteger(payload.weekly_points)) {
+          playerWeeklyPointsEl.textContent = String(payload.weekly_points);
+        }
+        if (playerPointsEl && Number.isInteger(payload.career_points)) {
+          playerPointsEl.textContent = String(payload.career_points);
+        }
         window.dispatchEvent(new CustomEvent("ww:camp-points-saved"));
         return payload;
       } finally {
@@ -1234,6 +1230,13 @@
       const payload = await response.json();
       const awards = Array.isArray(payload.awards) ? payload.awards : [];
       const next = prepareCurrentDay(stateApi.getState());
+
+      if (playerWeeklyPointsEl && Number.isInteger(payload.weekly_points)) {
+        playerWeeklyPointsEl.textContent = String(payload.weekly_points);
+      }
+      if (playerPointsEl && Number.isInteger(payload.career_points)) {
+        playerPointsEl.textContent = String(payload.career_points);
+      }
 
       awards.forEach((award) => {
         const activityType = award && award.activity_type;
@@ -1300,18 +1303,15 @@
         playerPointsEl.textContent = String(points);
       }
 
-      if (hoursInput) {
-        hoursInput.value =
-          daily.hours === null ? "" : String(daily.hours);
-        hoursInput.disabled = hasAward(current, "hours");
+      if (hoursCheckbox) {
+        const hoursComplete = serverConfirmedAwards.has("hours");
+        hoursCheckbox.checked = hoursComplete;
+        hoursCheckbox.disabled = hoursComplete;
       }
 
-      if (hasAward(current, "hours")) {
-        setButtonComplete(hoursButton, "Added to Board");
+      if (serverConfirmedAwards.has("hours")) {
         if (hoursStatusEl) {
-          hoursStatusEl.textContent = daily.hours === null
-            ? "Completed today"
-            : `${daily.hours} camp hours recorded today`;
+          hoursStatusEl.textContent = "Completed today";
         }
       } else if (hoursStatusEl) {
         hoursStatusEl.textContent = "Not completed today";
@@ -1372,33 +1372,35 @@
       // Leave activities open when server completion cannot be confirmed.
     });
 
-    if (hoursForm) {
-      hoursForm.addEventListener("submit", async function (event) {
-        event.preventDefault();
-
+    if (hoursCheckbox) {
+      hoursCheckbox.addEventListener("change", async function () {
+        if (!hoursCheckbox.checked) return;
         const next = prepareCurrentDay(stateApi.getState());
-        const hours = Number(hoursInput.value);
-
-        if (!Number.isFinite(hours) || hours <= 0) {
-          feedbackEl.textContent =
-            "Enter how many hours you spent at band camp.";
-          return;
-        }
-
-        if (hasAward(next, "hours")) return;
+        if (serverConfirmedAwards.has("hours")) return;
+        hoursCheckbox.disabled = true;
 
         try {
-          await persistCampPoint("hours");
+          const persistedAward = await persistCampPoint("hours");
+          if (!persistedAward) {
+            throw new Error("Band Camp Hours could not be saved.");
+          }
+          if (persistedAward.created === true) {
+            awardContest(next, "hours");
+          } else if (!hasAward(next, "hours")) {
+            next.bandCamp.daily.awarded.push("hours");
+          }
         } catch (error) {
-          feedbackEl.textContent = error.message || "Camp points could not be saved.";
+          hoursCheckbox.checked = false;
+          hoursCheckbox.disabled = false;
+          hoursActivity.open = true;
+          feedbackEl.textContent = error.message ||
+            "Band Camp Hours could not be saved. Please try again.";
           return;
         }
 
-        next.bandCamp.daily.hours = hours;
-        awardContest(next, "hours");
         stateApi.saveState(next);
         feedbackEl.textContent =
-          `${hours} camp hours added. +1 Camp Point and +1 dandelion.`;
+          "Band Camp Hours completed. +1 Camp Point and +1 dandelion.";
 
         renderBoard(next);
         hydrateHome(next);

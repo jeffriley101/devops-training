@@ -452,6 +452,33 @@ def weekly_camp_points(
     }
 
 
+def student_camp_point_totals(
+    session: Session,
+    *,
+    profile_id: int,
+    now: datetime,
+) -> dict[str, int]:
+    """Return persisted current-week and career Camp Point totals."""
+    if now.tzinfo is None or now.utcoffset() is None:
+        raise ValueError("The current time must be timezone-aware.")
+    central_now = now.astimezone(CENTRAL)
+    monday = central_now.date() - timedelta(days=central_now.weekday())
+    week_start = datetime.combine(
+        monday, time.min, CENTRAL
+    ).astimezone(timezone.utc)
+    awards = session.scalars(select(CampPointAward).where(
+        CampPointAward.profile_id == profile_id,
+        CampPointAward.occurred_at <= now.astimezone(timezone.utc),
+    )).all()
+    return {
+        "weekly_points": sum(
+            award.points_awarded for award in awards
+            if aware_utc(award.occurred_at) >= week_start
+        ),
+        "career_points": sum(award.points_awarded for award in awards),
+    }
+
+
 def create_camp_point_award(
     session: Session,
     *,
@@ -1179,6 +1206,7 @@ def daily_camp_point_awards(
         profile = current_profile(request, session)
         if profile is None:
             raise HTTPException(status_code=401, detail="Student sign-in is required.")
+        now = datetime.now(timezone.utc)
         prefix = f"band-camp:{activity_date.isoformat()}:"
         awards = session.scalars(select(CampPointAward).where(
             CampPointAward.profile_id == profile.id,
@@ -1186,6 +1214,9 @@ def daily_camp_point_awards(
         )).all()
         return {
             "activity_date": activity_date.isoformat(),
+            **student_camp_point_totals(
+                session, profile_id=profile.id, now=now
+            ),
             "awards": [
                 {
                     "activity_type": award.activity_type,
@@ -1234,6 +1265,9 @@ def award_camp_points(
             created = False
         return {
             "created": created,
+            **student_camp_point_totals(
+                session, profile_id=profile.id, now=now
+            ),
             "award": {
                 "activity_type": award.activity_type,
                 "points_awarded": award.points_awarded,

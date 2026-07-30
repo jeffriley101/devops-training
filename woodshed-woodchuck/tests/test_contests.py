@@ -27,6 +27,7 @@ from app.contests import (
     weekly_practice_by_instrument,
     weekly_student_points,
     weekly_camp_points,
+    student_camp_point_totals,
     create_camp_point_award,
     CampPointAwardCreate,
 )
@@ -232,6 +233,29 @@ def test_camp_points_do_not_include_p_charts_or_practice_minutes(
     assert payload["weekly-points-leaders"]["open"][0]["total_minutes"] == 45
     assert payload["weekly-practice-by-instrument"]["open"][0]["total_minutes"] == 45
     assert payload["weekly-camp-points"]["open"][0]["total_points"] == 1
+
+
+def test_student_camp_point_totals_use_persisted_central_week_and_exclude_future(
+    database: tuple[Session, sessionmaker[Session]],
+) -> None:
+    session, _ = database
+    student = add_student(session, woodchuck_id="WC-CAMP-TOTALS", instrument="Flute")
+    # NOW is Tuesday in America/Chicago. Only Monday and Tuesday-to-now count weekly.
+    for key, occurred_at, points in (
+        ("prior", datetime(2026, 7, 26, 20, tzinfo=timezone.utc), 5),
+        ("monday", datetime(2026, 7, 27, 6, tzinfo=timezone.utc), 1),
+        ("today", NOW - timedelta(minutes=1), 2),
+        ("future", NOW + timedelta(minutes=1), 50),
+    ):
+        session.add(CampPointAward(
+            profile_id=student.id, activity_type="hours", points_awarded=points,
+            occurred_at=occurred_at, duplicate_key=f"totals-{key}",
+        ))
+    session.commit()
+
+    assert student_camp_point_totals(
+        session, profile_id=student.id, now=NOW
+    ) == {"weekly_points": 3, "career_points": 8}
 
 
 def test_camp_point_award_endpoint_is_authenticated_idempotent_and_private(
@@ -1537,3 +1561,26 @@ def test_activity_crowns_reconcile_upward_and_tenth_event_is_permanent(
     session.commit()
     crown_progress_payload(session, profile_id=profile.id)
     assert progress.qualifying_wins == 12 and progress.crown_earned_at == earned_at
+
+
+def test_historical_hours_awards_still_feed_band_camp_hours_crown(
+    database: tuple[Session, sessionmaker[Session]],
+) -> None:
+    session, _ = database
+    profile = add_student(session, woodchuck_id="WC-HOURS-CROWN", instrument="Flute")
+    for index in range(10):
+        session.add(CampPointAward(
+            profile_id=profile.id, activity_type="hours", points_awarded=1,
+            occurred_at=NOW - timedelta(days=20 - index),
+            duplicate_key=f"historical-hours-{index}",
+        ))
+    session.commit()
+
+    payload = crown_progress_payload(session, profile_id=profile.id)
+    hours = next(
+        item for item in payload["categories"]
+        if item["key"] == "band-camp-hours"
+    )
+    assert hours["name"] == "Band Camp Hours Crown"
+    assert hours["progress"] == 10
+    assert hours["earned"] is True
