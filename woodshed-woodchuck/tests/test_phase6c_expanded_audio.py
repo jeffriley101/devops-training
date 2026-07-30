@@ -71,12 +71,12 @@ def test_quest_completion_requires_new_local_transition_and_server_confirmation(
     quest = APP[APP.index("function wireQuestForm"):APP.index("const STORE_ITEMS")]
     assert "if (next.daily.completed && next.daily.dateKey === dateKey)" in quest
     assert "const completedNow =" in quest
-    assert "const confirmed = await window.WWAccountSync.syncNow()" in quest
-    assert "if (!confirmed)" in quest
-    confirmed_at = quest.index("const confirmed =")
-    failure_at = quest.index("if (!confirmed)", confirmed_at)
-    sound_at = quest.index('playSound("questCompleted")', failure_at)
-    assert confirmed_at < failure_at < sound_at
+    assert 'fetch("/contests/quest/completions"' in quest
+    assert "if (!response.ok)" in quest
+    response_at = quest.index("const response = await fetch")
+    committed_at = quest.index("payload.created === true && payload.reward_created === true")
+    sound_at = quest.index('playSound("questCompleted")', committed_at)
+    assert response_at < committed_at < sound_at
     assert quest.count('playSound("questCompleted")') == 1
 
 

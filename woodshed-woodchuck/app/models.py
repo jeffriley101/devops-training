@@ -585,6 +585,36 @@ class DailyTriviaAttempt(Base):
     )
 
 
+class QuestCompletion(Base):
+    __tablename__ = "quest_completions"
+    __table_args__ = (
+        UniqueConstraint(
+            "profile_id",
+            "activity_date",
+            name="uq_quest_completion_profile_date",
+        ),
+        CheckConstraint("logged_minutes > 0", name="ck_quest_completion_minutes_positive"),
+        CheckConstraint("reward_amount > 0", name="ck_quest_completion_reward_positive"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    profile_id: Mapped[int] = mapped_column(
+        ForeignKey("woodchuck_profiles.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    activity_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    quest_id: Mapped[str] = mapped_column(String(100), nullable=False)
+    logged_minutes: Mapped[int] = mapped_column(Integer, nullable=False)
+    reward_amount: Mapped[int] = mapped_column(Integer, nullable=False)
+    completed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
+
+
 class Season(Base):
     __tablename__ = "seasons"
     __table_args__ = (

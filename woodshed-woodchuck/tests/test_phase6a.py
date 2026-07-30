@@ -130,7 +130,7 @@ def test_board_phase6a_feedback_success_and_placeholder_contract() -> None:
     assert "fetch(" not in plunge and "saveState" not in plunge and "award" not in plunge.casefold()
     assert 'id="complete-quest-btn"' in board and "Quest Complete" in javascript
     assert "The quest is complete. Extra practice" not in board
-    assert 'id="quest-feedback"' not in board
+    assert 'id="quest-feedback"' in board
     assert 'id="instrument-advice"' not in board
     assert 'id="practice-form"' in board
 

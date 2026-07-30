@@ -18,7 +18,7 @@ def test_tone_is_exactly_pinned_local_licensed_and_loaded_in_order():
     assert "cdn" not in BASE.casefold()
     tone_pos = BASE.index('/static/vendor/tone/Tone.js?v=15.1.22')
     audio_pos = BASE.index('/static/js/audio.js?v=3')
-    app_pos = BASE.index('/static/js/app.js?v=22')
+    app_pos = BASE.index('/static/js/app.js?v=23')
     assert tone_pos < audio_pos < app_pos
 
 

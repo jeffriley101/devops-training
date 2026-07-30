@@ -3,7 +3,11 @@
   if (!stateApi) return;
 
   function playSound(effectName) {
-    if (window.WoodshedAudio) window.WoodshedAudio.play(effectName);
+    try {
+      if (window.WoodshedAudio) window.WoodshedAudio.play(effectName);
+    } catch (_error) {
+      // Sound effects are supplemental and never block the application action.
+    }
   }
 
   function playCampReward(includeTriviaChime) {
@@ -401,6 +405,11 @@
     if (!form || !questTextEl || !questTargetEl || !questStatusEl) return;
 
     const today = stateApi.localDateKey();
+    let completionInFlight = false;
+
+    function setQuestFeedback(message) {
+      if (feedbackEl) feedbackEl.textContent = message;
+    }
 
     function renderQuestStatus(s) {
       questTextEl.textContent = s.daily.questText;
@@ -473,7 +482,7 @@
     updateInstrumentAdvice(state);
 
     if (state.daily.completed && feedbackEl) {
-      feedbackEl.querySelector("p:last-child").textContent = pickMessage("already_done", today);
+      setQuestFeedback(pickMessage("already_done", today));
     }
 
     if (chooseQuestBtn) {
@@ -501,7 +510,7 @@
         updateInstrumentAdvice(next);
 
         if (feedbackEl) {
-          feedbackEl.querySelector("p:last-child").textContent = "Quest skipped. Pick up momentum with this one instead.";
+          setQuestFeedback("Quest skipped. Pick up momentum with this one instead.");
         }
       });
     }
@@ -525,7 +534,7 @@
 
         if (questChoicePanel) questChoicePanel.classList.add("hidden");
         if (feedbackEl) {
-          feedbackEl.querySelector("p:last-child").textContent = "Quest selected. Keep moving.";
+          setQuestFeedback("Quest selected. Keep moving.");
         }
       });
     }
@@ -533,6 +542,7 @@
     form.addEventListener("submit", async function (event) {
       event.preventDefault();
       playSound("dialClick");
+      if (completionInFlight) return;
       errorEl.textContent = "";
 
       const next = stateApi.getState();
@@ -547,58 +557,111 @@
         return;
       }
 
-      next.practiceLog.unshift({
-        dateKey,
-        minutes,
-        note,
-        questId: next.daily.questId,
-        creditsAwarded: 0,
-        loggedAt: new Date().toISOString(),
-      });
-
-      next.practiceLog = next.practiceLog.slice(0, 50);
-      next.daily.loggedMinutes = (next.daily.loggedMinutes || 0) + minutes;
-
       if (next.daily.completed && next.daily.dateKey === dateKey) {
-        feedbackEl.querySelector("p:last-child").textContent = pickMessage("already_done", dateKey);
-        stateApi.saveState(next);
+        setQuestFeedback(pickMessage("already_done", dateKey));
         renderQuestStatus(next);
         return;
       }
 
-      const completedNow = next.daily.loggedMinutes >= next.daily.targetMinutes;
-      if (completedNow) {
-        next.daily.completed = true;
-        next.daily.completedAt = new Date().toISOString();
-        next.progress.credits += next.daily.rewardCredits;
-        updateStreak(next.progress, dateKey);
-
-        const lastLog = next.practiceLog[0];
-        lastLog.creditsAwarded = next.daily.rewardCredits;
-
-        feedbackEl.querySelector("p:last-child").textContent =
-          `${pickMessage("reward", dateKey)} +${next.daily.rewardCredits} dandelions earned.`;
-      } else {
-        feedbackEl.querySelector("p:last-child").textContent =
-          `${pickMessage("supportive", dateKey)} (${next.daily.loggedMinutes}/${next.daily.targetMinutes} minutes)`;
-      }
-
-      next.daily.encouragement = feedbackEl.querySelector("p:last-child").textContent;
-      if (completedNow && window.WWAccountSync) {
-        stateApi.saveState(next, { sync: false });
-        const confirmed = await window.WWAccountSync.syncNow();
-        if (!confirmed) {
-          errorEl.textContent = "Quest completion could not be saved. Please try again.";
-          return;
-        }
-        playSound("questCompleted");
-      } else {
+      const loggedMinutes = (next.daily.loggedMinutes || 0) + minutes;
+      const completedNow = loggedMinutes >= next.daily.targetMinutes;
+      if (!completedNow) {
+        next.practiceLog.unshift({
+          dateKey, minutes, note, questId: next.daily.questId,
+          creditsAwarded: 0, loggedAt: new Date().toISOString(), source: "quest",
+        });
+        next.practiceLog = next.practiceLog.slice(0, 50);
+        next.daily.loggedMinutes = loggedMinutes;
+        const message =
+          `${pickMessage("supportive", dateKey)} (${loggedMinutes}/${next.daily.targetMinutes} minutes)`;
+        next.daily.encouragement = message;
+        setQuestFeedback(message);
         stateApi.saveState(next);
+        renderQuestStatus(next);
+        hydrateHome(next);
+        minutesEl.value = "";
+        noteEl.value = "";
+        return;
       }
-      renderQuestStatus(next);
-      hydrateHome(next);
-      minutesEl.value = "";
-      noteEl.value = "";
+
+      completionInFlight = true;
+      if (completeBtn) {
+        completeBtn.disabled = true;
+        completeBtn.textContent = "Saving Quest…";
+      }
+      try {
+        const response = await fetch("/contests/quest/completions", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            activity_date: dateKey,
+            quest_id: next.daily.questId,
+            minutes,
+            logged_minutes: loggedMinutes,
+            note,
+          }),
+        });
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload.detail || "Quest completion could not be saved.");
+        }
+        const completion = payload.completion;
+        if (!completion || completion.quest_id !== next.daily.questId) {
+          throw new Error("The saved Quest response could not be read.");
+        }
+
+        if (payload.created === true) {
+          next.practiceLog.unshift({
+            dateKey, minutes, note, questId: completion.quest_id,
+            creditsAwarded: completion.reward_amount,
+            loggedAt: completion.completed_at, source: "quest",
+          });
+          next.practiceLog = next.practiceLog.slice(0, 50);
+        }
+        next.daily.loggedMinutes = completion.logged_minutes;
+        next.daily.completed = true;
+        next.daily.completedAt = completion.completed_at;
+        next.quest.completed = true;
+        next.progress.credits = payload.credits;
+        if (Number.isInteger(payload.streak)) next.progress.streak = payload.streak;
+        if (Number.isInteger(payload.revision)) {
+          next.account.serverRevision = payload.revision;
+        }
+        const rewardMessage = payload.created === true
+          ? `${pickMessage("reward", dateKey)} +${completion.reward_amount} dandelions earned. Total: ${payload.credits} dandelions.`
+          : "Quest already completed. No additional reward was added.";
+        next.daily.encouragement = rewardMessage;
+        stateApi.saveState(next, { sync: false });
+
+        const weeklyPoints = document.getElementById("board-player-weekly-points");
+        const careerPoints = document.getElementById("board-player-points");
+        if (weeklyPoints && Number.isInteger(payload.weekly_points)) {
+          weeklyPoints.textContent = String(payload.weekly_points);
+        }
+        if (careerPoints && Number.isInteger(payload.career_points)) {
+          careerPoints.textContent = String(payload.career_points);
+        }
+        window.dispatchEvent(new CustomEvent("ww:camp-points-saved"));
+
+        setQuestFeedback(rewardMessage);
+        renderQuestStatus(next);
+        hydrateHome(next);
+        minutesEl.value = "";
+        noteEl.value = "";
+        if (payload.created === true && payload.reward_created === true) {
+          playSound("questCompleted");
+        }
+      } catch (error) {
+        errorEl.textContent = error.message || "Quest completion could not be saved. Please try again.";
+        renderQuestStatus(next);
+      } finally {
+        completionInFlight = false;
+        if (completeBtn && !next.daily.completed) {
+          completeBtn.disabled = false;
+          completeBtn.textContent = "I Played It";
+        }
+      }
     });
   }
 
