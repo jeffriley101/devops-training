@@ -73,11 +73,7 @@
       >
         <h3>Invitation Created</h3>
 
-        <p>
-          Your email app should open with the adult's address,
-          message, and private invitation link filled in.
-          Press Send to deliver it.
-        </p>
+        <p id="trusted-verifier-delivery-status"></p>
 
         <p>
           If the email app does not open, copy the link below
@@ -100,6 +96,8 @@
         >
           Copy Invitation Link
         </button>
+        <button id="trusted-verifier-open-email" class="btn btn-secondary" type="button">Open in my email app</button>
+        <button id="trusted-verifier-resend-email" class="btn btn-secondary" type="button">Resend Email</button>
 
         <p
           id="trusted-verifier-copy-feedback"
@@ -161,5 +159,5 @@
 {% endblock %}
 
 {% block page_scripts %}
-<script src="/static/js/trusted-verifiers.js?v=6"></script>
+<script src="/static/js/trusted-verifiers.js?v=7"></script>
 {% endblock %}

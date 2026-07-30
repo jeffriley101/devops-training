@@ -2821,6 +2821,13 @@
     const timerFeedbackEl = document.getElementById("practice-timer-feedback");
     const errorEl = document.getElementById("p-book-error");
     const feedbackEl = document.getElementById("p-book-feedback");
+    const deliveryPanel = document.getElementById("p-book-email-delivery");
+    const deliveryStatusEl = document.getElementById("p-book-email-delivery-status");
+    const reviewLinkEl = document.getElementById("p-book-review-link");
+    const copyReviewLinkBtn = document.getElementById("p-book-copy-review-link");
+    const openReviewEmailBtn = document.getElementById("p-book-open-review-email");
+    const resendReviewEmailBtn = document.getElementById("p-book-resend-review-email");
+    const deliveryFeedbackEl = document.getElementById("p-book-email-delivery-feedback");
     const entriesEl = document.getElementById("p-book-entries");
     const exportBtn = document.getElementById("export-p-chart-btn");
     const emailBtn = document.getElementById("email-p-chart-btn");
@@ -2846,6 +2853,26 @@
     let submissionInFlight = false;
     let pendingSubmissionKey = null;
     let openSubmissionConfirmed = false;
+    let currentReviewRequest = null;
+
+    function reviewMailto(requestInfo) {
+      const params = new URLSearchParams();
+      params.set("subject", "A Woodshed Woodchuck P-Chart is ready for your review");
+      params.set("body", `Please review this P-Chart securely:\n${requestInfo.url}\n\nPlease do not forward this private link.`);
+      return `mailto:${encodeURIComponent(requestInfo.email)}?${params.toString().replace(/\+/g, "%20")}`;
+    }
+
+    function showReviewDelivery(payload) {
+      const verification = payload.chart?.verification;
+      const verifier = verification?.verifier;
+      if (!deliveryPanel || !verification || !verifier || !payload.review_url) return;
+      currentReviewRequest = { id: verification.id, email: verifier.email, url: payload.review_url };
+      deliveryPanel.hidden = false;
+      deliveryStatusEl.textContent = payload.email_delivery?.message || "P-Chart saved; no new email was sent.";
+      reviewLinkEl.href = payload.review_url;
+      reviewLinkEl.textContent = payload.review_url;
+      deliveryFeedbackEl.textContent = "";
+    }
 
     if (openDialog && submitOpenBtn && chooseVerifierBtn && cancelOpenBtn) {
       submitOpenBtn.addEventListener("click", function () {
@@ -3518,14 +3545,14 @@
 
         feedbackEl.textContent = verifierId
           ? (
-              `A new page was added and sent to ` +
-              `${verifierName}. Verification is pending. ` +
+              `A new page was added for ${verifierName}. Verification is pending. ` +
               `+${dandelionsEarned} dandelions added.`
             )
           : (
               `A new Open P-Chart was saved. ` +
               `+${dandelionsEarned} dandelions added.`
             );
+        if (verifierId) showReviewDelivery(createdPayload);
 
         minutesEl.value = "";
         noteEl.value = "";
@@ -3564,6 +3591,26 @@
         }
       });
     }
+
+    if (copyReviewLinkBtn) copyReviewLinkBtn.addEventListener("click", async function () {
+      if (!currentReviewRequest) return;
+      try { await navigator.clipboard.writeText(currentReviewRequest.url); deliveryFeedbackEl.textContent = "Review link copied."; }
+      catch (_error) { deliveryFeedbackEl.textContent = "Select and copy the review link above."; }
+    });
+    if (openReviewEmailBtn) openReviewEmailBtn.addEventListener("click", function () {
+      if (currentReviewRequest) window.location.href = reviewMailto(currentReviewRequest);
+    });
+    if (resendReviewEmailBtn) resendReviewEmailBtn.addEventListener("click", async function () {
+      if (!currentReviewRequest) return;
+      resendReviewEmailBtn.disabled = true;
+      try {
+        const response = await fetch(`/practice-charts/verifications/${currentReviewRequest.id}/resend-email`, { method: "POST", credentials: "same-origin" });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.detail || "The review email could not be resent.");
+        deliveryStatusEl.textContent = payload.email_delivery.message;
+      } catch (error) { deliveryFeedbackEl.textContent = error.message || "The review email could not be resent."; }
+      finally { resendReviewEmailBtn.disabled = false; }
+    });
 
     if (emailBtn) {
       emailBtn.addEventListener("click", function () {

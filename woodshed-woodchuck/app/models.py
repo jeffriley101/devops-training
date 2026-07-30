@@ -193,6 +193,11 @@ class TrustedVerifierInvitation(Base):
         nullable=True,
     )
 
+    last_email_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_email_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    email_attempt_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
+    last_email_error_code: Mapped[str | None] = mapped_column(String(40), nullable=True)
+
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=utc_now,
@@ -524,6 +529,11 @@ class PracticeChartVerification(Base):
         DateTime(timezone=True),
         nullable=True,
     )
+
+    last_email_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_email_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    email_attempt_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
+    last_email_error_code: Mapped[str | None] = mapped_column(String(40), nullable=True)
 
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

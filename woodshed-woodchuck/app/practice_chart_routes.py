@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
+import logging
+from datetime import timezone
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, HTTPException, Request
@@ -9,9 +11,11 @@ from sqlalchemy import distinct, func, select
 
 from .account_routes import current_profile
 from .db import SessionLocal
+from .email_service import DeliveryResult, EmailService, public_link
 from .models import (
     PracticeChart,
     PracticeChartVerification,
+    StudentVerifierConnection,
     TrustedVerifier,
 )
 from .practice_charts import (
@@ -25,6 +29,32 @@ router = APIRouter(
 )
 
 CENTRAL = ZoneInfo("America/Chicago")
+RESEND_COOLDOWN = timedelta(seconds=60)
+DAILY_EMAIL_CAP = 20
+logger = logging.getLogger(__name__)
+
+
+def _aware(value: datetime | None) -> datetime | None:
+    if value is None or value.tzinfo is not None:
+        return value
+    return value.replace(tzinfo=timezone.utc)
+
+
+def record_verification_delivery(session, verification, result: DeliveryResult) -> None:
+    now = datetime.now(timezone.utc)
+    previous = _aware(verification.last_email_attempt_at)
+    verification.email_attempt_count = (verification.email_attempt_count or 0) + 1 if previous and previous.date() == now.date() else 1
+    verification.last_email_attempt_at = now
+    verification.last_email_sent_at = now if result.sent else verification.last_email_sent_at
+    verification.last_email_error_code = None if result.sent else result.code
+    session.commit(); session.refresh(verification)
+    if not result.sent:
+        logger.warning("pchart_email_failed record_id=%s code=%s", verification.id, result.code)
+
+
+def email_delivery_payload(result: DeliveryResult, email: str) -> dict[str, object]:
+    message = f"Email sent to {email}" if result.sent else ("Email service is not configured" if result.code == "not_configured" else "Saved, but email could not be sent")
+    return {"sent": result.sent, "code": result.code, "message": message}
 
 
 def practice_streak(practice_dates: list[date], today: date) -> int:
@@ -112,6 +142,10 @@ def verification_payload(
             if verification.responded_at is not None
             else None
         ),
+        "last_email_attempt_at": verification.last_email_attempt_at.isoformat() if verification.last_email_attempt_at else None,
+        "last_email_sent_at": verification.last_email_sent_at.isoformat() if verification.last_email_sent_at else None,
+        "email_attempt_count": verification.email_attempt_count,
+        "last_email_error_code": verification.last_email_error_code,
     }
 
 
@@ -260,6 +294,25 @@ def create_student_practice_chart(
             else None
         )
 
+        delivery = None
+        review_url = None
+        verifier_role = None
+        if created.verification is not None and verifier is not None:
+            connection = session.scalar(select(StudentVerifierConnection).where(
+                StudentVerifierConnection.profile_id == profile.id,
+                StudentVerifierConnection.verifier_id == verifier.id,
+                StudentVerifierConnection.status == "accepted",
+            ))
+            verifier_role = connection.role if connection else "trusted_verifier"
+            review_url = public_link(f"/trusted-verifiers/dashboard#verification-{created.verification.id}")
+            if created.created:
+                delivery = EmailService().send_practice_chart(
+                    recipient=verifier.email, student_name=profile.display_name,
+                    practice_date=created.chart.practice_date.isoformat(), minutes=created.chart.minutes,
+                    role=verifier_role, review_url=review_url,
+                )
+                record_verification_delivery(session, created.verification, delivery)
+
         return {
             "created": created.created,
             "streak": profile_practice_streak(session, profile.id),
@@ -268,4 +321,49 @@ def create_student_practice_chart(
                 created.verification,
                 verifier,
             ),
+            "review_url": review_url,
+            "verifier_role": verifier_role,
+            "email_delivery": email_delivery_payload(delivery, verifier.email) if delivery and verifier else None,
+        }
+
+
+@router.post("/verifications/{verification_id}/resend-email")
+def resend_practice_chart_email(request: Request, verification_id: int):
+    with SessionLocal() as session:
+        profile = current_profile(request, session)
+        if profile is None:
+            raise HTTPException(status_code=401, detail="Student sign-in is required.")
+        row = session.execute(
+            select(PracticeChartVerification, PracticeChart, TrustedVerifier, StudentVerifierConnection)
+            .join(PracticeChart, PracticeChart.id == PracticeChartVerification.practice_chart_id)
+            .join(TrustedVerifier, TrustedVerifier.id == PracticeChartVerification.verifier_id)
+            .join(StudentVerifierConnection, StudentVerifierConnection.verifier_id == TrustedVerifier.id)
+            .where(
+                PracticeChartVerification.id == verification_id,
+                PracticeChart.profile_id == profile.id,
+                StudentVerifierConnection.profile_id == profile.id,
+                StudentVerifierConnection.status == "accepted",
+            )
+        ).first()
+        if row is None:
+            raise HTTPException(status_code=404, detail="Verification request was not found.")
+        verification, chart, verifier, connection = row
+        if verification.status != "pending":
+            raise HTTPException(status_code=400, detail="Only pending requests can be resent.")
+        now = datetime.now(timezone.utc); previous = _aware(verification.last_email_attempt_at)
+        if previous and previous.date() == now.date() and (verification.email_attempt_count or 0) >= DAILY_EMAIL_CAP:
+            raise HTTPException(status_code=429, detail="Daily email limit reached. Try again tomorrow.")
+        if previous and now - previous < RESEND_COOLDOWN:
+            raise HTTPException(status_code=429, detail="Please wait 60 seconds before resending.")
+        review_url = public_link(f"/trusted-verifiers/dashboard#verification-{verification.id}")
+        delivery = EmailService().send_practice_chart(
+            recipient=verifier.email, student_name=profile.display_name,
+            practice_date=chart.practice_date.isoformat(), minutes=chart.minutes,
+            role=connection.role, review_url=review_url,
+        )
+        record_verification_delivery(session, verification, delivery)
+        return {
+            "resent": delivery.sent, "verification": verification_payload(verification, verifier),
+            "review_url": review_url, "verifier_role": connection.role,
+            "email_delivery": email_delivery_payload(delivery, verifier.email),
         }

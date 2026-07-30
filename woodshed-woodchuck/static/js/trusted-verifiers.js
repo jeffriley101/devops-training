@@ -22,6 +22,9 @@
   const copyFeedback = document.querySelector(
     "#trusted-verifier-copy-feedback"
   );
+  const deliveryStatus = document.querySelector("#trusted-verifier-delivery-status");
+  const openEmailButton = document.querySelector("#trusted-verifier-open-email");
+  const resendEmailButton = document.querySelector("#trusted-verifier-resend-email");
   const connectionList = document.querySelector(
     "#trusted-verifier-connection-list"
   );
@@ -30,6 +33,7 @@
   );
 
   let currentInvitationUrl = "";
+  let currentInvitation = null;
 
   const roleLabel = (role) =>
     String(role || "")
@@ -100,15 +104,14 @@
   };
 
   const showInvitationLink = (payload) => {
-    currentInvitationUrl = new URL(
-      payload.accept_path,
-      window.location.origin
-    ).toString();
+    currentInvitationUrl = payload.accept_url || new URL(payload.accept_path, window.location.origin).toString();
+    currentInvitation = payload.invitation || currentInvitation;
 
     inviteLink.textContent = currentInvitationUrl;
     inviteLink.href = currentInvitationUrl;
     successPanel.hidden = false;
     copyFeedback.textContent = "";
+    deliveryStatus.textContent = payload.email_delivery?.message || "Invitation saved.";
   };
 
   const openInvitationEmail = (
@@ -196,8 +199,7 @@
     invitation
   ) => {
     const confirmed = window.confirm(
-      "Create a new private invitation link for " +
-      `${invitation.email}? The previous link will stop working.`
+      `Resend the invitation email to ${invitation.email}?`
     );
 
     if (!confirmed) {
@@ -213,7 +215,7 @@
         (
           "/trusted-verifiers/invitations/" +
           invitation.id +
-          "/reissue"
+          "/resend-email"
         ),
         {
           method: "POST",
@@ -231,24 +233,18 @@
       if (!response.ok) {
         throw new Error(
           payload.detail ||
-          "The invitation link could not be reissued."
+          "The invitation email could not be resent."
         );
       }
 
       showInvitationLink(payload);
-      openInvitationEmail(
-        invitation.email,
-        invitation.role
-      );
-
-      copyFeedback.textContent =
-        "New link created. The previous link no longer works.";
+      copyFeedback.textContent = payload.email_delivery?.message || "Invitation email attempted.";
 
       await loadVerifiers();
     } catch (error) {
       errorText.textContent =
         error.message ||
-        "The invitation link could not be reissued.";
+        "The invitation email could not be resent.";
     } finally {
       button.disabled = false;
     }
@@ -333,7 +329,7 @@
           `${roleLabel(invitation.role)} · Pending`,
           [
             {
-              label: "Reissue Link",
+              label: "Resend Email",
               className: "btn-secondary",
               onClick: (button) =>
                 runReissueAction(
@@ -397,10 +393,7 @@
       }
 
       showInvitationLink(payload);
-      openInvitationEmail(
-        recipientEmail,
-        invitationRole
-      );
+      currentInvitation = { ...payload.invitation, email: recipientEmail, role: invitationRole };
       form.reset();
 
       await loadVerifiers();
@@ -426,6 +419,14 @@
       copyFeedback.textContent =
         "Select and copy the invitation link above.";
     }
+  });
+
+  openEmailButton.addEventListener("click", () => {
+    if (currentInvitation) openInvitationEmail(currentInvitation.email, currentInvitation.role);
+  });
+
+  resendEmailButton.addEventListener("click", async () => {
+    if (currentInvitation) await runReissueAction(resendEmailButton, currentInvitation);
   });
 
   loadVerifiers().catch((error) => {
