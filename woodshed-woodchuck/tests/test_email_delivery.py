@@ -211,3 +211,35 @@ def test_password_and_token_are_absent_from_failure_logs(mail_database, monkeypa
     logs = caplog.text
     assert "app-password-secret" not in logs
     assert response.json()["invitation_token"] not in logs
+
+
+def test_confirmation_ui_is_status_only_and_original_controls_remain() -> None:
+    pbook = (ROOT / "templates/p_book.html").read_text(encoding="utf-8")
+    invitations = (ROOT / "templates/trusted_verifiers.html").read_text(encoding="utf-8")
+    app_js = (ROOT / "static/js/app.js").read_text(encoding="utf-8")
+    verifier_js = (ROOT / "static/js/trusted-verifiers.js").read_text(encoding="utf-8")
+    chart_routes = (ROOT / "app/practice_chart_routes.py").read_text(encoding="utf-8")
+    invitation_routes = (ROOT / "app/verifier_routes.py").read_text(encoding="utf-8")
+
+    assert 'id="p-book-email-delivery-status"' in pbook
+    for redundant in (
+        "p-book-review-link", "p-book-copy-review-link",
+        "p-book-open-review-email", "p-book-resend-review-email",
+    ):
+        assert redundant not in pbook + app_js
+    assert "Review link" not in pbook
+    assert "Copy Review Link" not in pbook
+    assert "Open in my email app" not in pbook
+    assert "Resend Email" not in pbook
+    assert 'id="trusted-verifier-open-email"' not in invitations
+    assert 'id="trusted-verifier-resend-email"' not in invitations
+
+    assert 'type="submit">Submit to Log Book</button>' in pbook
+    assert 'id="email-p-chart-btn"' in pbook
+    assert 'id="trusted-verifier-invite-form"' in invitations
+    assert 'id="trusted-verifier-copy-link"' in invitations
+    assert "showReviewDeliveryStatus" in app_js
+    assert "email_delivery?.message" in app_js + verifier_js
+    assert '@router.post("/verifications/{verification_id}/resend-email")' in chart_routes
+    assert '@router.post("/invitations/{invitation_id}/resend-email")' in invitation_routes
+    assert "respond_to_practice_chart_verification" in invitation_routes

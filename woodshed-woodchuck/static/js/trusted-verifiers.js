@@ -23,8 +23,6 @@
     "#trusted-verifier-copy-feedback"
   );
   const deliveryStatus = document.querySelector("#trusted-verifier-delivery-status");
-  const openEmailButton = document.querySelector("#trusted-verifier-open-email");
-  const resendEmailButton = document.querySelector("#trusted-verifier-resend-email");
   const connectionList = document.querySelector(
     "#trusted-verifier-connection-list"
   );
@@ -33,7 +31,6 @@
   );
 
   let currentInvitationUrl = "";
-  let currentInvitation = null;
 
   const roleLabel = (role) =>
     String(role || "")
@@ -105,7 +102,6 @@
 
   const showInvitationLink = (payload) => {
     currentInvitationUrl = payload.accept_url || new URL(payload.accept_path, window.location.origin).toString();
-    currentInvitation = payload.invitation || currentInvitation;
 
     inviteLink.textContent = currentInvitationUrl;
     inviteLink.href = currentInvitationUrl;
@@ -393,7 +389,6 @@
       }
 
       showInvitationLink(payload);
-      currentInvitation = { ...payload.invitation, email: recipientEmail, role: invitationRole };
       form.reset();
 
       await loadVerifiers();
@@ -419,14 +414,6 @@
       copyFeedback.textContent =
         "Select and copy the invitation link above.";
     }
-  });
-
-  openEmailButton.addEventListener("click", () => {
-    if (currentInvitation) openInvitationEmail(currentInvitation.email, currentInvitation.role);
-  });
-
-  resendEmailButton.addEventListener("click", async () => {
-    if (currentInvitation) await runReissueAction(resendEmailButton, currentInvitation);
   });
 
   loadVerifiers().catch((error) => {
