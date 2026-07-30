@@ -7,7 +7,17 @@
   const EFFECT_NAMES = [
     "correctTrivia", "incorrectTrivia", "dandelionEarned",
     "campPointEarned", "pChartSubmitted", "crownEarned", "dialClick",
-    "secretReward",
+    "secretReward", "goatTracker", "questCompleted", "bandCampBonus",
+    "marchingCompleted", "practiceRoomOpen", "medalEarned",
+  ];
+  // Add only approved local recordings here after placing them in static/audio/goats/.
+  // The empty pool is intentional until licensed clips are supplied.
+  const GOAT_CLIP_URLS = [];
+  const EXPECTED_GOAT_CLIP_URLS = [
+    "/static/audio/goats/baby-goat-1.mp3",
+    "/static/audio/goats/baby-goat-2.mp3",
+    "/static/audio/goats/baby-goat-3.mp3",
+    "/static/audio/goats/baby-goat-4.mp3",
   ];
   let enabled = readBoolean(STORAGE_ENABLED, true);
   let volume = readVolume();
@@ -15,6 +25,9 @@
   let unlockPending = null;
   let graph = null;
   let crownUntil = 0;
+  let goatPlayers = [];
+  let goatPoolLoading = false;
+  let lastGoatIndex = -1;
   const lastPlayed = new Map();
 
   function readBoolean(key, fallback) {
@@ -78,8 +91,77 @@
       envelope: { attack: 0.001, decay: 0.025, sustain: 0, release: 0.01 },
       volume: -29,
     }).connect(filter);
-    graph = { master, filter, chime, warm, wood, click };
+    const flourish = new Tone.PolySynth(Tone.Synth, {
+      maxPolyphony: 6,
+      options: {
+        oscillator: { type: "triangle8" },
+        envelope: { attack: 0.006, decay: 0.16, sustain: 0.08, release: 0.45 },
+        volume: -18,
+      },
+    }).connect(filter);
+    const doorFilter = new Tone.Filter({ frequency: 380, type: "bandpass", Q: 1.2 }).connect(master);
+    const door = new Tone.NoiseSynth({
+      noise: { type: "brown" },
+      envelope: { attack: 0.08, decay: 0.38, sustain: 0, release: 0.18 },
+      volume: -28,
+    }).connect(doorFilter);
+    const goatGain = new Tone.Gain(0.35).connect(master);
+    graph = { master, filter, chime, warm, wood, click, flourish, doorFilter, door, goatGain };
+    buildGoatPool(Tone, goatGain);
     return graph;
+  }
+
+  function isLocalGoatUrl(url) {
+    return typeof url === "string" &&
+      /^\/static\/audio\/goats\/[a-z0-9][a-z0-9._-]*\.(mp3|ogg|wav)$/i.test(url);
+  }
+
+  function buildGoatPool(Tone, output) {
+    if (goatPlayers.length || goatPoolLoading || !GOAT_CLIP_URLS.length) return;
+    goatPoolLoading = true;
+    const loads = GOAT_CLIP_URLS.filter(isLocalGoatUrl).map(async function (url) {
+      try {
+        const response = await window.fetch(url, { credentials: "same-origin" });
+        if (!response.ok) return null;
+        const decoded = await Tone.getContext().decodeAudioData(await response.arrayBuffer());
+        const player = new Tone.Player({ url: decoded, autostart: false, loop: false });
+        player.connect(output);
+        return player;
+      } catch (_error) {
+        return null;
+      }
+    });
+    Promise.all(loads).then(function (players) {
+      goatPlayers = players.filter(Boolean);
+    }).catch(function () {}).finally(function () {
+      goatPoolLoading = false;
+    });
+  }
+
+  function chooseGoatIndex(length, randomValue) {
+    if (length < 1) return -1;
+    let index = Math.min(length - 1, Math.floor(randomValue * length));
+    if (length > 1 && index === lastGoatIndex) index = (index + 1) % length;
+    return index;
+  }
+
+  function playGoat() {
+    const readyPlayers = goatPlayers.filter(function (player) {
+      return player && player.loaded === true;
+    });
+    if (!readyPlayers.length) return false;
+    const index = chooseGoatIndex(readyPlayers.length, Math.random());
+    if (index < 0) return false;
+    goatPlayers.forEach(function (player) {
+      try { if (player.state === "started") player.stop(); } catch (_error) {}
+    });
+    try {
+      readyPlayers[index].start();
+      lastGoatIndex = index;
+      return true;
+    } catch (_error) {
+      return false;
+    }
   }
 
   function applyOutputLevel() {
@@ -110,7 +192,12 @@
     if (!enabled || !unlocked || !graph || !EFFECT_NAMES.includes(name)) return false;
     const nowMs = Date.now();
     if (name !== "crownEarned" && nowMs < crownUntil) return false;
-    const quietPeriod = name === "dialClick" ? 55 : 120;
+    const quietPeriods = {
+      dialClick: 55, goatTracker: 900, questCompleted: 700,
+      bandCampBonus: 600, marchingCompleted: 600,
+      practiceRoomOpen: 700, medalEarned: 1000,
+    };
+    const quietPeriod = quietPeriods[name] || 120;
     if (nowMs - (lastPlayed.get(name) || 0) < quietPeriod) return false;
     lastPlayed.set(name, nowMs);
     return true;
@@ -143,6 +230,9 @@
         });
       } else if (name === "crownEarned") {
         crownUntil = Date.now() + 1800;
+        goatPlayers.forEach(function (player) {
+          try { if (player.state === "started") player.stop(); } catch (_error) {}
+        });
         [["C4", 0], ["E4", 0.16], ["G4", 0.32], ["C5", 0.52]].forEach(function (step) {
           graph.chime.triggerAttackRelease(step[0], 0.3, now + step[1], 0.42);
           if (step[1] >= 0.32) graph.warm.triggerAttackRelease(step[0], 0.38, now + step[1], 0.22);
@@ -153,6 +243,33 @@
         ["A3", "D4", "F4"].forEach(function (note, index) {
           graph.warm.triggerAttackRelease(note, 0.18, now + index * 0.14, 0.3);
         });
+      } else if (name === "goatTracker") {
+        return playGoat();
+      } else if (name === "questCompleted") {
+        graph.wood.triggerAttackRelease("C4", 0.08, now, 0.38);
+        graph.wood.triggerAttackRelease("G4", 0.08, now + 0.13, 0.32);
+        graph.chime.triggerAttackRelease("C5", 0.3, now + 0.28, 0.38);
+        graph.chime.triggerAttackRelease("E5", 0.34, now + 0.4, 0.3);
+      } else if (name === "bandCampBonus") {
+        [0, 0.09, 0.18, 0.3].forEach(function (offset, index) {
+          graph.click.triggerAttackRelease(0.035, now + offset, index === 3 ? 0.26 : 0.18);
+        });
+        graph.chime.triggerAttackRelease("G4", 0.22, now + 0.4, 0.28);
+      } else if (name === "marchingCompleted") {
+        [0, 0.15, 0.3].forEach(function (offset, index) {
+          graph.wood.triggerAttackRelease(index === 2 ? "D4" : "C4", 0.06, now + offset, 0.3);
+        });
+        graph.chime.triggerAttackRelease("D5", 0.25, now + 0.43, 0.34);
+      } else if (name === "practiceRoomOpen") {
+        graph.doorFilter.frequency.setValueAtTime(300, now);
+        graph.doorFilter.frequency.exponentialRampToValueAtTime(1250, now + 0.48);
+        graph.door.triggerAttackRelease(0.5, now, 0.24);
+        graph.chime.triggerAttackRelease("A4", 0.24, now + 0.48, 0.24);
+      } else if (name === "medalEarned") {
+        [["G4", 0], ["B4", 0.18], ["D5", 0.36]].forEach(function (step) {
+          graph.flourish.triggerAttackRelease(step[0], 0.3, now + step[1], 0.36);
+        });
+        graph.chime.triggerAttackRelease(["G4", "B4", "D5"], 0.42, now + 0.56, 0.28);
       }
       return true;
     } catch (_error) {
@@ -245,5 +362,7 @@
     isEnabled: function () { return enabled; },
     getVolume: function () { return volume; },
     effectNames: EFFECT_NAMES.slice(),
+    goatClipUrls: GOAT_CLIP_URLS.slice(),
+    expectedGoatClipUrls: EXPECTED_GOAT_CLIP_URLS.slice(),
   };
 }());

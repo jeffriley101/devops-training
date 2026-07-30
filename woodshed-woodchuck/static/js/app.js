@@ -18,6 +18,12 @@
     }
   }
 
+  function playNewMedalIfConfirmed(payload) {
+    if (payload && payload.medal_newly_earned === true) {
+      playSound("medalEarned");
+    }
+  }
+
   function celebrateSuccess(origin) {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const burst = document.createElement("div");
@@ -303,6 +309,7 @@
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.detail || "The secret could not be checked.");
         playNewCrownIfConfirmed(payload);
+        playNewMedalIfConfirmed(payload);
         const next = stateApi.getState();
         if (Number.isInteger(payload.credits)) next.progress.credits = payload.credits;
         if (Number.isInteger(payload.revision)) next.account.serverRevision = payload.revision;
@@ -584,7 +591,7 @@
           errorEl.textContent = "Quest completion could not be saved. Please try again.";
           return;
         }
-        playSound("dandelionEarned");
+        playSound("questCompleted");
       } else {
         stateApi.saveState(next);
       }
@@ -1246,6 +1253,7 @@
           throw new Error(payload.detail || "Camp points could not be saved.");
         }
         playNewCrownIfConfirmed(payload);
+        playNewMedalIfConfirmed(payload);
         if (payload.award && payload.award.activity_type) {
           serverConfirmedAwards.add(payload.award.activity_type);
         }
@@ -1486,7 +1494,7 @@
           }
           if (persistedAward.created === true) {
             awardContest(next, "hours");
-            playCampReward(false);
+            playSound("bandCampBonus");
           } else if (!hasAward(next, "hours")) {
             next.bandCamp.daily.awarded.push("hours");
           }
@@ -1569,6 +1577,7 @@
         }
         const isCorrect = checkedAnswer.correct === true;
         playNewCrownIfConfirmed(checkedAnswer);
+        playNewMedalIfConfirmed(checkedAnswer);
 
         serverConfirmedTriviaAttempt = {
           selected_answer_id: checkedAnswer.selected_answer_id,
@@ -1637,7 +1646,7 @@
         next.bandCamp.daily.marchingComplete = true;
         if (persistedAward.created === true) {
           awardContest(next, "marching");
-          playCampReward(false);
+          playSound("marchingCompleted");
         } else if (!hasAward(next, "marching")) {
           next.bandCamp.daily.awarded.push("marching");
         }
@@ -2722,6 +2731,8 @@
     controls.forEach((control) => {
       control.addEventListener("click", function () {
         const key = control.dataset.shopPanel;
+        if (key === "goat") playSound("goatTracker");
+        if (key === "practice-room") playSound("practiceRoomOpen");
         panels.forEach((panel) => { panel.hidden = panel.dataset.shopPanelContent !== key; });
         title.textContent = titles[key] || "Shop feature";
         activator = control;
@@ -3431,6 +3442,7 @@
           throw new Error("The saved P-Chart response could not be read.");
         }
         playNewCrownIfConfirmed(createdPayload);
+        playNewMedalIfConfirmed(createdPayload);
         if (createdPayload.created === true) {
           celebrateSuccess(form);
           playSound("pChartSubmitted");

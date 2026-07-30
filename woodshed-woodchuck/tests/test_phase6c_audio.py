@@ -17,8 +17,8 @@ def test_tone_is_exactly_pinned_local_licensed_and_loaded_in_order():
     assert "MIT License" in license_file.read_text()
     assert "cdn" not in BASE.casefold()
     tone_pos = BASE.index('/static/vendor/tone/Tone.js?v=15.1.22')
-    audio_pos = BASE.index('/static/js/audio.js?v=1')
-    app_pos = BASE.index('/static/js/app.js?v=21')
+    audio_pos = BASE.index('/static/js/audio.js?v=2')
+    app_pos = BASE.index('/static/js/app.js?v=22')
     assert tone_pos < audio_pos < app_pos
 
 
@@ -57,7 +57,7 @@ def test_all_named_synthesized_effects_route_to_one_master_without_loops():
         assert f'"{effect}"' in AUDIO
     assert "new Tone.Gain(outputLevel()).toDestination()" in AUDIO
     assert ".connect(master)" in AUDIO
-    assert "loop" not in AUDIO.casefold()
+    assert "loop: true" not in AUDIO.casefold()
     assert "crownUntil" in AUDIO
     assert "lastPlayed" in AUDIO
 
@@ -70,7 +70,7 @@ def test_confirmed_action_triggers_and_silent_restoration_paths():
     assert "playCampReward(true)" in APP
     assert 'if (createdPayload.created === true)' in APP
     assert 'playSound("pChartSubmitted")' in APP
-    assert APP.count("playCampReward(false)") == 3
+    assert APP.count("playCampReward(false)") == 1
     assert 'payload.crown_newly_earned === true' in APP
     hydration = APP[APP.index("async function loadPersistedCampAwards"):APP.index("function setButtonComplete")]
     assert "playSound(" not in hydration
