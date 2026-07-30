@@ -34,6 +34,7 @@ from .content import (
     SAX_VIKING_WELCOME,
 )
 from .instruments import instrument_definition_payloads
+from .models import WoodchuckState
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -72,6 +73,16 @@ NAV_ITEMS = [
 
 
 def _render(request: Request, template_name: str, **context: object):
+    account_state_bootstrap = None
+    with SessionLocal() as session:
+        profile = current_profile(request, session)
+        if profile is not None:
+            saved_state = session.get(WoodchuckState, profile.id)
+            account_state_bootstrap = {
+                "state": saved_state.state_json if saved_state else None,
+                "revision": saved_state.revision if saved_state else 0,
+            }
+
     return templates.TemplateResponse(
         request=request,
         name=template_name,
@@ -82,6 +93,7 @@ def _render(request: Request, template_name: str, **context: object):
             "quest_pool": QUEST_POOL,
             "sax_viking_messages": SAX_VIKING_MESSAGES,
             "instrument_definitions": instrument_definition_payloads(),
+            "account_state_bootstrap": account_state_bootstrap,
             **context,
         },
     )

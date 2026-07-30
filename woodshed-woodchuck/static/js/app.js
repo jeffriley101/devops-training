@@ -258,7 +258,7 @@
       if (!Number.isInteger(payload.streak) || payload.streak < 0) return;
       const next = stateApi.getState();
       next.progress.streak = payload.streak;
-      stateApi.saveState(next);
+      stateApi.saveState(next, { sync: false });
       hydrateHome(next);
     } catch (_error) {
       // Retain the last known server-derived value while offline.
@@ -1111,7 +1111,6 @@
     function prepareCurrentDay(current) {
       if (current.bandCamp.daily.dateKey !== today) {
         current.bandCamp.daily = freshBandCampDay(today);
-        stateApi.saveState(current);
       }
 
       return current;
@@ -1253,7 +1252,7 @@
         if (activityType === "marching") next.bandCamp.daily.marchingComplete = true;
       });
 
-      stateApi.saveState(next);
+      stateApi.saveState(next, { sync: false });
       renderBoard(next);
     }
 
@@ -2895,7 +2894,7 @@
 
         next.practiceLog = next.practiceLog.slice(0, 100);
 
-        stateApi.saveState(next);
+        stateApi.saveState(next, { sync: false });
         renderEntries(next);
         renderPBookSummary(next);
 
@@ -3308,7 +3307,6 @@
   }
 
   const state = ensureTodayQuest(stateApi.getState());
-  stateApi.saveState(state);
 
   if (!routeGuard(state)) return;
 

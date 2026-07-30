@@ -1,5 +1,24 @@
 (function () {
   const STORAGE_KEY = "woodshedWoodchuckState.v1";
+  let serverBootstrap = null;
+
+  const bootstrapElement = document.getElementById(
+    "account-state-bootstrap"
+  );
+  if (bootstrapElement) {
+    try {
+      const parsedBootstrap = JSON.parse(bootstrapElement.textContent);
+      if (
+        parsedBootstrap &&
+        parsedBootstrap.state &&
+        typeof parsedBootstrap.state === "object"
+      ) {
+        serverBootstrap = parsedBootstrap;
+      }
+    } catch (_error) {
+      serverBootstrap = null;
+    }
+  }
 
   function localDateKey(date = new Date()) {
     const y = date.getFullYear();
@@ -166,6 +185,17 @@
   }
 
   function getState() {
+    if (serverBootstrap) {
+      const bootstrap = serverBootstrap;
+      serverBootstrap = null;
+      const restored = migrateToV4(bootstrap.state);
+      restored.account.serverRevision = Number.isInteger(bootstrap.revision)
+        ? bootstrap.revision
+        : restored.account.serverRevision;
+      saveState(restored, { sync: false });
+      return restored;
+    }
+
     const raw = window.localStorage.getItem(STORAGE_KEY);
 
     if (!raw) {
