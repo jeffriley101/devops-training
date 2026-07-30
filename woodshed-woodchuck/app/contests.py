@@ -17,6 +17,7 @@ from .db import SessionLocal
 from .instruments import INSTRUMENTS_BY_LABEL
 from .models import (
     CampPointAward,
+    DailyTriviaAttempt,
     Contest,
     ContestResult,
     ContestWeek,
@@ -80,6 +81,74 @@ router = APIRouter(prefix="/contests", tags=["contests"])
 class CampPointAwardCreate(BaseModel):
     activity_type: str
     activity_date: date
+
+
+class TriviaAnswerSubmission(BaseModel):
+    activity_date: date
+    selected_answer_id: str
+
+
+TRIVIA_QUESTIONS = (
+    {"id": "whole-note-44", "question": "How many beats does a whole note receive in 4/4 time?", "choices": (
+        {"id": "two", "text": "2"}, {"id": "three", "text": "3"}, {"id": "four", "text": "4"},
+    ), "correct_answer_id": "four"},
+    {"id": "gradually-louder", "question": "Which word means to gradually get louder?", "choices": (
+        {"id": "crescendo", "text": "Crescendo"}, {"id": "diminuendo", "text": "Diminuendo"}, {"id": "fermata", "text": "Fermata"},
+    ), "correct_answer_id": "crescendo"},
+    {"id": "conductor-upbeat", "question": "What does a conductor’s upbeat usually help signal?", "choices": (
+        {"id": "entrance", "text": "An entrance"}, {"id": "break", "text": "A break"}, {"id": "rehearsal-end", "text": "The end of rehearsal"},
+    ), "correct_answer_id": "entrance"},
+    {"id": "stronger-wind-tone", "question": "What should most wind players use for a stronger tone?", "choices": (
+        {"id": "less-air", "text": "Less air"}, {"id": "more-air", "text": "More air"}, {"id": "tighter-stand", "text": "A tighter music stand"},
+    ), "correct_answer_id": "more-air"},
+    {"id": "piano-marking", "question": "What does the marking piano mean?", "choices": (
+        {"id": "softly", "text": "Play softly"}, {"id": "quickly", "text": "Play quickly"}, {"id": "stop", "text": "Stop playing"},
+    ), "correct_answer_id": "softly"},
+    {"id": "brass-section", "question": "Which section usually includes trumpets and trombones?", "choices": (
+        {"id": "woodwinds", "text": "Woodwinds"}, {"id": "brass", "text": "Brass"}, {"id": "percussion", "text": "Percussion"},
+    ), "correct_answer_id": "brass"},
+    {"id": "metronome-purpose", "question": "What does a metronome help a musician maintain?", "choices": (
+        {"id": "tempo", "text": "Tempo"}, {"id": "instrument-color", "text": "Instrument color"}, {"id": "stand-height", "text": "Music-stand height"},
+    ), "correct_answer_id": "tempo"},
+)
+
+
+def trivia_question_for(activity_date: date) -> dict[str, object]:
+    return TRIVIA_QUESTIONS[
+        activity_date.timetuple().tm_yday % len(TRIVIA_QUESTIONS)
+    ]
+
+
+def public_trivia_question(activity_date: date) -> dict[str, object]:
+    question = trivia_question_for(activity_date)
+    return {
+        "id": question["id"],
+        "question": question["question"],
+        "choices": [dict(choice) for choice in question["choices"]],
+    }
+
+
+def trivia_selected_choice(
+    activity_date: date, stored_answer: object, *, correct: bool
+) -> dict[str, str] | None:
+    """Resolve stable IDs and unambiguous legacy answer text."""
+    question = trivia_question_for(activity_date)
+    choices = question["choices"]
+    if not isinstance(stored_answer, str):
+        return None
+    value = stored_answer.strip()
+    candidates = [choice for choice in choices if value in (choice["id"], choice["text"])]
+    if value.isdigit():
+        legacy_index = int(value)
+        if 0 <= legacy_index < len(choices):
+            candidates.append(choices[legacy_index])
+    matching = {
+        choice["id"]: choice for choice in candidates
+        if (choice["id"] == question["correct_answer_id"]) is correct
+    }
+    if len(matching) == 1:
+        return dict(next(iter(matching.values())))
+    return None
 
 
 def central_week_boundaries(
@@ -1212,8 +1281,31 @@ def daily_camp_point_awards(
             CampPointAward.profile_id == profile.id,
             CampPointAward.duplicate_key.like(f"{prefix}%"),
         )).all()
+        trivia_attempt = session.scalar(select(DailyTriviaAttempt).where(
+            DailyTriviaAttempt.profile_id == profile.id,
+            DailyTriviaAttempt.activity_date == activity_date,
+        ))
+        trivia_attempt_payload = None
+        if trivia_attempt is not None:
+            selected_choice = trivia_selected_choice(
+                activity_date, trivia_attempt.selected_answer,
+                correct=trivia_attempt.correct,
+            )
+            trivia_attempt_payload = {
+                "selected_answer_id": selected_choice["id"] if selected_choice else None,
+                "correct": trivia_attempt.correct,
+            }
+        elif any(award.activity_type == "trivia" for award in awards):
+            # Pre-attempt-ledger trivia awards prove the submitted choice was
+            # correct; reconstruct that server-authored option for compatibility.
+            question = trivia_question_for(activity_date)
+            trivia_attempt_payload = {
+                "selected_answer_id": question["correct_answer_id"],
+                "correct": True,
+            }
         return {
             "activity_date": activity_date.isoformat(),
+            "trivia_question": public_trivia_question(activity_date),
             **student_camp_point_totals(
                 session, profile_id=profile.id, now=now
             ),
@@ -1225,6 +1317,82 @@ def daily_camp_point_awards(
                 }
                 for award in awards
             ],
+            "trivia_attempt": trivia_attempt_payload,
+        }
+
+
+@router.post("/trivia/answer")
+def check_trivia_answer(
+    request: Request,
+    submitted: TriviaAnswerSubmission,
+) -> dict[str, object]:
+    with SessionLocal() as session:
+        profile = current_profile(request, session)
+        if profile is None:
+            raise HTTPException(status_code=401, detail="Student sign-in is required.")
+        now = datetime.now(timezone.utc)
+        today = now.astimezone(CENTRAL).date()
+        if submitted.activity_date != today:
+            raise HTTPException(status_code=400, detail="Trivia can only be answered for today.")
+        question = trivia_question_for(today)
+        choice = next(
+            (item for item in question["choices"] if item["id"] == submitted.selected_answer_id),
+            None,
+        )
+        if choice is None:
+            raise HTTPException(status_code=400, detail="Choose one of today’s answers.")
+        attempt = session.scalar(select(DailyTriviaAttempt).where(
+            DailyTriviaAttempt.profile_id == profile.id,
+            DailyTriviaAttempt.activity_date == today,
+        ))
+        created = attempt is None
+        if attempt is None:
+            attempt = DailyTriviaAttempt(
+                profile_id=profile.id,
+                activity_date=today,
+                selected_answer=choice["id"],
+                correct=choice["id"] == question["correct_answer_id"],
+            )
+            session.add(attempt)
+            try:
+                session.flush()
+            except IntegrityError:
+                session.rollback()
+                attempt = session.scalar(select(DailyTriviaAttempt).where(
+                    DailyTriviaAttempt.profile_id == profile.id,
+                    DailyTriviaAttempt.activity_date == today,
+                ))
+                if attempt is None:
+                    raise HTTPException(status_code=500, detail="Trivia could not be saved.")
+                created = False
+        award = None
+        award_created = False
+        if attempt.correct:
+            award, award_created = create_camp_point_award(
+                session,
+                profile=profile,
+                activity_type="trivia",
+                activity_date=today,
+                now=now,
+            )
+            _reconcile_crown_categories(session, profile_id=profile.id)
+        session.commit()
+        return {
+            "question": question["question"],
+            "selected_answer_id": (
+                (trivia_selected_choice(
+                    today, attempt.selected_answer, correct=attempt.correct
+                ) or {}).get("id")
+            ),
+            "correct": attempt.correct,
+            "created": created,
+            "award_created": award_created,
+            "award": ({
+                "activity_type": award.activity_type,
+                "points_awarded": award.points_awarded,
+                "occurred_at": utc_iso(award.occurred_at),
+            } if award is not None else None),
+            **student_camp_point_totals(session, profile_id=profile.id, now=now),
         }
 
 

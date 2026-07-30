@@ -137,7 +137,7 @@
     if (state.profile.level) levelEl.value = state.profile.level;
     if (state.profile.goal) goalEl.value = state.profile.goal;
 
-    form.addEventListener("submit", function (event) {
+    form.addEventListener("submit", async function (event) {
       const woodchuckName = woodchuckNameEl.value.trim();
       const instrument = instrumentEl.value.trim();
       const level = levelEl.value.trim();
@@ -157,7 +157,7 @@
       next.profile.createdAt = next.profile.createdAt || new Date().toISOString();
 
       ensureTodayQuest(next);
-      stateApi.saveState(next);
+      stateApi.saveState(next, { sync: false });
     });
   }
 
@@ -241,9 +241,64 @@
     if (dandelionObjectEl) {
       dandelionObjectEl.setAttribute(
         "aria-label",
-        `${dandelions} dandelions. Open the shop.`
+        window.location.pathname === "/store"
+          ? `${dandelions} dandelions.`
+          : `${dandelions} dandelions. Open the shop.`
       );
     }
+  }
+
+  function wireShedSecret() {
+    const trigger = document.getElementById("shed-secret-button");
+    const panel = document.getElementById("shed-secret-panel");
+    const form = document.getElementById("shed-secret-form");
+    const input = document.getElementById("shed-secret-passcode");
+    const feedback = document.getElementById("shed-secret-feedback");
+    if (!trigger || !panel || !form || !input || !feedback) return;
+    const closeButtons = [
+      document.getElementById("shed-secret-cancel"),
+      document.getElementById("shed-secret-close"),
+    ].filter(Boolean);
+    function close() {
+      panel.hidden = true;
+      panel.classList.add("hidden");
+      trigger.setAttribute("aria-expanded", "false");
+      input.value = "";
+      trigger.focus();
+    }
+    trigger.addEventListener("click", function () {
+      panel.hidden = false;
+      panel.classList.remove("hidden");
+      trigger.setAttribute("aria-expanded", "true");
+      feedback.textContent = "";
+      input.focus();
+    });
+    closeButtons.forEach((button) => button.addEventListener("click", close));
+    form.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      const submit = form.querySelector("button[type='submit']");
+      submit.disabled = true;
+      try {
+        const response = await fetch("/account/daily-secret", {
+          method: "POST", credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ passcode: input.value }),
+        });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.detail || "The secret could not be checked.");
+        const next = stateApi.getState();
+        if (Number.isInteger(payload.credits)) next.progress.credits = payload.credits;
+        if (Number.isInteger(payload.revision)) next.account.serverRevision = payload.revision;
+        stateApi.saveState(next, { sync: false });
+        hydrateHome(next);
+        feedback.textContent = payload.redeemed ? "+20 dandelions" : "Already found today. Come back tomorrow!";
+        if (payload.redeemed) celebrateSuccess(form);
+      } catch (error) {
+        feedback.textContent = error.message || "That passcode did not match. Try again.";
+      } finally {
+        submit.disabled = false;
+      }
+    });
   }
 
   async function refreshPracticeStreak() {
@@ -285,7 +340,7 @@
     Flute: "Use the head joint trick if you're having a hard time getting notes out.",
     Clarinet: "Cover the holes all the way to prevent squawking.",
     Saxophone: "Use full tone, but don't play loud.",
-    Trumpet: "Keep getting faster... Then one day we will show you double-tonguing!",
+    Trumpet: "Build speed gradually with relaxed, even articulation.",
     Trombone: "Use more air!",
     Tuba: "Big air. Let the room rumble.",
     Percussion: "Paradiddles are like tongue-twisters for drummers.",
@@ -331,6 +386,11 @@
 
       if (completeBtn && s.daily.completed) {
         completeBtn.textContent = "Quest Complete";
+        completeBtn.classList.add("is-confirmed-success");
+        completeBtn.disabled = true;
+      } else if (completeBtn) {
+        completeBtn.classList.remove("is-confirmed-success");
+        completeBtn.disabled = false;
       }
     }
 
@@ -439,7 +499,7 @@
       });
     }
 
-    form.addEventListener("submit", function (event) {
+    form.addEventListener("submit", async function (event) {
       event.preventDefault();
       errorEl.textContent = "";
 
@@ -474,7 +534,8 @@
         return;
       }
 
-      if (next.daily.loggedMinutes >= next.daily.targetMinutes) {
+      const completedNow = next.daily.loggedMinutes >= next.daily.targetMinutes;
+      if (completedNow) {
         next.daily.completed = true;
         next.daily.completedAt = new Date().toISOString();
         next.progress.credits += next.daily.rewardCredits;
@@ -491,7 +552,16 @@
       }
 
       next.daily.encouragement = feedbackEl.querySelector("p:last-child").textContent;
-      stateApi.saveState(next);
+      if (completedNow && window.WWAccountSync) {
+        stateApi.saveState(next, { sync: false });
+        const confirmed = await window.WWAccountSync.syncNow();
+        if (!confirmed) {
+          errorEl.textContent = "Quest completion could not be saved. Please try again.";
+          return;
+        }
+      } else {
+        stateApi.saveState(next);
+      }
       renderQuestStatus(next);
       hydrateHome(next);
       minutesEl.value = "";
@@ -998,44 +1068,6 @@
     window.addEventListener("pagehide", stopMetronome);
   }
 
-  const BAND_CAMP_TRIVIA = [
-    {
-      question: "How many beats does a whole note receive in 4/4 time?",
-      options: ["2", "3", "4"],
-      answer: 2,
-    },
-    {
-      question: "Which word means to gradually get louder?",
-      options: ["Crescendo", "Diminuendo", "Fermata"],
-      answer: 0,
-    },
-    {
-      question: "What does a conductor’s upbeat usually help signal?",
-      options: ["An entrance", "A break", "The end of rehearsal"],
-      answer: 0,
-    },
-    {
-      question: "What should most wind players use for a stronger tone?",
-      options: ["Less air", "More air", "A tighter music stand"],
-      answer: 1,
-    },
-    {
-      question: "What does the marking piano mean?",
-      options: ["Play softly", "Play quickly", "Stop playing"],
-      answer: 0,
-    },
-    {
-      question: "Which section usually includes trumpets and trombones?",
-      options: ["Woodwinds", "Brass", "Percussion"],
-      answer: 1,
-    },
-    {
-      question: "What does a metronome help a musician maintain?",
-      options: ["Tempo", "Instrument color", "Music-stand height"],
-      answer: 0,
-    },
-  ];
-
   const BAND_CAMP_MARCHING_CHALLENGES = [
     "Mark time for one minute while counting evenly.",
     "Practice eight steps forward while keeping your upper body still.",
@@ -1089,8 +1121,7 @@
 
     const today = stateApi.localDateKey();
     const dayIndex = getDayIndex(new Date());
-    const trivia =
-      BAND_CAMP_TRIVIA[dayIndex % BAND_CAMP_TRIVIA.length];
+    let trivia = null;
     const marchingChallenge =
       BAND_CAMP_MARCHING_CHALLENGES[
         dayIndex % BAND_CAMP_MARCHING_CHALLENGES.length
@@ -1169,6 +1200,7 @@
 
     const campAwardsInFlight = new Set();
     const serverConfirmedAwards = new Set();
+    let serverConfirmedTriviaAttempt = null;
 
     async function persistCampPoint(activityType) {
       if (campAwardsInFlight.has(activityType)) return null;
@@ -1205,9 +1237,15 @@
 
     function renderActivityDisclosure(details, summary, activityType) {
       if (!details || !summary) return;
-      const complete = serverConfirmedAwards.has(activityType);
-      summary.textContent = complete
-        ? "Completed · +1 Camp Point · +1 dandelion"
+      const complete = activityType === "trivia"
+        ? serverConfirmedTriviaAttempt !== null
+        : serverConfirmedAwards.has(activityType);
+      const rewarded = activityType !== "trivia"
+        || serverConfirmedTriviaAttempt?.correct === true;
+      summary.innerHTML = complete && rewarded
+        ? '+1 Camp Point · +1 dandelion <span class="confirmed-checkmark" aria-hidden="true">✓</span><span class="sr-only"> Completed</span>'
+        : complete
+          ? 'Attempt used <span class="confirmed-checkmark" aria-hidden="true">✓</span><span class="sr-only"> Completed; no reward earned</span>'
         : activityType === "trivia"
           ? "One attempt per day"
           : "Not completed today";
@@ -1227,8 +1265,12 @@
       );
       if (!response.ok) return;
       const payload = await response.json();
+      if (payload.trivia_question && Array.isArray(payload.trivia_question.choices)) {
+        trivia = payload.trivia_question;
+      }
       const awards = Array.isArray(payload.awards) ? payload.awards : [];
       const next = prepareCurrentDay(stateApi.getState());
+      const triviaAttempt = payload.trivia_attempt;
 
       if (playerWeeklyPointsEl && Number.isInteger(payload.weekly_points)) {
         playerWeeklyPointsEl.textContent = String(payload.weekly_points);
@@ -1252,6 +1294,13 @@
         if (activityType === "marching") next.bandCamp.daily.marchingComplete = true;
       });
 
+      if (triviaAttempt && Object.hasOwn(triviaAttempt, "selected_answer_id")) {
+        serverConfirmedTriviaAttempt = triviaAttempt;
+        next.bandCamp.daily.triviaAttempted = true;
+        next.bandCamp.daily.triviaCorrect = triviaAttempt.correct === true;
+        next.bandCamp.daily.triviaSelectedAnswer = triviaAttempt.selected_answer_id;
+      }
+
       stateApi.saveState(next, { sync: false });
       renderBoard(next);
     }
@@ -1261,25 +1310,37 @@
 
       button.disabled = true;
       button.textContent = text;
+      button.classList.add("is-confirmed-success");
     }
 
     function renderTriviaOptions(current) {
       if (!triviaOptionsEl) return;
 
       triviaOptionsEl.replaceChildren();
+      if (!trivia) return;
+      const daily = current.bandCamp.daily;
+      const selectedAnswerId = serverConfirmedTriviaAttempt?.selected_answer_id
+        || daily.triviaSelectedAnswer;
 
-      trivia.options.forEach((option, index) => {
+      trivia.choices.forEach((choice) => {
         const label = document.createElement("label");
         label.className = "trivia-option";
 
         const input = document.createElement("input");
         input.type = "radio";
         input.name = "trivia-answer";
-        input.value = String(index);
-        input.disabled = current.bandCamp.daily.triviaAttempted;
+        input.value = choice.id;
+        input.checked = choice.id === selectedAnswerId;
+        input.disabled = daily.triviaAttempted;
+
+        label.classList.toggle("is-selected", input.checked);
+        label.classList.toggle(
+          "is-confirmed-success",
+          input.checked && daily.triviaAttempted && daily.triviaCorrect
+        );
 
         const text = document.createElement("span");
-        text.textContent = option;
+        text.textContent = choice.text;
 
         label.append(input, text);
         triviaOptionsEl.appendChild(label);
@@ -1306,6 +1367,8 @@
         const hoursComplete = serverConfirmedAwards.has("hours");
         hoursCheckbox.checked = hoursComplete;
         hoursCheckbox.disabled = hoursComplete;
+        const label = hoursCheckbox.closest("label");
+        if (label) label.classList.toggle("is-confirmed-success", hoursComplete);
       }
 
       if (serverConfirmedAwards.has("hours")) {
@@ -1316,7 +1379,7 @@
         hoursStatusEl.textContent = "Not completed today";
       }
 
-      if (daily.careComplete) {
+      if (serverConfirmedAwards.has("care")) {
         setButtonComplete(careButton, "Instrument ready ✓");
         if (careStatusEl) {
           careStatusEl.textContent = "Completed today";
@@ -1325,16 +1388,18 @@
         careStatusEl.textContent = "Not completed today";
       }
 
-      if (triviaQuestionEl) {
+      if (triviaQuestionEl && trivia) {
         triviaQuestionEl.textContent = trivia.question;
       }
 
       renderTriviaOptions(current);
 
       if (daily.triviaAttempted) {
-        setButtonComplete(
-          triviaButton,
-          daily.triviaCorrect ? "Correct ✓" : "Attempt used"
+        triviaButton.disabled = true;
+        triviaButton.textContent = daily.triviaCorrect ? "Correct ✓" : "Attempt used";
+        triviaButton.classList.toggle(
+          "is-confirmed-success",
+          serverConfirmedTriviaAttempt?.correct === true
         );
 
         if (triviaStatusEl) {
@@ -1350,7 +1415,7 @@
         marchingTextEl.textContent = marchingChallenge;
       }
 
-      if (daily.marchingComplete) {
+      if (serverConfirmedAwards.has("marching")) {
         setButtonComplete(
           marchingButton,
           "Challenge completed ✓"
@@ -1370,6 +1435,15 @@
     loadPersistedCampAwards().catch(() => {
       // Leave activities open when server completion cannot be confirmed.
     });
+
+    if (triviaOptionsEl) {
+      triviaOptionsEl.addEventListener("change", function () {
+        triviaOptionsEl.querySelectorAll(".trivia-option").forEach((label) => {
+          const input = label.querySelector('input[name="trivia-answer"]');
+          label.classList.toggle("is-selected", Boolean(input && input.checked));
+        });
+      });
+    }
 
     if (hoursCheckbox) {
       hoursCheckbox.addEventListener("change", async function () {
@@ -1449,27 +1523,50 @@
           return;
         }
 
-        const isCorrect = Number(selected.value) === trivia.answer;
+        let checkedAnswer;
+        try {
+          const response = await fetch("/contests/trivia/answer", {
+            method: "POST", credentials: "same-origin",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ activity_date: today, selected_answer_id: selected.value }),
+          });
+          checkedAnswer = await response.json();
+          if (!response.ok) throw new Error(checkedAnswer.detail || "Trivia could not be checked.");
+        } catch (error) {
+          feedbackEl.textContent = error.message || "Trivia could not be checked.";
+          return;
+        }
+        const isCorrect = checkedAnswer.correct === true;
+
+        serverConfirmedTriviaAttempt = {
+          selected_answer_id: checkedAnswer.selected_answer_id,
+          correct: isCorrect,
+        };
 
         next.bandCamp.daily.triviaAttempted = true;
         next.bandCamp.daily.triviaCorrect = isCorrect;
+        next.bandCamp.daily.triviaSelectedAnswer = checkedAnswer.selected_answer_id;
 
         if (isCorrect) {
-          try {
-            const persistedAward = await persistCampPoint("trivia");
-            if (persistedAward && persistedAward.created === true) {
-              celebrateSuccess(triviaForm);
-            }
-          } catch (error) {
-            feedbackEl.textContent = error.message || "Camp points could not be saved.";
-            return;
+          serverConfirmedAwards.add("trivia");
+          if (playerWeeklyPointsEl && Number.isInteger(checkedAnswer.weekly_points)) {
+            playerWeeklyPointsEl.textContent = String(checkedAnswer.weekly_points);
           }
-          awardContest(next, "trivia");
+          if (playerPointsEl && Number.isInteger(checkedAnswer.career_points)) {
+            playerPointsEl.textContent = String(checkedAnswer.career_points);
+          }
+          if (checkedAnswer.award_created === true) {
+            celebrateSuccess(triviaForm);
+            awardContest(next, "trivia");
+          } else if (!next.bandCamp.daily.awarded.includes("trivia")) {
+            next.bandCamp.daily.awarded.push("trivia");
+          }
+          window.dispatchEvent(new CustomEvent("ww:camp-points-saved"));
           feedbackEl.textContent =
             "Correct! +1 Camp Point and +1 dandelion.";
         } else {
           feedbackEl.textContent =
-            `Not quite. The correct answer was “${trivia.options[trivia.answer]}.”`;
+            "Not quite. No reward was earned today—thanks for giving it a try.";
         }
 
         stateApi.saveState(next);
@@ -1482,17 +1579,30 @@
       marchingButton.addEventListener("click", async function () {
         const next = prepareCurrentDay(stateApi.getState());
 
-        if (next.bandCamp.daily.marchingComplete) return;
+        if (next.bandCamp.daily.marchingComplete || marchingButton.disabled) return;
 
+        const readyText = marchingButton.textContent;
+        marchingButton.disabled = true;
+        marchingButton.textContent = "Saving challenge…";
+
+        let persistedAward;
         try {
-          await persistCampPoint("marching");
+          persistedAward = await persistCampPoint("marching");
+          if (!persistedAward) throw new Error("Marching challenge could not be saved.");
         } catch (error) {
+          marchingButton.disabled = false;
+          marchingButton.textContent = readyText;
+          marchingActivity.open = true;
           feedbackEl.textContent = error.message || "Camp points could not be saved.";
           return;
         }
 
         next.bandCamp.daily.marchingComplete = true;
-        awardContest(next, "marching");
+        if (persistedAward.created === true) {
+          awardContest(next, "marching");
+        } else if (!hasAward(next, "marching")) {
+          next.bandCamp.daily.awarded.push("marching");
+        }
         stateApi.saveState(next);
 
         feedbackEl.textContent =
@@ -1502,6 +1612,21 @@
         hydrateHome(next);
       });
     }
+  }
+
+  function wirePlungeBurrow() {
+    const button = document.getElementById("plunge-burrow-button");
+    const panel = document.getElementById("plunge-burrow-panel");
+    const close = document.getElementById("plunge-burrow-close");
+    if (!button || !panel || !close) return;
+    button.addEventListener("click", function () {
+      panel.hidden = false; panel.classList.remove("hidden");
+      button.setAttribute("aria-expanded", "true"); close.focus();
+    });
+    close.addEventListener("click", function () {
+      panel.hidden = true; panel.classList.add("hidden");
+      button.setAttribute("aria-expanded", "false"); button.focus();
+    });
   }
 
   function wireBandCampStandings() {
@@ -2297,13 +2422,12 @@
 
     function showError(message) {
       roots.forEach((root) => {
-        const loading = root.querySelector(".personal-crown-loading");
-        const error = root.querySelector(".personal-crown-error");
-        const content = root.querySelector(".personal-crown-content");
-        loading.classList.add("hidden");
-        content.classList.add("hidden");
-        error.textContent = message;
-        error.classList.remove("hidden");
+        root.querySelectorAll(".personal-crown-loading").forEach((element) => element.classList.add("hidden"));
+        root.querySelectorAll(".personal-crown-content").forEach((element) => element.classList.add("hidden"));
+        root.querySelectorAll(".personal-crown-error").forEach((element) => {
+          element.textContent = message;
+          element.classList.remove("hidden");
+        });
         root.setAttribute("aria-busy", "false");
       });
     }
@@ -2319,9 +2443,6 @@
 
     function render(progress) {
       roots.forEach((root) => {
-        const loading = root.querySelector(".personal-crown-loading");
-        const error = root.querySelector(".personal-crown-error");
-        const content = root.querySelector(".personal-crown-content");
         const status = root.querySelector(".personal-crown-status");
         const count = root.querySelector(".personal-crown-count strong");
         const meter = root.querySelector(".personal-crown-meter");
@@ -2331,21 +2452,20 @@
         const wins = progress.qualifying_wins;
         const target = progress.target_wins;
 
-        count.textContent = `${wins} of ${target} wins`;
-        meter.value = Math.min(wins, target);
-        meter.textContent = `${wins} of ${target} qualifying wins`;
-        meter.setAttribute(
-          "aria-label",
-          `Crown progress: ${wins} of ${target} qualifying wins`
-        );
-        if (progress.earned) {
+        if (count) count.textContent = `${wins} of ${target} wins`;
+        if (meter) {
+          meter.value = Math.min(wins, target);
+          meter.textContent = `${wins} of ${target} qualifying wins`;
+          meter.setAttribute("aria-label", `Crown progress: ${wins} of ${target} qualifying wins`);
+        }
+        if (progress.earned && status && remaining && date) {
           status.textContent = "👑 Permanent crown earned";
           status.classList.add("personal-crown-earned");
           remaining.textContent = "Permanent achievement — progress never resets.";
           const formattedDate = earnedDate(progress.earned_at);
           date.textContent = formattedDate ? `Earned ${formattedDate}` : "";
           date.classList.toggle("hidden", !formattedDate);
-        } else {
+        } else if (status && remaining && date) {
           status.textContent = "Keep going toward your permanent crown.";
           status.classList.remove("personal-crown-earned");
           const winsRemaining = progress.remaining_wins;
@@ -2362,17 +2482,20 @@
             name.textContent = `${category.earned ? "👑 " : ""}${category.name}`;
             const value = document.createElement("span");
             value.textContent = `${category.progress} / ${category.target}`;
+            const categoryEarnedDate = earnedDate(category.earned_at);
+            const detail = document.createElement("small");
+            detail.textContent = categoryEarnedDate ? `Earned ${categoryEarnedDate}` : "In progress";
             card.setAttribute(
               "aria-label",
               `${category.name}: ${category.progress} of ${category.target}${category.earned ? ", permanent crown earned" : ""}`
             );
-            card.append(name, value);
+            card.append(name, value, detail);
             categoryList.appendChild(card);
           });
         }
-        loading.classList.add("hidden");
-        error.classList.add("hidden");
-        content.classList.remove("hidden");
+        root.querySelectorAll(".personal-crown-loading").forEach((element) => element.classList.add("hidden"));
+        root.querySelectorAll(".personal-crown-error").forEach((element) => element.classList.add("hidden"));
+        root.querySelectorAll(".personal-crown-content").forEach((element) => element.classList.remove("hidden"));
         root.setAttribute("aria-busy", "false");
       });
     }
@@ -2531,43 +2654,54 @@
   }
 
   function wireShopPolish() {
-    const door = document.getElementById("practice-room-door");
-    const panel = document.getElementById("practice-room-panel");
-    if (door && panel) {
-      door.addEventListener("click", function () {
-        const opening = panel.hidden;
-        panel.hidden = !opening;
-        panel.classList.toggle("hidden", !opening);
-        door.setAttribute("aria-expanded", String(opening));
-        if (opening) panel.querySelector("h3").focus({ preventScroll: true });
-      });
+    const dialog = document.getElementById("shop-feature-dialog");
+    const closeButton = document.getElementById("shop-dialog-close");
+    const title = document.getElementById("shop-dialog-title");
+    const qrStatus = document.getElementById("shop-qr-status");
+    const controls = Array.from(document.querySelectorAll("[data-shop-panel]"));
+    if (!dialog || !closeButton || !title || !controls.length) return;
+    const panels = Array.from(dialog.querySelectorAll("[data-shop-panel-content]"));
+    const titles = {
+      crown: "Crown Progress", goat: "The GOAT Tracker",
+      "practice-definition": "Practice Definition", share: "Share Woodshed",
+      clothing: "Clothing Shelf", gear: "Gear Shelf",
+      "practice-room": "Practice Room", artist: "Artist",
+    };
+    let activator = null;
+
+    async function copyPublicAddress(control) {
+      const address = control.dataset.publicSiteUrl;
+      if (!address || !qrStatus) return;
+      try {
+        if (!navigator.clipboard || !navigator.clipboard.writeText) throw new Error("Clipboard unavailable");
+        await navigator.clipboard.writeText(address);
+        qrStatus.textContent = "Website address copied.";
+      } catch (_error) {
+        qrStatus.textContent = `The website address could not be copied. Use this link: ${address}`;
+      }
     }
 
-    const qrButton = document.getElementById("shop-qr-copy");
-    const qrStatus = document.getElementById("shop-qr-status");
-    if (qrButton && qrStatus) {
-      qrButton.addEventListener("click", async function () {
-        const address = qrButton.dataset.publicSiteUrl;
-        try {
-          if (navigator.clipboard && navigator.clipboard.writeText) {
-            await navigator.clipboard.writeText(address);
-          } else {
-            const fallback = document.createElement("textarea");
-            fallback.value = address;
-            fallback.setAttribute("readonly", "");
-            fallback.className = "sr-only";
-            document.body.appendChild(fallback);
-            fallback.select();
-            const copied = document.execCommand("copy");
-            fallback.remove();
-            if (!copied) throw new Error("Clipboard unavailable");
-          }
-          qrStatus.textContent = "Website address copied";
-        } catch (_error) {
-          qrStatus.textContent = `Copy this website address: ${address}`;
+    controls.forEach((control) => {
+      control.addEventListener("click", function () {
+        const key = control.dataset.shopPanel;
+        panels.forEach((panel) => { panel.hidden = panel.dataset.shopPanelContent !== key; });
+        title.textContent = titles[key] || "Shop feature";
+        activator = control;
+        if (key === "share") {
+          qrStatus.textContent = "";
+          copyPublicAddress(control);
         }
+        dialog.showModal();
+        title.focus({ preventScroll: true });
       });
-    }
+    });
+    closeButton.addEventListener("click", () => dialog.close());
+    dialog.addEventListener("click", function (event) {
+      if (event.target === dialog) dialog.close();
+    });
+    dialog.addEventListener("close", function () {
+      if (activator) activator.focus({ preventScroll: true });
+    });
   }
 
   function wirePBook(state) {
@@ -2579,6 +2713,7 @@
     const noteEl = document.getElementById("p-book-note");
     const practiceDetailEls = Array.from(document.querySelectorAll("input[name='practice-detail']"));
     const timerDisplayEl = document.getElementById("practice-timer-display");
+    const timerToggleBtn = document.getElementById("practice-timer-toggle-btn");
     const timerStartBtn = document.getElementById("practice-timer-start-btn");
     const timerStopBtn = document.getElementById("practice-timer-stop-btn");
     const timerFeedbackEl = document.getElementById("practice-timer-feedback");
@@ -2704,8 +2839,7 @@
         if (verifierHelpEl) {
           verifierHelpEl.textContent = connections.length
             ? (
-                "Choose one connected adult to review this " +
-                "P-Chart, or leave it open."
+                "Select a trusted verifier, or leave this Open."
               )
             : (
                 "No trusted verifiers are connected yet. " +
@@ -2926,6 +3060,8 @@
 
     let practiceTimerStartedAt = null;
     let practiceTimerInterval = null;
+    const PRACTICE_TIMER_LIMIT_SECONDS = 120 * 60;
+    const PRACTICE_TIMER_STORAGE_KEY = "woodshedPracticeTimerStartedAt";
 
     function formatTimerSeconds(totalSeconds) {
       const minutes = Math.floor(totalSeconds / 60);
@@ -2936,8 +3072,25 @@
     function updatePracticeTimerDisplay() {
       if (!timerDisplayEl || !practiceTimerStartedAt) return;
 
-      const elapsedSeconds = Math.max(0, Math.floor((Date.now() - practiceTimerStartedAt) / 1000));
+      const elapsedSeconds = Math.min(
+        PRACTICE_TIMER_LIMIT_SECONDS,
+        Math.max(0, Math.floor((Date.now() - practiceTimerStartedAt) / 1000))
+      );
       timerDisplayEl.textContent = formatTimerSeconds(elapsedSeconds);
+      if (elapsedSeconds >= PRACTICE_TIMER_LIMIT_SECONDS) {
+        stopPracticeTimerInterval();
+        practiceTimerStartedAt = null;
+        window.sessionStorage.removeItem(PRACTICE_TIMER_STORAGE_KEY);
+        minutesEl.value = "120";
+        if (timerFeedbackEl) timerFeedbackEl.textContent =
+          "Timer stopped at 2 hours. You can adjust your minutes before submitting.";
+        const toggle = document.getElementById("practice-timer-toggle-btn");
+        if (toggle) {
+          toggle.textContent = "Start Timer";
+          toggle.classList.remove("btn-red");
+          toggle.classList.add("btn-secondary");
+        }
+      }
     }
 
     function stopPracticeTimerInterval() {
@@ -2948,10 +3101,17 @@
     }
 
     function wirePracticeTimer() {
-      if (!timerDisplayEl || !timerStartBtn || !timerStopBtn || !minutesEl) return;
+      if (!timerDisplayEl || !timerToggleBtn || !timerStartBtn || !timerStopBtn || !minutesEl) return;
+
+      function renderTimerRunning(running) {
+        timerToggleBtn.textContent = running ? "Stop Timer" : "Start Timer";
+        timerToggleBtn.classList.toggle("btn-red", running);
+        timerToggleBtn.classList.toggle("btn-secondary", !running);
+      }
 
       timerStartBtn.addEventListener("click", function () {
         practiceTimerStartedAt = Date.now();
+        window.sessionStorage.setItem(PRACTICE_TIMER_STORAGE_KEY, String(practiceTimerStartedAt));
         stopPracticeTimerInterval();
         timerDisplayEl.textContent = "00:00";
         practiceTimerInterval = window.setInterval(updatePracticeTimerDisplay, 1000);
@@ -2959,6 +3119,7 @@
         if (timerFeedbackEl) {
           timerFeedbackEl.textContent = "Timer started. Go make some music.";
         }
+        renderTimerRunning(true);
       });
 
       timerStopBtn.addEventListener("click", function () {
@@ -2969,12 +3130,14 @@
           return;
         }
 
-        const elapsedSeconds = Math.max(0, Math.floor((Date.now() - practiceTimerStartedAt) / 1000));
+        const elapsedSeconds = Math.min(PRACTICE_TIMER_LIMIT_SECONDS, Math.max(0, Math.floor((Date.now() - practiceTimerStartedAt) / 1000)));
         const elapsedMinutes = Math.max(1, Math.round(elapsedSeconds / 60));
 
         stopPracticeTimerInterval();
         timerDisplayEl.textContent = formatTimerSeconds(elapsedSeconds);
         practiceTimerStartedAt = null;
+        window.sessionStorage.removeItem(PRACTICE_TIMER_STORAGE_KEY);
+        renderTimerRunning(false);
 
         const shouldFillMinutes = window.confirm(`Do you want to enter ${elapsedMinutes} practice minute${elapsedMinutes === 1 ? "" : "s"}?`);
         if (shouldFillMinutes) {
@@ -2986,6 +3149,21 @@
           timerFeedbackEl.textContent = "Timer stopped. Minutes were not added.";
         }
       });
+
+      timerToggleBtn.addEventListener("click", function () {
+        if (practiceTimerStartedAt) timerStopBtn.click();
+        else timerStartBtn.click();
+      });
+
+      const restoredStart = Number(window.sessionStorage.getItem(PRACTICE_TIMER_STORAGE_KEY));
+      if (Number.isFinite(restoredStart) && restoredStart > 0) {
+        practiceTimerStartedAt = restoredStart;
+        updatePracticeTimerDisplay();
+        if (practiceTimerStartedAt) {
+          practiceTimerInterval = window.setInterval(updatePracticeTimerDisplay, 1000);
+          renderTimerRunning(true);
+        }
+      }
     }
 
     function getRecentEmails(s, type) {
@@ -3312,12 +3490,14 @@
 
   wireSetupForm(state);
   hydrateHome(state);
+  wireShedSecret();
   refreshPracticeStreak();
   wireMetronome();
   wireTuner();
   wireMum(state);
   wireQuestForm(state);
   wireBandCamp(state);
+  wirePlungeBurrow();
   wireBandCampStandings();
   wirePastWinners();
   wireHallOfChampions();

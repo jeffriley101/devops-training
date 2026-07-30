@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from datetime import datetime, timezone
+import json
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Body, Form, HTTPException, Request
 from pydantic import BaseModel
 from fastapi.responses import JSONResponse
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .accounts import (
@@ -16,8 +21,9 @@ from .accounts import (
     update_profile_level,
 )
 from .instruments import INSTRUMENTS_BY_LABEL
+from .content import LEVEL_OPTIONS
 from .db import SessionLocal
-from .models import WoodchuckProfile, WoodchuckState
+from .models import RewardGrant, WoodchuckProfile, WoodchuckState
 
 
 router = APIRouter(prefix="/account", tags=["account"])
@@ -35,6 +41,14 @@ class DisplayNameUpdate(BaseModel):
 
 class LevelUpdate(BaseModel):
     level: str
+
+
+class DailySecretSubmission(BaseModel):
+    passcode: str
+
+
+SECRET_REWARD_TIMEZONE = ZoneInfo("America/Chicago")
+SECRET_REWARD_AMOUNT = 20
 
 
 def profile_payload(profile: WoodchuckProfile) -> dict[str, object]:
@@ -71,14 +85,47 @@ def current_profile(
 @router.post("/create")
 def create_account(
     request: Request,
-    display_name: str = Form(...),
-    pin: str = Form(...),
-    instrument: str = Form(...),
-    level: str = Form(...),
-    goal: str = Form(...),
+    display_name: str | None = Form(None),
+    pin: str | None = Form(None),
+    instrument: str | None = Form(None),
+    level: str | None = Form(None),
+    goal: str | None = Form(None),
+    initial_state: str | None = Form(None),
 ):
     with SessionLocal() as session:
+        existing_profile = current_profile(request, session)
+        if existing_profile is not None:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "A Woodchuck is already signed in. Use its existing "
+                    "Woodchuck ID and PIN instead of creating another account."
+                ),
+            )
+        if not isinstance(display_name, str) or not display_name.strip():
+            raise HTTPException(status_code=400, detail="Please name your Woodchuck.")
+        if not isinstance(instrument, str) or not instrument.strip():
+            raise HTTPException(status_code=400, detail="Please choose an instrument.")
+        instrument_key = " ".join(instrument.split()).casefold()
+        if instrument_key not in INSTRUMENTS_BY_LABEL:
+            raise HTTPException(status_code=400, detail="Please choose a supported instrument.")
+        if not isinstance(level, str) or not level.strip():
+            raise HTTPException(status_code=400, detail="Please choose a level.")
+        if level.strip() not in LEVEL_OPTIONS:
+            raise HTTPException(status_code=400, detail="Please choose a supported level.")
+        if not isinstance(goal, str) or not goal.strip():
+            raise HTTPException(status_code=400, detail="Please choose a practice goal.")
+        if not isinstance(pin, str) or len(pin) != 4 or not pin.isascii() or not pin.isdigit():
+            raise HTTPException(status_code=400, detail="Your PIN must contain exactly four digits.")
+        if not isinstance(initial_state, str) or not initial_state.strip():
+            raise HTTPException(status_code=400, detail="The initial Woodshed state is required.")
         try:
+            try:
+                submitted_state = json.loads(initial_state)
+            except json.JSONDecodeError as exc:
+                raise ValueError("The initial Woodshed state is malformed.") from exc
+            if not isinstance(submitted_state, dict):
+                raise ValueError("The initial Woodshed state must be an object.")
             profile = create_woodchuck_profile(
                 session,
                 display_name=display_name,
@@ -86,15 +133,50 @@ def create_account(
                 instrument=instrument,
                 level=level,
                 goal=goal,
+                commit=False,
             )
+            authoritative_state = deepcopy(submitted_state)
+            account = dict(authoritative_state.get("account") or {})
+            account.update({
+                "woodchuckId": profile.woodchuck_id,
+                "authenticated": True,
+                "serverRevision": 0,
+                "lastSyncedAt": None,
+            })
+            authoritative_state["account"] = account
+            browser_profile = dict(authoritative_state.get("profile") or {})
+            browser_profile.update({
+                "woodchuckName": profile.display_name,
+                "instrument": profile.instrument,
+                "level": profile.level,
+                "goal": profile.goal,
+                "createdAt": profile.created_at.isoformat(),
+            })
+            authoritative_state["profile"] = browser_profile
+            session.add(WoodchuckState(
+                profile_id=profile.id,
+                state_json=authoritative_state,
+                revision=0,
+            ))
+            session.commit()
         except ValueError as exc:
+            session.rollback()
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except Exception:
+            session.rollback()
+            raise
 
         request.session[SESSION_PROFILE_ID] = profile.id
 
         return {
             "authenticated": True,
             "profile": profile_payload(profile),
+            "credentials": {
+                "woodchuck_id": profile.woodchuck_id,
+                "pin": pin,
+            },
+            "state": authoritative_state,
+            "revision": 0,
         }
 
 
@@ -144,6 +226,51 @@ def logout(request: Request):
     request.session.clear()
 
     return {"authenticated": False}
+
+
+@router.post("/daily-secret")
+def redeem_daily_secret(request: Request, submitted: DailySecretSubmission):
+    if submitted.passcode.strip().casefold() != "union":
+        raise HTTPException(status_code=400, detail="That passcode did not match. Try again.")
+    with SessionLocal() as session:
+        profile = current_profile(request, session)
+        if profile is None:
+            raise HTTPException(status_code=401, detail="Student sign-in is required.")
+        activity_date = datetime.now(timezone.utc).astimezone(SECRET_REWARD_TIMEZONE).date()
+        source_key = f"daily-secret:{activity_date.isoformat()}"
+        existing = session.scalar(select(RewardGrant).where(
+            RewardGrant.profile_id == profile.id,
+            RewardGrant.source_key == source_key,
+            RewardGrant.reward_type == "dandelion",
+        ))
+        state = session.get(WoodchuckState, profile.id)
+        if existing is not None:
+            credits = ((state.state_json or {}).get("progress") or {}).get("credits", 0) if state else 0
+            return {"redeemed": False, "amount": 0, "credits": credits, "revision": state.revision if state else 0}
+        if state is None:
+            state = WoodchuckState(profile_id=profile.id, state_json={}, revision=0)
+            session.add(state)
+        payload = deepcopy(state.state_json or {})
+        progress = dict(payload.get("progress") or {})
+        credits = progress.get("credits", 0)
+        credits = credits if isinstance(credits, int) and not isinstance(credits, bool) else 0
+        progress["credits"] = credits + SECRET_REWARD_AMOUNT
+        payload["progress"] = progress
+        state.state_json = payload
+        state.revision += 1
+        session.add(RewardGrant(
+            profile_id=profile.id, contest_result_id=None,
+            source_key=source_key, reward_type="dandelion",
+            category_key=None, amount=SECRET_REWARD_AMOUNT,
+        ))
+        try:
+            session.commit()
+        except IntegrityError:
+            session.rollback()
+            current = session.get(WoodchuckState, profile.id)
+            current_credits = ((current.state_json or {}).get("progress") or {}).get("credits", 0) if current else 0
+            return {"redeemed": False, "amount": 0, "credits": current_credits, "revision": current.revision if current else 0}
+        return {"redeemed": True, "amount": SECRET_REWARD_AMOUNT, "credits": progress["credits"], "revision": state.revision}
 
 
 @router.patch("/profile/instrument")

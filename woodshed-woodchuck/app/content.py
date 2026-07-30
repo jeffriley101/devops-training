@@ -17,6 +17,11 @@ GOAL_OPTIONS = [
 
 SAX_VIKING_WELCOME = "Ahoy, musician! Set your path and let the woodshed sing."
 
+PRACTICE_DEFINITION = "Practice counts whenever you give your instrument real attention—playing it, cleaning it, fingering through music, or thinking about what you want to improve. Thinking-only time counts as half-minutes. We trust you to keep it honest!"
+
+ART_SUBMISSION_EMAIL = "woodshedwoodchuck@gmail.com"
+SHOP_SHARE_URL = "https://woodshed-woodchuck.onrender.com/"
+
 QUEST_POOL = {
     "Flute": [
         {

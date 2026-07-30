@@ -561,6 +561,30 @@ class CampPointAward(Base):
     )
 
 
+class DailyTriviaAttempt(Base):
+    __tablename__ = "daily_trivia_attempts"
+    __table_args__ = (
+        UniqueConstraint(
+            "profile_id",
+            "activity_date",
+            name="uq_daily_trivia_attempt_profile_date",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    profile_id: Mapped[int] = mapped_column(
+        ForeignKey("woodchuck_profiles.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    activity_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    selected_answer: Mapped[str] = mapped_column(String(200), nullable=False)
+    correct: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
+
+
 class Season(Base):
     __tablename__ = "seasons"
     __table_args__ = (

@@ -2,7 +2,7 @@ import os
 import base64
 from io import BytesIO
 from pathlib import Path
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import quote
 
 import qrcode
 import qrcode.image.svg
@@ -26,12 +26,15 @@ from .contests import router as contest_router
 from .contest_admin import router as contest_admin_router
 from .db import SessionLocal
 from .content import (
+    ART_SUBMISSION_EMAIL,
     GOAL_OPTIONS,
     INSTRUMENT_OPTIONS,
     LEVEL_OPTIONS,
     QUEST_POOL,
+    PRACTICE_DEFINITION,
     SAX_VIKING_MESSAGES,
     SAX_VIKING_WELCOME,
+    SHOP_SHARE_URL,
 )
 from .instruments import instrument_definition_payloads
 from .models import WoodchuckState
@@ -100,12 +103,7 @@ def _render(request: Request, template_name: str, **context: object):
 
 
 def public_site_url(request: Request) -> str:
-    candidate = os.getenv("PUBLIC_BASE_URL", "").strip() or str(request.base_url)
-    parsed = urlsplit(candidate)
-    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
-        raise ValueError("PUBLIC_BASE_URL must be an absolute HTTP or HTTPS URL.")
-    path = parsed.path.rstrip("/") + "/"
-    return urlunsplit((parsed.scheme, parsed.netloc, path, "", ""))
+    return SHOP_SHARE_URL
 
 
 def qr_data_uri(value: str) -> str:
@@ -114,6 +112,10 @@ def qr_data_uri(value: str) -> str:
     image.save(output)
     encoded = base64.b64encode(output.getvalue()).decode("ascii")
     return f"data:image/svg+xml;base64,{encoded}"
+
+
+def art_submission_mailto() -> str:
+    return f"mailto:{quote(ART_SUBMISSION_EMAIL, safe='@.+-_')}?subject=Woodshed%20Woodchuck%20Artwork"
 
 
 @app.get("/")
@@ -266,4 +268,6 @@ def store(request: Request):
     return _render(
         request, "store.html", title="shop", active_nav="store",
         public_site_url=site_url, public_site_qr=qr_data_uri(site_url),
+        practice_definition=PRACTICE_DEFINITION,
+        art_submission_mailto=art_submission_mailto(),
     )

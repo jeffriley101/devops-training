@@ -43,45 +43,26 @@
   async function uploadState(state) {
     const response = await fetch("/account/state", {
       method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(state),
     });
 
     if (!response.ok) {
       throw new Error(
-        await responseMessage(
-          response,
-          "The account was created, but the game could not be saved."
-        )
+        await responseMessage(response, "The game could not be saved.")
       );
     }
 
     const payload = await response.json();
-
     const latestState = stateApi.getState();
-    const latestAccount =
-      latestState.account && typeof latestState.account === "object"
-        ? latestState.account
-        : {};
-
-    const latestRevision =
-      Number.isInteger(payload.revision)
-        ? payload.revision
-        : Number.isInteger(latestAccount.serverRevision)
-          ? latestAccount.serverRevision
-          : 0;
-
     latestState.account = {
-      ...latestAccount,
-      serverRevision: latestRevision,
-      lastSyncedAt:
-        payload.last_synced_at || new Date().toISOString(),
+      ...(latestState.account || {}),
+      serverRevision: Number.isInteger(payload.revision)
+        ? payload.revision
+        : latestState.account.serverRevision || 0,
+      lastSyncedAt: payload.last_synced_at || new Date().toISOString(),
     };
-
     stateApi.saveState(latestState, { sync: false });
-
     return payload;
   }
 
@@ -122,6 +103,7 @@
     const accountIdEl = document.getElementById(
       "created-woodchuck-id"
     );
+    const accountPinEl = document.getElementById("created-pin");
     const copyButton = document.getElementById(
       "copy-woodchuck-id"
     );
@@ -155,9 +137,18 @@
         return;
       }
 
-      if (!instrument || !level || !goal) {
-        errorEl.textContent =
-          "Please choose an instrument, level, and goal.";
+      if (!instrument) {
+        errorEl.textContent = "Please choose an instrument.";
+        return;
+      }
+
+      if (!level) {
+        errorEl.textContent = "Please choose a level.";
+        return;
+      }
+
+      if (!goal) {
+        errorEl.textContent = "Please choose a practice goal.";
         return;
       }
 
@@ -175,6 +166,10 @@
       submitButton.textContent = "Creating Woodchuck...";
 
       try {
+        formData.set(
+          "initial_state",
+          JSON.stringify(stateApi.getState())
+        );
         const response = await fetch("/account/create", {
           method: "POST",
           body: formData,
@@ -191,16 +186,24 @@
 
         const payload = await response.json();
         const profile = payload.profile;
+        const state = payload.state;
 
-        const state = applyAccountProfile(
-          stateApi.getState(),
-          profile
-        );
+        if (!state || typeof state !== "object") {
+          throw new Error("The server did not return the new Woodshed.");
+        }
 
+        state.account = {
+          ...(state.account || {}),
+          serverRevision: Number.isInteger(payload.revision)
+            ? payload.revision
+            : 0,
+        };
         stateApi.saveState(state, { sync: false });
-        await uploadState(state);
 
         accountIdEl.textContent = profile.woodchuck_id;
+        if (accountPinEl) {
+          accountPinEl.textContent = payload.credentials.pin;
+        }
         successPanel.hidden = false;
         form.hidden = true;
 
@@ -418,6 +421,7 @@
           instrumentObject.title = "Change instrument";
         }
         feedback.textContent = `Instrument changed to ${payload.instrument}.`;
+        submitButton.classList.add("is-confirmed-success");
       } catch (error) {
         feedback.classList.add("error-text");
         feedback.textContent = error instanceof TypeError
@@ -479,6 +483,7 @@
         next.profile[stateKey] = payload[payloadKey];
         stateApi.saveState(next);
         feedback.textContent = `${kind === "name" ? "Name" : "Level"} changed successfully.`;
+        button.classList.add("is-confirmed-success");
         openButton.textContent = kind === "level"
           ? payload[payloadKey].charAt(0).toUpperCase()
           : payload[payloadKey];
@@ -583,11 +588,11 @@
   async function syncStateToServer() {
     const state = stateApi.getState();
 
-    if (!isPersistentAccount(state)) return;
+    if (!isPersistentAccount(state)) return false;
 
     if (syncInProgress) {
       pendingSync = true;
-      return;
+      return false;
     }
 
     syncInProgress = true;
@@ -606,13 +611,13 @@
       if (response.status === 401) {
         state.account.authenticated = false;
         stateApi.saveState(state, { sync: false });
-        return;
+        return false;
       }
 
       if (response.status === 409) {
         pendingSync = false;
         await recoverFromConflict(state);
-        return;
+        return false;
       }
 
       if (!response.ok) {
@@ -638,8 +643,10 @@
       };
 
       stateApi.saveState(latestState, { sync: false });
+      return true;
     } catch (error) {
       console.warn("Woodshed account sync failed:", error);
+      return false;
     } finally {
       syncInProgress = false;
 

@@ -30,7 +30,7 @@
     <section class="board-contests" aria-label="Band Camp contests">
       <details id="camp-hours-activity" class="board-contest-card board-activity" open>
         <summary>
-          <span>Band Camp Hours Bonus</span>
+          <span>Band Camp Bonus</span>
           <small id="camp-hours-summary">Not completed today</small>
         </summary>
         <div class="board-activity-body">
@@ -405,6 +405,11 @@
     Each contest win earns one Camp Point and one dandelion.
   </p>
 
+  <section class="board-panel plunge-burrow" aria-labelledby="plunge-burrow-title">
+    <button id="plunge-burrow-button" class="btn btn-secondary" type="button" aria-controls="plunge-burrow-panel" aria-expanded="false"><span aria-hidden="true">🕳️</span> <span id="plunge-burrow-title">Plunge Burrow</span></button>
+    <div id="plunge-burrow-panel" class="mentor-card hidden" hidden><p>Coming Soon</p><button id="plunge-burrow-close" class="btn btn-secondary" type="button">Close</button></div>
+  </section>
+
   <section class="board-practice-section bonus-challenge-section" aria-labelledby="bonus-challenge-title">
     <div class="section-head">
       <p id="bonus-challenge-title" class="chip bonus-challenge-title"><span aria-hidden="true">🏆</span> Bonus Challenge</p>
@@ -419,14 +424,14 @@
     <div class="button-row">
       <button
         id="choose-quest-btn"
-        class="btn btn-secondary"
+        class="btn btn-secondary quest-stereo-dial"
         type="button"
       >
         Choose Another Challenge
       </button>
       <button
         id="skip-quest-btn"
-        class="btn btn-red"
+        class="btn btn-red quest-stereo-dial"
         type="button"
       >
         Skip Challenge
@@ -461,22 +466,13 @@
 
       <button
         id="complete-quest-btn"
-        class="btn btn-primary"
+        class="btn btn-primary quest-stereo-dial"
         type="submit"
       >
-        I played it!
+        I Played It
       </button>
     </form>
 
-    <article
-      id="quest-feedback"
-      class="board-practice-feedback mt-md"
-      aria-live="polite"
-    >
-      <p id="instrument-advice">
-        “Scales today, legends tomorrow.”
-      </p>
-    </article>
   </section>
 </section>
 

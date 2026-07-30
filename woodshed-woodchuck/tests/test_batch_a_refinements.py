@@ -50,12 +50,13 @@ def test_book_definition_position_magenta_button_and_timer_cleanup() -> None:
     book = (ROOT / "templates/p_book.html").read_text(encoding="utf-8")
     css = (ROOT / "static/css/styles.css").read_text(encoding="utf-8")
     definition = (
-        "Anytime you are messing with your instrument—giving it attention in any way—counts as practice. "
-        "Minutes spent thinking about your instrument can count as half-minutes. We’re on the honor system here!"
+        "Practice counts whenever you give your instrument real attention—playing it, cleaning it, fingering through music, "
+        "or thinking about what you want to improve. Thinking-only time counts as half-minutes. We trust you to keep it honest!"
     )
-    assert definition in book
-    assert book.index("Manage Trusted Verifiers") < book.index(definition) < book.index("Submit to Log Book")
-    assert "practice-minutes-definition" in book and ".practice-minutes-definition" in css
+    content = (ROOT / "app/content.py").read_text(encoding="utf-8")
+    assert definition not in book
+    assert definition in content
+    assert "practice-minutes-definition" not in book
     assert "p-book-verifier-manage" in book
     assert "#c72c83" in css and "#83124f" in css
     assert ".p-book-action-column .btn,\n.p-book-verifier-manage" in css

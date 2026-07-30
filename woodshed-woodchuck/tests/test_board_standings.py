@@ -187,7 +187,8 @@ def test_shop_renders_accessible_personal_crown_progress() -> None:
     assert "Gold wins in Top Five Minutes Leaders qualify" in shop
     assert "Silver, Bronze, and instrument participation do not count" in shop
     assert 'id="board-crown-title"' not in board
-    assert 'id="shop-crown-title"' in shop
+    assert 'data-shop-panel="crown"' in shop
+    assert 'data-shop-panel-content="crown"' in shop
 
 
 def test_crown_javascript_handles_earned_unearned_date_and_above_ten() -> None:
@@ -293,7 +294,8 @@ def test_camp_point_actions_persist_and_guard_duplicate_clicks() -> None:
     assert "campAwardsInFlight.has(activityType)" in javascript
     assert 'await persistCampPoint("hours")' in javascript
     assert 'await persistCampPoint("care")' in javascript
-    assert 'await persistCampPoint("trivia")' in javascript
+    assert 'fetch("/contests/trivia/answer"' in javascript
+    assert 'serverConfirmedAwards.add("trivia")' in javascript
     assert 'await persistCampPoint("marching")' in javascript
     assert 'activity_date: today' in javascript
     assert 'new CustomEvent("ww:camp-points-saved")' in javascript

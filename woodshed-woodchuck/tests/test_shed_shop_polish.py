@@ -112,11 +112,12 @@ def test_practice_room_is_local_expandable_and_has_tool_slots() -> None:
     store = (ROOT / "templates/store.html").read_text(encoding="utf-8")
     assert "Practice Room" in store
     assert "🚪" in store
-    assert 'aria-controls="practice-room-panel"' in store
+    assert 'data-shop-panel="practice-room"' in store
+    assert 'data-shop-panel-content="practice-room"' in store
     assert "Trombone Practice Tool" in store
     assert "More Practice Tools" in store
     assert store.count("Coming Soon") >= 2
-    practice_section = store[store.index("practice-room-hub"):store.index("shop-share-card")]
+    practice_section = store[store.index('data-shop-panel-content="practice-room"'):store.index('data-shop-panel-content="artist"')]
     assert "href=" not in practice_section
     assert "http://" not in practice_section and "https://" not in practice_section
 
@@ -126,9 +127,9 @@ def test_donate_moved_once_to_shop_and_qr_is_accessible() -> None:
     store = (ROOT / "templates/store.html").read_text(encoding="utf-8")
     assert "venmo.com/u/jeffriley101" not in home
     assert store.count("venmo.com/u/jeffriley101") == 1
-    assert "Donate — Support the Shed Project" in store
-    assert 'alt="QR code for the Woodshed Woodchuck website"' in store
-    assert "Open the Woodshed website" in store
+    assert 'aria-label="Donate"' in store
+    assert 'alt="QR code for the public Woodshed Woodchuck website at {{ public_site_url }}"' in store
+    assert "Open the Woodshed website" not in store
     assert 'data-public-site-url="{{ public_site_url }}"' in store
 
 
@@ -138,7 +139,7 @@ def test_qr_receives_only_configured_public_site_url(monkeypatch: pytest.MonkeyP
     monkeypatch.setattr(main, "qr_data_uri", lambda value: captured.append(value) or "data:image/svg+xml;base64,SAFE")
     response = TestClient(main.app).get("/store")
     assert response.status_code == 200
-    assert captured == ["https://woodshed.example/app/"]
+    assert captured == ["https://woodshed-woodchuck.onrender.com/"]
     assert "private=ignored" not in response.text
     assert "Website address copied" in (ROOT / "static/js/app.js").read_text(encoding="utf-8")
     assert "navigator.clipboard.writeText(address)" in (ROOT / "static/js/app.js").read_text(encoding="utf-8")
@@ -169,9 +170,11 @@ def test_bonus_challenge_and_success_confetti_hooks() -> None:
     assert "Practice Challenge" not in board
     assert "Bonus Challenge" in board and "🏆" in board
     assert "bonus-challenge-section" in board and ".board-practice-section.bonus-challenge-section" in css
-    assert 'persistCampPoint("trivia")' in javascript
+    assert 'fetch("/contests/trivia/answer"' in javascript
+    assert 'serverConfirmedAwards.add("trivia")' in javascript
     assert "persistedAward.created === true" in javascript
-    wrong_branch = javascript[javascript.index("} else {", javascript.index('persistCampPoint("trivia")')):javascript.index("stateApi.saveState(next)", javascript.index('persistCampPoint("trivia")'))]
+    wrong_start = javascript.index('feedbackEl.textContent =\n            "Not quite.')
+    wrong_branch = javascript[wrong_start:javascript.index("stateApi.saveState(next)", wrong_start)]
     assert "celebrateSuccess" not in wrong_branch
     assert "createdPayload.created === true" in javascript
     assert 'celebrateSuccess(form)' in javascript

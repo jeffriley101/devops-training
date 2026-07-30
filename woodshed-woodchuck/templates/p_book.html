@@ -97,10 +97,6 @@
       Leave this blank to save an Open P-Chart to your account.
     </p>
 
-    <aside class="practice-minutes-definition">
-      Anytime you are messing with your instrument—giving it attention in any way—counts as practice. Minutes spent thinking about your instrument can count as half-minutes. We’re on the honor system here!
-    </aside>
-
     <label class="contest-opt-in-control" for="p-book-include-contests">
       <input id="p-book-include-contests" name="include-contests" type="checkbox" checked />
       <span><strong>Include this chart in Band Camp contests</strong><small>Uncheck to keep it in your Log Book without adding it to Open or Verified standings.</small></span>
@@ -109,15 +105,9 @@
     <p id="p-book-error" class="error-text" aria-live="polite"></p>
     <p id="p-book-feedback" class="body-copy" aria-live="polite"></p>
 
-    <div class="p-book-action-column">
-      <button class="btn btn-green" type="submit">Submit to Log Book</button>
-      <button id="export-p-chart-btn" class="btn btn-book-copy" type="button">Copy to Clipboard</button>
-      <button id="email-p-chart-btn" class="btn btn-red" type="button">Email Your Chart</button>
-    </div>
-
     <details class="mentor-card">
-      <summary>P-Chart sharing contacts</summary>
-      <p class="body-copy">Recent emails are saved only on this device for quicker P-Chart sharing.</p>
+      <summary>Preset email addresses</summary>
+      <p class="body-copy">Do not submit your band director or teacher's email address without talking with them first, please!</p>
 
       <label for="teacher-email">Teacher email</label>
       <input
@@ -139,6 +129,12 @@
       />
       <datalist id="parent-email-options"></datalist>
     </details>
+
+    <div class="p-book-action-column">
+      <button class="btn btn-green" type="submit">Submit to Log Book</button>
+      <button id="export-p-chart-btn" class="btn btn-book-copy" type="button">Copy to Clipboard</button>
+      <button id="email-p-chart-btn" class="btn btn-red" type="button">Email Your Chart</button>
+    </div>
   </form>
 
   <dialog id="open-chart-confirmation" class="p-book-submit-dialog" aria-labelledby="open-chart-confirmation-title">
@@ -150,22 +146,23 @@
     </div>
   </dialog>
 
-  <hr class="section-divider" />
-
+  <hr class="section-divider p-book-bold-divider" />
+  <div class="p-book-lower-region">
+  <div class="p-book-lower-spacer" aria-hidden="true"></div>
   <div class="stats-grid mt-md practice-total-cards" aria-label="Persisted practice totals">
-    <article class="stat-card">
+    <article class="stat-card practice-stat-stone">
       <h3>This Week’s Practice</h3>
       <p id="p-book-week-practice">0 minutes</p>
     </article>
-    <article class="stat-card">
+    <article class="stat-card practice-stat-stone">
       <h3>Career Practice</h3>
       <p id="p-book-career-practice">0 minutes</p>
     </article>
-    <article class="stat-card">
+    <article class="stat-card practice-stat-stone">
       <h3>Practice Days</h3>
       <p id="p-book-practice-days">0</p>
     </article>
-    <article class="stat-card">
+    <article class="stat-card practice-stat-stone">
       <h3>Charts in Book</h3>
       <p id="p-book-pages-count">0</p>
     </article>
@@ -176,36 +173,7 @@
       <p>No practice charts logged yet.</p>
     </div>
   </article>
+  </div>
 </section>
-
-<script>
-  document.addEventListener("DOMContentLoaded", function () {
-    const toggleButton = document.getElementById("practice-timer-toggle-btn");
-    const startButton = document.getElementById("practice-timer-start-btn");
-    const stopButton = document.getElementById("practice-timer-stop-btn");
-
-    if (!toggleButton || !startButton || !stopButton) {
-      return;
-    }
-
-    let timerRunning = false;
-
-    toggleButton.addEventListener("click", function () {
-      if (timerRunning) {
-        stopButton.click();
-        timerRunning = false;
-        toggleButton.textContent = "Start Timer";
-        toggleButton.classList.remove("btn-red");
-        toggleButton.classList.add("btn-secondary");
-      } else {
-        startButton.click();
-        timerRunning = true;
-        toggleButton.textContent = "Stop Timer";
-        toggleButton.classList.remove("btn-secondary");
-        toggleButton.classList.add("btn-red");
-      }
-    });
-  });
-</script>
 
 {% endblock %}
