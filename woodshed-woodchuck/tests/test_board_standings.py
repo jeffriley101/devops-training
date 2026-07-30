@@ -101,7 +101,7 @@ def test_board_contains_past_winners_medal_board_states_and_navigation() -> None
         "past-winners-verified-panel",
     ):
         assert f'id="{element_id}"' in markup
-    assert "No finalized Band Camp weeks yet." in markup
+    assert "Medals will appear after a Band Camp week is finalized." in markup
     assert "No podium results for this contest and division." in markup
     assert "WEEKLY PRACTICE BY INSTRUMENT" in markup
     assert "TOP FIVE MINUTES LEADERS" in markup

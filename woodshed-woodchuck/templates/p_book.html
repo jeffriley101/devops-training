@@ -101,6 +101,11 @@
       Anytime you are messing with your instrument—giving it attention in any way—counts as practice. Minutes spent thinking about your instrument can count as half-minutes. We’re on the honor system here!
     </aside>
 
+    <label class="contest-opt-in-control" for="p-book-include-contests">
+      <input id="p-book-include-contests" name="include-contests" type="checkbox" checked />
+      <span><strong>Include this chart in Band Camp contests</strong><small>Uncheck to keep it in your Log Book without adding it to Open or Verified standings.</small></span>
+    </label>
+
     <p id="p-book-error" class="error-text" aria-live="polite"></p>
     <p id="p-book-feedback" class="body-copy" aria-live="polite"></p>
 
@@ -147,10 +152,14 @@
 
   <hr class="section-divider" />
 
-  <div class="stats-grid mt-md" aria-label="P-Book summary">
+  <div class="stats-grid mt-md practice-total-cards" aria-label="Persisted practice totals">
     <article class="stat-card">
-      <h3>Lifetime Minutes</h3>
-      <p id="p-book-total-minutes">0</p>
+      <h3>This Week’s Practice</h3>
+      <p id="p-book-week-practice">0 minutes</p>
+    </article>
+    <article class="stat-card">
+      <h3>Career Practice</h3>
+      <p id="p-book-career-practice">0 minutes</p>
     </article>
     <article class="stat-card">
       <h3>Practice Days</h3>

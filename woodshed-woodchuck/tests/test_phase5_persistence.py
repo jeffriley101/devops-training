@@ -312,8 +312,8 @@ def test_contest_models_match_approved_foundation() -> None:
         },
         PracticeChart: {
             "id", "profile_id", "practice_date", "minutes", "instrument",
-            "note", "practice_details", "source", "submission_key",
-            "credits_awarded", "created_at", "updated_at",
+                "note", "practice_details", "source", "submission_key",
+                "include_contests", "credits_awarded", "created_at", "updated_at",
         },
     }
 

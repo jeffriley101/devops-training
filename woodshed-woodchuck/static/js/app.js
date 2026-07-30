@@ -2261,6 +2261,7 @@
         const meter = root.querySelector(".personal-crown-meter");
         const remaining = root.querySelector(".personal-crown-remaining");
         const date = root.querySelector(".personal-crown-earned-date");
+        const categoryList = root.querySelector(".crown-category-list");
         const wins = progress.qualifying_wins;
         const target = progress.target_wins;
 
@@ -2285,6 +2286,23 @@
           remaining.textContent = `${winsRemaining} qualifying ${winsRemaining === 1 ? "win" : "wins"} remain.`;
           date.textContent = "";
           date.classList.add("hidden");
+        }
+        if (categoryList && Array.isArray(progress.categories)) {
+          categoryList.replaceChildren();
+          progress.categories.forEach((category) => {
+            const card = document.createElement("article");
+            card.className = "crown-category-card";
+            const name = document.createElement("strong");
+            name.textContent = `${category.earned ? "👑 " : ""}${category.name}`;
+            const value = document.createElement("span");
+            value.textContent = `${category.progress} / ${category.target}`;
+            card.setAttribute(
+              "aria-label",
+              `${category.name}: ${category.progress} of ${category.target}${category.earned ? ", permanent crown earned" : ""}`
+            );
+            card.append(name, value);
+            categoryList.appendChild(card);
+          });
         }
         loading.classList.add("hidden");
         error.classList.add("hidden");
@@ -2316,6 +2334,15 @@
             payload.remaining_wins < 0 ||
             typeof payload.earned !== "boolean") {
           showError("Crown progress could not be read.");
+          return;
+        }
+        if (!Array.isArray(payload.categories) || payload.categories.length !== 6 ||
+            payload.categories.some((category) =>
+              !category || typeof category.name !== "string" ||
+              !Number.isInteger(category.progress) || category.progress < 0 ||
+              category.target !== 10 || typeof category.earned !== "boolean"
+            )) {
+          showError("Crown categories could not be read.");
           return;
         }
         render(payload);
@@ -2499,6 +2526,7 @@
     const teacherEmailOptionsEl = document.getElementById("teacher-email-options");
     const parentEmailOptionsEl = document.getElementById("parent-email-options");
     const verifierSelectEl = document.getElementById("p-book-verifier");
+    const includeContestsEl = document.getElementById("p-book-include-contests");
     const verifierHelpEl = document.getElementById("p-book-verifier-help");
     const submitBtn = form.querySelector("button[type='submit']");
     const openDialog = document.getElementById("open-chart-confirmation");
@@ -2506,7 +2534,8 @@
     const chooseVerifierBtn = document.getElementById("choose-chart-verifier");
     const cancelOpenBtn = document.getElementById("cancel-open-chart");
 
-    const totalMinutesEl = document.getElementById("p-book-total-minutes");
+    const weekPracticeEl = document.getElementById("p-book-week-practice");
+    const careerPracticeEl = document.getElementById("p-book-career-practice");
     const practiceDaysEl = document.getElementById("p-book-practice-days");
     const pagesCountEl = document.getElementById("p-book-pages-count");
 
@@ -2641,6 +2670,7 @@
       practiceDetails,
       creditsAwarded,
       submissionKey,
+      includeContests,
     }) {
       const response = await fetch(
         "/practice-charts",
@@ -2659,6 +2689,7 @@
             source: "p-book",
             credits_awarded: creditsAwarded,
             submission_key: submissionKey,
+            include_contests: includeContests,
           }),
         }
       );
@@ -2779,6 +2810,7 @@
             verificationResponseNote: responseNote,
             verifierId: verification.verifier_id || null,
             verifierName,
+            includeContests: serverChart.include_contests !== false,
           });
 
           changed = true;
@@ -2977,13 +3009,30 @@
 
     function renderPBookSummary(s) {
       const entries = Array.isArray(s.practiceLog) ? s.practiceLog : [];
-      const totalMinutes = entries.reduce((sum, entry) => sum + (Number(entry.minutes) || 0), 0);
       const practiceDays = new Set(entries.map((entry) => entry.dateKey).filter(Boolean)).size;
       const pagesCount = entries.length;
 
-      if (totalMinutesEl) totalMinutesEl.textContent = String(totalMinutes);
       if (practiceDaysEl) practiceDaysEl.textContent = String(practiceDays);
       if (pagesCountEl) pagesCountEl.textContent = String(pagesCount);
+    }
+
+    async function loadPracticeTotals() {
+      if (!weekPracticeEl && !careerPracticeEl) return;
+      try {
+        const response = await fetch("/practice-charts/totals", {
+          credentials: "same-origin", cache: "no-store",
+        });
+        if (!response.ok) return;
+        const payload = await response.json();
+        if (weekPracticeEl && typeof payload.this_week_display === "string") {
+          weekPracticeEl.textContent = payload.this_week_display;
+        }
+        if (careerPracticeEl && typeof payload.career_display === "string") {
+          careerPracticeEl.textContent = payload.career_display;
+        }
+      } catch (_error) {
+        // Keep the compact zero-value placeholder while offline.
+      }
     }
 
     function buildExportText(s) {
@@ -3020,6 +3069,7 @@
     wirePracticeTimer();
     loadVerifierOptions();
     loadPersistentPracticeCharts();
+    loadPracticeTotals();
 
     form.addEventListener("submit", async function (event) {
       event.preventDefault();
@@ -3066,6 +3116,7 @@
         verifierSelectEl.selectedOptions.length
           ? verifierSelectEl.selectedOptions[0].textContent
           : "";
+      const includeContests = includeContestsEl ? includeContestsEl.checked : true;
 
       if (!verifierId && !openSubmissionConfirmed && openDialog) {
         if (!openDialog.open) openDialog.showModal();
@@ -3091,6 +3142,7 @@
           practiceDetails,
           creditsAwarded: dandelionsEarned,
           submissionKey: pendingSubmissionKey,
+          includeContests,
         });
         const serverChart = createdPayload && createdPayload.chart;
         if (!serverChart || !Number.isInteger(serverChart.id)) {
@@ -3111,6 +3163,7 @@
         renderEntries(next);
         renderPBookSummary(next);
         await loadPersistentPracticeCharts();
+        await loadPracticeTotals();
 
         feedbackEl.classList.add("success-callout");
 
@@ -3131,6 +3184,7 @@
         practiceDetailEls.forEach((checkbox) => {
           checkbox.checked = false;
         });
+        if (includeContestsEl) includeContestsEl.checked = true;
 
         pendingSubmissionKey = null;
         hydrateHome(next);

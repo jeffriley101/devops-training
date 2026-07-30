@@ -452,6 +452,10 @@ class PracticeChart(Base):
         nullable=True,
     )
 
+    include_contests: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default="1", nullable=False
+    )
+
     credits_awarded: Mapped[int] = mapped_column(
         Integer,
         default=0,

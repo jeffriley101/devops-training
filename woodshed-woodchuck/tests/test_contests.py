@@ -92,6 +92,7 @@ def add_chart(
     minutes: int,
     instrument: str | None = None,
     verification_status: str | None = None,
+    include_contests: bool = True,
 ) -> PracticeChart:
     chart = PracticeChart(
         profile_id=profile.id,
@@ -101,6 +102,7 @@ def add_chart(
         practice_details=[],
         source="p-book",
         credits_awarded=0,
+        include_contests=include_contests,
     )
     session.add(chart)
     session.flush()
@@ -737,7 +739,7 @@ def test_existing_finalized_student_scores_are_not_rewritten(
     }
 
 
-def test_camp_points_finalize_once_with_medals_reward_and_no_crown(
+def test_camp_points_finalize_once_with_medals_reward_and_crown(
     database: tuple[Session, sessionmaker[Session]],
 ) -> None:
     session, _ = database
@@ -776,11 +778,13 @@ def test_camp_points_finalize_once_with_medals_reward_and_no_crown(
         RewardGrant.source_key.like("%:weekly-camp-points:%")
     )).all()
     assert [(grant.profile_id, grant.reward_type) for grant in grants] == [
-        (gold.id, "dandelion")
+        (gold.id, "dandelion"), (gold.id, "crown_win")
     ]
-    assert session.scalar(select(CrownProgress).where(
-        CrownProgress.profile_id == gold.id
-    )) is None
+    camp_crown = session.scalar(select(CrownProgress).where(
+        CrownProgress.profile_id == gold.id,
+        CrownProgress.category_key == "weekly-camp-points",
+    ))
+    assert camp_crown is not None and camp_crown.qualifying_wins == 1
     results = contest_results_payload(session, week)["results"]
     assert any(row["contest"]["key"] == "weekly-camp-points" for row in results)
     hall = hall_of_champions_payload(session)
@@ -1288,6 +1292,10 @@ def test_crown_progress_defaults_to_zero_without_creating_a_row(
         "remaining_wins": 10,
         "earned": False,
         "earned_at": None,
+        "categories": [
+            {"key": key, "name": name, "progress": 0, "target": 10, "earned": False, "earned_at": None}
+            for key, name in contest_module.CROWN_CATEGORIES
+        ],
     }
     assert session.scalar(select(func.count()).select_from(CrownProgress)) == 0
 
@@ -1392,7 +1400,7 @@ def test_crown_progress_endpoint_authentication_and_privacy(
     assert unauthorized.value.status_code == 401
     payload = contest_module.current_crown_progress(request_with_session(profile.id))
     assert set(payload) == {
-        "qualifying_wins", "target_wins", "remaining_wins", "earned", "earned_at"
+        "qualifying_wins", "target_wins", "remaining_wins", "earned", "earned_at", "categories"
     }
     serialized = repr(payload).casefold()
     for private_field in (
@@ -1469,3 +1477,52 @@ def test_open_p_chart_submission_is_idempotent_listed_and_updates_standings(
     assert approved_instruments["verified"] == [
         {"rank": 1, "instrument": "Tuba", "total_minutes": 35}
     ]
+
+
+def test_contest_opt_out_stays_in_history_but_not_either_division(
+    database: tuple[Session, sessionmaker[Session]],
+) -> None:
+    session, _ = database
+    _, _, week = ensure_band_camp_data(session, now=NOW)
+    profile = add_student(session, woodchuck_id="WC-OPTOUT", instrument="Clarinet")
+    opted_in = add_chart(
+        session, profile=profile, practice_date=week.week_start,
+        minutes=20, verification_status="approved", include_contests=True,
+    )
+    opted_out = add_chart(
+        session, profile=profile, practice_date=week.week_start,
+        minutes=80, verification_status="approved", include_contests=False,
+    )
+    session.commit()
+    payload = current_contests_payload(session, now=NOW, current_profile_id=profile.id)
+    assert payload["standings"]["weekly-points-leaders"]["open"][0]["total_minutes"] == 20
+    assert payload["standings"]["weekly-points-leaders"]["verified"][0]["total_minutes"] == 20
+    assert session.get(PracticeChart, opted_out.id).minutes == 80
+    assert session.get(PracticeChart, opted_in.id).include_contests is True
+
+
+def test_activity_crowns_reconcile_upward_and_tenth_event_is_permanent(
+    database: tuple[Session, sessionmaker[Session]],
+) -> None:
+    session, _ = database
+    profile = add_student(session, woodchuck_id="WC-ACTIVITY-CROWN", instrument="Flute")
+    for index in range(12):
+        occurred = NOW + timedelta(days=index)
+        session.add(CampPointAward(
+            profile_id=profile.id, activity_type="trivia", points_awarded=1,
+            occurred_at=occurred, duplicate_key=f"trivia-{index}",
+        ))
+    session.commit()
+    payload = crown_progress_payload(session, profile_id=profile.id)
+    trivia = next(item for item in payload["categories"] if item["key"] == "trivia")
+    assert trivia["progress"] == 12 and trivia["earned"] is True
+    progress = session.scalar(select(CrownProgress).where(
+        CrownProgress.profile_id == profile.id,
+        CrownProgress.category_key == "trivia",
+    ))
+    assert progress is not None and progress.qualifying_wins == 12
+    earned_at = progress.crown_earned_at
+    session.query(CampPointAward).filter(CampPointAward.profile_id == profile.id).delete()
+    session.commit()
+    crown_progress_payload(session, profile_id=profile.id)
+    assert progress.qualifying_wins == 12 and progress.crown_earned_at == earned_at

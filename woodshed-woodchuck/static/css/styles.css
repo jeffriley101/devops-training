@@ -2612,6 +2612,37 @@ select {
   line-height: 1.4;
 }
 
+.contest-opt-in-control {
+  display: grid;
+  grid-template-columns: 1.35rem minmax(0, 1fr);
+  gap: 0.6rem;
+  align-items: start;
+  padding: 0.7rem 0.8rem;
+  border: 2px solid #527a58;
+  border-radius: 10px;
+  background: #eef7e8;
+}
+
+.contest-opt-in-control input { width: 1.2rem; height: 1.2rem; margin-top: 0.1rem; }
+.contest-opt-in-control span { display: grid; gap: 0.2rem; }
+.contest-opt-in-control small { font-weight: 600; line-height: 1.35; }
+
+.crown-category-chart { margin-top: 1rem; padding-top: 0.8rem; border-top: 2px solid rgba(92, 63, 32, 0.3); }
+.crown-category-list { display: grid; gap: 0.5rem; }
+.crown-category-card {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+  align-items: center;
+  min-width: 0;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid #b9944d;
+  border-radius: 9px;
+  background: #fff5cf;
+}
+.crown-category-card strong { min-width: 0; overflow-wrap: anywhere; }
+.crown-category-card span { flex: none; font-weight: 950; }
+
 .p-book-submit-dialog {
   width: min(92vw, 32rem);
   border: 3px solid #6d4126;
