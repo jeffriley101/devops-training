@@ -1,5 +1,6 @@
 import base64
 from datetime import date
+from copy import deepcopy
 import json
 from pathlib import Path
 
@@ -135,7 +136,7 @@ def contest_request(profile_id: int) -> Request:
 
 def test_trivia_server_resolves_legacy_indices_and_numeric_answer_text(monkeypatch) -> None:
     sessions = database(monkeypatch, contests)
-    activity_date = date(2026, 1, 1)
+    activity_date = date(2026, 1, 7)
     with sessions() as session:
         legacy = WoodchuckProfile(
             woodchuck_id="WC-LEGACY", display_name="Legacy", pin_hash="private",
@@ -155,22 +156,68 @@ def test_trivia_server_resolves_legacy_indices_and_numeric_answer_text(monkeypat
 
     legacy_payload = contests.daily_camp_point_awards(activity_date, contest_request(legacy_id))
     literal_payload = contests.daily_camp_point_awards(activity_date, contest_request(literal_id))
-    assert legacy_payload["trivia_attempt"] == {"selected_answer_text": "4", "correct": True}
-    assert literal_payload["trivia_attempt"] == {"selected_answer_text": "2", "correct": False}
+    assert legacy_payload["trivia_attempt"] == {"selected_answer_id": "four", "correct": True}
+    assert literal_payload["trivia_attempt"] == {"selected_answer_id": "two", "correct": False}
     assert "selected_answer" not in legacy_payload["trivia_attempt"]
 
 
 def test_trivia_client_never_displays_raw_response_index_and_summarizes_result() -> None:
     javascript = (ROOT / "static/js/app.js").read_text(encoding="utf-8")
     band_camp = javascript[javascript.index("function wireBandCamp"):javascript.index("function wirePlungeBurrow")]
-    assert "selected_answer_text" in band_camp
-    assert "checkedAnswer.selected_answer\n" not in band_camp
+    assert "selected_answer_id" in band_camp
+    assert "selected_index" not in band_camp
     assert "Your answer:" not in band_camp
-    assert "input.checked = option === selectedAnswerText" in band_camp
-    assert "legacyTriviaAnswerText" in band_camp
+    assert "input.checked = choice.id === selectedAnswerId" in band_camp
+    assert "Number(selected.value)" not in band_camp
     assert "+1 Camp Point · +1 dandelion" in band_camp
     assert "Attempt used" in band_camp
     assert "Completed; no reward earned" in band_camp
+
+
+def test_every_canonical_trivia_question_has_one_matching_stable_answer() -> None:
+    question_ids = set()
+    for question in contests.TRIVIA_QUESTIONS:
+        assert question["id"] not in question_ids
+        question_ids.add(question["id"])
+        choice_ids = [choice["id"] for choice in question["choices"]]
+        assert len(choice_ids) == len(set(choice_ids))
+        assert choice_ids.count(question["correct_answer_id"]) == 1
+
+
+def test_crescendo_correctness_survives_choice_reordering(monkeypatch) -> None:
+    sessions = database(monkeypatch, contests)
+    with sessions() as session:
+        profile = WoodchuckProfile(
+            woodchuck_id="WC-SHUFFLE", display_name="Shuffle", pin_hash="private",
+            instrument="Flute", level="Beginner", goal="Practice",
+        )
+        session.add(profile); session.commit(); profile_id = profile.id
+
+    questions = deepcopy(contests.TRIVIA_QUESTIONS)
+    crescendo = questions[1]
+    crescendo["choices"] = tuple(reversed(crescendo["choices"]))
+    monkeypatch.setattr(contests, "TRIVIA_QUESTIONS", questions)
+    real_datetime = contests.datetime
+
+    class FrozenDateTime(real_datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return real_datetime(2026, 7, 30, 12, tzinfo=tz)
+
+    monkeypatch.setattr(contests, "datetime", FrozenDateTime)
+    result = contests.check_trivia_answer(
+        contest_request(profile_id),
+        contests.TriviaAnswerSubmission(
+            activity_date=date(2026, 7, 30), selected_answer_id="crescendo",
+        ),
+    )
+    assert result["question"] == "Which word means to gradually get louder?"
+    assert result["selected_answer_id"] == "crescendo"
+    assert result["correct"] is True
+    assert result["award_created"] is True
+    public = contests.public_trivia_question(date(2026, 7, 30))
+    assert "correct_answer_id" not in public
+    assert [choice["id"] for choice in public["choices"]][-1] == "crescendo"
 
 
 def test_marching_uses_one_pending_request_and_restores_on_failure() -> None:

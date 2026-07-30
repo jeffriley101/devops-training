@@ -157,7 +157,7 @@
       next.profile.createdAt = next.profile.createdAt || new Date().toISOString();
 
       ensureTodayQuest(next);
-      stateApi.saveState(next);
+      stateApi.saveState(next, { sync: false });
     });
   }
 
@@ -1068,37 +1068,6 @@
     window.addEventListener("pagehide", stopMetronome);
   }
 
-  const BAND_CAMP_TRIVIA = [
-    {
-      question: "How many beats does a whole note receive in 4/4 time?",
-      options: ["2", "3", "4"],
-    },
-    {
-      question: "Which word means to gradually get louder?",
-      options: ["Crescendo", "Diminuendo", "Fermata"],
-    },
-    {
-      question: "What does a conductor’s upbeat usually help signal?",
-      options: ["An entrance", "A break", "The end of rehearsal"],
-    },
-    {
-      question: "What should most wind players use for a stronger tone?",
-      options: ["Less air", "More air", "A tighter music stand"],
-    },
-    {
-      question: "What does the marking piano mean?",
-      options: ["Play softly", "Play quickly", "Stop playing"],
-    },
-    {
-      question: "Which section usually includes trumpets and trombones?",
-      options: ["Woodwinds", "Brass", "Percussion"],
-    },
-    {
-      question: "What does a metronome help a musician maintain?",
-      options: ["Tempo", "Instrument color", "Music-stand height"],
-    },
-  ];
-
   const BAND_CAMP_MARCHING_CHALLENGES = [
     "Mark time for one minute while counting evenly.",
     "Practice eight steps forward while keeping your upper body still.",
@@ -1152,22 +1121,11 @@
 
     const today = stateApi.localDateKey();
     const dayIndex = getDayIndex(new Date());
-    const trivia =
-      BAND_CAMP_TRIVIA[dayIndex % BAND_CAMP_TRIVIA.length];
+    let trivia = null;
     const marchingChallenge =
       BAND_CAMP_MARCHING_CHALLENGES[
         dayIndex % BAND_CAMP_MARCHING_CHALLENGES.length
       ];
-
-    function legacyTriviaAnswerText(value) {
-      if (typeof value !== "string" && !Number.isInteger(value)) return null;
-      const stored = String(value).trim();
-      const legacyIndex = /^\d+$/.test(stored) ? Number(stored) : null;
-      if (legacyIndex !== null && legacyIndex >= 0 && legacyIndex < trivia.options.length) {
-        return trivia.options[legacyIndex];
-      }
-      return trivia.options.includes(stored) ? stored : null;
-    }
 
     function freshBandCampDay(dateKey) {
       return {
@@ -1307,6 +1265,9 @@
       );
       if (!response.ok) return;
       const payload = await response.json();
+      if (payload.trivia_question && Array.isArray(payload.trivia_question.choices)) {
+        trivia = payload.trivia_question;
+      }
       const awards = Array.isArray(payload.awards) ? payload.awards : [];
       const next = prepareCurrentDay(stateApi.getState());
       const triviaAttempt = payload.trivia_attempt;
@@ -1333,11 +1294,11 @@
         if (activityType === "marching") next.bandCamp.daily.marchingComplete = true;
       });
 
-      if (triviaAttempt && typeof triviaAttempt.selected_answer_text === "string") {
+      if (triviaAttempt && Object.hasOwn(triviaAttempt, "selected_answer_id")) {
         serverConfirmedTriviaAttempt = triviaAttempt;
         next.bandCamp.daily.triviaAttempted = true;
         next.bandCamp.daily.triviaCorrect = triviaAttempt.correct === true;
-        next.bandCamp.daily.triviaSelectedAnswer = triviaAttempt.selected_answer_text;
+        next.bandCamp.daily.triviaSelectedAnswer = triviaAttempt.selected_answer_id;
       }
 
       stateApi.saveState(next, { sync: false });
@@ -1356,19 +1317,20 @@
       if (!triviaOptionsEl) return;
 
       triviaOptionsEl.replaceChildren();
+      if (!trivia) return;
       const daily = current.bandCamp.daily;
-      const selectedAnswerText = serverConfirmedTriviaAttempt?.selected_answer_text
-        || legacyTriviaAnswerText(daily.triviaSelectedAnswer);
+      const selectedAnswerId = serverConfirmedTriviaAttempt?.selected_answer_id
+        || daily.triviaSelectedAnswer;
 
-      trivia.options.forEach((option, index) => {
+      trivia.choices.forEach((choice) => {
         const label = document.createElement("label");
         label.className = "trivia-option";
 
         const input = document.createElement("input");
         input.type = "radio";
         input.name = "trivia-answer";
-        input.value = String(index);
-        input.checked = option === selectedAnswerText;
+        input.value = choice.id;
+        input.checked = choice.id === selectedAnswerId;
         input.disabled = daily.triviaAttempted;
 
         label.classList.toggle("is-selected", input.checked);
@@ -1378,7 +1340,7 @@
         );
 
         const text = document.createElement("span");
-        text.textContent = option;
+        text.textContent = choice.text;
 
         label.append(input, text);
         triviaOptionsEl.appendChild(label);
@@ -1426,7 +1388,7 @@
         careStatusEl.textContent = "Not completed today";
       }
 
-      if (triviaQuestionEl) {
+      if (triviaQuestionEl && trivia) {
         triviaQuestionEl.textContent = trivia.question;
       }
 
@@ -1566,7 +1528,7 @@
           const response = await fetch("/contests/trivia/answer", {
             method: "POST", credentials: "same-origin",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ activity_date: today, selected_index: Number(selected.value) }),
+            body: JSON.stringify({ activity_date: today, selected_answer_id: selected.value }),
           });
           checkedAnswer = await response.json();
           if (!response.ok) throw new Error(checkedAnswer.detail || "Trivia could not be checked.");
@@ -1577,13 +1539,13 @@
         const isCorrect = checkedAnswer.correct === true;
 
         serverConfirmedTriviaAttempt = {
-          selected_answer_text: checkedAnswer.selected_answer_text,
+          selected_answer_id: checkedAnswer.selected_answer_id,
           correct: isCorrect,
         };
 
         next.bandCamp.daily.triviaAttempted = true;
         next.bandCamp.daily.triviaCorrect = isCorrect;
-        next.bandCamp.daily.triviaSelectedAnswer = checkedAnswer.selected_answer_text;
+        next.bandCamp.daily.triviaSelectedAnswer = checkedAnswer.selected_answer_id;
 
         if (isCorrect) {
           serverConfirmedAwards.add("trivia");

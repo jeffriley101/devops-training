@@ -70,7 +70,7 @@ def test_trivia_restores_native_checked_and_visual_selected_state() -> None:
     band_camp = javascript[javascript.index("function wireBandCamp"):javascript.index("function wirePlungeBurrow")]
     assert 'id="trivia-selected-answer"' not in board
     assert "Your answer:" not in board + band_camp
-    assert "input.checked = option === selectedAnswerText" in band_camp
+    assert "input.checked = choice.id === selectedAnswerId" in band_camp
     assert 'input.type = "radio"' in band_camp
     assert 'input.name = "trivia-answer"' in band_camp
     assert 'label.classList.toggle("is-selected", input.checked)' in band_camp
@@ -78,7 +78,7 @@ def test_trivia_restores_native_checked_and_visual_selected_state() -> None:
     assert '"is-confirmed-success",\n          input.checked && daily.triviaAttempted && daily.triviaCorrect' in band_camp
     assert ".trivia-option.is-selected" in css
     assert 'content: "Selected"' in css
-    assert "serverConfirmedTriviaAttempt?.selected_answer_text" in band_camp
+    assert "serverConfirmedTriviaAttempt?.selected_answer_id" in band_camp
     assert "+1 Camp Point · +1 dandelion" in band_camp
     assert "Attempt used" in band_camp
 

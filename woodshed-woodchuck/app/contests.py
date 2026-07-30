@@ -85,39 +85,69 @@ class CampPointAwardCreate(BaseModel):
 
 class TriviaAnswerSubmission(BaseModel):
     activity_date: date
-    selected_index: int
+    selected_answer_id: str
 
 
-TRIVIA_ANSWERS = (
-    ("How many beats does a whole note receive in 4/4 time?", ("2", "3", "4"), 2),
-    ("Which word means to gradually get louder?", ("Crescendo", "Diminuendo", "Fermata"), 0),
-    ("What does a conductor’s upbeat usually help signal?", ("An entrance", "A break", "The end of rehearsal"), 0),
-    ("What should most wind players use for a stronger tone?", ("Less air", "More air", "A tighter music stand"), 1),
-    ("What does the marking piano mean?", ("Play softly", "Play quickly", "Stop playing"), 0),
-    ("Which section usually includes trumpets and trombones?", ("Woodwinds", "Brass", "Percussion"), 1),
-    ("What does a metronome help a musician maintain?", ("Tempo", "Instrument color", "Music-stand height"), 0),
+TRIVIA_QUESTIONS = (
+    {"id": "whole-note-44", "question": "How many beats does a whole note receive in 4/4 time?", "choices": (
+        {"id": "two", "text": "2"}, {"id": "three", "text": "3"}, {"id": "four", "text": "4"},
+    ), "correct_answer_id": "four"},
+    {"id": "gradually-louder", "question": "Which word means to gradually get louder?", "choices": (
+        {"id": "crescendo", "text": "Crescendo"}, {"id": "diminuendo", "text": "Diminuendo"}, {"id": "fermata", "text": "Fermata"},
+    ), "correct_answer_id": "crescendo"},
+    {"id": "conductor-upbeat", "question": "What does a conductor’s upbeat usually help signal?", "choices": (
+        {"id": "entrance", "text": "An entrance"}, {"id": "break", "text": "A break"}, {"id": "rehearsal-end", "text": "The end of rehearsal"},
+    ), "correct_answer_id": "entrance"},
+    {"id": "stronger-wind-tone", "question": "What should most wind players use for a stronger tone?", "choices": (
+        {"id": "less-air", "text": "Less air"}, {"id": "more-air", "text": "More air"}, {"id": "tighter-stand", "text": "A tighter music stand"},
+    ), "correct_answer_id": "more-air"},
+    {"id": "piano-marking", "question": "What does the marking piano mean?", "choices": (
+        {"id": "softly", "text": "Play softly"}, {"id": "quickly", "text": "Play quickly"}, {"id": "stop", "text": "Stop playing"},
+    ), "correct_answer_id": "softly"},
+    {"id": "brass-section", "question": "Which section usually includes trumpets and trombones?", "choices": (
+        {"id": "woodwinds", "text": "Woodwinds"}, {"id": "brass", "text": "Brass"}, {"id": "percussion", "text": "Percussion"},
+    ), "correct_answer_id": "brass"},
+    {"id": "metronome-purpose", "question": "What does a metronome help a musician maintain?", "choices": (
+        {"id": "tempo", "text": "Tempo"}, {"id": "instrument-color", "text": "Instrument color"}, {"id": "stand-height", "text": "Music-stand height"},
+    ), "correct_answer_id": "tempo"},
 )
 
 
-def trivia_selected_answer_text(
-    activity_date: date, stored_answer: object, *, correct: bool
-) -> str | None:
-    """Resolve current and legacy stored trivia choices without exposing indices."""
-    _, options, answer_index = TRIVIA_ANSWERS[
-        (activity_date.timetuple().tm_yday - 1) % len(TRIVIA_ANSWERS)
+def trivia_question_for(activity_date: date) -> dict[str, object]:
+    return TRIVIA_QUESTIONS[
+        activity_date.timetuple().tm_yday % len(TRIVIA_QUESTIONS)
     ]
-    if not isinstance(stored_answer, (str, int)) or isinstance(stored_answer, bool):
+
+
+def public_trivia_question(activity_date: date) -> dict[str, object]:
+    question = trivia_question_for(activity_date)
+    return {
+        "id": question["id"],
+        "question": question["question"],
+        "choices": [dict(choice) for choice in question["choices"]],
+    }
+
+
+def trivia_selected_choice(
+    activity_date: date, stored_answer: object, *, correct: bool
+) -> dict[str, str] | None:
+    """Resolve stable IDs and unambiguous legacy answer text."""
+    question = trivia_question_for(activity_date)
+    choices = question["choices"]
+    if not isinstance(stored_answer, str):
         return None
-    value = str(stored_answer).strip()
-    direct_index = options.index(value) if value in options else None
-    legacy_index = int(value) if value.isdigit() else None
-    if direct_index is not None and (direct_index == answer_index) is correct:
-        return options[direct_index]
-    if legacy_index is not None and 0 <= legacy_index < len(options):
-        if (legacy_index == answer_index) is correct:
-            return options[legacy_index]
-    if direct_index is not None:
-        return options[direct_index]
+    value = stored_answer.strip()
+    candidates = [choice for choice in choices if value in (choice["id"], choice["text"])]
+    if value.isdigit():
+        legacy_index = int(value)
+        if 0 <= legacy_index < len(choices):
+            candidates.append(choices[legacy_index])
+    matching = {
+        choice["id"]: choice for choice in candidates
+        if (choice["id"] == question["correct_answer_id"]) is correct
+    }
+    if len(matching) == 1:
+        return dict(next(iter(matching.values())))
     return None
 
 
@@ -1257,26 +1287,25 @@ def daily_camp_point_awards(
         ))
         trivia_attempt_payload = None
         if trivia_attempt is not None:
-            selected_answer_text = trivia_selected_answer_text(
+            selected_choice = trivia_selected_choice(
                 activity_date, trivia_attempt.selected_answer,
                 correct=trivia_attempt.correct,
             )
             trivia_attempt_payload = {
-                "selected_answer_text": selected_answer_text or "Saved answer unavailable",
+                "selected_answer_id": selected_choice["id"] if selected_choice else None,
                 "correct": trivia_attempt.correct,
             }
         elif any(award.activity_type == "trivia" for award in awards):
             # Pre-attempt-ledger trivia awards prove the submitted choice was
             # correct; reconstruct that server-authored option for compatibility.
-            _, options, answer = TRIVIA_ANSWERS[
-                (activity_date.timetuple().tm_yday - 1) % len(TRIVIA_ANSWERS)
-            ]
+            question = trivia_question_for(activity_date)
             trivia_attempt_payload = {
-                "selected_answer_text": options[answer],
+                "selected_answer_id": question["correct_answer_id"],
                 "correct": True,
             }
         return {
             "activity_date": activity_date.isoformat(),
+            "trivia_question": public_trivia_question(activity_date),
             **student_camp_point_totals(
                 session, profile_id=profile.id, now=now
             ),
@@ -1305,8 +1334,12 @@ def check_trivia_answer(
         today = now.astimezone(CENTRAL).date()
         if submitted.activity_date != today:
             raise HTTPException(status_code=400, detail="Trivia can only be answered for today.")
-        question, options, answer = TRIVIA_ANSWERS[(today.timetuple().tm_yday - 1) % len(TRIVIA_ANSWERS)]
-        if submitted.selected_index < 0 or submitted.selected_index >= len(options):
+        question = trivia_question_for(today)
+        choice = next(
+            (item for item in question["choices"] if item["id"] == submitted.selected_answer_id),
+            None,
+        )
+        if choice is None:
             raise HTTPException(status_code=400, detail="Choose one of today’s answers.")
         attempt = session.scalar(select(DailyTriviaAttempt).where(
             DailyTriviaAttempt.profile_id == profile.id,
@@ -1317,8 +1350,8 @@ def check_trivia_answer(
             attempt = DailyTriviaAttempt(
                 profile_id=profile.id,
                 activity_date=today,
-                selected_answer=options[submitted.selected_index],
-                correct=submitted.selected_index == answer,
+                selected_answer=choice["id"],
+                correct=choice["id"] == question["correct_answer_id"],
             )
             session.add(attempt)
             try:
@@ -1345,11 +1378,11 @@ def check_trivia_answer(
             _reconcile_crown_categories(session, profile_id=profile.id)
         session.commit()
         return {
-            "question": question,
-            "selected_answer_text": (
-                trivia_selected_answer_text(
+            "question": question["question"],
+            "selected_answer_id": (
+                (trivia_selected_choice(
                     today, attempt.selected_answer, correct=attempt.correct
-                ) or "Saved answer unavailable"
+                ) or {}).get("id")
             ),
             "correct": attempt.correct,
             "created": created,

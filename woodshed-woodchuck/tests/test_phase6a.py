@@ -143,8 +143,8 @@ def test_board_trivia_and_visible_copy_refinements() -> None:
     assert '"marching": "marching", "hours": "band-camp-hours"' in contests_source
     assert "Keep getting faster... Then one day we will show you double-tonguing!" not in board + javascript
     assert "serverConfirmedTriviaAttempt !== null" in javascript
-    assert "selected_answer_text: checkedAnswer.selected_answer_text" in javascript
-    assert "daily.triviaSelectedAnswer = triviaAttempt.selected_answer_text" in javascript
+    assert "selected_answer_id: checkedAnswer.selected_answer_id" in javascript
+    assert "daily.triviaSelectedAnswer = triviaAttempt.selected_answer_id" in javascript
     assert "Attempt used" in javascript and "no reward earned" in javascript
     assert "persistCampPoint(\"trivia\")" not in javascript
     for index in range(10):
@@ -165,28 +165,28 @@ def test_trivia_attempt_persists_text_and_rewards_only_correct_once(monkeypatch:
     class FrozenDateTime(datetime):
         @classmethod
         def now(cls, tz=None):
-            return real_datetime(2026, 7, 31, 12, tzinfo=timezone.utc)
+            return real_datetime(2026, 7, 30, 12, tzinfo=timezone.utc)
     monkeypatch.setattr(contests, "datetime", FrozenDateTime)
 
     wrong = contests.check_trivia_answer(
-        request_for(wrong_id), TriviaAnswerSubmission(activity_date=datetime(2026, 7, 31).date(), selected_index=1)
+        request_for(wrong_id), TriviaAnswerSubmission(activity_date=datetime(2026, 7, 30).date(), selected_answer_id="diminuendo")
     )
     wrong_retry = contests.check_trivia_answer(
-        request_for(wrong_id), TriviaAnswerSubmission(activity_date=datetime(2026, 7, 31).date(), selected_index=0)
+        request_for(wrong_id), TriviaAnswerSubmission(activity_date=datetime(2026, 7, 30).date(), selected_answer_id="crescendo")
     )
     correct = contests.check_trivia_answer(
-        request_for(correct_id), TriviaAnswerSubmission(activity_date=datetime(2026, 7, 31).date(), selected_index=0)
+        request_for(correct_id), TriviaAnswerSubmission(activity_date=datetime(2026, 7, 30).date(), selected_answer_id="crescendo")
     )
     correct_retry = contests.check_trivia_answer(
-        request_for(correct_id), TriviaAnswerSubmission(activity_date=datetime(2026, 7, 31).date(), selected_index=2)
+        request_for(correct_id), TriviaAnswerSubmission(activity_date=datetime(2026, 7, 30).date(), selected_answer_id="fermata")
     )
 
-    assert wrong["selected_answer_text"] == wrong_retry["selected_answer_text"] == "Diminuendo"
+    assert wrong["selected_answer_id"] == wrong_retry["selected_answer_id"] == "diminuendo"
     assert wrong["correct"] is False and wrong["award"] is None
-    assert correct["selected_answer_text"] == correct_retry["selected_answer_text"] == "Crescendo"
+    assert correct["selected_answer_id"] == correct_retry["selected_answer_id"] == "crescendo"
     assert correct["award_created"] is True and correct_retry["award_created"] is False
-    refreshed = contests.daily_camp_point_awards(datetime(2026, 7, 31).date(), request_for(wrong_id))
-    assert refreshed["trivia_attempt"] == {"selected_answer_text": "Diminuendo", "correct": False}
+    refreshed = contests.daily_camp_point_awards(datetime(2026, 7, 30).date(), request_for(wrong_id))
+    assert refreshed["trivia_attempt"] == {"selected_answer_id": "diminuendo", "correct": False}
     assert not {"profile_id", "woodchuck_id", "pin_hash"}.intersection(refreshed)
     with sessions() as session:
         assert session.scalar(select(func.count()).select_from(DailyTriviaAttempt)) == 2
