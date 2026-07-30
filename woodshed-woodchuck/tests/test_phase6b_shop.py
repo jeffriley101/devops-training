@@ -108,3 +108,37 @@ def test_mobile_css_avoids_fixed_width_overflow() -> None:
     assert ".shop-page { width: 100%; min-width: 0; }" in css
     assert "max-width: calc(100vw - 1.5rem)" in css
     assert "width: min(100%, 760px)" in css
+
+
+def test_mobile_shop_keeps_both_vertical_columns_over_the_scene() -> None:
+    css = CSS.read_text(encoding="utf-8")
+    markup = shop_markup()
+    mobile_start = css.index("@media (max-width: 430px)", css.index("/* SHOP */"))
+    mobile = css[mobile_start:css.index("@media (max-width: 640px)", mobile_start)]
+
+    assert "display: block" in mobile
+    assert ".shop-object-column {" in mobile
+    assert "position: absolute" in mobile
+    assert "display: flex" in mobile
+    assert "flex-direction: column" in mobile
+    assert "justify-content: space-between" in mobile
+    assert ".shop-object-column-left { left: .35rem; }" in mobile
+    assert ".shop-object-column-right { right: .35rem; }" in mobile
+    assert "flex-direction: row" not in mobile
+    assert "display: none" not in mobile
+    assert "width: 100%" not in mobile
+    assert "overflow-x" not in mobile
+    assert "min-height: 44px" in mobile
+
+    left = markup[markup.index("shop-object-column-left"):markup.index("shop-object-column-right")]
+    right_start = markup.index("shop-object-column-right")
+    right = markup[
+        right_start:markup.index("</div>\n  </div>", right_start)
+    ]
+    for control in ("🌼", "👑", "🐐", "🗿", "↗"):
+        assert control in left
+    for control in ("🧢", "🧃", "🚪", "🎨", "💝"):
+        assert control in right
+    assert 'class="shop-dandelion-count"' in left
+    assert 'aria-label="Shop rewards and sharing"' in markup
+    assert 'aria-label="Shop shelves and rooms"' in markup
