@@ -293,7 +293,8 @@ def test_camp_point_actions_persist_and_guard_duplicate_clicks() -> None:
     assert "campAwardsInFlight.has(activityType)" in javascript
     assert 'await persistCampPoint("hours")' in javascript
     assert 'await persistCampPoint("care")' in javascript
-    assert 'await persistCampPoint("trivia")' in javascript
+    assert 'fetch("/contests/trivia/answer"' in javascript
+    assert 'serverConfirmedAwards.add("trivia")' in javascript
     assert 'await persistCampPoint("marching")' in javascript
     assert 'activity_date: today' in javascript
     assert 'new CustomEvent("ww:camp-points-saved")' in javascript

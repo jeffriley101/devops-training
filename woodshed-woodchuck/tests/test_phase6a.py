@@ -10,10 +10,11 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 from starlette.requests import Request
 
-from app import account_routes
+from app import account_routes, contests
 from app.account_routes import DailySecretSubmission
+from app.contests import TriviaAnswerSubmission
 from app.db import Base
-from app.models import RewardGrant, WoodchuckProfile, WoodchuckState
+from app.models import CampPointAward, DailyTriviaAttempt, RewardGrant, WoodchuckProfile, WoodchuckState
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -94,6 +95,22 @@ def test_book_phase6a_timer_text_structure_and_stone_hooks() -> None:
     assert ".practice-stat-stone" in css and "pirate-logbook" in book[book.index("p-book-lower-region"):]
 
 
+def test_book_actions_precede_divider_and_blue_statistics_region() -> None:
+    book = (ROOT / "templates/p_book.html").read_text(encoding="utf-8")
+    css = (ROOT / "static/css/styles.css").read_text(encoding="utf-8")
+    action_positions = [book.index(label) for label in (
+        "Submit to Log Book", "Copy to Clipboard", "Email Your Chart",
+    )]
+    divider = book.index("p-book-bold-divider")
+    lower = book.index("p-book-lower-region")
+    stats = book.index("This Week’s Practice")
+    logbook = book.index("pirate-logbook")
+    assert max(action_positions) < divider < lower < stats < logbook
+    assert "p-book-lower-spacer" in book and ".p-book-lower-spacer" in css
+    assert "background: linear-gradient" in css[css.index(".p-book-lower-region"):css.index(".practice-stat-stone")]
+    assert "p-book-lower-actions" not in book + css
+
+
 def test_board_phase6a_feedback_success_and_placeholder_contract() -> None:
     board = (ROOT / "templates/quest.html").read_text(encoding="utf-8")
     javascript = (ROOT / "static/js/app.js").read_text(encoding="utf-8")
@@ -113,3 +130,61 @@ def test_board_phase6a_feedback_success_and_placeholder_contract() -> None:
     assert "fetch(" not in plunge and "saveState" not in plunge and "award" not in plunge.casefold()
     assert 'id="complete-quest-btn"' in board and "Quest Complete" in javascript
     assert "The quest is complete. Extra practice" not in board
+
+
+def test_board_trivia_and_visible_copy_refinements() -> None:
+    board = (ROOT / "templates/quest.html").read_text(encoding="utf-8")
+    javascript = (ROOT / "static/js/app.js").read_text(encoding="utf-8")
+    contests_source = (ROOT / "app/contests.py").read_text(encoding="utf-8")
+    assert "Band Camp Bonus" in board and "Band Camp Hours Bonus" not in board
+    assert '"marching": "marching", "hours": "band-camp-hours"' in contests_source
+    assert "Keep getting faster... Then one day we will show you double-tonguing!" not in board + javascript
+    assert "serverConfirmedTriviaAttempt !== null" in javascript
+    assert "selected_answer: checkedAnswer.selected_answer" in javascript
+    assert "daily.triviaSelectedAnswer = triviaAttempt.selected_answer" in javascript
+    assert "Attempt used" in javascript and "no reward earned" in javascript
+    assert "persistCampPoint(\"trivia\")" not in javascript
+    for index in range(10):
+        assert f"Your answer: {index}" not in board + javascript
+
+
+def test_trivia_attempt_persists_text_and_rewards_only_correct_once(monkeypatch: pytest.MonkeyPatch) -> None:
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    Base.metadata.create_all(engine)
+    sessions = sessionmaker(bind=engine, expire_on_commit=False)
+    with sessions() as session:
+        wrong_profile = WoodchuckProfile(woodchuck_id="WC-WRONG", display_name="Wrong", pin_hash="private", instrument="Flute", level="Beginner", goal="Practice")
+        correct_profile = WoodchuckProfile(woodchuck_id="WC-RIGHT", display_name="Right", pin_hash="private", instrument="Flute", level="Beginner", goal="Practice")
+        session.add_all([wrong_profile, correct_profile]); session.commit()
+        wrong_id, correct_id = wrong_profile.id, correct_profile.id
+    monkeypatch.setattr(contests, "SessionLocal", sessions)
+    real_datetime = datetime
+    class FrozenDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return real_datetime(2026, 7, 31, 12, tzinfo=timezone.utc)
+    monkeypatch.setattr(contests, "datetime", FrozenDateTime)
+
+    wrong = contests.check_trivia_answer(
+        request_for(wrong_id), TriviaAnswerSubmission(activity_date=datetime(2026, 7, 31).date(), selected_index=1)
+    )
+    wrong_retry = contests.check_trivia_answer(
+        request_for(wrong_id), TriviaAnswerSubmission(activity_date=datetime(2026, 7, 31).date(), selected_index=0)
+    )
+    correct = contests.check_trivia_answer(
+        request_for(correct_id), TriviaAnswerSubmission(activity_date=datetime(2026, 7, 31).date(), selected_index=0)
+    )
+    correct_retry = contests.check_trivia_answer(
+        request_for(correct_id), TriviaAnswerSubmission(activity_date=datetime(2026, 7, 31).date(), selected_index=2)
+    )
+
+    assert wrong["selected_answer"] == wrong_retry["selected_answer"] == "Diminuendo"
+    assert wrong["correct"] is False and wrong["award"] is None
+    assert correct["selected_answer"] == correct_retry["selected_answer"] == "Crescendo"
+    assert correct["award_created"] is True and correct_retry["award_created"] is False
+    refreshed = contests.daily_camp_point_awards(datetime(2026, 7, 31).date(), request_for(wrong_id))
+    assert refreshed["trivia_attempt"] == {"selected_answer": "Diminuendo", "correct": False}
+    assert not {"profile_id", "woodchuck_id", "pin_hash"}.intersection(refreshed)
+    with sessions() as session:
+        assert session.scalar(select(func.count()).select_from(DailyTriviaAttempt)) == 2
+        assert session.scalar(select(func.count()).select_from(CampPointAward)) == 1

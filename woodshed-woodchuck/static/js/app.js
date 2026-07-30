@@ -338,7 +338,7 @@
     Flute: "Use the head joint trick if you're having a hard time getting notes out.",
     Clarinet: "Cover the holes all the way to prevent squawking.",
     Saxophone: "Use full tone, but don't play loud.",
-    Trumpet: "Keep getting faster... Then one day we will show you double-tonguing!",
+    Trumpet: "Build speed gradually with relaxed, even articulation.",
     Trombone: "Use more air!",
     Tuba: "Big air. Let the room rumble.",
     Percussion: "Paradiddles are like tongue-twisters for drummers.",
@@ -1231,6 +1231,7 @@
 
     const campAwardsInFlight = new Set();
     const serverConfirmedAwards = new Set();
+    let serverConfirmedTriviaAttempt = null;
 
     async function persistCampPoint(activityType) {
       if (campAwardsInFlight.has(activityType)) return null;
@@ -1267,9 +1268,15 @@
 
     function renderActivityDisclosure(details, summary, activityType) {
       if (!details || !summary) return;
-      const complete = serverConfirmedAwards.has(activityType);
-      summary.innerHTML = complete
+      const complete = activityType === "trivia"
+        ? serverConfirmedTriviaAttempt !== null
+        : serverConfirmedAwards.has(activityType);
+      const rewarded = activityType !== "trivia"
+        || serverConfirmedTriviaAttempt?.correct === true;
+      summary.innerHTML = complete && rewarded
         ? '+1 Camp Point · +1 dandelion <span class="confirmed-checkmark" aria-hidden="true">✓</span><span class="sr-only"> Completed</span>'
+        : complete
+          ? 'Attempt used <span class="confirmed-checkmark" aria-hidden="true">✓</span><span class="sr-only"> Completed; no reward earned</span>'
         : activityType === "trivia"
           ? "One attempt per day"
           : "Not completed today";
@@ -1291,6 +1298,7 @@
       const payload = await response.json();
       const awards = Array.isArray(payload.awards) ? payload.awards : [];
       const next = prepareCurrentDay(stateApi.getState());
+      const triviaAttempt = payload.trivia_attempt;
 
       if (playerWeeklyPointsEl && Number.isInteger(payload.weekly_points)) {
         playerWeeklyPointsEl.textContent = String(payload.weekly_points);
@@ -1313,6 +1321,13 @@
         }
         if (activityType === "marching") next.bandCamp.daily.marchingComplete = true;
       });
+
+      if (triviaAttempt && typeof triviaAttempt.selected_answer === "string") {
+        serverConfirmedTriviaAttempt = triviaAttempt;
+        next.bandCamp.daily.triviaAttempted = true;
+        next.bandCamp.daily.triviaCorrect = triviaAttempt.correct === true;
+        next.bandCamp.daily.triviaSelectedAnswer = triviaAttempt.selected_answer;
+      }
 
       stateApi.saveState(next, { sync: false });
       renderBoard(next);
@@ -1401,7 +1416,7 @@
         triviaButton.textContent = daily.triviaCorrect ? "Correct ✓" : "Attempt used";
         triviaButton.classList.toggle(
           "is-confirmed-success",
-          daily.triviaCorrect && serverConfirmedAwards.has("trivia")
+          serverConfirmedTriviaAttempt !== null
         );
 
         if (triviaStatusEl) {
@@ -1535,21 +1550,30 @@
         }
         const isCorrect = checkedAnswer.correct === true;
 
+        serverConfirmedTriviaAttempt = {
+          selected_answer: checkedAnswer.selected_answer,
+          correct: isCorrect,
+        };
+
         next.bandCamp.daily.triviaAttempted = true;
         next.bandCamp.daily.triviaCorrect = isCorrect;
         next.bandCamp.daily.triviaSelectedAnswer = checkedAnswer.selected_answer;
 
         if (isCorrect) {
-          try {
-            const persistedAward = await persistCampPoint("trivia");
-            if (persistedAward && persistedAward.created === true) {
-              celebrateSuccess(triviaForm);
-            }
-          } catch (error) {
-            feedbackEl.textContent = error.message || "Camp points could not be saved.";
-            return;
+          serverConfirmedAwards.add("trivia");
+          if (playerWeeklyPointsEl && Number.isInteger(checkedAnswer.weekly_points)) {
+            playerWeeklyPointsEl.textContent = String(checkedAnswer.weekly_points);
           }
-          awardContest(next, "trivia");
+          if (playerPointsEl && Number.isInteger(checkedAnswer.career_points)) {
+            playerPointsEl.textContent = String(checkedAnswer.career_points);
+          }
+          if (checkedAnswer.award_created === true) {
+            celebrateSuccess(triviaForm);
+            awardContest(next, "trivia");
+          } else if (!next.bandCamp.daily.awarded.includes("trivia")) {
+            next.bandCamp.daily.awarded.push("trivia");
+          }
+          window.dispatchEvent(new CustomEvent("ww:camp-points-saved"));
           feedbackEl.textContent =
             "Correct! +1 Camp Point and +1 dandelion.";
         } else {

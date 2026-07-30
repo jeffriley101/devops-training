@@ -531,10 +531,8 @@ select {
   border-radius: 0 0 var(--radius-lg) var(--radius-lg);
 }
 
-.p-book-lower-actions {
-  margin: 0 -1rem -1rem;
-  padding: 1.2rem 1rem;
-  background: linear-gradient(160deg, #bfd3e2, #7897b1);
+.p-book-lower-spacer {
+  min-height: 1.35rem;
 }
 
 .practice-stat-stone {

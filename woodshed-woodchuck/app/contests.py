@@ -17,6 +17,7 @@ from .db import SessionLocal
 from .instruments import INSTRUMENTS_BY_LABEL
 from .models import (
     CampPointAward,
+    DailyTriviaAttempt,
     Contest,
     ContestResult,
     ContestWeek,
@@ -1228,6 +1229,26 @@ def daily_camp_point_awards(
             CampPointAward.profile_id == profile.id,
             CampPointAward.duplicate_key.like(f"{prefix}%"),
         )).all()
+        trivia_attempt = session.scalar(select(DailyTriviaAttempt).where(
+            DailyTriviaAttempt.profile_id == profile.id,
+            DailyTriviaAttempt.activity_date == activity_date,
+        ))
+        trivia_attempt_payload = None
+        if trivia_attempt is not None:
+            trivia_attempt_payload = {
+                "selected_answer": trivia_attempt.selected_answer,
+                "correct": trivia_attempt.correct,
+            }
+        elif any(award.activity_type == "trivia" for award in awards):
+            # Pre-attempt-ledger trivia awards prove the submitted choice was
+            # correct; reconstruct that server-authored option for compatibility.
+            _, options, answer = TRIVIA_ANSWERS[
+                (activity_date.timetuple().tm_yday - 1) % len(TRIVIA_ANSWERS)
+            ]
+            trivia_attempt_payload = {
+                "selected_answer": options[answer],
+                "correct": True,
+            }
         return {
             "activity_date": activity_date.isoformat(),
             **student_camp_point_totals(
@@ -1241,6 +1262,7 @@ def daily_camp_point_awards(
                 }
                 for award in awards
             ],
+            "trivia_attempt": trivia_attempt_payload,
         }
 
 
@@ -1250,19 +1272,65 @@ def check_trivia_answer(
     submitted: TriviaAnswerSubmission,
 ) -> dict[str, object]:
     with SessionLocal() as session:
-        if current_profile(request, session) is None:
+        profile = current_profile(request, session)
+        if profile is None:
             raise HTTPException(status_code=401, detail="Student sign-in is required.")
-    today = datetime.now(timezone.utc).astimezone(CENTRAL).date()
-    if submitted.activity_date != today:
-        raise HTTPException(status_code=400, detail="Trivia can only be answered for today.")
-    question, options, answer = TRIVIA_ANSWERS[(today.timetuple().tm_yday - 1) % len(TRIVIA_ANSWERS)]
-    if submitted.selected_index < 0 or submitted.selected_index >= len(options):
-        raise HTTPException(status_code=400, detail="Choose one of today’s answers.")
-    return {
-        "question": question,
-        "selected_answer": options[submitted.selected_index],
-        "correct": submitted.selected_index == answer,
-    }
+        now = datetime.now(timezone.utc)
+        today = now.astimezone(CENTRAL).date()
+        if submitted.activity_date != today:
+            raise HTTPException(status_code=400, detail="Trivia can only be answered for today.")
+        question, options, answer = TRIVIA_ANSWERS[(today.timetuple().tm_yday - 1) % len(TRIVIA_ANSWERS)]
+        if submitted.selected_index < 0 or submitted.selected_index >= len(options):
+            raise HTTPException(status_code=400, detail="Choose one of today’s answers.")
+        attempt = session.scalar(select(DailyTriviaAttempt).where(
+            DailyTriviaAttempt.profile_id == profile.id,
+            DailyTriviaAttempt.activity_date == today,
+        ))
+        created = attempt is None
+        if attempt is None:
+            attempt = DailyTriviaAttempt(
+                profile_id=profile.id,
+                activity_date=today,
+                selected_answer=options[submitted.selected_index],
+                correct=submitted.selected_index == answer,
+            )
+            session.add(attempt)
+            try:
+                session.flush()
+            except IntegrityError:
+                session.rollback()
+                attempt = session.scalar(select(DailyTriviaAttempt).where(
+                    DailyTriviaAttempt.profile_id == profile.id,
+                    DailyTriviaAttempt.activity_date == today,
+                ))
+                if attempt is None:
+                    raise HTTPException(status_code=500, detail="Trivia could not be saved.")
+                created = False
+        award = None
+        award_created = False
+        if attempt.correct:
+            award, award_created = create_camp_point_award(
+                session,
+                profile=profile,
+                activity_type="trivia",
+                activity_date=today,
+                now=now,
+            )
+            _reconcile_crown_categories(session, profile_id=profile.id)
+        session.commit()
+        return {
+            "question": question,
+            "selected_answer": attempt.selected_answer,
+            "correct": attempt.correct,
+            "created": created,
+            "award_created": award_created,
+            "award": ({
+                "activity_type": award.activity_type,
+                "points_awarded": award.points_awarded,
+                "occurred_at": utc_iso(award.occurred_at),
+            } if award is not None else None),
+            **student_camp_point_totals(session, profile_id=profile.id, now=now),
+        }
 
 
 @router.post("/camp-points/awards")

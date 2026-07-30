@@ -169,9 +169,11 @@ def test_bonus_challenge_and_success_confetti_hooks() -> None:
     assert "Practice Challenge" not in board
     assert "Bonus Challenge" in board and "🏆" in board
     assert "bonus-challenge-section" in board and ".board-practice-section.bonus-challenge-section" in css
-    assert 'persistCampPoint("trivia")' in javascript
+    assert 'fetch("/contests/trivia/answer"' in javascript
+    assert 'serverConfirmedAwards.add("trivia")' in javascript
     assert "persistedAward.created === true" in javascript
-    wrong_branch = javascript[javascript.index("} else {", javascript.index('persistCampPoint("trivia")')):javascript.index("stateApi.saveState(next)", javascript.index('persistCampPoint("trivia")'))]
+    wrong_start = javascript.index('feedbackEl.textContent =\n            "Not quite.')
+    wrong_branch = javascript[wrong_start:javascript.index("stateApi.saveState(next)", wrong_start)]
     assert "celebrateSuccess" not in wrong_branch
     assert "createdPayload.created === true" in javascript
     assert 'celebrateSuccess(form)' in javascript
