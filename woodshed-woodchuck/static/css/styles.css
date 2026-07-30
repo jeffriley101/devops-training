@@ -4009,7 +4009,7 @@ select {
 
 .plunge-status {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 0.6rem;
   margin-bottom: 0.8rem;
 }
@@ -4025,6 +4025,26 @@ select {
 }
 
 #plunge-hearts { color: #a72e2e; letter-spacing: 0.08em; }
+.plunge-band-set {
+  display: grid;
+  grid-template-columns: minmax(12rem, 1fr) minmax(0, 2fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.8rem;
+  padding: 0.7rem 0.85rem;
+  border: 2px solid #86552e;
+  border-radius: 0.85rem;
+  background: rgba(255, 243, 211, 0.82);
+  color: #4a2a17;
+}
+
+.plunge-band-set h2, .plunge-band-set p { margin: 0; }
+.plunge-band-set h2 { font-size: 1.05rem; }
+.plunge-band-set p { font-size: 0.86rem; }
+.plunge-band-set ul { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0; padding: 0; list-style: none; }
+.plunge-band-set li { padding: 0.25rem 0.45rem; border-radius: 999px; background: #ead095; font-size: 0.88rem; font-weight: 700; }
+.plunge-band-set .plunge-band-empty { background: transparent; color: #76502f; font-weight: 600; }
+.plunge-band-complete { color: #28623c; white-space: nowrap; }
 .plunge-layout { display: grid; grid-template-columns: minmax(0, 1fr) 15rem; align-items: start; gap: 1rem; }
 
 .plunge-board-wrap {
@@ -4043,6 +4063,7 @@ select {
 #plunge-canvas { display: block; width: 100%; height: 100%; outline-offset: -0.3rem; }
 #plunge-canvas:focus-visible { outline: 0.25rem solid #ffd75b; }
 #plunge-canvas.is-hit { filter: sepia(0.35) brightness(1.22); }
+#plunge-canvas.is-portal { filter: brightness(1.16) saturate(1.2); }
 
 .plunge-overlay {
   position: absolute;
@@ -4105,6 +4126,8 @@ select {
 .plunge-music legend { padding-inline: 0.3rem; font-weight: 800; }
 .plunge-music input[type="range"] { width: 100%; }
 .plunge-coming-soon { margin: 0; color: #76502f; font-size: 0.9rem; font-weight: 700; }
+.plunge-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.45rem 0.8rem; margin-top: 1rem; }
+.plunge-legend span { padding: 0.35rem 0.55rem; border-radius: 0.65rem; background: rgba(255, 243, 211, 0.74); color: #4b2b19; font-size: 0.88rem; }
 .plunge-instructions { margin: 1rem 0 0; text-align: center; color: #4b2b19; }
 
 @media (max-width: 760px) {
@@ -4112,6 +4135,8 @@ select {
   .plunge-header { align-items: stretch; flex-direction: column; }
   .plunge-header .btn { align-self: flex-start; }
   .plunge-status { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .plunge-band-set { grid-template-columns: 1fr; }
+  .plunge-band-complete { white-space: normal; }
   .plunge-layout { grid-template-columns: minmax(0, 1fr); }
   .plunge-controls { grid-template-columns: minmax(0, 1fr) minmax(10rem, 1fr); }
   .plunge-action-row { align-content: start; }
@@ -4127,4 +4152,5 @@ select {
   .plunge-direction { transition: none; }
   .plunge-direction:active { transform: none; }
   #plunge-canvas.is-hit { filter: none; }
+  #plunge-canvas.is-portal { filter: none; }
 }

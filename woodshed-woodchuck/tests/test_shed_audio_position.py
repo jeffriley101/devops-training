@@ -30,7 +30,8 @@ def test_shed_button_uses_lower_safe_edge_and_panel_opens_upward() -> None:
 def test_shed_mobile_avoids_top_right_and_retains_44px_target() -> None:
     start = CSS.index("/* SHED keeps Sound Effects")
     shed = CSS[start:]
-    mobile = shed[shed.index("@media (max-width: 640px)"):]
+    mobile_start = shed.index("@media (max-width: 640px)")
+    mobile = shed[mobile_start:shed.index("\n}", mobile_start) + 2]
     assert "top:" not in mobile
     assert "bottom: calc(4.5rem + env(safe-area-inset-bottom))" in mobile
     assert "right: max(0.65rem, env(safe-area-inset-right))" in mobile

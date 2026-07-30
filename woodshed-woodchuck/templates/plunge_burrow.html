@@ -6,7 +6,7 @@
     <div>
       <p class="plunge-kicker">Underground practice break</p>
       <h1 id="plunge-title">Plunge Burrow</h1>
-      <p>Guide the Woodchuck to dandelions, avoid rocks and roots, and protect all three hearts.</p>
+      <p>Gather burrow snacks and band instruments, use paired tunnel holes, and protect all three hearts.</p>
     </div>
     <a class="btn btn-secondary" href="/quest">Back to BOARD</a>
   </header>
@@ -15,12 +15,22 @@
     <p>Score <strong id="plunge-score">0</strong></p>
     <p>Best <strong id="plunge-best">0</strong></p>
     <p>Hearts <strong id="plunge-hearts" aria-label="3 hearts">♥ ♥ ♥</strong></p>
+    <p>Dandelions <strong id="plunge-dandelions">0</strong></p>
     <p>Status <strong id="plunge-state">Ready</strong></p>
   </div>
 
+  <section class="plunge-band-set" aria-labelledby="plunge-band-set-title">
+    <div>
+      <h2 id="plunge-band-set-title">Band Set <span id="plunge-band-progress">0 / 4</span></h2>
+      <p>Collect four different instruments for a +20 score bonus.</p>
+    </div>
+    <ul id="plunge-band-list" aria-label="Instruments in the active Band Set"><li class="plunge-band-empty">No instruments yet</li></ul>
+    <strong id="plunge-band-complete" class="plunge-band-complete" hidden>Band Set Complete!</strong>
+  </section>
+
   <div class="plunge-layout">
     <div class="plunge-board-wrap">
-      <canvas id="plunge-canvas" width="600" height="600" tabindex="0" aria-label="Plunge Burrow game board. Move the Woodchuck through the underground grid to eat dandelions while avoiding walls, its trail, rocks, and roots." aria-describedby="plunge-instructions"></canvas>
+      <canvas id="plunge-canvas" width="600" height="600" tabindex="0" aria-label="Plunge Burrow game board. Find dandelions, carrots, and band instruments, travel through matching lettered portals, and avoid walls, your trail, rocks, and roots." aria-describedby="plunge-instructions plunge-legend"></canvas>
       <div id="plunge-overlay" class="plunge-overlay" aria-hidden="true">
         <strong id="plunge-overlay-title">Ready to burrow?</strong>
         <span id="plunge-overlay-detail">Choose a direction, then press Start.</span>
@@ -51,11 +61,17 @@
     </aside>
   </div>
 
+  <div id="plunge-legend" class="plunge-legend" aria-label="Burrow legend">
+    <span><b aria-hidden="true">🌼</b> Dandelion: +1 score and segment</span>
+    <span><b aria-hidden="true">🥕</b> Carrot: +3 score, two segments, and a heart when needed</span>
+    <span><b aria-hidden="true">◉A</b> Matching holes teleport you</span>
+    <span><b aria-hidden="true">🎷</b> Instrument: +5 score; four different complete a Band Set</span>
+  </div>
   <p id="plunge-instructions" class="plunge-instructions">Use Arrow keys or W, A, S, D. On touch screens, swipe the burrow or use the direction buttons. Direct reversals are blocked.</p>
   <p id="plunge-live" class="sr-only" aria-live="polite" aria-atomic="true"></p>
 </section>
 {% endblock %}
 
 {% block page_scripts %}
-<script src="/static/js/plunge-burrow.js?v=1"></script>
+<script src="/static/js/plunge-burrow.js?v=2"></script>
 {% endblock %}

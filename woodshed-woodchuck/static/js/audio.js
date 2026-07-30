@@ -9,6 +9,8 @@
     "campPointEarned", "pChartSubmitted", "crownEarned", "dialClick",
     "secretReward", "goatTracker", "questCompleted", "bandCampBonus",
     "marchingCompleted", "practiceRoomOpen", "medalEarned",
+    "burrowPortal", "carrotCollected", "instrumentCollected",
+    "bandSetCompleted",
   ];
   const GOAT_CLIP_URLS = [
     "/static/audio/goats/goat-01.mp3",
@@ -209,6 +211,8 @@
       dialClick: 55, goatTracker: 900, questCompleted: 700,
       bandCampBonus: 600, marchingCompleted: 600,
       practiceRoomOpen: 700, medalEarned: 1000,
+      burrowPortal: 300, carrotCollected: 350,
+      instrumentCollected: 350, bandSetCompleted: 900,
     };
     const quietPeriod = quietPeriods[name] || 120;
     if (nowMs - (lastPlayed.get(name) || 0) < quietPeriod) return false;
@@ -283,6 +287,22 @@
           graph.flourish.triggerAttackRelease(step[0], 0.3, now + step[1], 0.36);
         });
         graph.chime.triggerAttackRelease(["G4", "B4", "D5"], 0.42, now + 0.56, 0.28);
+      } else if (name === "burrowPortal") {
+        graph.doorFilter.frequency.setValueAtTime(520, now);
+        graph.doorFilter.frequency.exponentialRampToValueAtTime(1800, now + 0.22);
+        graph.door.triggerAttackRelease(0.22, now, 0.15);
+        graph.chime.triggerAttackRelease("D5", 0.1, now + 0.2, 0.18);
+      } else if (name === "carrotCollected") {
+        graph.warm.triggerAttackRelease("G4", 0.14, now, 0.3);
+        graph.chime.triggerAttackRelease("C5", 0.18, now + 0.13, 0.25);
+      } else if (name === "instrumentCollected") {
+        graph.wood.triggerAttackRelease("E4", 0.06, now, 0.28);
+        graph.chime.triggerAttackRelease("A4", 0.2, now + 0.08, 0.26);
+      } else if (name === "bandSetCompleted") {
+        [["C4", 0], ["E4", 0.13], ["G4", 0.26], ["C5", 0.43]].forEach(function (step) {
+          graph.flourish.triggerAttackRelease(step[0], 0.24, now + step[1], 0.3);
+        });
+        graph.chime.triggerAttackRelease(["E5", "G5"], 0.3, now + 0.55, 0.24);
       }
       return true;
     } catch (_error) {
