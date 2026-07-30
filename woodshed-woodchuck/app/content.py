@@ -17,6 +17,8 @@ GOAL_OPTIONS = [
 
 SAX_VIKING_WELCOME = "Ahoy, musician! Set your path and let the woodshed sing."
 
+PRACTICE_DEFINITION = "Anytime you are messing with your instrument—giving it attention in any way—counts as practice. Minutes spent thinking about your instrument can count as half-minutes. We’re on the honor system here!"
+
 QUEST_POOL = {
     "Flute": [
         {

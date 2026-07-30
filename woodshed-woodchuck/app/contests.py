@@ -82,6 +82,22 @@ class CampPointAwardCreate(BaseModel):
     activity_date: date
 
 
+class TriviaAnswerSubmission(BaseModel):
+    activity_date: date
+    selected_index: int
+
+
+TRIVIA_ANSWERS = (
+    ("How many beats does a whole note receive in 4/4 time?", ("2", "3", "4"), 2),
+    ("Which word means to gradually get louder?", ("Crescendo", "Diminuendo", "Fermata"), 0),
+    ("What does a conductor’s upbeat usually help signal?", ("An entrance", "A break", "The end of rehearsal"), 0),
+    ("What should most wind players use for a stronger tone?", ("Less air", "More air", "A tighter music stand"), 1),
+    ("What does the marking piano mean?", ("Play softly", "Play quickly", "Stop playing"), 0),
+    ("Which section usually includes trumpets and trombones?", ("Woodwinds", "Brass", "Percussion"), 1),
+    ("What does a metronome help a musician maintain?", ("Tempo", "Instrument color", "Music-stand height"), 0),
+)
+
+
 def central_week_boundaries(
     now: datetime,
 ) -> tuple[date, date, datetime, datetime]:
@@ -1226,6 +1242,27 @@ def daily_camp_point_awards(
                 for award in awards
             ],
         }
+
+
+@router.post("/trivia/answer")
+def check_trivia_answer(
+    request: Request,
+    submitted: TriviaAnswerSubmission,
+) -> dict[str, object]:
+    with SessionLocal() as session:
+        if current_profile(request, session) is None:
+            raise HTTPException(status_code=401, detail="Student sign-in is required.")
+    today = datetime.now(timezone.utc).astimezone(CENTRAL).date()
+    if submitted.activity_date != today:
+        raise HTTPException(status_code=400, detail="Trivia can only be answered for today.")
+    question, options, answer = TRIVIA_ANSWERS[(today.timetuple().tm_yday - 1) % len(TRIVIA_ANSWERS)]
+    if submitted.selected_index < 0 or submitted.selected_index >= len(options):
+        raise HTTPException(status_code=400, detail="Choose one of today’s answers.")
+    return {
+        "question": question,
+        "selected_answer": options[submitted.selected_index],
+        "correct": submitted.selected_index == answer,
+    }
 
 
 @router.post("/camp-points/awards")

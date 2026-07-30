@@ -137,7 +137,7 @@
     if (state.profile.level) levelEl.value = state.profile.level;
     if (state.profile.goal) goalEl.value = state.profile.goal;
 
-    form.addEventListener("submit", function (event) {
+    form.addEventListener("submit", async function (event) {
       const woodchuckName = woodchuckNameEl.value.trim();
       const instrument = instrumentEl.value.trim();
       const level = levelEl.value.trim();
@@ -246,6 +246,59 @@
     }
   }
 
+  function wireShedSecret() {
+    const trigger = document.getElementById("shed-secret-button");
+    const panel = document.getElementById("shed-secret-panel");
+    const form = document.getElementById("shed-secret-form");
+    const input = document.getElementById("shed-secret-passcode");
+    const feedback = document.getElementById("shed-secret-feedback");
+    if (!trigger || !panel || !form || !input || !feedback) return;
+    const closeButtons = [
+      document.getElementById("shed-secret-cancel"),
+      document.getElementById("shed-secret-close"),
+    ].filter(Boolean);
+    function close() {
+      panel.hidden = true;
+      panel.classList.add("hidden");
+      trigger.setAttribute("aria-expanded", "false");
+      input.value = "";
+      trigger.focus();
+    }
+    trigger.addEventListener("click", function () {
+      panel.hidden = false;
+      panel.classList.remove("hidden");
+      trigger.setAttribute("aria-expanded", "true");
+      feedback.textContent = "";
+      input.focus();
+    });
+    closeButtons.forEach((button) => button.addEventListener("click", close));
+    form.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      const submit = form.querySelector("button[type='submit']");
+      submit.disabled = true;
+      try {
+        const response = await fetch("/account/daily-secret", {
+          method: "POST", credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ passcode: input.value }),
+        });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.detail || "The secret could not be checked.");
+        const next = stateApi.getState();
+        if (Number.isInteger(payload.credits)) next.progress.credits = payload.credits;
+        if (Number.isInteger(payload.revision)) next.account.serverRevision = payload.revision;
+        stateApi.saveState(next, { sync: false });
+        hydrateHome(next);
+        feedback.textContent = payload.redeemed ? "+20 dandelions" : "Already found today. Come back tomorrow!";
+        if (payload.redeemed) celebrateSuccess(form);
+      } catch (error) {
+        feedback.textContent = error.message || "That passcode did not match. Try again.";
+      } finally {
+        submit.disabled = false;
+      }
+    });
+  }
+
   async function refreshPracticeStreak() {
     const streakEl = document.getElementById("streak-value");
     if (!streakEl) return;
@@ -331,6 +384,11 @@
 
       if (completeBtn && s.daily.completed) {
         completeBtn.textContent = "Quest Complete";
+        completeBtn.classList.add("is-confirmed-success");
+        completeBtn.disabled = true;
+      } else if (completeBtn) {
+        completeBtn.classList.remove("is-confirmed-success");
+        completeBtn.disabled = false;
       }
     }
 
@@ -439,7 +497,7 @@
       });
     }
 
-    form.addEventListener("submit", function (event) {
+    form.addEventListener("submit", async function (event) {
       event.preventDefault();
       errorEl.textContent = "";
 
@@ -474,7 +532,8 @@
         return;
       }
 
-      if (next.daily.loggedMinutes >= next.daily.targetMinutes) {
+      const completedNow = next.daily.loggedMinutes >= next.daily.targetMinutes;
+      if (completedNow) {
         next.daily.completed = true;
         next.daily.completedAt = new Date().toISOString();
         next.progress.credits += next.daily.rewardCredits;
@@ -491,7 +550,16 @@
       }
 
       next.daily.encouragement = feedbackEl.querySelector("p:last-child").textContent;
-      stateApi.saveState(next);
+      if (completedNow && window.WWAccountSync) {
+        stateApi.saveState(next, { sync: false });
+        const confirmed = await window.WWAccountSync.syncNow();
+        if (!confirmed) {
+          errorEl.textContent = "Quest completion could not be saved. Please try again.";
+          return;
+        }
+      } else {
+        stateApi.saveState(next);
+      }
       renderQuestStatus(next);
       hydrateHome(next);
       minutesEl.value = "";
@@ -1002,37 +1070,30 @@
     {
       question: "How many beats does a whole note receive in 4/4 time?",
       options: ["2", "3", "4"],
-      answer: 2,
     },
     {
       question: "Which word means to gradually get louder?",
       options: ["Crescendo", "Diminuendo", "Fermata"],
-      answer: 0,
     },
     {
       question: "What does a conductor’s upbeat usually help signal?",
       options: ["An entrance", "A break", "The end of rehearsal"],
-      answer: 0,
     },
     {
       question: "What should most wind players use for a stronger tone?",
       options: ["Less air", "More air", "A tighter music stand"],
-      answer: 1,
     },
     {
       question: "What does the marking piano mean?",
       options: ["Play softly", "Play quickly", "Stop playing"],
-      answer: 0,
     },
     {
       question: "Which section usually includes trumpets and trombones?",
       options: ["Woodwinds", "Brass", "Percussion"],
-      answer: 1,
     },
     {
       question: "What does a metronome help a musician maintain?",
       options: ["Tempo", "Instrument color", "Music-stand height"],
-      answer: 0,
     },
   ];
 
@@ -1070,6 +1131,7 @@
     const triviaOptionsEl = document.getElementById("trivia-options");
     const triviaButton = document.getElementById("trivia-button");
     const triviaStatusEl = document.getElementById("trivia-status");
+    const triviaSelectedEl = document.getElementById("trivia-selected-answer");
     const triviaActivity = document.getElementById("trivia-activity");
     const triviaSummaryEl = document.getElementById("trivia-summary");
 
@@ -1206,8 +1268,8 @@
     function renderActivityDisclosure(details, summary, activityType) {
       if (!details || !summary) return;
       const complete = serverConfirmedAwards.has(activityType);
-      summary.textContent = complete
-        ? "Completed · +1 Camp Point · +1 dandelion"
+      summary.innerHTML = complete
+        ? '+1 Camp Point · +1 dandelion <span class="confirmed-checkmark" aria-hidden="true">✓</span><span class="sr-only"> Completed</span>'
         : activityType === "trivia"
           ? "One attempt per day"
           : "Not completed today";
@@ -1261,6 +1323,7 @@
 
       button.disabled = true;
       button.textContent = text;
+      button.classList.add("is-confirmed-success");
     }
 
     function renderTriviaOptions(current) {
@@ -1306,6 +1369,8 @@
         const hoursComplete = serverConfirmedAwards.has("hours");
         hoursCheckbox.checked = hoursComplete;
         hoursCheckbox.disabled = hoursComplete;
+        const label = hoursCheckbox.closest("label");
+        if (label) label.classList.toggle("is-confirmed-success", hoursComplete);
       }
 
       if (serverConfirmedAwards.has("hours")) {
@@ -1316,7 +1381,7 @@
         hoursStatusEl.textContent = "Not completed today";
       }
 
-      if (daily.careComplete) {
+      if (serverConfirmedAwards.has("care")) {
         setButtonComplete(careButton, "Instrument ready ✓");
         if (careStatusEl) {
           careStatusEl.textContent = "Completed today";
@@ -1332,15 +1397,21 @@
       renderTriviaOptions(current);
 
       if (daily.triviaAttempted) {
-        setButtonComplete(
-          triviaButton,
-          daily.triviaCorrect ? "Correct ✓" : "Attempt used"
+        triviaButton.disabled = true;
+        triviaButton.textContent = daily.triviaCorrect ? "Correct ✓" : "Attempt used";
+        triviaButton.classList.toggle(
+          "is-confirmed-success",
+          daily.triviaCorrect && serverConfirmedAwards.has("trivia")
         );
 
         if (triviaStatusEl) {
           triviaStatusEl.textContent = daily.triviaCorrect
             ? "Correct answer—point earned"
             : "Try a new question tomorrow";
+        }
+        if (triviaSelectedEl && daily.triviaSelectedAnswer) {
+          triviaSelectedEl.textContent = `Your answer: ${daily.triviaSelectedAnswer}`;
+          triviaSelectedEl.classList.remove("hidden");
         }
       } else if (triviaStatusEl) {
         triviaStatusEl.textContent = "One attempt per day";
@@ -1350,7 +1421,7 @@
         marchingTextEl.textContent = marchingChallenge;
       }
 
-      if (daily.marchingComplete) {
+      if (serverConfirmedAwards.has("marching")) {
         setButtonComplete(
           marchingButton,
           "Challenge completed ✓"
@@ -1449,10 +1520,24 @@
           return;
         }
 
-        const isCorrect = Number(selected.value) === trivia.answer;
+        let checkedAnswer;
+        try {
+          const response = await fetch("/contests/trivia/answer", {
+            method: "POST", credentials: "same-origin",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ activity_date: today, selected_index: Number(selected.value) }),
+          });
+          checkedAnswer = await response.json();
+          if (!response.ok) throw new Error(checkedAnswer.detail || "Trivia could not be checked.");
+        } catch (error) {
+          feedbackEl.textContent = error.message || "Trivia could not be checked.";
+          return;
+        }
+        const isCorrect = checkedAnswer.correct === true;
 
         next.bandCamp.daily.triviaAttempted = true;
         next.bandCamp.daily.triviaCorrect = isCorrect;
+        next.bandCamp.daily.triviaSelectedAnswer = checkedAnswer.selected_answer;
 
         if (isCorrect) {
           try {
@@ -1469,7 +1554,7 @@
             "Correct! +1 Camp Point and +1 dandelion.";
         } else {
           feedbackEl.textContent =
-            `Not quite. The correct answer was “${trivia.options[trivia.answer]}.”`;
+            "Not quite. No reward was earned today—thanks for giving it a try.";
         }
 
         stateApi.saveState(next);
@@ -1502,6 +1587,21 @@
         hydrateHome(next);
       });
     }
+  }
+
+  function wirePlungeBurrow() {
+    const button = document.getElementById("plunge-burrow-button");
+    const panel = document.getElementById("plunge-burrow-panel");
+    const close = document.getElementById("plunge-burrow-close");
+    if (!button || !panel || !close) return;
+    button.addEventListener("click", function () {
+      panel.hidden = false; panel.classList.remove("hidden");
+      button.setAttribute("aria-expanded", "true"); close.focus();
+    });
+    close.addEventListener("click", function () {
+      panel.hidden = true; panel.classList.add("hidden");
+      button.setAttribute("aria-expanded", "false"); button.focus();
+    });
   }
 
   function wireBandCampStandings() {
@@ -2579,6 +2679,7 @@
     const noteEl = document.getElementById("p-book-note");
     const practiceDetailEls = Array.from(document.querySelectorAll("input[name='practice-detail']"));
     const timerDisplayEl = document.getElementById("practice-timer-display");
+    const timerToggleBtn = document.getElementById("practice-timer-toggle-btn");
     const timerStartBtn = document.getElementById("practice-timer-start-btn");
     const timerStopBtn = document.getElementById("practice-timer-stop-btn");
     const timerFeedbackEl = document.getElementById("practice-timer-feedback");
@@ -2704,8 +2805,7 @@
         if (verifierHelpEl) {
           verifierHelpEl.textContent = connections.length
             ? (
-                "Choose one connected adult to review this " +
-                "P-Chart, or leave it open."
+                "Select a trusted verifier, or leave this Open."
               )
             : (
                 "No trusted verifiers are connected yet. " +
@@ -2926,6 +3026,8 @@
 
     let practiceTimerStartedAt = null;
     let practiceTimerInterval = null;
+    const PRACTICE_TIMER_LIMIT_SECONDS = 120 * 60;
+    const PRACTICE_TIMER_STORAGE_KEY = "woodshedPracticeTimerStartedAt";
 
     function formatTimerSeconds(totalSeconds) {
       const minutes = Math.floor(totalSeconds / 60);
@@ -2936,8 +3038,25 @@
     function updatePracticeTimerDisplay() {
       if (!timerDisplayEl || !practiceTimerStartedAt) return;
 
-      const elapsedSeconds = Math.max(0, Math.floor((Date.now() - practiceTimerStartedAt) / 1000));
+      const elapsedSeconds = Math.min(
+        PRACTICE_TIMER_LIMIT_SECONDS,
+        Math.max(0, Math.floor((Date.now() - practiceTimerStartedAt) / 1000))
+      );
       timerDisplayEl.textContent = formatTimerSeconds(elapsedSeconds);
+      if (elapsedSeconds >= PRACTICE_TIMER_LIMIT_SECONDS) {
+        stopPracticeTimerInterval();
+        practiceTimerStartedAt = null;
+        window.sessionStorage.removeItem(PRACTICE_TIMER_STORAGE_KEY);
+        minutesEl.value = "120";
+        if (timerFeedbackEl) timerFeedbackEl.textContent =
+          "Timer stopped at 2 hours. You can adjust your minutes before submitting.";
+        const toggle = document.getElementById("practice-timer-toggle-btn");
+        if (toggle) {
+          toggle.textContent = "Start Timer";
+          toggle.classList.remove("btn-red");
+          toggle.classList.add("btn-secondary");
+        }
+      }
     }
 
     function stopPracticeTimerInterval() {
@@ -2948,10 +3067,17 @@
     }
 
     function wirePracticeTimer() {
-      if (!timerDisplayEl || !timerStartBtn || !timerStopBtn || !minutesEl) return;
+      if (!timerDisplayEl || !timerToggleBtn || !timerStartBtn || !timerStopBtn || !minutesEl) return;
+
+      function renderTimerRunning(running) {
+        timerToggleBtn.textContent = running ? "Stop Timer" : "Start Timer";
+        timerToggleBtn.classList.toggle("btn-red", running);
+        timerToggleBtn.classList.toggle("btn-secondary", !running);
+      }
 
       timerStartBtn.addEventListener("click", function () {
         practiceTimerStartedAt = Date.now();
+        window.sessionStorage.setItem(PRACTICE_TIMER_STORAGE_KEY, String(practiceTimerStartedAt));
         stopPracticeTimerInterval();
         timerDisplayEl.textContent = "00:00";
         practiceTimerInterval = window.setInterval(updatePracticeTimerDisplay, 1000);
@@ -2959,6 +3085,7 @@
         if (timerFeedbackEl) {
           timerFeedbackEl.textContent = "Timer started. Go make some music.";
         }
+        renderTimerRunning(true);
       });
 
       timerStopBtn.addEventListener("click", function () {
@@ -2969,12 +3096,14 @@
           return;
         }
 
-        const elapsedSeconds = Math.max(0, Math.floor((Date.now() - practiceTimerStartedAt) / 1000));
+        const elapsedSeconds = Math.min(PRACTICE_TIMER_LIMIT_SECONDS, Math.max(0, Math.floor((Date.now() - practiceTimerStartedAt) / 1000)));
         const elapsedMinutes = Math.max(1, Math.round(elapsedSeconds / 60));
 
         stopPracticeTimerInterval();
         timerDisplayEl.textContent = formatTimerSeconds(elapsedSeconds);
         practiceTimerStartedAt = null;
+        window.sessionStorage.removeItem(PRACTICE_TIMER_STORAGE_KEY);
+        renderTimerRunning(false);
 
         const shouldFillMinutes = window.confirm(`Do you want to enter ${elapsedMinutes} practice minute${elapsedMinutes === 1 ? "" : "s"}?`);
         if (shouldFillMinutes) {
@@ -2986,6 +3115,21 @@
           timerFeedbackEl.textContent = "Timer stopped. Minutes were not added.";
         }
       });
+
+      timerToggleBtn.addEventListener("click", function () {
+        if (practiceTimerStartedAt) timerStopBtn.click();
+        else timerStartBtn.click();
+      });
+
+      const restoredStart = Number(window.sessionStorage.getItem(PRACTICE_TIMER_STORAGE_KEY));
+      if (Number.isFinite(restoredStart) && restoredStart > 0) {
+        practiceTimerStartedAt = restoredStart;
+        updatePracticeTimerDisplay();
+        if (practiceTimerStartedAt) {
+          practiceTimerInterval = window.setInterval(updatePracticeTimerDisplay, 1000);
+          renderTimerRunning(true);
+        }
+      }
     }
 
     function getRecentEmails(s, type) {
@@ -3312,12 +3456,14 @@
 
   wireSetupForm(state);
   hydrateHome(state);
+  wireShedSecret();
   refreshPracticeStreak();
   wireMetronome();
   wireTuner();
   wireMum(state);
   wireQuestForm(state);
   wireBandCamp(state);
+  wirePlungeBurrow();
   wireBandCampStandings();
   wirePastWinners();
   wireHallOfChampions();

@@ -95,6 +95,7 @@
           </form>
 
           <small id="trivia-status">One attempt per day</small>
+          <p id="trivia-selected-answer" class="trivia-selected-answer hidden"></p>
         </div>
         </div>
       </details>
@@ -404,6 +405,11 @@
   <p id="board-feedback" class="board-feedback" aria-live="polite">
     Each contest win earns one Camp Point and one dandelion.
   </p>
+
+  <section class="board-panel plunge-burrow" aria-labelledby="plunge-burrow-title">
+    <button id="plunge-burrow-button" class="btn btn-secondary" type="button" aria-controls="plunge-burrow-panel" aria-expanded="false"><span aria-hidden="true">🕳️</span> <span id="plunge-burrow-title">Plunge Burrow</span></button>
+    <div id="plunge-burrow-panel" class="mentor-card hidden" hidden><p>Coming Soon</p><button id="plunge-burrow-close" class="btn btn-secondary" type="button">Close</button></div>
+  </section>
 
   <section class="board-practice-section bonus-challenge-section" aria-labelledby="bonus-challenge-title">
     <div class="section-head">

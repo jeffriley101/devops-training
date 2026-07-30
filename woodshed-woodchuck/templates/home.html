@@ -12,6 +12,7 @@
     </div>
 
     <div class="woodshed-foreground" aria-label="Clickable Woodshed objects">
+      <button id="shed-secret-button" class="shed-secret-button" type="button" aria-controls="shed-secret-panel" aria-expanded="false" aria-label="Open secret passcode">U</button>
       <div class="woodshed-object-column woodshed-object-column-left">
         <button
           id="woodchuck-name-value"
@@ -150,6 +151,20 @@
       </div>
     </div>
   </div>
+
+  <section id="shed-secret-panel" class="mentor-card shed-secret-panel hidden" hidden aria-labelledby="shed-secret-title">
+    <h2 id="shed-secret-title">Secret</h2>
+    <form id="shed-secret-form" class="stack-form">
+      <label for="shed-secret-passcode">Passcode</label>
+      <input id="shed-secret-passcode" name="passcode" type="password" autocomplete="off" required />
+      <p id="shed-secret-feedback" role="status" aria-live="polite"></p>
+      <div class="button-row">
+        <button class="btn btn-primary" type="submit">Submit</button>
+        <button id="shed-secret-cancel" class="btn btn-secondary" type="button">Cancel</button>
+        <button id="shed-secret-close" class="btn btn-secondary" type="button">Close</button>
+      </div>
+    </form>
+  </section>
 
   <section
     id="change-instrument-panel"

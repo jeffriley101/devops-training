@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Body, Form, HTTPException, Request
 from pydantic import BaseModel
 from fastapi.responses import JSONResponse
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .accounts import (
@@ -17,7 +21,7 @@ from .accounts import (
 )
 from .instruments import INSTRUMENTS_BY_LABEL
 from .db import SessionLocal
-from .models import WoodchuckProfile, WoodchuckState
+from .models import RewardGrant, WoodchuckProfile, WoodchuckState
 
 
 router = APIRouter(prefix="/account", tags=["account"])
@@ -35,6 +39,14 @@ class DisplayNameUpdate(BaseModel):
 
 class LevelUpdate(BaseModel):
     level: str
+
+
+class DailySecretSubmission(BaseModel):
+    passcode: str
+
+
+SECRET_REWARD_TIMEZONE = ZoneInfo("America/Chicago")
+SECRET_REWARD_AMOUNT = 20
 
 
 def profile_payload(profile: WoodchuckProfile) -> dict[str, object]:
@@ -144,6 +156,51 @@ def logout(request: Request):
     request.session.clear()
 
     return {"authenticated": False}
+
+
+@router.post("/daily-secret")
+def redeem_daily_secret(request: Request, submitted: DailySecretSubmission):
+    if submitted.passcode.strip().casefold() != "union":
+        raise HTTPException(status_code=400, detail="That passcode did not match. Try again.")
+    with SessionLocal() as session:
+        profile = current_profile(request, session)
+        if profile is None:
+            raise HTTPException(status_code=401, detail="Student sign-in is required.")
+        activity_date = datetime.now(timezone.utc).astimezone(SECRET_REWARD_TIMEZONE).date()
+        source_key = f"daily-secret:{activity_date.isoformat()}"
+        existing = session.scalar(select(RewardGrant).where(
+            RewardGrant.profile_id == profile.id,
+            RewardGrant.source_key == source_key,
+            RewardGrant.reward_type == "dandelion",
+        ))
+        state = session.get(WoodchuckState, profile.id)
+        if existing is not None:
+            credits = ((state.state_json or {}).get("progress") or {}).get("credits", 0) if state else 0
+            return {"redeemed": False, "amount": 0, "credits": credits, "revision": state.revision if state else 0}
+        if state is None:
+            state = WoodchuckState(profile_id=profile.id, state_json={}, revision=0)
+            session.add(state)
+        payload = deepcopy(state.state_json or {})
+        progress = dict(payload.get("progress") or {})
+        credits = progress.get("credits", 0)
+        credits = credits if isinstance(credits, int) and not isinstance(credits, bool) else 0
+        progress["credits"] = credits + SECRET_REWARD_AMOUNT
+        payload["progress"] = progress
+        state.state_json = payload
+        state.revision += 1
+        session.add(RewardGrant(
+            profile_id=profile.id, contest_result_id=None,
+            source_key=source_key, reward_type="dandelion",
+            category_key=None, amount=SECRET_REWARD_AMOUNT,
+        ))
+        try:
+            session.commit()
+        except IntegrityError:
+            session.rollback()
+            current = session.get(WoodchuckState, profile.id)
+            current_credits = ((current.state_json or {}).get("progress") or {}).get("credits", 0) if current else 0
+            return {"redeemed": False, "amount": 0, "credits": current_credits, "revision": current.revision if current else 0}
+        return {"redeemed": True, "amount": SECRET_REWARD_AMOUNT, "credits": progress["credits"], "revision": state.revision}
 
 
 @router.patch("/profile/instrument")

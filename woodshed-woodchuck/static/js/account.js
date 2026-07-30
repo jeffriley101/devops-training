@@ -418,6 +418,7 @@
           instrumentObject.title = "Change instrument";
         }
         feedback.textContent = `Instrument changed to ${payload.instrument}.`;
+        submitButton.classList.add("is-confirmed-success");
       } catch (error) {
         feedback.classList.add("error-text");
         feedback.textContent = error instanceof TypeError
@@ -479,6 +480,7 @@
         next.profile[stateKey] = payload[payloadKey];
         stateApi.saveState(next);
         feedback.textContent = `${kind === "name" ? "Name" : "Level"} changed successfully.`;
+        button.classList.add("is-confirmed-success");
         openButton.textContent = kind === "level"
           ? payload[payloadKey].charAt(0).toUpperCase()
           : payload[payloadKey];
@@ -583,11 +585,11 @@
   async function syncStateToServer() {
     const state = stateApi.getState();
 
-    if (!isPersistentAccount(state)) return;
+    if (!isPersistentAccount(state)) return false;
 
     if (syncInProgress) {
       pendingSync = true;
-      return;
+      return false;
     }
 
     syncInProgress = true;
@@ -606,13 +608,13 @@
       if (response.status === 401) {
         state.account.authenticated = false;
         stateApi.saveState(state, { sync: false });
-        return;
+        return false;
       }
 
       if (response.status === 409) {
         pendingSync = false;
         await recoverFromConflict(state);
-        return;
+        return false;
       }
 
       if (!response.ok) {
@@ -638,8 +640,10 @@
       };
 
       stateApi.saveState(latestState, { sync: false });
+      return true;
     } catch (error) {
       console.warn("Woodshed account sync failed:", error);
+      return false;
     } finally {
       syncInProgress = false;
 

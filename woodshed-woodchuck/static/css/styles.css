@@ -515,6 +515,50 @@ select {
   cursor: default;
 }
 
+.p-book-bold-divider {
+  height: 0;
+  margin: 1.6rem -1rem 0;
+  border: 0;
+  border-top: 7px solid #263f58;
+  box-shadow: 0 3px 0 #9fb6c9;
+}
+
+.p-book-lower-region {
+  margin: 0 -1rem -1rem;
+  padding: 0 1rem 1.2rem;
+  overflow-x: clip;
+  background: linear-gradient(160deg, #bfd3e2, #7897b1);
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+.p-book-lower-actions {
+  margin: 0 -1rem -1rem;
+  padding: 1.2rem 1rem;
+  background: linear-gradient(160deg, #bfd3e2, #7897b1);
+}
+
+.practice-stat-stone {
+  color: #202a31;
+  background:
+    radial-gradient(circle at 18% 20%, rgba(255,255,255,.28) 0 2px, transparent 3px),
+    linear-gradient(145deg, #c9ced0, #858f94 52%, #b7bec1);
+  border: 3px ridge #657076;
+  box-shadow: inset 2px 2px 5px rgba(255,255,255,.45), inset -3px -3px 7px rgba(35,43,47,.35), 0 5px 8px rgba(28,45,58,.3);
+  text-shadow: 0 1px rgba(255,255,255,.55);
+}
+
+.is-confirmed-success {
+  color: #fff !important;
+  background: #267447 !important;
+  border-color: #174c2e !important;
+}
+
+.confirmed-checkmark { color: #16833d; font-weight: 1000; }
+
+.camp-hours-checkbox-label.is-confirmed-success input[type="checkbox"] {
+  accent-color: #2fa85f;
+}
+
 @media (max-width: 640px) {
   .board-activity > summary {
     align-items: flex-start;
@@ -530,6 +574,31 @@ select {
 
 .shed-readout-level {
   letter-spacing: 0.04em;
+}
+
+.shed-secret-button {
+  position: absolute;
+  bottom: 0.45rem;
+  left: 0.45rem;
+  z-index: 5;
+  width: 2rem;
+  height: 2rem;
+  color: #fff4d4;
+  font-weight: 900;
+  background: rgba(58, 35, 22, 0.82);
+  border: 2px solid #c9a96b;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.shed-secret-panel {
+  max-width: 30rem;
+  margin: 1rem auto 0;
+}
+
+.shed-secret-button:focus-visible {
+  outline: 3px solid #fff4d4;
+  outline-offset: 3px;
 }
 
 .shed-icon-object,

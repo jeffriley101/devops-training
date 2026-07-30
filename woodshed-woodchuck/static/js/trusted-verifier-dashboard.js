@@ -148,6 +148,9 @@
           ? "P-Chart approved."
           : "P-Chart rejected. The student can review your note.";
 
+      const completedButton = decision === "approved" ? buttons[0] : buttons[1];
+      if (completedButton) completedButton.classList.add("is-confirmed-success");
+
       await loadPracticeCharts();
     } catch (error) {
       errorText.textContent =
