@@ -2421,13 +2421,12 @@
 
     function showError(message) {
       roots.forEach((root) => {
-        const loading = root.querySelector(".personal-crown-loading");
-        const error = root.querySelector(".personal-crown-error");
-        const content = root.querySelector(".personal-crown-content");
-        loading.classList.add("hidden");
-        content.classList.add("hidden");
-        error.textContent = message;
-        error.classList.remove("hidden");
+        root.querySelectorAll(".personal-crown-loading").forEach((element) => element.classList.add("hidden"));
+        root.querySelectorAll(".personal-crown-content").forEach((element) => element.classList.add("hidden"));
+        root.querySelectorAll(".personal-crown-error").forEach((element) => {
+          element.textContent = message;
+          element.classList.remove("hidden");
+        });
         root.setAttribute("aria-busy", "false");
       });
     }
@@ -2443,9 +2442,6 @@
 
     function render(progress) {
       roots.forEach((root) => {
-        const loading = root.querySelector(".personal-crown-loading");
-        const error = root.querySelector(".personal-crown-error");
-        const content = root.querySelector(".personal-crown-content");
         const status = root.querySelector(".personal-crown-status");
         const count = root.querySelector(".personal-crown-count strong");
         const meter = root.querySelector(".personal-crown-meter");
@@ -2455,21 +2451,20 @@
         const wins = progress.qualifying_wins;
         const target = progress.target_wins;
 
-        count.textContent = `${wins} of ${target} wins`;
-        meter.value = Math.min(wins, target);
-        meter.textContent = `${wins} of ${target} qualifying wins`;
-        meter.setAttribute(
-          "aria-label",
-          `Crown progress: ${wins} of ${target} qualifying wins`
-        );
-        if (progress.earned) {
+        if (count) count.textContent = `${wins} of ${target} wins`;
+        if (meter) {
+          meter.value = Math.min(wins, target);
+          meter.textContent = `${wins} of ${target} qualifying wins`;
+          meter.setAttribute("aria-label", `Crown progress: ${wins} of ${target} qualifying wins`);
+        }
+        if (progress.earned && status && remaining && date) {
           status.textContent = "👑 Permanent crown earned";
           status.classList.add("personal-crown-earned");
           remaining.textContent = "Permanent achievement — progress never resets.";
           const formattedDate = earnedDate(progress.earned_at);
           date.textContent = formattedDate ? `Earned ${formattedDate}` : "";
           date.classList.toggle("hidden", !formattedDate);
-        } else {
+        } else if (status && remaining && date) {
           status.textContent = "Keep going toward your permanent crown.";
           status.classList.remove("personal-crown-earned");
           const winsRemaining = progress.remaining_wins;
@@ -2486,17 +2481,20 @@
             name.textContent = `${category.earned ? "👑 " : ""}${category.name}`;
             const value = document.createElement("span");
             value.textContent = `${category.progress} / ${category.target}`;
+            const categoryEarnedDate = earnedDate(category.earned_at);
+            const detail = document.createElement("small");
+            detail.textContent = categoryEarnedDate ? `Earned ${categoryEarnedDate}` : "In progress";
             card.setAttribute(
               "aria-label",
               `${category.name}: ${category.progress} of ${category.target}${category.earned ? ", permanent crown earned" : ""}`
             );
-            card.append(name, value);
+            card.append(name, value, detail);
             categoryList.appendChild(card);
           });
         }
-        loading.classList.add("hidden");
-        error.classList.add("hidden");
-        content.classList.remove("hidden");
+        root.querySelectorAll(".personal-crown-loading").forEach((element) => element.classList.add("hidden"));
+        root.querySelectorAll(".personal-crown-error").forEach((element) => element.classList.add("hidden"));
+        root.querySelectorAll(".personal-crown-content").forEach((element) => element.classList.remove("hidden"));
         root.setAttribute("aria-busy", "false");
       });
     }
@@ -2655,43 +2653,54 @@
   }
 
   function wireShopPolish() {
-    const door = document.getElementById("practice-room-door");
-    const panel = document.getElementById("practice-room-panel");
-    if (door && panel) {
-      door.addEventListener("click", function () {
-        const opening = panel.hidden;
-        panel.hidden = !opening;
-        panel.classList.toggle("hidden", !opening);
-        door.setAttribute("aria-expanded", String(opening));
-        if (opening) panel.querySelector("h3").focus({ preventScroll: true });
-      });
+    const dialog = document.getElementById("shop-feature-dialog");
+    const closeButton = document.getElementById("shop-dialog-close");
+    const title = document.getElementById("shop-dialog-title");
+    const qrStatus = document.getElementById("shop-qr-status");
+    const controls = Array.from(document.querySelectorAll("[data-shop-panel]"));
+    if (!dialog || !closeButton || !title || !controls.length) return;
+    const panels = Array.from(dialog.querySelectorAll("[data-shop-panel-content]"));
+    const titles = {
+      crown: "Crown Progress", goat: "The GOAT Tracker",
+      "practice-definition": "Practice Definition", share: "Share Woodshed",
+      clothing: "Clothing Shelf", gear: "Gear Shelf",
+      "practice-room": "Practice Room", artist: "Artist",
+    };
+    let activator = null;
+
+    async function copyPublicAddress(control) {
+      const address = control.dataset.publicSiteUrl;
+      if (!address || !qrStatus) return;
+      try {
+        if (!navigator.clipboard || !navigator.clipboard.writeText) throw new Error("Clipboard unavailable");
+        await navigator.clipboard.writeText(address);
+        qrStatus.textContent = "Website address copied.";
+      } catch (_error) {
+        qrStatus.textContent = `The website address could not be copied. Use this link: ${address}`;
+      }
     }
 
-    const qrButton = document.getElementById("shop-qr-copy");
-    const qrStatus = document.getElementById("shop-qr-status");
-    if (qrButton && qrStatus) {
-      qrButton.addEventListener("click", async function () {
-        const address = qrButton.dataset.publicSiteUrl;
-        try {
-          if (navigator.clipboard && navigator.clipboard.writeText) {
-            await navigator.clipboard.writeText(address);
-          } else {
-            const fallback = document.createElement("textarea");
-            fallback.value = address;
-            fallback.setAttribute("readonly", "");
-            fallback.className = "sr-only";
-            document.body.appendChild(fallback);
-            fallback.select();
-            const copied = document.execCommand("copy");
-            fallback.remove();
-            if (!copied) throw new Error("Clipboard unavailable");
-          }
-          qrStatus.textContent = "Website address copied";
-        } catch (_error) {
-          qrStatus.textContent = `Copy this website address: ${address}`;
+    controls.forEach((control) => {
+      control.addEventListener("click", function () {
+        const key = control.dataset.shopPanel;
+        panels.forEach((panel) => { panel.hidden = panel.dataset.shopPanelContent !== key; });
+        title.textContent = titles[key] || "Shop feature";
+        activator = control;
+        if (key === "share") {
+          qrStatus.textContent = "";
+          copyPublicAddress(control);
         }
+        dialog.showModal();
+        title.focus({ preventScroll: true });
       });
-    }
+    });
+    closeButton.addEventListener("click", () => dialog.close());
+    dialog.addEventListener("click", function (event) {
+      if (event.target === dialog) dialog.close();
+    });
+    dialog.addEventListener("close", function () {
+      if (activator) activator.focus({ preventScroll: true });
+    });
   }
 
   function wirePBook(state) {

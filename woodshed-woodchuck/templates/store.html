@@ -1,88 +1,115 @@
 {% extends "base.html" %}
 
 {% block content %}
-<section class="card shop-page">
-  <article class="mentor-card">
-    <h2>Coming Soon</h2>
+<section class="shop-page" aria-labelledby="shop-scene-title">
+  <h1 id="shop-scene-title" class="sr-only">Shop</h1>
+  <div class="shop-scene" aria-label="Interactive Shop with Sax Viking">
+    <img
+      class="shop-viking-art"
+      src="/static/img/sax-viking-portrait.png"
+      alt="Sax Viking welcoming you to the Shop"
+    />
 
-    <p class="body-copy">
-      The Dandelion Shop is getting ready for new hats,
-      hoodies, instruments, and camp gear.
-    </p>
-
-    <p class="body-copy">
-      Keep practicing and saving your dandelions.
-    </p>
-  </article>
-
-  <section
-    class="mentor-card personal-crown-progress crown-progress-shop"
-    aria-labelledby="shop-crown-title"
-    aria-busy="true"
-  >
-    <h3 id="shop-crown-title">Your Permanent Crown</h3>
-    <div class="personal-crown-loading" role="status">Loading crown progress…</div>
-    <div class="personal-crown-error hidden" role="alert">
-      Crown progress is unavailable right now.
-    </div>
-    <div class="personal-crown-content hidden">
-      <p class="personal-crown-status"></p>
-      <p class="personal-crown-count"><strong>0 of 10 wins</strong></p>
-      <progress
-        class="personal-crown-meter"
-        max="10"
-        value="0"
-        aria-label="Crown progress: 0 of 10 qualifying wins"
-      >0 of 10 qualifying wins</progress>
-      <p class="personal-crown-remaining">10 qualifying wins remain.</p>
-      <p class="personal-crown-earned-date hidden"></p>
-      <p class="personal-crown-explanation">
-        Duplicate-safe Gold wins in Top Five Minutes Leaders qualify.
-        Silver, Bronze, and instrument participation do not count.
-      </p>
-      <div class="crown-category-chart" aria-labelledby="crown-category-chart-title">
-        <h4 id="crown-category-chart-title">Crown Categories</h4>
-        <div class="crown-category-list"></div>
+    <div class="shop-object-column shop-object-column-left" aria-label="Shop rewards and sharing">
+      <div class="shop-scene-control shop-dandelion-control" aria-label="Dandelions">
+        <span class="shop-control-emoji" aria-hidden="true">🌼</span>
+        <span class="shop-control-label">Dandelions</span>
+        <strong id="credits-value" class="shop-dandelion-count">0</strong>
       </div>
+      <button class="shop-scene-control" type="button" data-shop-panel="crown" aria-label="Open Crown Progress">
+        <span class="shop-control-emoji" aria-hidden="true">👑</span><span class="shop-control-label">Crown Progress</span>
+      </button>
+      <button class="shop-scene-control" type="button" data-shop-panel="goat" aria-label="Open The GOAT Tracker">
+        <span class="shop-control-emoji" aria-hidden="true">🐐</span><span class="shop-control-label">The GOAT Tracker</span>
+      </button>
+      <button class="shop-scene-control" type="button" data-shop-panel="practice-definition" aria-label="Open Practice Definition">
+        <span class="shop-control-emoji" aria-hidden="true">🗿</span><span class="shop-control-label">Practice Definition</span>
+      </button>
+      <button
+        class="shop-scene-control"
+        type="button"
+        data-shop-panel="share"
+        data-public-site-url="{{ public_site_url }}"
+        aria-label="Share Woodshed"
+      >
+        <span class="shop-control-emoji shop-share-arrow" aria-hidden="true">↗</span><span class="shop-control-label">Share Woodshed</span>
+      </button>
     </div>
-  </section>
 
-  <section class="mentor-card practice-room-hub" aria-labelledby="practice-room-title">
-    <button
-      id="practice-room-door"
-      class="practice-room-door"
-      type="button"
-      aria-controls="practice-room-panel"
-      aria-expanded="false"
-    >
-      <span class="practice-room-door-icon" aria-hidden="true">🚪</span>
-      <span id="practice-room-title">Practice Room</span>
-    </button>
-    <div id="practice-room-panel" class="practice-room-panel hidden" hidden>
-      <h3 tabindex="-1">Practice Room</h3>
-      <p>New practice tools are coming soon. This room will grow as each tool is ready.</p>
-      <div class="practice-tool-grid" aria-label="Upcoming practice tools">
-        <article class="practice-tool-slot"><h4>Trombone Practice Tool</h4><p>Coming Soon</p></article>
-        <article class="practice-tool-slot"><h4>More Practice Tools</h4><p>Coming Soon</p></article>
-      </div>
+    <div class="shop-object-column shop-object-column-right" aria-label="Shop shelves and rooms">
+      <button class="shop-scene-control shop-shelf-control" type="button" data-shop-panel="clothing" aria-label="Open Clothing Shelf, coming soon">
+        <span class="shop-control-emoji" aria-hidden="true">🧢</span><span class="shop-control-label">Clothing Shelf</span><span class="shop-coming-soon">Coming Soon</span>
+      </button>
+      <button class="shop-scene-control shop-shelf-control" type="button" data-shop-panel="gear" aria-label="Open Gear Shelf, coming soon">
+        <span class="shop-control-emoji" aria-hidden="true">🧃</span><span class="shop-control-label">Gear Shelf</span><span class="shop-coming-soon">Coming Soon</span>
+      </button>
+      <button class="shop-scene-control" type="button" data-shop-panel="practice-room" aria-label="Open Practice Room">
+        <span class="shop-control-emoji" aria-hidden="true">🚪</span><span class="shop-control-label">Practice Room</span>
+      </button>
+      <button class="shop-scene-control" type="button" data-shop-panel="artist" aria-label="Open Artist instructions">
+        <span class="shop-control-emoji" aria-hidden="true">🎨</span><span class="shop-control-label">Artist</span>
+      </button>
+      <a class="shop-scene-control" href="https://venmo.com/u/jeffriley101" target="_blank" rel="noopener noreferrer" aria-label="Donate">
+        <span class="shop-control-emoji" aria-hidden="true">💝</span><span class="shop-control-label">Donate</span>
+      </a>
     </div>
-  </section>
+  </div>
 
-  <section class="mentor-card shop-share-card" aria-labelledby="share-woodshed-title">
-    <h3 id="share-woodshed-title">Share the Woodshed</h3>
-    <button
-      id="shop-qr-copy"
-      class="shop-qr-copy"
-      type="button"
-      data-public-site-url="{{ public_site_url }}"
-      aria-describedby="shop-qr-help shop-qr-status"
-    >
-      <img src="{{ public_site_qr }}" alt="QR code for the Woodshed Woodchuck website" />
-    </button>
-    <p id="shop-qr-help">Tap the QR code to copy the website address.</p>
-    <p id="shop-qr-status" class="body-copy" role="status" aria-live="polite"></p>
-    <p><a href="{{ public_site_url }}">Open the Woodshed website</a></p>
-    <a class="btn btn-primary shop-donate-button" href="https://venmo.com/u/jeffriley101" target="_blank" rel="noopener noreferrer">Donate — Support the Shed Project</a>
-  </section>
+  <dialog id="shop-feature-dialog" class="shop-feature-dialog" aria-labelledby="shop-dialog-title">
+    <div class="shop-dialog-head">
+      <h2 id="shop-dialog-title" tabindex="-1">Shop feature</h2>
+      <button id="shop-dialog-close" class="shop-dialog-close" type="button" aria-label="Close Shop panel">×</button>
+    </div>
+    <div class="shop-dialog-scroll personal-crown-progress" aria-busy="true">
+      <section data-shop-panel-content="crown" hidden>
+        <div class="personal-crown-loading" role="status">Loading crown progress…</div>
+        <div class="personal-crown-error hidden" role="alert">Crown progress is unavailable right now.</div>
+        <div class="personal-crown-content hidden">
+          <div class="crown-category-chart" aria-label="Six-category crown progress">
+            <div class="crown-category-list"></div>
+          </div>
+          <p class="shop-crown-history-note">Each category keeps its progress and earned date permanently.</p>
+        </div>
+      </section>
+      <section data-shop-panel-content="goat" hidden>
+        <div class="personal-crown-loading" role="status">Loading crown progress…</div>
+        <div class="personal-crown-error hidden" role="alert">Crown progress is unavailable right now.</div>
+        <div class="personal-crown-content hidden">
+          <p class="personal-crown-status"></p>
+          <p class="personal-crown-count"><strong>0 of 10 wins</strong></p>
+          <progress class="personal-crown-meter" max="10" value="0" aria-label="Crown progress: 0 of 10 qualifying wins">0 of 10 qualifying wins</progress>
+          <p class="personal-crown-remaining">10 qualifying wins remain.</p>
+          <p class="personal-crown-earned-date hidden"></p>
+          <p class="personal-crown-explanation">Duplicate-safe Gold wins in Top Five Minutes Leaders qualify. Silver, Bronze, and instrument participation do not count.</p>
+        </div>
+      </section>
+      <section data-shop-panel-content="practice-definition" hidden>
+        <p class="shop-practice-definition">{{ practice_definition }}</p>
+      </section>
+      <section data-shop-panel-content="share" hidden>
+        <p>Scan this code or use the website link to invite someone to Woodshed Woodchuck.</p>
+        <img class="shop-qr-image" src="{{ public_site_qr }}" alt="QR code for the public Woodshed Woodchuck website at {{ public_site_url }}" />
+        <p><a href="{{ public_site_url }}">{{ public_site_url }}</a></p>
+        <p id="shop-qr-status" role="status" aria-live="polite"></p>
+      </section>
+      <section data-shop-panel-content="clothing" hidden>
+        <p class="shop-panel-sign">Coming Soon</p><p>Hats and hoodies are coming soon. This shelf has room for future avatar clothing.</p>
+      </section>
+      <section data-shop-panel-content="gear" hidden>
+        <p class="shop-panel-sign">Coming Soon</p><p>Future gear may include water bottles, stickers, instrument cases, and camp gear.</p>
+      </section>
+      <section data-shop-panel-content="practice-room" hidden>
+        <p>New practice tools are coming soon. This room is ready to grow with multiple tools.</p>
+        <div class="practice-tool-grid" aria-label="Upcoming practice tools">
+          <article class="practice-tool-slot"><h3>Trombone Practice Tool</h3><p>Coming Soon</p></article>
+          <article class="practice-tool-slot"><h3>More Practice Tools</h3><p>Coming Soon</p></article>
+        </div>
+      </section>
+      <section data-shop-panel-content="artist" hidden>
+        <p>Draw a new HOME, SHED, or SHOP scene. Ask an adult before emailing your artwork to Woodshed Woodchuck. We may feature selected artwork in the app.</p>
+        {% if art_submission_mailto %}<p><a class="btn btn-secondary" href="{{ art_submission_mailto }}">Email artwork instructions</a></p>{% else %}<p><strong>Artwork email coming soon.</strong></p>{% endif %}
+      </section>
+    </div>
+  </dialog>
 </section>
 {% endblock %}

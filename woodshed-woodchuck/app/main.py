@@ -2,7 +2,7 @@ import os
 import base64
 from io import BytesIO
 from pathlib import Path
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import quote, urlsplit, urlunsplit
 
 import qrcode
 import qrcode.image.svg
@@ -30,6 +30,7 @@ from .content import (
     INSTRUMENT_OPTIONS,
     LEVEL_OPTIONS,
     QUEST_POOL,
+    PRACTICE_DEFINITION,
     SAX_VIKING_MESSAGES,
     SAX_VIKING_WELCOME,
 )
@@ -114,6 +115,16 @@ def qr_data_uri(value: str) -> str:
     image.save(output)
     encoded = base64.b64encode(output.getvalue()).decode("ascii")
     return f"data:image/svg+xml;base64,{encoded}"
+
+
+def art_submission_mailto() -> str | None:
+    address = os.getenv("ART_SUBMISSION_EMAIL", "").strip()
+    if not address or any(character in address for character in "\r\n?&#"):
+        return None
+    local, separator, domain = address.rpartition("@")
+    if not separator or not local or "." not in domain or " " in address:
+        return None
+    return f"mailto:{quote(address, safe='@.+-_')}?subject=Woodshed%20Woodchuck%20Artwork"
 
 
 @app.get("/")
@@ -266,4 +277,6 @@ def store(request: Request):
     return _render(
         request, "store.html", title="shop", active_nav="store",
         public_site_url=site_url, public_site_qr=qr_data_uri(site_url),
+        practice_definition=PRACTICE_DEFINITION,
+        art_submission_mailto=art_submission_mailto(),
     )

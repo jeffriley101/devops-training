@@ -187,7 +187,8 @@ def test_shop_renders_accessible_personal_crown_progress() -> None:
     assert "Gold wins in Top Five Minutes Leaders qualify" in shop
     assert "Silver, Bronze, and instrument participation do not count" in shop
     assert 'id="board-crown-title"' not in board
-    assert 'id="shop-crown-title"' in shop
+    assert 'data-shop-panel="crown"' in shop
+    assert 'data-shop-panel-content="crown"' in shop
 
 
 def test_crown_javascript_handles_earned_unearned_date_and_above_ten() -> None:

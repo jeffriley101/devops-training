@@ -112,11 +112,12 @@ def test_practice_room_is_local_expandable_and_has_tool_slots() -> None:
     store = (ROOT / "templates/store.html").read_text(encoding="utf-8")
     assert "Practice Room" in store
     assert "🚪" in store
-    assert 'aria-controls="practice-room-panel"' in store
+    assert 'data-shop-panel="practice-room"' in store
+    assert 'data-shop-panel-content="practice-room"' in store
     assert "Trombone Practice Tool" in store
     assert "More Practice Tools" in store
     assert store.count("Coming Soon") >= 2
-    practice_section = store[store.index("practice-room-hub"):store.index("shop-share-card")]
+    practice_section = store[store.index('data-shop-panel-content="practice-room"'):store.index('data-shop-panel-content="artist"')]
     assert "href=" not in practice_section
     assert "http://" not in practice_section and "https://" not in practice_section
 
@@ -126,9 +127,9 @@ def test_donate_moved_once_to_shop_and_qr_is_accessible() -> None:
     store = (ROOT / "templates/store.html").read_text(encoding="utf-8")
     assert "venmo.com/u/jeffriley101" not in home
     assert store.count("venmo.com/u/jeffriley101") == 1
-    assert "Donate — Support the Shed Project" in store
-    assert 'alt="QR code for the Woodshed Woodchuck website"' in store
-    assert "Open the Woodshed website" in store
+    assert 'aria-label="Donate"' in store
+    assert 'alt="QR code for the public Woodshed Woodchuck website at {{ public_site_url }}"' in store
+    assert "Open the Woodshed website" not in store
     assert 'data-public-site-url="{{ public_site_url }}"' in store
 
 

@@ -118,7 +118,8 @@ def test_admin_page_requires_valid_token_and_is_not_in_student_navigation(
     shop = client.get("/store").text
     assert 'href="/contests/admin"' not in board + shop
     assert "Band Camp Standings" in board
-    assert "Your Permanent Crown" in shop
+    assert "The GOAT Tracker" in shop
+    assert "Your Permanent Crown" not in shop
 
 
 def test_admin_status_is_private_and_shows_season_week_and_deadlines(
