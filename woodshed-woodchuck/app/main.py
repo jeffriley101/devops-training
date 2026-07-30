@@ -103,10 +103,16 @@ def _render(request: Request, template_name: str, **context: object):
 def public_site_url(request: Request) -> str:
     candidate = os.getenv("PUBLIC_BASE_URL", "").strip() or str(request.base_url)
     parsed = urlsplit(candidate)
-    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+    if (parsed.scheme not in {"http", "https"} or not parsed.netloc
+            or parsed.username is not None or parsed.password is not None):
         raise ValueError("PUBLIC_BASE_URL must be an absolute HTTP or HTTPS URL.")
-    path = parsed.path.rstrip("/") + "/"
-    return urlunsplit((parsed.scheme, parsed.netloc, path, "", ""))
+    return urlunsplit((parsed.scheme, parsed.netloc, "/", "", ""))
+
+
+def uses_local_share_fallback(request: Request) -> bool:
+    if os.getenv("PUBLIC_BASE_URL", "").strip():
+        return False
+    return request.url.hostname in {"localhost", "127.0.0.1", "::1", "testserver"}
 
 
 def qr_data_uri(value: str) -> str:
@@ -279,4 +285,5 @@ def store(request: Request):
         public_site_url=site_url, public_site_qr=qr_data_uri(site_url),
         practice_definition=PRACTICE_DEFINITION,
         art_submission_mailto=art_submission_mailto(),
+        local_share_fallback=uses_local_share_fallback(request),
     )

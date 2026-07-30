@@ -11,19 +11,19 @@
     />
 
     <div class="shop-object-column shop-object-column-left" aria-label="Shop rewards and sharing">
-      <div class="shop-scene-control shop-dandelion-control" aria-label="Dandelions">
+      <div id="dandelion-object" class="shop-scene-control shop-dandelion-control" aria-label="0 dandelions">
         <span class="shop-control-emoji" aria-hidden="true">🌼</span>
-        <span class="shop-control-label">Dandelions</span>
-        <strong id="credits-value" class="shop-dandelion-count">0</strong>
+        <span class="sr-only">Dandelions</span>
+        <strong id="credits-value" class="sr-only">0</strong>
       </div>
       <button class="shop-scene-control" type="button" data-shop-panel="crown" aria-label="Open Crown Progress">
-        <span class="shop-control-emoji" aria-hidden="true">👑</span><span class="shop-control-label">Crown Progress</span>
+        <span class="shop-control-emoji" aria-hidden="true">👑</span><span class="sr-only">Crown Progress</span>
       </button>
       <button class="shop-scene-control" type="button" data-shop-panel="goat" aria-label="Open The GOAT Tracker">
-        <span class="shop-control-emoji" aria-hidden="true">🐐</span><span class="shop-control-label">The GOAT Tracker</span>
+        <span class="shop-control-emoji" aria-hidden="true">🐐</span><span class="sr-only">The GOAT Tracker</span>
       </button>
       <button class="shop-scene-control" type="button" data-shop-panel="practice-definition" aria-label="Open Practice Definition">
-        <span class="shop-control-emoji" aria-hidden="true">🗿</span><span class="shop-control-label">Practice Definition</span>
+        <span class="shop-control-emoji" aria-hidden="true">🗿</span><span class="sr-only">Practice Definition</span>
       </button>
       <button
         class="shop-scene-control"
@@ -32,25 +32,25 @@
         data-public-site-url="{{ public_site_url }}"
         aria-label="Share Woodshed"
       >
-        <span class="shop-control-emoji shop-share-arrow" aria-hidden="true">↗</span><span class="shop-control-label">Share Woodshed</span>
+        <span class="shop-control-emoji shop-share-arrow" aria-hidden="true">↗</span><span class="sr-only">Share Woodshed</span>
       </button>
     </div>
 
     <div class="shop-object-column shop-object-column-right" aria-label="Shop shelves and rooms">
       <button class="shop-scene-control shop-shelf-control" type="button" data-shop-panel="clothing" aria-label="Open Clothing Shelf, coming soon">
-        <span class="shop-control-emoji" aria-hidden="true">🧢</span><span class="shop-control-label">Clothing Shelf</span><span class="shop-coming-soon">Coming Soon</span>
+        <span class="shop-control-emoji" aria-hidden="true">🧢</span><span class="sr-only">Clothing Shelf, coming soon</span>
       </button>
       <button class="shop-scene-control shop-shelf-control" type="button" data-shop-panel="gear" aria-label="Open Gear Shelf, coming soon">
-        <span class="shop-control-emoji" aria-hidden="true">🧃</span><span class="shop-control-label">Gear Shelf</span><span class="shop-coming-soon">Coming Soon</span>
+        <span class="shop-control-emoji" aria-hidden="true">🧃</span><span class="sr-only">Gear Shelf, coming soon</span>
       </button>
       <button class="shop-scene-control" type="button" data-shop-panel="practice-room" aria-label="Open Practice Room">
-        <span class="shop-control-emoji" aria-hidden="true">🚪</span><span class="shop-control-label">Practice Room</span>
+        <span class="shop-control-emoji" aria-hidden="true">🚪</span><span class="sr-only">Practice Room</span>
       </button>
       <button class="shop-scene-control" type="button" data-shop-panel="artist" aria-label="Open Artist instructions">
-        <span class="shop-control-emoji" aria-hidden="true">🎨</span><span class="shop-control-label">Artist</span>
+        <span class="shop-control-emoji" aria-hidden="true">🎨</span><span class="sr-only">Artist</span>
       </button>
       <a class="shop-scene-control" href="https://venmo.com/u/jeffriley101" target="_blank" rel="noopener noreferrer" aria-label="Donate">
-        <span class="shop-control-emoji" aria-hidden="true">💝</span><span class="shop-control-label">Donate</span>
+        <span class="shop-control-emoji" aria-hidden="true">💝</span><span class="sr-only">Donate</span>
       </a>
     </div>
   </div>
@@ -90,6 +90,7 @@
         <p>Scan this code or use the website link to invite someone to Woodshed Woodchuck.</p>
         <img class="shop-qr-image" src="{{ public_site_qr }}" alt="QR code for the public Woodshed Woodchuck website at {{ public_site_url }}" />
         <p><a href="{{ public_site_url }}">{{ public_site_url }}</a></p>
+        {% if local_share_fallback %}<p class="shop-share-development-note">Development address — configure PUBLIC_BASE_URL before sharing publicly.</p>{% endif %}
         <p id="shop-qr-status" role="status" aria-live="polite"></p>
       </section>
       <section data-shop-panel-content="clothing" hidden>

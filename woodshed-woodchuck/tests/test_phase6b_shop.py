@@ -86,7 +86,7 @@ def test_share_uses_one_canonical_url_and_accessible_qr(monkeypatch) -> None:
     monkeypatch.setattr(main, "qr_data_uri", lambda value: captured.append(value) or "data:image/svg+xml;base64,SAFE")
     response = TestClient(main.app).get("/store")
     assert response.status_code == 200
-    assert captured == ["https://woodshed.example/public/"]
+    assert captured == ["https://woodshed.example/"]
     assert "profile=private" not in response.text and "#session" not in response.text
     assert "QR code for the public Woodshed Woodchuck website" in response.text
     javascript = JS.read_text(encoding="utf-8")
@@ -116,4 +116,4 @@ def test_mobile_css_avoids_fixed_width_overflow() -> None:
     assert "@media (max-width: 430px)" in css
     assert ".shop-page { width: 100%; min-width: 0; }" in css
     assert "max-width: calc(100vw - 1.5rem)" in css
-    assert "width: min(100%, 920px)" in css
+    assert "width: min(100%, 760px)" in css

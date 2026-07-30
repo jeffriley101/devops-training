@@ -21,6 +21,7 @@ from .accounts import (
     update_profile_level,
 )
 from .instruments import INSTRUMENTS_BY_LABEL
+from .content import LEVEL_OPTIONS
 from .db import SessionLocal
 from .models import RewardGrant, WoodchuckProfile, WoodchuckState
 
@@ -84,12 +85,12 @@ def current_profile(
 @router.post("/create")
 def create_account(
     request: Request,
-    display_name: str = Form(...),
-    pin: str = Form(...),
-    instrument: str = Form(...),
-    level: str = Form(...),
-    goal: str = Form(...),
-    initial_state: str = Form(...),
+    display_name: str | None = Form(None),
+    pin: str | None = Form(None),
+    instrument: str | None = Form(None),
+    level: str | None = Form(None),
+    goal: str | None = Form(None),
+    initial_state: str | None = Form(None),
 ):
     with SessionLocal() as session:
         existing_profile = current_profile(request, session)
@@ -101,10 +102,30 @@ def create_account(
                     "Woodchuck ID and PIN instead of creating another account."
                 ),
             )
+        if not isinstance(display_name, str) or not display_name.strip():
+            raise HTTPException(status_code=400, detail="Please name your Woodchuck.")
+        if not isinstance(instrument, str) or not instrument.strip():
+            raise HTTPException(status_code=400, detail="Please choose an instrument.")
+        instrument_key = " ".join(instrument.split()).casefold()
+        if instrument_key not in INSTRUMENTS_BY_LABEL:
+            raise HTTPException(status_code=400, detail="Please choose a supported instrument.")
+        if not isinstance(level, str) or not level.strip():
+            raise HTTPException(status_code=400, detail="Please choose a level.")
+        if level.strip() not in LEVEL_OPTIONS:
+            raise HTTPException(status_code=400, detail="Please choose a supported level.")
+        if not isinstance(goal, str) or not goal.strip():
+            raise HTTPException(status_code=400, detail="Please choose a practice goal.")
+        if not isinstance(pin, str) or len(pin) != 4 or not pin.isascii() or not pin.isdigit():
+            raise HTTPException(status_code=400, detail="Your PIN must contain exactly four digits.")
+        if not isinstance(initial_state, str) or not initial_state.strip():
+            raise HTTPException(status_code=400, detail="The initial Woodshed state is required.")
         try:
-            submitted_state = json.loads(initial_state)
+            try:
+                submitted_state = json.loads(initial_state)
+            except json.JSONDecodeError as exc:
+                raise ValueError("The initial Woodshed state is malformed.") from exc
             if not isinstance(submitted_state, dict):
-                raise ValueError("Initial account state must be an object.")
+                raise ValueError("The initial Woodshed state must be an object.")
             profile = create_woodchuck_profile(
                 session,
                 display_name=display_name,

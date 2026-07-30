@@ -99,6 +99,28 @@ TRIVIA_ANSWERS = (
 )
 
 
+def trivia_selected_answer_text(
+    activity_date: date, stored_answer: object, *, correct: bool
+) -> str | None:
+    """Resolve current and legacy stored trivia choices without exposing indices."""
+    _, options, answer_index = TRIVIA_ANSWERS[
+        (activity_date.timetuple().tm_yday - 1) % len(TRIVIA_ANSWERS)
+    ]
+    if not isinstance(stored_answer, (str, int)) or isinstance(stored_answer, bool):
+        return None
+    value = str(stored_answer).strip()
+    direct_index = options.index(value) if value in options else None
+    legacy_index = int(value) if value.isdigit() else None
+    if direct_index is not None and (direct_index == answer_index) is correct:
+        return options[direct_index]
+    if legacy_index is not None and 0 <= legacy_index < len(options):
+        if (legacy_index == answer_index) is correct:
+            return options[legacy_index]
+    if direct_index is not None:
+        return options[direct_index]
+    return None
+
+
 def central_week_boundaries(
     now: datetime,
 ) -> tuple[date, date, datetime, datetime]:
@@ -1235,8 +1257,12 @@ def daily_camp_point_awards(
         ))
         trivia_attempt_payload = None
         if trivia_attempt is not None:
+            selected_answer_text = trivia_selected_answer_text(
+                activity_date, trivia_attempt.selected_answer,
+                correct=trivia_attempt.correct,
+            )
             trivia_attempt_payload = {
-                "selected_answer": trivia_attempt.selected_answer,
+                "selected_answer_text": selected_answer_text or "Saved answer unavailable",
                 "correct": trivia_attempt.correct,
             }
         elif any(award.activity_type == "trivia" for award in awards):
@@ -1246,7 +1272,7 @@ def daily_camp_point_awards(
                 (activity_date.timetuple().tm_yday - 1) % len(TRIVIA_ANSWERS)
             ]
             trivia_attempt_payload = {
-                "selected_answer": options[answer],
+                "selected_answer_text": options[answer],
                 "correct": True,
             }
         return {
@@ -1320,7 +1346,11 @@ def check_trivia_answer(
         session.commit()
         return {
             "question": question,
-            "selected_answer": attempt.selected_answer,
+            "selected_answer_text": (
+                trivia_selected_answer_text(
+                    today, attempt.selected_answer, correct=attempt.correct
+                ) or "Saved answer unavailable"
+            ),
             "correct": attempt.correct,
             "created": created,
             "award_created": award_created,

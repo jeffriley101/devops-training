@@ -80,7 +80,7 @@ def test_book_phase6a_timer_text_structure_and_stone_hooks() -> None:
     javascript = (ROOT / "static/js/app.js").read_text(encoding="utf-8")
     content = (ROOT / "app/content.py").read_text(encoding="utf-8")
     css = (ROOT / "static/css/styles.css").read_text(encoding="utf-8")
-    definition = "Anytime you are messing with your instrument—giving it attention in any way—counts as practice. Minutes spent thinking about your instrument can count as half-minutes. We’re on the honor system here!"
+    definition = "Practice counts whenever you give your instrument real attention—playing it, cleaning it, fingering through music, or thinking about what you want to improve. Thinking-only time counts as half-minutes. We trust you to keep it honest!"
     assert "Preset email addresses" in book
     assert "Do not submit your band director or teacher's email address without talking with them first, please!" in book
     assert "P-Chart sharing contacts" not in book
@@ -116,7 +116,7 @@ def test_board_phase6a_feedback_success_and_placeholder_contract() -> None:
     javascript = (ROOT / "static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "static/css/styles.css").read_text(encoding="utf-8")
     assert 'id="trivia-selected-answer"' in board
-    assert "Your answer: ${daily.triviaSelectedAnswer}" in javascript
+    assert "Your answer: ${selectedAnswerText}" in javascript
     assert 'fetch("/contests/trivia/answer"' in javascript
     assert "checkedAnswer.correct === true" in javascript
     assert "No reward was earned today" in javascript
@@ -143,8 +143,8 @@ def test_board_trivia_and_visible_copy_refinements() -> None:
     assert '"marching": "marching", "hours": "band-camp-hours"' in contests_source
     assert "Keep getting faster... Then one day we will show you double-tonguing!" not in board + javascript
     assert "serverConfirmedTriviaAttempt !== null" in javascript
-    assert "selected_answer: checkedAnswer.selected_answer" in javascript
-    assert "daily.triviaSelectedAnswer = triviaAttempt.selected_answer" in javascript
+    assert "selected_answer_text: checkedAnswer.selected_answer_text" in javascript
+    assert "daily.triviaSelectedAnswer = triviaAttempt.selected_answer_text" in javascript
     assert "Attempt used" in javascript and "no reward earned" in javascript
     assert "persistCampPoint(\"trivia\")" not in javascript
     for index in range(10):
@@ -181,12 +181,12 @@ def test_trivia_attempt_persists_text_and_rewards_only_correct_once(monkeypatch:
         request_for(correct_id), TriviaAnswerSubmission(activity_date=datetime(2026, 7, 31).date(), selected_index=2)
     )
 
-    assert wrong["selected_answer"] == wrong_retry["selected_answer"] == "Diminuendo"
+    assert wrong["selected_answer_text"] == wrong_retry["selected_answer_text"] == "Diminuendo"
     assert wrong["correct"] is False and wrong["award"] is None
-    assert correct["selected_answer"] == correct_retry["selected_answer"] == "Crescendo"
+    assert correct["selected_answer_text"] == correct_retry["selected_answer_text"] == "Crescendo"
     assert correct["award_created"] is True and correct_retry["award_created"] is False
     refreshed = contests.daily_camp_point_awards(datetime(2026, 7, 31).date(), request_for(wrong_id))
-    assert refreshed["trivia_attempt"] == {"selected_answer": "Diminuendo", "correct": False}
+    assert refreshed["trivia_attempt"] == {"selected_answer_text": "Diminuendo", "correct": False}
     assert not {"profile_id", "woodchuck_id", "pin_hash"}.intersection(refreshed)
     with sessions() as session:
         assert session.scalar(select(func.count()).select_from(DailyTriviaAttempt)) == 2

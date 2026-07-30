@@ -241,7 +241,9 @@
     if (dandelionObjectEl) {
       dandelionObjectEl.setAttribute(
         "aria-label",
-        `${dandelions} dandelions. Open the shop.`
+        window.location.pathname === "/store"
+          ? `${dandelions} dandelions.`
+          : `${dandelions} dandelions. Open the shop.`
       );
     }
   }
@@ -1158,6 +1160,16 @@
         dayIndex % BAND_CAMP_MARCHING_CHALLENGES.length
       ];
 
+    function legacyTriviaAnswerText(value) {
+      if (typeof value !== "string" && !Number.isInteger(value)) return null;
+      const stored = String(value).trim();
+      const legacyIndex = /^\d+$/.test(stored) ? Number(stored) : null;
+      if (legacyIndex !== null && legacyIndex >= 0 && legacyIndex < trivia.options.length) {
+        return trivia.options[legacyIndex];
+      }
+      return trivia.options.includes(stored) ? stored : null;
+    }
+
     function freshBandCampDay(dateKey) {
       return {
         dateKey,
@@ -1322,11 +1334,11 @@
         if (activityType === "marching") next.bandCamp.daily.marchingComplete = true;
       });
 
-      if (triviaAttempt && typeof triviaAttempt.selected_answer === "string") {
+      if (triviaAttempt && typeof triviaAttempt.selected_answer_text === "string") {
         serverConfirmedTriviaAttempt = triviaAttempt;
         next.bandCamp.daily.triviaAttempted = true;
         next.bandCamp.daily.triviaCorrect = triviaAttempt.correct === true;
-        next.bandCamp.daily.triviaSelectedAnswer = triviaAttempt.selected_answer;
+        next.bandCamp.daily.triviaSelectedAnswer = triviaAttempt.selected_answer_text;
       }
 
       stateApi.saveState(next, { sync: false });
@@ -1416,7 +1428,7 @@
         triviaButton.textContent = daily.triviaCorrect ? "Correct ✓" : "Attempt used";
         triviaButton.classList.toggle(
           "is-confirmed-success",
-          serverConfirmedTriviaAttempt !== null
+          serverConfirmedTriviaAttempt?.correct === true
         );
 
         if (triviaStatusEl) {
@@ -1424,9 +1436,14 @@
             ? "Correct answer—point earned"
             : "Try a new question tomorrow";
         }
-        if (triviaSelectedEl && daily.triviaSelectedAnswer) {
-          triviaSelectedEl.textContent = `Your answer: ${daily.triviaSelectedAnswer}`;
+        const selectedAnswerText = serverConfirmedTriviaAttempt?.selected_answer_text
+          || legacyTriviaAnswerText(daily.triviaSelectedAnswer);
+        if (triviaSelectedEl && selectedAnswerText) {
+          triviaSelectedEl.textContent = `Your answer: ${selectedAnswerText}`;
           triviaSelectedEl.classList.remove("hidden");
+        } else if (triviaSelectedEl) {
+          triviaSelectedEl.textContent = "";
+          triviaSelectedEl.classList.add("hidden");
         }
       } else if (triviaStatusEl) {
         triviaStatusEl.textContent = "One attempt per day";
@@ -1551,13 +1568,13 @@
         const isCorrect = checkedAnswer.correct === true;
 
         serverConfirmedTriviaAttempt = {
-          selected_answer: checkedAnswer.selected_answer,
+          selected_answer_text: checkedAnswer.selected_answer_text,
           correct: isCorrect,
         };
 
         next.bandCamp.daily.triviaAttempted = true;
         next.bandCamp.daily.triviaCorrect = isCorrect;
-        next.bandCamp.daily.triviaSelectedAnswer = checkedAnswer.selected_answer;
+        next.bandCamp.daily.triviaSelectedAnswer = checkedAnswer.selected_answer_text;
 
         if (isCorrect) {
           serverConfirmedAwards.add("trivia");
@@ -1591,17 +1608,30 @@
       marchingButton.addEventListener("click", async function () {
         const next = prepareCurrentDay(stateApi.getState());
 
-        if (next.bandCamp.daily.marchingComplete) return;
+        if (next.bandCamp.daily.marchingComplete || marchingButton.disabled) return;
 
+        const readyText = marchingButton.textContent;
+        marchingButton.disabled = true;
+        marchingButton.textContent = "Saving challenge…";
+
+        let persistedAward;
         try {
-          await persistCampPoint("marching");
+          persistedAward = await persistCampPoint("marching");
+          if (!persistedAward) throw new Error("Marching challenge could not be saved.");
         } catch (error) {
+          marchingButton.disabled = false;
+          marchingButton.textContent = readyText;
+          marchingActivity.open = true;
           feedbackEl.textContent = error.message || "Camp points could not be saved.";
           return;
         }
 
         next.bandCamp.daily.marchingComplete = true;
-        awardContest(next, "marching");
+        if (persistedAward.created === true) {
+          awardContest(next, "marching");
+        } else if (!hasAward(next, "marching")) {
+          next.bandCamp.daily.awarded.push("marching");
+        }
         stateApi.saveState(next);
 
         feedbackEl.textContent =

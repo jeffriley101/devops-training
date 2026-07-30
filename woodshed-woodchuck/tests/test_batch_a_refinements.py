@@ -50,8 +50,8 @@ def test_book_definition_position_magenta_button_and_timer_cleanup() -> None:
     book = (ROOT / "templates/p_book.html").read_text(encoding="utf-8")
     css = (ROOT / "static/css/styles.css").read_text(encoding="utf-8")
     definition = (
-        "Anytime you are messing with your instrument—giving it attention in any way—counts as practice. "
-        "Minutes spent thinking about your instrument can count as half-minutes. We’re on the honor system here!"
+        "Practice counts whenever you give your instrument real attention—playing it, cleaning it, fingering through music, "
+        "or thinking about what you want to improve. Thinking-only time counts as half-minutes. We trust you to keep it honest!"
     )
     content = (ROOT / "app/content.py").read_text(encoding="utf-8")
     assert definition not in book

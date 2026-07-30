@@ -137,9 +137,18 @@
         return;
       }
 
-      if (!instrument || !level || !goal) {
-        errorEl.textContent =
-          "Please choose an instrument, level, and goal.";
+      if (!instrument) {
+        errorEl.textContent = "Please choose an instrument.";
+        return;
+      }
+
+      if (!level) {
+        errorEl.textContent = "Please choose a level.";
+        return;
+      }
+
+      if (!goal) {
+        errorEl.textContent = "Please choose a practice goal.";
         return;
       }
 
