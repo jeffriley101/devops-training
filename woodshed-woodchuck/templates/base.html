@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{{ title }} · Woodshed Woodchuck</title>
-  <link rel="stylesheet" href="/static/css/styles.css?v=58" />
+  <link rel="stylesheet" href="/static/css/styles.css?v=59" />
 
   <!-- Woodshed app icons -->
   <link
@@ -37,7 +37,7 @@
   />
   <!-- End Woodshed app icons -->
 </head>
-<body>
+<body{% if active_nav == "home" %} class="shed-screen"{% endif %}>
   <div class="bg-orbs" aria-hidden="true"></div>
   <div class="app-shell">
     <main class="content-wrap">

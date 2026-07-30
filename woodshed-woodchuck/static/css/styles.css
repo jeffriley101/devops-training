@@ -3958,3 +3958,31 @@ select {
   .sound-effects-controls { right: 0.45rem; }
   .sound-effects-button { width: 2.6rem; height: 2.6rem; }
 }
+
+/* SHED keeps Sound Effects clear of the room's right-side status column. */
+.shed-screen .sound-effects-controls {
+  top: auto;
+  right: max(0.75rem, env(safe-area-inset-right));
+  bottom: calc(4.75rem + env(safe-area-inset-bottom));
+  z-index: 6;
+}
+
+.shed-screen .sound-effects-button {
+  width: 2.75rem;
+  height: 2.75rem;
+}
+
+.shed-screen .sound-effects-panel {
+  top: auto;
+  right: 0;
+  bottom: 3.15rem;
+  max-height: calc(100vh - 10rem);
+  overflow-y: auto;
+}
+
+@media (max-width: 640px) {
+  .shed-screen .sound-effects-controls {
+    right: max(0.65rem, env(safe-area-inset-right));
+    bottom: calc(4.5rem + env(safe-area-inset-bottom));
+  }
+}
