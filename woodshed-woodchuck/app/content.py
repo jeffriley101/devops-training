@@ -3,8 +3,8 @@
 from .instruments import INSTRUMENT_OPTIONS
 
 LEVEL_OPTIONS = [
-    "Beginner", "Intermediate", "Advanced", "High School", "College",
-    "Conservatory", "Weekend Warrior", "Professional", "Legend",
+    "Beginner", "Intermediate", "Advanced", "High School", "Honors",
+    "College", "Weekend Warrior", "Professional", "Legend",
     "Mount Rushmore",
 ]
 

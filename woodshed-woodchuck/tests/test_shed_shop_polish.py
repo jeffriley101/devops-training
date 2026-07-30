@@ -17,8 +17,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 EXPECTED_LEVELS = [
-    "Beginner", "Intermediate", "Advanced", "High School", "College",
-    "Conservatory", "Weekend Warrior", "Professional", "Legend",
+    "Beginner", "Intermediate", "Advanced", "High School", "Honors",
+    "College", "Weekend Warrior", "Professional", "Legend",
     "Mount Rushmore",
 ]
 
@@ -30,6 +30,8 @@ def test_exact_level_catalog_is_used_by_account_and_profile_ui() -> None:
     for level in EXPECTED_LEVELS:
         assert f'<option value="{level}">{level}</option>' in setup
         assert f'<option value="{level}">{level}</option>' in home
+    assert "Conservatory" not in setup + home
+    assert EXPECTED_LEVELS.index("Honors") < EXPECTED_LEVELS.index("College")
 
 
 def test_unsupported_new_level_is_rejected_without_rewriting_existing() -> None:

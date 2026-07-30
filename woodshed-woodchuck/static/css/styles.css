@@ -2569,9 +2569,11 @@ select {
   gap: 0.7rem;
 }
 
-.p-book-action-column .btn {
+.p-book-action-column .btn,
+.p-book-verifier-manage {
   width: 100%;
   min-height: 3rem;
+  font-size: 1rem;
 }
 
 .btn-book-copy {
@@ -2585,7 +2587,30 @@ select {
   background: linear-gradient(145deg, #438db8, #276789);
 }
 
-.p-book-verifier-manage { width: min(100%, 22rem); }
+.p-book-verifier-manage {
+  width: min(100%, 22rem);
+  color: #fff8fc;
+  background: linear-gradient(145deg, #c72c83, #83124f);
+  border-color: #65103f;
+  box-shadow: inset 0 1px 0 rgba(255, 210, 237, 0.5), 0 5px 10px rgba(89, 12, 55, 0.32);
+}
+
+.p-book-verifier-manage:hover,
+.p-book-verifier-manage:focus-visible {
+  background: linear-gradient(145deg, #dd3d98, #971b61);
+}
+
+.practice-minutes-definition {
+  max-width: 38rem;
+  padding: 0.7rem 0.85rem;
+  border: 2px dashed #8b5a9b;
+  border-radius: 10px;
+  color: #402445;
+  background: #f8eafa;
+  font-size: 0.92rem;
+  font-weight: 750;
+  line-height: 1.4;
+}
 
 .p-book-submit-dialog {
   width: min(92vw, 32rem);
@@ -3485,6 +3510,22 @@ select {
 }
 
 /* Phase 4C: corrected tiny landing image nudge */
+
+/* Bonus Challenge: metallic-gold interior over the superhero frame. */
+.board-practice-section.bonus-challenge-section > .section-head,
+.board-practice-section.bonus-challenge-section > form,
+.board-practice-section.bonus-challenge-section > article,
+.board-practice-section.bonus-challenge-section > .button-row {
+  color: #241708;
+  background:
+    linear-gradient(110deg, transparent 0 18%, rgba(255, 250, 202, 0.72) 28%, transparent 39%),
+    linear-gradient(145deg, #8f5b09 0%, #e2ae32 24%, #fff0a0 48%, #bd7c0c 72%, #f1c64d 100%);
+  border: 2px solid #6f4305;
+  box-shadow:
+    inset 0 2px 0 rgba(255, 248, 185, 0.85),
+    inset 0 -3px 0 rgba(91, 49, 2, 0.3),
+    0 5px 10px rgba(35, 12, 29, 0.32);
+}
 .welcome-hero-art {
   object-position: 48% 14%;
 }
