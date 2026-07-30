@@ -1,5 +1,11 @@
 import os
+import base64
+from io import BytesIO
 from pathlib import Path
+from urllib.parse import urlsplit, urlunsplit
+
+import qrcode
+import qrcode.image.svg
 
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import RedirectResponse
@@ -28,6 +34,7 @@ from .content import (
     SAX_VIKING_WELCOME,
 )
 from .instruments import instrument_definition_payloads
+from .models import WoodchuckState
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -66,6 +73,16 @@ NAV_ITEMS = [
 
 
 def _render(request: Request, template_name: str, **context: object):
+    account_state_bootstrap = None
+    with SessionLocal() as session:
+        profile = current_profile(request, session)
+        if profile is not None:
+            saved_state = session.get(WoodchuckState, profile.id)
+            account_state_bootstrap = {
+                "state": saved_state.state_json if saved_state else None,
+                "revision": saved_state.revision if saved_state else 0,
+            }
+
     return templates.TemplateResponse(
         request=request,
         name=template_name,
@@ -76,9 +93,27 @@ def _render(request: Request, template_name: str, **context: object):
             "quest_pool": QUEST_POOL,
             "sax_viking_messages": SAX_VIKING_MESSAGES,
             "instrument_definitions": instrument_definition_payloads(),
+            "account_state_bootstrap": account_state_bootstrap,
             **context,
         },
     )
+
+
+def public_site_url(request: Request) -> str:
+    candidate = os.getenv("PUBLIC_BASE_URL", "").strip() or str(request.base_url)
+    parsed = urlsplit(candidate)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise ValueError("PUBLIC_BASE_URL must be an absolute HTTP or HTTPS URL.")
+    path = parsed.path.rstrip("/") + "/"
+    return urlunsplit((parsed.scheme, parsed.netloc, path, "", ""))
+
+
+def qr_data_uri(value: str) -> str:
+    image = qrcode.make(value, image_factory=qrcode.image.svg.SvgPathImage)
+    output = BytesIO()
+    image.save(output)
+    encoded = base64.b64encode(output.getvalue()).decode("ascii")
+    return f"data:image/svg+xml;base64,{encoded}"
 
 
 @app.get("/")
@@ -193,12 +228,25 @@ def setup_submit(
 
 @app.get("/home")
 def home(request: Request):
+    member_since = None
+    with SessionLocal() as session:
+        profile = current_profile(request, session)
+        if profile is not None:
+            created_at = profile.created_at
+            member_since = {
+                "timestamp": created_at.isoformat(),
+                "compact": created_at.strftime("%b %Y"),
+                "full": created_at.strftime("%B %d, %Y"),
+            }
+
     return _render(
         request,
         "home.html",
         title="shed",
         active_nav="home",
         instruments=INSTRUMENT_OPTIONS,
+        levels=LEVEL_OPTIONS,
+        member_since=member_since,
     )
 
 
@@ -214,4 +262,8 @@ def quest(request: Request):
 
 @app.get("/store")
 def store(request: Request):
-    return _render(request, "store.html", title="shop", active_nav="store")
+    site_url = public_site_url(request)
+    return _render(
+        request, "store.html", title="shop", active_nav="store",
+        public_site_url=site_url, public_site_qr=qr_data_uri(site_url),
+    )

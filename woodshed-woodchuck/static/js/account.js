@@ -34,10 +34,7 @@
       instrument: profile.instrument,
       level: profile.level,
       goal: profile.goal,
-      createdAt:
-        state.profile && state.profile.createdAt
-          ? state.profile.createdAt
-          : new Date().toISOString(),
+      createdAt: profile.created_at,
     };
 
     return state;
@@ -345,7 +342,7 @@
 
   function wireInstrumentChange() {
     const openButton = document.getElementById(
-      "change-instrument-open-button"
+      "instrument-object"
     );
     const panel = document.getElementById("change-instrument-panel");
     const form = document.getElementById("change-instrument-form");
@@ -414,6 +411,11 @@
             instrumentObject,
             payload.instrument
           );
+          instrumentObject.setAttribute(
+            "aria-label",
+            `Change instrument. Current instrument: ${payload.instrument}`
+          );
+          instrumentObject.title = "Change instrument";
         }
         feedback.textContent = `Instrument changed to ${payload.instrument}.`;
       } catch (error) {
@@ -427,9 +429,82 @@
     });
   }
 
+  function wireProfileChange({ kind, endpoint, stateKey, payloadKey, triggerId }) {
+    const openButton = document.getElementById(triggerId);
+    const panel = document.getElementById(`change-${kind}-panel`);
+    const form = document.getElementById(`change-${kind}-form`);
+    const input = form && form.querySelector("input, select");
+    const feedback = document.getElementById(`change-${kind}-feedback`);
+    if (!openButton || !panel || !form || !input || !feedback) return;
+
+    function close() {
+      panel.hidden = true;
+      panel.classList.add("hidden");
+      openButton.setAttribute("aria-expanded", "false");
+      openButton.focus();
+    }
+    openButton.addEventListener("click", function () {
+      const currentValue = stateApi.getState().profile[stateKey] || "";
+      if (input instanceof HTMLSelectElement && currentValue && !Array.from(input.options).some((option) => option.value === currentValue)) {
+        input.prepend(new Option(`${currentValue} (current saved level)`, currentValue));
+      }
+      input.value = currentValue;
+      feedback.textContent = "";
+      feedback.classList.remove("error-text");
+      panel.hidden = false;
+      panel.classList.remove("hidden");
+      openButton.setAttribute("aria-expanded", "true");
+      input.focus();
+    });
+    panel.querySelectorAll("[data-close-profile-panel]").forEach((button) => {
+      button.addEventListener("click", close);
+    });
+    form.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      const button = form.querySelector("button[type='submit']");
+      feedback.classList.remove("error-text");
+      feedback.textContent = "Saving…";
+      button.disabled = true;
+      try {
+        const response = await fetch(endpoint, {
+          method: "PATCH", credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ [payloadKey]: input.value.trim() }),
+        });
+        if (!response.ok) {
+          throw new Error(await responseMessage(response, `The ${kind} could not be changed.`));
+        }
+        const payload = await response.json();
+        const next = stateApi.getState();
+        next.profile[stateKey] = payload[payloadKey];
+        stateApi.saveState(next);
+        feedback.textContent = `${kind === "name" ? "Name" : "Level"} changed successfully.`;
+        openButton.textContent = kind === "level"
+          ? payload[payloadKey].charAt(0).toUpperCase()
+          : payload[payloadKey];
+        openButton.setAttribute(
+          "aria-label",
+          kind === "name"
+            ? `Change Woodchuck name. Current name: ${payload[payloadKey]}`
+            : `Level: ${payload[payloadKey]}. Change level.`
+        );
+        if (kind === "level") {
+          openButton.title = `Level: ${payload[payloadKey]}. Change level.`;
+        }
+      } catch (error) {
+        feedback.classList.add("error-text");
+        feedback.textContent = error.message || `The ${kind} could not be changed.`;
+      } finally {
+        button.disabled = false;
+      }
+    });
+  }
+
   wireCreateAccount();
   wireLogin();
   wireInstrumentChange();
+  wireProfileChange({ kind: "name", endpoint: "/account/profile/name", stateKey: "woodchuckName", payloadKey: "display_name", triggerId: "woodchuck-name-value" });
+  wireProfileChange({ kind: "level", endpoint: "/account/profile/level", stateKey: "level", payloadKey: "level", triggerId: "level-value" });
 })();
 
 (function () {

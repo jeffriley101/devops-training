@@ -282,16 +282,21 @@ def test_rollover_preserves_history_state_rewards_crown_and_activity_data(
         profile_id=student.id, category_key="weekly-points-leaders",
         qualifying_wins=12, crown_earned_at=ROLLOVER_NOW - timedelta(days=30),
     )
+    activity_crown = CrownProgress(
+        profile_id=student.id, category_key="instrument-care",
+        qualifying_wins=14, crown_earned_at=ROLLOVER_NOW - timedelta(days=20),
+    )
     award = CampPointAward(
         profile_id=student.id, activity_type="care", points_awarded=1,
         occurred_at=datetime(2026, 8, 1, 18, tzinfo=timezone.utc),
         duplicate_key="preserved-camp-award",
     )
-    session.add_all([reward, crown, award])
+    session.add_all([reward, crown, activity_crown, award])
     session.commit()
     preserved_ids = {
         "chart": chart.id, "verification": verification.id, "result": result.id,
-        "reward": reward.id, "crown": crown.id, "award": award.id,
+        "reward": reward.id, "crown": crown.id,
+        "activity_crown": activity_crown.id, "award": award.id,
         "verifier": verifier.id, "connection": connection.id,
     }
 
@@ -305,6 +310,9 @@ def test_rollover_preserves_history_state_rewards_crown_and_activity_data(
     assert session.get(RewardGrant, preserved_ids["reward"]).source_key == "preserved-reward"
     saved_crown = session.get(CrownProgress, preserved_ids["crown"])
     assert saved_crown.qualifying_wins == 12 and saved_crown.crown_earned_at is not None
+    saved_activity_crown = session.get(CrownProgress, preserved_ids["activity_crown"])
+    assert saved_activity_crown.qualifying_wins == 14
+    assert saved_activity_crown.crown_earned_at is not None
     assert session.get(CampPointAward, preserved_ids["award"]).points_awarded == 1
     assert session.get(TrustedVerifier, preserved_ids["verifier"]).email == "preserved-verifier@example.com"
     assert session.get(StudentVerifierConnection, preserved_ids["connection"]).status == "accepted"

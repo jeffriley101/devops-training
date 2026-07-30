@@ -45,6 +45,13 @@ class WoodchuckProfile(Base):
     level: Mapped[str] = mapped_column(String(50), nullable=False)
     goal: Mapped[str] = mapped_column(String(100), nullable=False)
 
+    display_name_changed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    level_changed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=utc_now,
@@ -443,6 +450,10 @@ class PracticeChart(Base):
     submission_key: Mapped[str | None] = mapped_column(
         String(64),
         nullable=True,
+    )
+
+    include_contests: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default="1", nullable=False
     )
 
     credits_awarded: Mapped[int] = mapped_column(

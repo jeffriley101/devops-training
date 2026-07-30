@@ -13,39 +13,51 @@
 
     <div class="woodshed-foreground" aria-label="Clickable Woodshed objects">
       <div class="woodshed-object-column woodshed-object-column-left">
-        <div
+        <button
           id="woodchuck-name-value"
-          class="shed-readout shed-readout-name"
-          title="Woodchuck name"
+          class="shed-readout shed-readout-name shed-profile-field"
+          type="button"
+          aria-controls="change-name-panel"
+          aria-expanded="false"
+          aria-label="Change Woodchuck name"
+          title="Change Woodchuck name"
         >
           Name your Woodchuck
-        </div>
+        </button>
 
-        <div
+        <time
           id="camp-level-value"
-          class="shed-readout shed-readout-class"
-          title="Class"
+          class="shed-readout shed-readout-class shed-member-since"
+          {% if member_since %}datetime="{{ member_since.timestamp }}"
+          title="Member since {{ member_since.full }}"
+          aria-label="Member since {{ member_since.full }}"{% endif %}
         >
-          Chuckling
-        </div>
+          Member Since{% if member_since %} {{ member_since.compact }}{% endif %}
+        </time>
 
-        <div
+        <button
           id="instrument-object"
-          class="shed-icon-object"
-          role="img"
-          aria-label="Instrument"
-          title="Instrument"
+          class="shed-icon-object shed-profile-field"
+          type="button"
+          aria-controls="change-instrument-panel"
+          aria-expanded="false"
+          aria-label="Change instrument"
+          title="Change instrument"
         >
           ♪
-        </div>
+        </button>
 
-        <div
+        <button
           id="level-value"
-          class="shed-readout shed-readout-level"
-          title="Level"
+          class="shed-readout shed-readout-level shed-profile-field"
+          type="button"
+          aria-controls="change-level-panel"
+          aria-expanded="false"
+          aria-label="Change student level"
+          title="Change student level"
         >
-          #1
-        </div>
+          B
+        </button>
 
         <a
           id="p-book"
@@ -63,7 +75,7 @@
           aria-label="Open Quest Book"
           title="Quest Book"
         >
-          <span class="room-object-icon" aria-hidden="true">📔</span>
+          <span class="room-object-icon" aria-hidden="true">📋</span>
         </a>
       </div>
 
@@ -139,18 +151,6 @@
     </div>
   </div>
 
-  <div class="shed-edit-profile-row">
-    <button
-      id="change-instrument-open-button"
-      class="shed-edit-profile-button"
-      type="button"
-      aria-controls="change-instrument-panel"
-      aria-expanded="false"
-    >
-      Change Instrument
-    </button>
-  </div>
-
   <section
     id="change-instrument-panel"
     class="mentor-card change-instrument-panel hidden"
@@ -191,6 +191,28 @@
     </form>
   </section>
 
+  <section id="change-name-panel" class="mentor-card change-profile-panel hidden" aria-labelledby="change-name-title" hidden>
+    <div class="section-head"><p class="chip">Edit Profile</p><h2 id="change-name-title">Change Name</h2></div>
+    <p>Your public Woodchuck name may be changed once every 24 hours.</p>
+    <form id="change-name-form" class="stack-form">
+      <label for="change-name-input">Public Woodchuck name</label>
+      <input id="change-name-input" name="display_name" maxlength="50" required />
+      <p id="change-name-feedback" class="body-copy" role="status" aria-live="polite"></p>
+      <div class="button-row"><button class="btn btn-primary" type="submit">Save Name</button><button class="btn btn-secondary" type="button" data-close-profile-panel>Cancel</button></div>
+    </form>
+  </section>
+
+  <section id="change-level-panel" class="mentor-card change-profile-panel hidden" aria-labelledby="change-level-title" hidden>
+    <div class="section-head"><p class="chip">Edit Profile</p><h2 id="change-level-title">Change Level</h2></div>
+    <p>Your level may be changed once every 30 days.</p>
+    <form id="change-level-form" class="stack-form">
+      <label for="change-level-select">Current level</label>
+      <select id="change-level-select" name="level" required>{% for item in levels %}<option value="{{ item }}">{{ item }}</option>{% endfor %}</select>
+      <p id="change-level-feedback" class="body-copy" role="status" aria-live="polite"></p>
+      <div class="button-row"><button class="btn btn-primary" type="submit">Save Level</button><button class="btn btn-secondary" type="button" data-close-profile-panel>Cancel</button></div>
+    </form>
+  </section>
+
   <section
     id="metronome-panel"
     class="metronome-panel hidden"
@@ -217,9 +239,7 @@
         id="metronome-pulse"
         class="metronome-pulse"
         aria-hidden="true"
-      >
-        <span id="metronome-beat-number">1</span>
-      </div>
+      ></div>
 
       <div class="metronome-tempo-readout">
         <strong id="metronome-bpm-readout">100</strong>
@@ -287,7 +307,7 @@
     </div>
 
     <p id="metronome-status" class="metronome-status" aria-live="polite">
-      Stopped at 100 BPM. Beat one is accented.
+      Stopped at 100 BPM.
     </p>
   </section>
 
@@ -381,20 +401,5 @@
     </button>
   </section>
 
-  <p class="support-line">
-    <a href="/trusted-verifiers">
-      Manage Trusted Verifiers
-    </a>
-  </p>
-
-  <p class="support-line">
-    <a
-      href="https://venmo.com/u/jeffriley101"
-      target="_blank"
-      rel="noopener noreferrer"
-    >
-      Please Support the Shed Project!
-    </a>
-  </p>
 </section>
 {% endblock %}

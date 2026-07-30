@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{{ title }} · Woodshed Woodchuck</title>
-  <link rel="stylesheet" href="/static/css/styles.css?v=44" />
+  <link rel="stylesheet" href="/static/css/styles.css?v=51" />
 
   <!-- Woodshed app icons -->
   <link
@@ -56,10 +56,11 @@
   <script id="quest-pool-data" type="application/json">{{ quest_pool | tojson }}</script>
   <script id="sax-viking-messages-data" type="application/json">{{ sax_viking_messages | tojson }}</script>
   <script id="instrument-definitions-data" type="application/json">{{ instrument_definitions | tojson }}</script>
-  <script src="/static/js/state.js?v=6"></script>
+  <script id="account-state-bootstrap" type="application/json">{{ account_state_bootstrap | tojson }}</script>
+  <script src="/static/js/state.js?v=7"></script>
   <script src="/static/js/instruments.js?v=3"></script>
-  <script src="/static/js/app.js?v=8"></script>
-  <script src="/static/js/account.js?v=8"></script>
+  <script src="/static/js/app.js?v=15"></script>
+  <script src="/static/js/account.js?v=11"></script>
   {% block page_scripts %}{% endblock %}
 </body>
 </html>

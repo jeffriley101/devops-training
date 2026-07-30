@@ -2,7 +2,11 @@
 
 from .instruments import INSTRUMENT_OPTIONS
 
-LEVEL_OPTIONS = ["Beginner", "Intermediate", "Advanced"]
+LEVEL_OPTIONS = [
+    "Beginner", "Intermediate", "Advanced", "High School", "Honors",
+    "College", "Weekend Warrior", "Professional", "Legend",
+    "Mount Rushmore",
+]
 
 GOAL_OPTIONS = [
     "Build daily consistency",

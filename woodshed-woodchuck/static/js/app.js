@@ -2,6 +2,23 @@
   const stateApi = window.WWState;
   if (!stateApi) return;
 
+  function celebrateSuccess(origin) {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const burst = document.createElement("div");
+    burst.className = "success-confetti";
+    burst.setAttribute("aria-hidden", "true");
+    const colors = ["#f4d35e", "#ee964b", "#f95738", "#74c0fc", "#90be6d"];
+    for (let index = 0; index < 24; index += 1) {
+      const piece = document.createElement("span");
+      piece.style.setProperty("--confetti-x", `${(index % 8) * 12 - 42}vw`);
+      piece.style.setProperty("--confetti-delay", `${(index % 6) * 30}ms`);
+      piece.style.backgroundColor = colors[index % colors.length];
+      burst.appendChild(piece);
+    }
+    document.body.appendChild(burst);
+    window.setTimeout(() => burst.remove(), 1400);
+  }
+
   function parseJsonFromId(id, fallback) {
     const el = document.getElementById(id);
     if (!el) return fallback;
@@ -150,7 +167,6 @@
     const woodchuckNameEl = document.getElementById("woodchuck-name-value");
     const instrumentObjectEl = document.getElementById("instrument-object");
     const levelEl = document.getElementById("level-value");
-    const campLevelEl = document.getElementById("camp-level-value");
     const totalPChartsEl = document.getElementById("total-p-charts-value");
     const dandelionObjectEl = document.getElementById("dandelion-object");
 
@@ -164,16 +180,15 @@
 
     const dandelions = state.progress.credits ?? 0;
     const streak = state.progress.streak ?? 0;
-    const gameLevel = state.progress.level ?? 1;
     const instrument = state.profile.instrument || "Instrument not set";
 
     if (woodchuckNameEl) {
       woodchuckNameEl.textContent =
         state.profile.woodchuckName || "Name your Woodchuck";
-    }
-
-    if (campLevelEl) {
-      campLevelEl.textContent = "Chuckling";
+      woodchuckNameEl.setAttribute(
+        "aria-label",
+        `Change Woodchuck name. Current name: ${state.profile.woodchuckName || "not set"}`
+      );
     }
 
     if (instrumentObjectEl) {
@@ -184,11 +199,23 @@
         instrumentObjectEl.title = instrument;
         instrumentObjectEl.setAttribute("aria-label", instrument);
       }
+      instrumentObjectEl.setAttribute(
+        "aria-label",
+        `Change instrument. Current instrument: ${instrument}`
+      );
+      instrumentObjectEl.title = "Change instrument";
     }
 
     if (levelEl) {
-      levelEl.textContent = `#${gameLevel}`;
-      levelEl.setAttribute("aria-label", `Level ${gameLevel}`);
+      const profileLevel = state.profile.level || "Level not set";
+      levelEl.textContent = profileLevel === "Level not set"
+        ? "—"
+        : profileLevel.charAt(0).toUpperCase();
+      levelEl.setAttribute(
+        "aria-label",
+        `Level: ${profileLevel}. Change level.`
+      );
+      levelEl.title = `Level: ${profileLevel}. Change level.`;
     }
 
     if (streakEl) {
@@ -216,6 +243,25 @@
         "aria-label",
         `${dandelions} dandelions. Open the shop.`
       );
+    }
+  }
+
+  async function refreshPracticeStreak() {
+    const streakEl = document.getElementById("streak-value");
+    if (!streakEl) return;
+    try {
+      const response = await fetch("/practice-charts/streak", {
+        credentials: "same-origin", cache: "no-store",
+      });
+      if (!response.ok) return;
+      const payload = await response.json();
+      if (!Number.isInteger(payload.streak) || payload.streak < 0) return;
+      const next = stateApi.getState();
+      next.progress.streak = payload.streak;
+      stateApi.saveState(next, { sync: false });
+      hydrateHome(next);
+    } catch (_error) {
+      // Retain the last known server-derived value while offline.
     }
   }
 
@@ -634,9 +680,6 @@
       "metronome-bpm-readout"
     );
     const pulse = document.getElementById("metronome-pulse");
-    const beatNumber = document.getElementById(
-      "metronome-beat-number"
-    );
     const status = document.getElementById("metronome-status");
 
     if (
@@ -657,7 +700,6 @@
     let audioContext = null;
     let schedulerTimer = null;
     let nextBeatTime = 0;
-    let currentBeat = 0;
     let isRunning = false;
     let tapTimes = [];
     const visualTimers = new Set();
@@ -709,7 +751,7 @@
 
       if (status && !isRunning) {
         status.textContent =
-          `Stopped at ${bpm} BPM. Beat one is accented.`;
+          `Stopped at ${bpm} BPM.`;
       }
     }
 
@@ -727,8 +769,8 @@
       visualTimers.clear();
     }
 
-    function showBeat(beat, scheduledTime) {
-      if (!audioContext || !pulse || !beatNumber) return;
+    function showBeat(scheduledTime) {
+      if (!audioContext || !pulse) return;
 
       const delay = Math.max(
         0,
@@ -738,39 +780,29 @@
       queueVisualUpdate(function () {
         if (!isRunning) return;
 
-        beatNumber.textContent = String(beat + 1);
-        pulse.classList.remove("is-active", "is-accent");
+        pulse.classList.remove("is-active");
 
         void pulse.offsetWidth;
 
         pulse.classList.add("is-active");
 
-        if (beat === 0) {
-          pulse.classList.add("is-accent");
-        }
-
         queueVisualUpdate(function () {
-          pulse.classList.remove("is-active", "is-accent");
+          pulse.classList.remove("is-active");
         }, 110);
       }, delay);
     }
 
-    function playClick(beat, scheduledTime) {
+    function playClick(scheduledTime) {
       if (!audioContext) return;
 
       const oscillator = audioContext.createOscillator();
       const gain = audioContext.createGain();
-      const isAccent = beat === 0;
-
       oscillator.type = "sine";
-      oscillator.frequency.setValueAtTime(
-        isAccent ? 1250 : 850,
-        scheduledTime
-      );
+      oscillator.frequency.setValueAtTime(850, scheduledTime);
 
       gain.gain.setValueAtTime(0.0001, scheduledTime);
       gain.gain.exponentialRampToValueAtTime(
-        isAccent ? 0.24 : 0.14,
+        0.14,
         scheduledTime + 0.003
       );
       gain.gain.exponentialRampToValueAtTime(
@@ -784,7 +816,7 @@
       oscillator.start(scheduledTime);
       oscillator.stop(scheduledTime + 0.06);
 
-      showBeat(beat, scheduledTime);
+      showBeat(scheduledTime);
     }
 
     function scheduler() {
@@ -794,10 +826,9 @@
         nextBeatTime <
         audioContext.currentTime + 0.1
       ) {
-        playClick(currentBeat, nextBeatTime);
+        playClick(nextBeatTime);
 
         nextBeatTime += 60 / bpm;
-        currentBeat = (currentBeat + 1) % 4;
       }
     }
 
@@ -819,7 +850,6 @@
       }
 
       isRunning = true;
-      currentBeat = 0;
       nextBeatTime = audioContext.currentTime + 0.05;
 
       scheduler();
@@ -830,7 +860,7 @@
 
       if (status) {
         status.textContent =
-          `Playing at ${bpm} BPM. Beat one is accented.`;
+          `Playing at ${bpm} BPM.`;
       }
     }
 
@@ -845,11 +875,7 @@
       clearVisualTimers();
 
       if (pulse) {
-        pulse.classList.remove("is-active", "is-accent");
-      }
-
-      if (beatNumber) {
-        beatNumber.textContent = "1";
+        pulse.classList.remove("is-active");
       }
 
       startButton.textContent = "Start";
@@ -857,7 +883,7 @@
 
       if (status) {
         status.textContent =
-          `Stopped at ${bpm} BPM. Beat one is accented.`;
+          `Stopped at ${bpm} BPM.`;
       }
     }
 
@@ -1025,20 +1051,27 @@
     if (!playerNameEl) return;
 
     const playerPointsEl = document.getElementById("board-player-points");
+    const playerWeeklyPointsEl = document.getElementById(
+      "board-player-weekly-points"
+    );
 
-    const hoursForm = document.getElementById("camp-hours-form");
-    const hoursInput = document.getElementById("camp-hours");
-    const hoursButton = document.getElementById("camp-hours-button");
+    const hoursCheckbox = document.getElementById("camp-hours-checkbox");
     const hoursStatusEl = document.getElementById("camp-hours-status");
+    const hoursActivity = document.getElementById("camp-hours-activity");
+    const hoursSummaryEl = document.getElementById("camp-hours-summary");
 
     const careButton = document.getElementById("instrument-care-button");
     const careStatusEl = document.getElementById("instrument-care-status");
+    const careActivity = document.getElementById("instrument-care-activity");
+    const careSummaryEl = document.getElementById("instrument-care-summary");
 
     const triviaForm = document.getElementById("trivia-form");
     const triviaQuestionEl = document.getElementById("trivia-question");
     const triviaOptionsEl = document.getElementById("trivia-options");
     const triviaButton = document.getElementById("trivia-button");
     const triviaStatusEl = document.getElementById("trivia-status");
+    const triviaActivity = document.getElementById("trivia-activity");
+    const triviaSummaryEl = document.getElementById("trivia-summary");
 
     const marchingTextEl = document.getElementById(
       "marching-challenge-text"
@@ -1049,6 +1082,8 @@
     const marchingStatusEl = document.getElementById(
       "marching-challenge-status"
     );
+    const marchingActivity = document.getElementById("marching-activity");
+    const marchingSummaryEl = document.getElementById("marching-challenge-summary");
 
     const feedbackEl = document.getElementById("board-feedback");
 
@@ -1076,7 +1111,6 @@
     function prepareCurrentDay(current) {
       if (current.bandCamp.daily.dateKey !== today) {
         current.bandCamp.daily = freshBandCampDay(today);
-        stateApi.saveState(current);
       }
 
       return current;
@@ -1134,6 +1168,7 @@
     }
 
     const campAwardsInFlight = new Set();
+    const serverConfirmedAwards = new Set();
 
     async function persistCampPoint(activityType) {
       if (campAwardsInFlight.has(activityType)) return null;
@@ -1152,11 +1187,73 @@
         if (!response.ok) {
           throw new Error(payload.detail || "Camp points could not be saved.");
         }
+        if (payload.award && payload.award.activity_type) {
+          serverConfirmedAwards.add(payload.award.activity_type);
+        }
+        if (playerWeeklyPointsEl && Number.isInteger(payload.weekly_points)) {
+          playerWeeklyPointsEl.textContent = String(payload.weekly_points);
+        }
+        if (playerPointsEl && Number.isInteger(payload.career_points)) {
+          playerPointsEl.textContent = String(payload.career_points);
+        }
         window.dispatchEvent(new CustomEvent("ww:camp-points-saved"));
         return payload;
       } finally {
         campAwardsInFlight.delete(activityType);
       }
+    }
+
+    function renderActivityDisclosure(details, summary, activityType) {
+      if (!details || !summary) return;
+      const complete = serverConfirmedAwards.has(activityType);
+      summary.textContent = complete
+        ? "Completed · +1 Camp Point · +1 dandelion"
+        : activityType === "trivia"
+          ? "One attempt per day"
+          : "Not completed today";
+
+      if (complete && details.dataset.serverComplete !== "true") {
+        details.open = false;
+      } else if (!complete) {
+        details.open = true;
+      }
+      details.dataset.serverComplete = String(complete);
+    }
+
+    async function loadPersistedCampAwards() {
+      const response = await fetch(
+        `/contests/camp-points/awards/${encodeURIComponent(today)}`,
+        { credentials: "same-origin", cache: "no-store" }
+      );
+      if (!response.ok) return;
+      const payload = await response.json();
+      const awards = Array.isArray(payload.awards) ? payload.awards : [];
+      const next = prepareCurrentDay(stateApi.getState());
+
+      if (playerWeeklyPointsEl && Number.isInteger(payload.weekly_points)) {
+        playerWeeklyPointsEl.textContent = String(payload.weekly_points);
+      }
+      if (playerPointsEl && Number.isInteger(payload.career_points)) {
+        playerPointsEl.textContent = String(payload.career_points);
+      }
+
+      awards.forEach((award) => {
+        const activityType = award && award.activity_type;
+        if (!["hours", "care", "trivia", "marching"].includes(activityType)) return;
+        serverConfirmedAwards.add(activityType);
+        if (!next.bandCamp.daily.awarded.includes(activityType)) {
+          next.bandCamp.daily.awarded.push(activityType);
+        }
+        if (activityType === "care") next.bandCamp.daily.careComplete = true;
+        if (activityType === "trivia") {
+          next.bandCamp.daily.triviaAttempted = true;
+          next.bandCamp.daily.triviaCorrect = true;
+        }
+        if (activityType === "marching") next.bandCamp.daily.marchingComplete = true;
+      });
+
+      stateApi.saveState(next, { sync: false });
+      renderBoard(next);
     }
 
     function setButtonComplete(button, text) {
@@ -1194,23 +1291,26 @@
       const points = current.bandCamp.totals.points;
       const daily = current.bandCamp.daily;
 
+      renderActivityDisclosure(hoursActivity, hoursSummaryEl, "hours");
+      renderActivityDisclosure(careActivity, careSummaryEl, "care");
+      renderActivityDisclosure(triviaActivity, triviaSummaryEl, "trivia");
+      renderActivityDisclosure(marchingActivity, marchingSummaryEl, "marching");
+
       playerNameEl.textContent = name;
 
       if (playerPointsEl) {
         playerPointsEl.textContent = String(points);
       }
 
-      if (hoursInput) {
-        hoursInput.value =
-          daily.hours === null ? "" : String(daily.hours);
-        hoursInput.disabled = hasAward(current, "hours");
+      if (hoursCheckbox) {
+        const hoursComplete = serverConfirmedAwards.has("hours");
+        hoursCheckbox.checked = hoursComplete;
+        hoursCheckbox.disabled = hoursComplete;
       }
 
-      if (hasAward(current, "hours")) {
-        setButtonComplete(hoursButton, "Added to Board");
+      if (serverConfirmedAwards.has("hours")) {
         if (hoursStatusEl) {
-          hoursStatusEl.textContent =
-            `${daily.hours} camp hours recorded today`;
+          hoursStatusEl.textContent = "Completed today";
         }
       } else if (hoursStatusEl) {
         hoursStatusEl.textContent = "Not completed today";
@@ -1267,34 +1367,39 @@
 
     let current = prepareCurrentDay(stateApi.getState());
     renderBoard(current);
+    loadPersistedCampAwards().catch(() => {
+      // Leave activities open when server completion cannot be confirmed.
+    });
 
-    if (hoursForm) {
-      hoursForm.addEventListener("submit", async function (event) {
-        event.preventDefault();
-
+    if (hoursCheckbox) {
+      hoursCheckbox.addEventListener("change", async function () {
+        if (!hoursCheckbox.checked) return;
         const next = prepareCurrentDay(stateApi.getState());
-        const hours = Number(hoursInput.value);
-
-        if (!Number.isFinite(hours) || hours <= 0) {
-          feedbackEl.textContent =
-            "Enter how many hours you spent at band camp.";
-          return;
-        }
-
-        if (hasAward(next, "hours")) return;
+        if (serverConfirmedAwards.has("hours")) return;
+        hoursCheckbox.disabled = true;
 
         try {
-          await persistCampPoint("hours");
+          const persistedAward = await persistCampPoint("hours");
+          if (!persistedAward) {
+            throw new Error("Band Camp Hours could not be saved.");
+          }
+          if (persistedAward.created === true) {
+            awardContest(next, "hours");
+          } else if (!hasAward(next, "hours")) {
+            next.bandCamp.daily.awarded.push("hours");
+          }
         } catch (error) {
-          feedbackEl.textContent = error.message || "Camp points could not be saved.";
+          hoursCheckbox.checked = false;
+          hoursCheckbox.disabled = false;
+          hoursActivity.open = true;
+          feedbackEl.textContent = error.message ||
+            "Band Camp Hours could not be saved. Please try again.";
           return;
         }
 
-        next.bandCamp.daily.hours = hours;
-        awardContest(next, "hours");
         stateApi.saveState(next);
         feedbackEl.textContent =
-          `${hours} camp hours added. +1 Camp Point and +1 dandelion.`;
+          "Band Camp Hours completed. +1 Camp Point and +1 dandelion.";
 
         renderBoard(next);
         hydrateHome(next);
@@ -1351,7 +1456,10 @@
 
         if (isCorrect) {
           try {
-            await persistCampPoint("trivia");
+            const persistedAward = await persistCampPoint("trivia");
+            if (persistedAward && persistedAward.created === true) {
+              celebrateSuccess(triviaForm);
+            }
           } catch (error) {
             feedbackEl.textContent = error.message || "Camp points could not be saved.";
             return;
@@ -1585,7 +1693,7 @@
       const messageEl = document.getElementById(
         `contest-${division}-${campPoints ? "camp-position" : "position"}-message`
       );
-      if (!list || !emptyEl || !messageEl) return;
+      if (!list || !emptyEl) return;
 
       list.replaceChildren();
       const safeRows = Array.isArray(rows)
@@ -1634,7 +1742,9 @@
       const isEmpty = safeRows.length === 0;
       emptyEl.classList.toggle("hidden", !isEmpty);
       list.classList.toggle("hidden", isEmpty);
-      messageEl.textContent = positionMessage(division, position, campPoints);
+      if (messageEl) {
+        messageEl.textContent = positionMessage(division, position, campPoints);
+      }
     }
 
     function showError(message) {
@@ -2217,6 +2327,7 @@
         const meter = root.querySelector(".personal-crown-meter");
         const remaining = root.querySelector(".personal-crown-remaining");
         const date = root.querySelector(".personal-crown-earned-date");
+        const categoryList = root.querySelector(".crown-category-list");
         const wins = progress.qualifying_wins;
         const target = progress.target_wins;
 
@@ -2241,6 +2352,23 @@
           remaining.textContent = `${winsRemaining} qualifying ${winsRemaining === 1 ? "win" : "wins"} remain.`;
           date.textContent = "";
           date.classList.add("hidden");
+        }
+        if (categoryList && Array.isArray(progress.categories)) {
+          categoryList.replaceChildren();
+          progress.categories.forEach((category) => {
+            const card = document.createElement("article");
+            card.className = "crown-category-card";
+            const name = document.createElement("strong");
+            name.textContent = `${category.earned ? "👑 " : ""}${category.name}`;
+            const value = document.createElement("span");
+            value.textContent = `${category.progress} / ${category.target}`;
+            card.setAttribute(
+              "aria-label",
+              `${category.name}: ${category.progress} of ${category.target}${category.earned ? ", permanent crown earned" : ""}`
+            );
+            card.append(name, value);
+            categoryList.appendChild(card);
+          });
         }
         loading.classList.add("hidden");
         error.classList.add("hidden");
@@ -2272,6 +2400,15 @@
             payload.remaining_wins < 0 ||
             typeof payload.earned !== "boolean") {
           showError("Crown progress could not be read.");
+          return;
+        }
+        if (!Array.isArray(payload.categories) || payload.categories.length !== 6 ||
+            payload.categories.some((category) =>
+              !category || typeof category.name !== "string" ||
+              !Number.isInteger(category.progress) || category.progress < 0 ||
+              category.target !== 10 || typeof category.earned !== "boolean"
+            )) {
+          showError("Crown categories could not be read.");
           return;
         }
         render(payload);
@@ -2393,6 +2530,46 @@
     renderStore(ensureInventoryShape(state));
   }
 
+  function wireShopPolish() {
+    const door = document.getElementById("practice-room-door");
+    const panel = document.getElementById("practice-room-panel");
+    if (door && panel) {
+      door.addEventListener("click", function () {
+        const opening = panel.hidden;
+        panel.hidden = !opening;
+        panel.classList.toggle("hidden", !opening);
+        door.setAttribute("aria-expanded", String(opening));
+        if (opening) panel.querySelector("h3").focus({ preventScroll: true });
+      });
+    }
+
+    const qrButton = document.getElementById("shop-qr-copy");
+    const qrStatus = document.getElementById("shop-qr-status");
+    if (qrButton && qrStatus) {
+      qrButton.addEventListener("click", async function () {
+        const address = qrButton.dataset.publicSiteUrl;
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(address);
+          } else {
+            const fallback = document.createElement("textarea");
+            fallback.value = address;
+            fallback.setAttribute("readonly", "");
+            fallback.className = "sr-only";
+            document.body.appendChild(fallback);
+            fallback.select();
+            const copied = document.execCommand("copy");
+            fallback.remove();
+            if (!copied) throw new Error("Clipboard unavailable");
+          }
+          qrStatus.textContent = "Website address copied";
+        } catch (_error) {
+          qrStatus.textContent = `Copy this website address: ${address}`;
+        }
+      });
+    }
+  }
+
   function wirePBook(state) {
     const form = document.getElementById("p-book-form");
     if (!form) return;
@@ -2415,16 +2592,38 @@
     const teacherEmailOptionsEl = document.getElementById("teacher-email-options");
     const parentEmailOptionsEl = document.getElementById("parent-email-options");
     const verifierSelectEl = document.getElementById("p-book-verifier");
+    const includeContestsEl = document.getElementById("p-book-include-contests");
     const verifierHelpEl = document.getElementById("p-book-verifier-help");
     const submitBtn = form.querySelector("button[type='submit']");
+    const openDialog = document.getElementById("open-chart-confirmation");
+    const submitOpenBtn = document.getElementById("submit-open-chart");
+    const chooseVerifierBtn = document.getElementById("choose-chart-verifier");
+    const cancelOpenBtn = document.getElementById("cancel-open-chart");
 
-    const totalMinutesEl = document.getElementById("p-book-total-minutes");
+    const weekPracticeEl = document.getElementById("p-book-week-practice");
+    const careerPracticeEl = document.getElementById("p-book-career-practice");
     const practiceDaysEl = document.getElementById("p-book-practice-days");
     const pagesCountEl = document.getElementById("p-book-pages-count");
 
     const DANDELION_DAILY_CAP = 75;
     let submissionInFlight = false;
     let pendingSubmissionKey = null;
+    let openSubmissionConfirmed = false;
+
+    if (openDialog && submitOpenBtn && chooseVerifierBtn && cancelOpenBtn) {
+      submitOpenBtn.addEventListener("click", function () {
+        openSubmissionConfirmed = true;
+        openDialog.close();
+        form.requestSubmit();
+      });
+      chooseVerifierBtn.addEventListener("click", function () {
+        openDialog.close();
+        verifierSelectEl.focus();
+      });
+      cancelOpenBtn.addEventListener("click", function () {
+        openDialog.close();
+      });
+    }
 
     function verifierRoleLabel(role) {
       return String(role || "")
@@ -2510,7 +2709,7 @@
               )
             : (
                 "No trusted verifiers are connected yet. " +
-                "This chart can still be saved on this device."
+                "This chart can still be saved as Open."
               );
         }
       } catch (error) {
@@ -2537,6 +2736,7 @@
       practiceDetails,
       creditsAwarded,
       submissionKey,
+      includeContests,
     }) {
       const response = await fetch(
         "/practice-charts",
@@ -2555,6 +2755,7 @@
             source: "p-book",
             credits_awarded: creditsAwarded,
             submission_key: submissionKey,
+            include_contests: includeContests,
           }),
         }
       );
@@ -2675,6 +2876,7 @@
             verificationResponseNote: responseNote,
             verifierId: verification.verifier_id || null,
             verifierName,
+            includeContests: serverChart.include_contests !== false,
           });
 
           changed = true;
@@ -2692,7 +2894,7 @@
 
         next.practiceLog = next.practiceLog.slice(0, 100);
 
-        stateApi.saveState(next);
+        stateApi.saveState(next, { sync: false });
         renderEntries(next);
         renderPBookSummary(next);
 
@@ -2873,13 +3075,30 @@
 
     function renderPBookSummary(s) {
       const entries = Array.isArray(s.practiceLog) ? s.practiceLog : [];
-      const totalMinutes = entries.reduce((sum, entry) => sum + (Number(entry.minutes) || 0), 0);
       const practiceDays = new Set(entries.map((entry) => entry.dateKey).filter(Boolean)).size;
       const pagesCount = entries.length;
 
-      if (totalMinutesEl) totalMinutesEl.textContent = String(totalMinutes);
       if (practiceDaysEl) practiceDaysEl.textContent = String(practiceDays);
       if (pagesCountEl) pagesCountEl.textContent = String(pagesCount);
+    }
+
+    async function loadPracticeTotals() {
+      if (!weekPracticeEl && !careerPracticeEl) return;
+      try {
+        const response = await fetch("/practice-charts/totals", {
+          credentials: "same-origin", cache: "no-store",
+        });
+        if (!response.ok) return;
+        const payload = await response.json();
+        if (weekPracticeEl && typeof payload.this_week_display === "string") {
+          weekPracticeEl.textContent = payload.this_week_display;
+        }
+        if (careerPracticeEl && typeof payload.career_display === "string") {
+          careerPracticeEl.textContent = payload.career_display;
+        }
+      } catch (_error) {
+        // Keep the compact zero-value placeholder while offline.
+      }
     }
 
     function buildExportText(s) {
@@ -2916,6 +3135,7 @@
     wirePracticeTimer();
     loadVerifierOptions();
     loadPersistentPracticeCharts();
+    loadPracticeTotals();
 
     form.addEventListener("submit", async function (event) {
       event.preventDefault();
@@ -2962,6 +3182,12 @@
         verifierSelectEl.selectedOptions.length
           ? verifierSelectEl.selectedOptions[0].textContent
           : "";
+      const includeContests = includeContestsEl ? includeContestsEl.checked : true;
+
+      if (!verifierId && !openSubmissionConfirmed && openDialog) {
+        if (!openDialog.open) openDialog.showModal();
+        return;
+      }
 
       submissionInFlight = true;
       if (submitBtn) {
@@ -2982,20 +3208,28 @@
           practiceDetails,
           creditsAwarded: dandelionsEarned,
           submissionKey: pendingSubmissionKey,
+          includeContests,
         });
         const serverChart = createdPayload && createdPayload.chart;
         if (!serverChart || !Number.isInteger(serverChart.id)) {
           throw new Error("The saved P-Chart response could not be read.");
         }
+        if (createdPayload.created === true) {
+          celebrateSuccess(form);
+        }
 
         next.progress.credits =
           (next.progress.credits || 0) +
           dandelionsEarned;
+        if (Number.isInteger(createdPayload.streak)) {
+          next.progress.streak = createdPayload.streak;
+        }
 
         stateApi.saveState(next);
         renderEntries(next);
         renderPBookSummary(next);
         await loadPersistentPracticeCharts();
+        await loadPracticeTotals();
 
         feedbackEl.classList.add("success-callout");
 
@@ -3016,6 +3250,7 @@
         practiceDetailEls.forEach((checkbox) => {
           checkbox.checked = false;
         });
+        if (includeContestsEl) includeContestsEl.checked = true;
 
         pendingSubmissionKey = null;
         hydrateHome(next);
@@ -3025,6 +3260,7 @@
           error.message ||
           "The P-Chart could not be submitted.";
       } finally {
+        openSubmissionConfirmed = false;
         submissionInFlight = false;
         if (submitBtn) {
           submitBtn.disabled = false;
@@ -3071,12 +3307,12 @@
   }
 
   const state = ensureTodayQuest(stateApi.getState());
-  stateApi.saveState(state);
 
   if (!routeGuard(state)) return;
 
   wireSetupForm(state);
   hydrateHome(state);
+  refreshPracticeStreak();
   wireMetronome();
   wireTuner();
   wireMum(state);
@@ -3087,5 +3323,6 @@
   wireHallOfChampions();
   wirePersonalCrownProgress();
   wireStore(state);
+  wireShopPolish();
   wirePBook(state);
 })();

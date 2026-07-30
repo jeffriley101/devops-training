@@ -15,6 +15,10 @@
       <p class="board-kicker">Get your name on the Board</p>
       <h3 id="board-player-name">Your Woodchuck</h3>
       <p>
+        This Week’s Camp Points:
+        <strong id="board-player-weekly-points">0</strong>
+      </p>
+      <p>
         Career Band Camp Points:
         <strong id="board-player-points">0</strong>
       </p>
@@ -24,39 +28,33 @@
 
   <div class="board-layout">
     <section class="board-contests" aria-label="Band Camp contests">
-      <article class="board-contest-card">
+      <details id="camp-hours-activity" class="board-contest-card board-activity" open>
+        <summary>
+          <span>Band Camp Hours Bonus</span>
+          <small id="camp-hours-summary">Not completed today</small>
+        </summary>
+        <div class="board-activity-body">
         <span class="board-contest-icon" aria-hidden="true">⛺</span>
         <div>
-          <h3>Band Camp Hours</h3>
-          <p>How many hours did you spend at band camp today?</p>
-
-          <form id="camp-hours-form" class="board-inline-form">
-            <label class="sr-only" for="camp-hours">Band camp hours</label>
-            <input
-              id="camp-hours"
-              type="number"
-              min="0.25"
-              step="0.25"
-              placeholder="Hours"
-              required
-            />
-            <button
-              id="camp-hours-button"
-              class="btn btn-primary"
-              type="submit"
-            >
-              Add to Board
-            </button>
-          </form>
+          <label class="camp-hours-checkbox-label" for="camp-hours-checkbox">
+            <input id="camp-hours-checkbox" type="checkbox" />
+            <span>Were you at band camp or mini-camp today?</span>
+          </label>
+          <p>Actual practice time comes from submitted P-Charts and appears in This Week’s Practice and Career Practice.</p>
 
           <small id="camp-hours-status">Not completed today</small>
         </div>
-      </article>
+        </div>
+      </details>
 
-      <article class="board-contest-card">
+      <details id="instrument-care-activity" class="board-contest-card board-activity" open>
+        <summary>
+          <span>Instrument Care</span>
+          <small id="instrument-care-summary">Not completed today</small>
+        </summary>
+        <div class="board-activity-body">
         <span class="board-contest-icon" aria-hidden="true">✨</span>
         <div>
-          <h3>Instrument Care</h3>
           <p>Did you clean or shine your instrument today?</p>
           <button
             id="instrument-care-button"
@@ -67,12 +65,17 @@
           </button>
           <small id="instrument-care-status">Not completed today</small>
         </div>
-      </article>
+        </div>
+      </details>
 
-      <article class="board-contest-card">
+      <details id="trivia-activity" class="board-contest-card board-activity" open>
+        <summary>
+          <span>Daily Trivia</span>
+          <small id="trivia-summary">One attempt per day</small>
+        </summary>
+        <div class="board-activity-body">
         <span class="board-contest-icon" aria-hidden="true">❓</span>
         <div>
-          <h3>Daily Trivia</h3>
           <p id="trivia-question">Loading today’s question...</p>
 
           <form id="trivia-form">
@@ -93,12 +96,17 @@
 
           <small id="trivia-status">One attempt per day</small>
         </div>
-      </article>
+        </div>
+      </details>
 
-      <article class="board-contest-card">
+      <details id="marching-activity" class="board-contest-card board-activity" open>
+        <summary>
+          <span>Marching Challenge</span>
+          <small id="marching-challenge-summary">Not completed today</small>
+        </summary>
+        <div class="board-activity-body">
         <span class="board-contest-icon" aria-hidden="true">🥁</span>
         <div>
-          <h3>Marching Challenge</h3>
           <p id="marching-challenge-text">
             Loading today’s challenge...
           </p>
@@ -113,7 +121,8 @@
             Not completed today
           </small>
         </div>
-      </article>
+        </div>
+      </details>
     </section>
 
     <aside class="board-scoreboard">
@@ -183,11 +192,7 @@
           aria-labelledby="contest-open-tab"
         >
           <section class="contest-points-section" aria-labelledby="open-points-title">
-            <h4 id="open-points-title">Top Five Minutes Leaders</h4>
-            <div id="contest-open-position" class="contest-position-card">
-              <strong>Your Position</strong>
-              <span id="contest-open-position-message">Loading your position…</span>
-            </div>
+            <h4 id="open-points-title">TOP FIVE MINUTES LEADERS</h4>
             <div id="contest-open-points" class="contest-ranked-list" role="list" aria-label="Open minutes leaders"></div>
             <p id="contest-open-points-empty" class="contest-empty-state hidden">
               No P-Charts have been submitted this week yet.
@@ -195,12 +200,8 @@
           </section>
 
           <section class="contest-camp-points-section" aria-labelledby="open-camp-points-title">
-            <h4 id="open-camp-points-title">Weekly Band Camp Points</h4>
+            <h4 id="open-camp-points-title">WEEKLY BAND CAMP POINTS</h4>
             <p class="contest-division-explanation">Camp activities completed this week</p>
-            <div id="contest-open-camp-position" class="contest-position-card">
-              <strong>Your Position</strong>
-              <span id="contest-open-camp-position-message">Loading your position…</span>
-            </div>
             <div id="contest-open-camp-points" class="contest-ranked-list contest-camp-points-list" role="list" aria-label="Open Band Camp points leaders"></div>
             <p id="contest-open-camp-points-empty" class="contest-empty-state hidden">
               No Camp points have been earned this week yet.
@@ -208,7 +209,7 @@
           </section>
 
           <section class="contest-instrument-section" aria-labelledby="open-instruments-title">
-            <h4 id="open-instruments-title">Weekly Practice Minutes by Instrument</h4>
+            <h4 id="open-instruments-title">WEEKLY PRACTICE BY INSTRUMENT</h4>
             <p class="contest-division-explanation">All submitted P-Charts</p>
             <div id="contest-open-standings" class="contest-ranked-list" role="list" aria-label="Open instrument standings"></div>
           </section>
@@ -225,11 +226,7 @@
           hidden
         >
           <section class="contest-points-section" aria-labelledby="verified-points-title">
-            <h4 id="verified-points-title">Top Five Minutes Leaders</h4>
-            <div id="contest-verified-position" class="contest-position-card">
-              <strong>Your Position</strong>
-              <span id="contest-verified-position-message">Loading your position…</span>
-            </div>
+            <h4 id="verified-points-title">TOP FIVE MINUTES LEADERS</h4>
             <div id="contest-verified-points" class="contest-ranked-list" role="list" aria-label="Verified minutes leaders"></div>
             <p id="contest-verified-points-empty" class="contest-empty-state hidden">
               No verified P-Charts have been approved this week yet.
@@ -237,7 +234,7 @@
           </section>
 
           <section class="contest-instrument-section" aria-labelledby="verified-instruments-title">
-            <h4 id="verified-instruments-title">Weekly Practice Minutes by Instrument</h4>
+            <h4 id="verified-instruments-title">WEEKLY PRACTICE BY INSTRUMENT</h4>
             <p class="contest-division-explanation">Approved P-Charts only</p>
             <div id="contest-verified-standings" class="contest-ranked-list" role="list" aria-label="Verified instrument standings"></div>
           </section>
@@ -253,20 +250,20 @@
         aria-labelledby="past-winners-title"
         aria-busy="true"
       >
-        <h3 id="past-winners-title">Past Winners</h3>
-        <p class="medal-board-intro">Final Band Camp podiums</p>
+        <h3 id="past-winners-title">Medal Board of Past Winners</h3>
+        <p class="medal-board-intro">Weekly Gold, Silver, and Bronze winners</p>
 
         <div id="past-winners-loading" class="medal-board-state" role="status">
-          Loading Past Winners…
+          Loading Medal Board of Past Winners…
         </div>
         <div id="past-winners-auth" class="medal-board-state hidden" role="alert">
-          Sign in to view Past Winners.
+          Sign in to view the Medal Board of Past Winners.
         </div>
         <div id="past-winners-empty" class="medal-board-state hidden">
-          No finalized Band Camp weeks yet.
+          Medals will appear after a Band Camp week is finalized.
         </div>
         <div id="past-winners-error" class="medal-board-state hidden" role="alert">
-          <p>Past Winners could not be loaded.</p>
+          <p>The Medal Board of Past Winners could not be loaded.</p>
           <button id="past-winners-retry" class="btn btn-secondary" type="button">
             Retry
           </button>
@@ -282,7 +279,7 @@
             id="past-winners-division-tabs"
             class="contest-division-tabs"
             role="tablist"
-            aria-label="Past Winners division"
+            aria-label="Medal Board of Past Winners division"
           >
             <button
               id="past-winners-open-tab"
@@ -316,21 +313,21 @@
             {% if division == "verified" %}hidden{% endif %}
           >
             <section class="medal-contest" aria-labelledby="past-{{ division }}-points-title">
-              <h4 id="past-{{ division }}-points-title">Top Five Minutes Leaders</h4>
+              <h4 id="past-{{ division }}-points-title">TOP FIVE MINUTES LEADERS</h4>
               <div id="past-winners-{{ division }}-points" class="medal-rows"></div>
               <p id="past-winners-{{ division }}-points-empty" class="contest-empty-state hidden">
                 No podium results for this contest and division.
               </p>
             </section>
             <section class="medal-contest" aria-labelledby="past-{{ division }}-instruments-title">
-              <h4 id="past-{{ division }}-instruments-title">Weekly Practice Minutes by Instrument</h4>
+              <h4 id="past-{{ division }}-instruments-title">WEEKLY PRACTICE BY INSTRUMENT</h4>
               <div id="past-winners-{{ division }}-instruments" class="medal-rows"></div>
               <p id="past-winners-{{ division }}-instruments-empty" class="contest-empty-state hidden">
                 No podium results for this contest and division.
               </p>
             </section>
             <section class="medal-contest" aria-labelledby="past-{{ division }}-camp-points-title">
-              <h4 id="past-{{ division }}-camp-points-title">Weekly Band Camp Points</h4>
+              <h4 id="past-{{ division }}-camp-points-title">WEEKLY BAND CAMP POINTS</h4>
               <div id="past-winners-{{ division }}-camp-points" class="medal-rows"></div>
               <p id="past-winners-{{ division }}-camp-points-empty" class="contest-empty-state hidden">
                 No podium results for this contest and division.
@@ -408,9 +405,9 @@
     Each contest win earns one Camp Point and one dandelion.
   </p>
 
-  <section class="board-practice-section">
+  <section class="board-practice-section bonus-challenge-section" aria-labelledby="bonus-challenge-title">
     <div class="section-head">
-      <p class="chip">Practice Challenge</p>
+      <p id="bonus-challenge-title" class="chip bonus-challenge-title"><span aria-hidden="true">🏆</span> Bonus Challenge</p>
       <h2 id="quest-text">Loading quest...</h2>
       <p>
         Target: <strong><span id="quest-target">0</span> minutes</strong>

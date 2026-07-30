@@ -61,6 +61,18 @@ CONTEST_DEFINITIONS = (
 )
 
 CAMP_POINT_ACTIVITIES = frozenset({"hours", "care", "trivia", "marching"})
+CROWN_CATEGORIES = (
+    ("weekly-points-leaders", "Practice Crown"),
+    ("weekly-camp-points", "Band Camp Crown"),
+    ("trivia", "Trivia Crown"),
+    ("instrument-care", "Instrument Care Crown"),
+    ("marching", "Marching Crown"),
+    ("band-camp-hours", "Band Camp Hours Crown"),
+)
+ACTIVITY_CROWN_KEYS = {
+    "trivia": "trivia", "care": "instrument-care",
+    "marching": "marching", "hours": "band-camp-hours",
+}
 
 router = APIRouter(prefix="/contests", tags=["contests"])
 
@@ -440,6 +452,33 @@ def weekly_camp_points(
     }
 
 
+def student_camp_point_totals(
+    session: Session,
+    *,
+    profile_id: int,
+    now: datetime,
+) -> dict[str, int]:
+    """Return persisted current-week and career Camp Point totals."""
+    if now.tzinfo is None or now.utcoffset() is None:
+        raise ValueError("The current time must be timezone-aware.")
+    central_now = now.astimezone(CENTRAL)
+    monday = central_now.date() - timedelta(days=central_now.weekday())
+    week_start = datetime.combine(
+        monday, time.min, CENTRAL
+    ).astimezone(timezone.utc)
+    awards = session.scalars(select(CampPointAward).where(
+        CampPointAward.profile_id == profile_id,
+        CampPointAward.occurred_at <= now.astimezone(timezone.utc),
+    )).all()
+    return {
+        "weekly_points": sum(
+            award.points_awarded for award in awards
+            if aware_utc(award.occurred_at) >= week_start
+        ),
+        "career_points": sum(award.points_awarded for award in awards),
+    }
+
+
 def create_camp_point_award(
     session: Session,
     *,
@@ -500,6 +539,7 @@ def _charts_and_approved_ids(
             select(PracticeChart).where(
                 PracticeChart.practice_date >= contest_week.week_start,
                 PracticeChart.practice_date < contest_week.week_end,
+                PracticeChart.include_contests.is_(True),
             )
         ).all()
     )
@@ -784,6 +824,28 @@ def finalize_contest_week(
             reward_type="dandelion",
         ):
             _add_dandelion(session, profile_id)
+        if _grant_once(
+            session,
+            profile_id=profile_id,
+            result_id=result.id,
+            source_key=source,
+            reward_type="crown_win",
+            category_key="weekly-camp-points",
+        ):
+            progress = session.scalar(select(CrownProgress).where(
+                CrownProgress.profile_id == profile_id,
+                CrownProgress.category_key == "weekly-camp-points",
+            ).with_for_update())
+            if progress is None:
+                progress = CrownProgress(
+                    profile_id=profile_id,
+                    category_key="weekly-camp-points",
+                    qualifying_wins=0,
+                )
+                session.add(progress)
+            progress.qualifying_wins += 1
+            if progress.qualifying_wins >= 10 and progress.crown_earned_at is None:
+                progress.crown_earned_at = now_utc
 
     participation_winners: set[tuple[str, int]] = set()
     for winning_division, instrument_key in winning_instruments:
@@ -979,29 +1041,86 @@ def hall_of_champions_payload(session: Session) -> dict[str, object]:
 def crown_progress_payload(
     session: Session, *, profile_id: int
 ) -> dict[str, object]:
-    points_contest = session.scalar(
-        select(Contest).where(Contest.key == "weekly-points-leaders")
-    )
-    crown_category = (
-        points_contest.crown_category or points_contest.key
-        if points_contest is not None
-        else "weekly-points-leaders"
-    )
-    progress = session.scalar(
-        select(CrownProgress).where(
+    _reconcile_crown_categories(session, profile_id=profile_id)
+    progress_rows = {
+        row.category_key: row for row in session.scalars(select(CrownProgress).where(
             CrownProgress.profile_id == profile_id,
-            CrownProgress.category_key == crown_category,
-        )
-    )
-    qualifying_wins = progress.qualifying_wins if progress is not None else 0
-    earned_at = progress.crown_earned_at if progress is not None else None
+            CrownProgress.category_key.in_([key for key, _ in CROWN_CATEGORIES]),
+        )).all()
+    }
+    progress = progress_rows.get("weekly-points-leaders")
+    qualifying_wins = progress.qualifying_wins if progress else 0
+    earned_at = progress.crown_earned_at if progress else None
     return {
         "qualifying_wins": qualifying_wins,
         "target_wins": 10,
         "remaining_wins": max(10 - qualifying_wins, 0),
         "earned": earned_at is not None,
         "earned_at": utc_iso(earned_at),
+        "categories": [
+            {
+                "key": key, "name": name,
+                "progress": progress_rows[key].qualifying_wins if key in progress_rows else 0,
+                "target": 10,
+                "earned": bool(key in progress_rows and progress_rows[key].crown_earned_at),
+                "earned_at": utc_iso(progress_rows[key].crown_earned_at) if key in progress_rows else None,
+            }
+            for key, name in CROWN_CATEGORIES
+        ],
     }
+
+
+def _set_crown_progress_at_least(
+    session: Session, *, profile_id: int, category_key: str,
+    count: int, earned_at: datetime | None,
+) -> CrownProgress | None:
+    if count <= 0:
+        return None
+    progress = session.scalar(select(CrownProgress).where(
+        CrownProgress.profile_id == profile_id,
+        CrownProgress.category_key == category_key,
+    ).with_for_update())
+    if progress is None:
+        progress = CrownProgress(
+            profile_id=profile_id, category_key=category_key, qualifying_wins=0,
+        )
+        session.add(progress)
+    progress.qualifying_wins = max(progress.qualifying_wins, count)
+    if progress.qualifying_wins >= 10 and progress.crown_earned_at is None:
+        progress.crown_earned_at = earned_at or datetime.now(timezone.utc)
+    return progress
+
+
+def _reconcile_crown_categories(session: Session, *, profile_id: int) -> None:
+    for activity, category_key in ACTIVITY_CROWN_KEYS.items():
+        awards = list(session.scalars(select(CampPointAward.occurred_at).where(
+            CampPointAward.profile_id == profile_id,
+            CampPointAward.activity_type == activity,
+        ).order_by(CampPointAward.occurred_at)).all())
+        _set_crown_progress_at_least(
+            session, profile_id=profile_id, category_key=category_key,
+            count=len(awards), earned_at=awards[9] if len(awards) >= 10 else None,
+        )
+
+    camp_gold_dates = list(session.scalars(
+        select(ContestResult.created_at)
+        .join(Contest, Contest.id == ContestResult.contest_id)
+        .join(ContestWeek, ContestWeek.id == ContestResult.contest_week_id)
+        .where(
+            ContestResult.profile_id == profile_id,
+            ContestResult.rank == 1,
+            ContestResult.medal == "gold",
+            Contest.key == "weekly-camp-points",
+            ContestWeek.status == "finalized",
+        )
+        .order_by(ContestResult.created_at)
+    ).all())
+    _set_crown_progress_at_least(
+        session, profile_id=profile_id, category_key="weekly-camp-points",
+        count=len(camp_gold_dates),
+        earned_at=camp_gold_dates[9] if len(camp_gold_dates) >= 10 else None,
+    )
+    session.flush()
 
 
 def current_contests_payload(
@@ -1077,6 +1196,38 @@ def current_contests(request: Request) -> dict[str, object]:
         )
 
 
+@router.get("/camp-points/awards/{activity_date}")
+def daily_camp_point_awards(
+    activity_date: date,
+    request: Request,
+) -> dict[str, object]:
+    """Return persisted completion records for one student's requested day."""
+    with SessionLocal() as session:
+        profile = current_profile(request, session)
+        if profile is None:
+            raise HTTPException(status_code=401, detail="Student sign-in is required.")
+        now = datetime.now(timezone.utc)
+        prefix = f"band-camp:{activity_date.isoformat()}:"
+        awards = session.scalars(select(CampPointAward).where(
+            CampPointAward.profile_id == profile.id,
+            CampPointAward.duplicate_key.like(f"{prefix}%"),
+        )).all()
+        return {
+            "activity_date": activity_date.isoformat(),
+            **student_camp_point_totals(
+                session, profile_id=profile.id, now=now
+            ),
+            "awards": [
+                {
+                    "activity_type": award.activity_type,
+                    "points_awarded": award.points_awarded,
+                    "occurred_at": utc_iso(award.occurred_at),
+                }
+                for award in awards
+            ],
+        }
+
+
 @router.post("/camp-points/awards")
 def award_camp_points(
     request: Request,
@@ -1095,6 +1246,7 @@ def award_camp_points(
                 activity_date=submitted.activity_date,
                 now=now,
             )
+            _reconcile_crown_categories(session, profile_id=profile.id)
             session.commit()
         except ValueError as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
@@ -1113,6 +1265,9 @@ def award_camp_points(
             created = False
         return {
             "created": created,
+            **student_camp_point_totals(
+                session, profile_id=profile.id, now=now
+            ),
             "award": {
                 "activity_type": award.activity_type,
                 "points_awarded": award.points_awarded,
@@ -1167,7 +1322,9 @@ def current_crown_progress(request: Request) -> dict[str, object]:
         profile = current_profile(request, session)
         if profile is None:
             raise HTTPException(status_code=401, detail="Student sign-in is required.")
-        return crown_progress_payload(session, profile_id=profile.id)
+        payload = crown_progress_payload(session, profile_id=profile.id)
+        session.commit()
+        return payload
 
 
 @router.get("/seasons/status")

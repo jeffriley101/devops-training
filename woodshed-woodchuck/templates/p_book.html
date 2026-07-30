@@ -35,13 +35,7 @@
       Stop Timer
     </button>
 
-    <p
-      id="practice-timer-feedback"
-      class="body-copy"
-      aria-live="polite"
-    >
-      Stop the timer to fill in your minutes. You can still change them before submitting.
-    </p>
+    <p id="practice-timer-feedback" class="body-copy" aria-live="polite"></p>
   </article>
 
   <form id="p-book-form" class="stack-form mt-md" novalidate>
@@ -97,17 +91,28 @@
       <option value="">Loading trusted verifiers...</option>
     </select>
 
+    <a class="btn btn-secondary p-book-verifier-manage" href="/trusted-verifiers">Manage Trusted Verifiers</a>
+
     <p id="p-book-verifier-help" class="body-copy">
-      Leave this blank to save an open P-Chart on this device.
+      Leave this blank to save an Open P-Chart to your account.
     </p>
+
+    <aside class="practice-minutes-definition">
+      Anytime you are messing with your instrument—giving it attention in any way—counts as practice. Minutes spent thinking about your instrument can count as half-minutes. We’re on the honor system here!
+    </aside>
+
+    <label class="contest-opt-in-control" for="p-book-include-contests">
+      <input id="p-book-include-contests" name="include-contests" type="checkbox" checked />
+      <span><strong>Include this chart in Band Camp contests</strong><small>Uncheck to keep it in your Log Book without adding it to Open or Verified standings.</small></span>
+    </label>
 
     <p id="p-book-error" class="error-text" aria-live="polite"></p>
     <p id="p-book-feedback" class="body-copy" aria-live="polite"></p>
 
     <div class="p-book-action-column">
-      <button class="btn btn-green" type="submit">Submit</button>
-      <button id="export-p-chart-btn" class="btn btn-secondary" type="button">Copy</button>
-      <button id="email-p-chart-btn" class="btn btn-red" type="button">Email</button>
+      <button class="btn btn-green" type="submit">Submit to Log Book</button>
+      <button id="export-p-chart-btn" class="btn btn-book-copy" type="button">Copy to Clipboard</button>
+      <button id="email-p-chart-btn" class="btn btn-red" type="button">Email Your Chart</button>
     </div>
 
     <details class="mentor-card">
@@ -136,12 +141,25 @@
     </details>
   </form>
 
+  <dialog id="open-chart-confirmation" class="p-book-submit-dialog" aria-labelledby="open-chart-confirmation-title">
+    <h2 id="open-chart-confirmation-title">Submit as Open only, or choose a trusted verifier?</h2>
+    <div class="button-row">
+      <button id="submit-open-chart" class="btn btn-green" type="button">Submit Open</button>
+      <button id="choose-chart-verifier" class="btn btn-secondary" type="button">Choose Verifier</button>
+      <button id="cancel-open-chart" class="btn btn-secondary" type="button">Cancel</button>
+    </div>
+  </dialog>
+
   <hr class="section-divider" />
 
-  <div class="stats-grid mt-md" aria-label="P-Book summary">
+  <div class="stats-grid mt-md practice-total-cards" aria-label="Persisted practice totals">
     <article class="stat-card">
-      <h3>Lifetime Minutes</h3>
-      <p id="p-book-total-minutes">0</p>
+      <h3>This Week’s Practice</h3>
+      <p id="p-book-week-practice">0 minutes</p>
+    </article>
+    <article class="stat-card">
+      <h3>Career Practice</h3>
+      <p id="p-book-career-practice">0 minutes</p>
     </article>
     <article class="stat-card">
       <h3>Practice Days</h3>

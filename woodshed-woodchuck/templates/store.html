@@ -40,7 +40,49 @@
         Duplicate-safe Gold wins in Top Five Minutes Leaders qualify.
         Silver, Bronze, and instrument participation do not count.
       </p>
+      <div class="crown-category-chart" aria-labelledby="crown-category-chart-title">
+        <h4 id="crown-category-chart-title">Crown Categories</h4>
+        <div class="crown-category-list"></div>
+      </div>
     </div>
+  </section>
+
+  <section class="mentor-card practice-room-hub" aria-labelledby="practice-room-title">
+    <button
+      id="practice-room-door"
+      class="practice-room-door"
+      type="button"
+      aria-controls="practice-room-panel"
+      aria-expanded="false"
+    >
+      <span class="practice-room-door-icon" aria-hidden="true">🚪</span>
+      <span id="practice-room-title">Practice Room</span>
+    </button>
+    <div id="practice-room-panel" class="practice-room-panel hidden" hidden>
+      <h3 tabindex="-1">Practice Room</h3>
+      <p>New practice tools are coming soon. This room will grow as each tool is ready.</p>
+      <div class="practice-tool-grid" aria-label="Upcoming practice tools">
+        <article class="practice-tool-slot"><h4>Trombone Practice Tool</h4><p>Coming Soon</p></article>
+        <article class="practice-tool-slot"><h4>More Practice Tools</h4><p>Coming Soon</p></article>
+      </div>
+    </div>
+  </section>
+
+  <section class="mentor-card shop-share-card" aria-labelledby="share-woodshed-title">
+    <h3 id="share-woodshed-title">Share the Woodshed</h3>
+    <button
+      id="shop-qr-copy"
+      class="shop-qr-copy"
+      type="button"
+      data-public-site-url="{{ public_site_url }}"
+      aria-describedby="shop-qr-help shop-qr-status"
+    >
+      <img src="{{ public_site_qr }}" alt="QR code for the Woodshed Woodchuck website" />
+    </button>
+    <p id="shop-qr-help">Tap the QR code to copy the website address.</p>
+    <p id="shop-qr-status" class="body-copy" role="status" aria-live="polite"></p>
+    <p><a href="{{ public_site_url }}">Open the Woodshed website</a></p>
+    <a class="btn btn-primary shop-donate-button" href="https://venmo.com/u/jeffriley101" target="_blank" rel="noopener noreferrer">Donate — Support the Shed Project</a>
   </section>
 </section>
 {% endblock %}

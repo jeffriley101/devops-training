@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel, Field
-from sqlalchemy import select
+from pydantic import BaseModel, Field, StrictBool
+from sqlalchemy import distinct, func, select
 
 from .account_routes import current_profile
 from .db import SessionLocal
@@ -23,6 +24,57 @@ router = APIRouter(
     tags=["practice-charts"],
 )
 
+CENTRAL = ZoneInfo("America/Chicago")
+
+
+def practice_streak(practice_dates: list[date], today: date) -> int:
+    days = sorted(set(practice_dates), reverse=True)
+    if not days or days[0] < today - timedelta(days=1):
+        return 0
+    streak = 1
+    for newer, older in zip(days, days[1:]):
+        if newer - older != timedelta(days=1):
+            break
+        streak += 1
+    return streak
+
+
+def profile_practice_streak(session, profile_id: int, today: date | None = None) -> int:
+    dates = list(session.scalars(
+        select(distinct(PracticeChart.practice_date)).where(
+            PracticeChart.profile_id == profile_id,
+            PracticeChart.minutes > 0,
+        )
+    ))
+    return practice_streak(dates, today or datetime.now(CENTRAL).date())
+
+
+def format_practice_minutes(minutes: int) -> str:
+    if minutes < 60:
+        return f"{minutes} minute{'s' if minutes != 1 else ''}"
+    hours, remaining = divmod(minutes, 60)
+    hour_text = f"{hours} hour{'s' if hours != 1 else ''}"
+    return hour_text if remaining == 0 else f"{hour_text} {remaining} minutes"
+
+
+def practice_totals_payload(session, profile_id: int, today: date | None = None) -> dict[str, object]:
+    today = today or datetime.now(CENTRAL).date()
+    week_start = today - timedelta(days=today.weekday())
+    week_end = week_start + timedelta(days=7)
+    career = session.scalar(select(func.coalesce(func.sum(PracticeChart.minutes), 0)).where(
+        PracticeChart.profile_id == profile_id, PracticeChart.minutes > 0,
+    )) or 0
+    weekly = session.scalar(select(func.coalesce(func.sum(PracticeChart.minutes), 0)).where(
+        PracticeChart.profile_id == profile_id, PracticeChart.minutes > 0,
+        PracticeChart.practice_date >= week_start,
+        PracticeChart.practice_date < week_end,
+    )) or 0
+    return {
+        "week_start": week_start.isoformat(), "week_end": (week_end - timedelta(days=1)).isoformat(),
+        "this_week_minutes": int(weekly), "this_week_display": format_practice_minutes(int(weekly)),
+        "career_minutes": int(career), "career_display": format_practice_minutes(int(career)),
+    }
+
 
 class PracticeChartCreate(BaseModel):
     verifier_id: int | None = Field(default=None, gt=0)
@@ -33,6 +85,7 @@ class PracticeChartCreate(BaseModel):
     source: str = "p-book"
     credits_awarded: int = 0
     submission_key: str | None = Field(default=None, min_length=1, max_length=64)
+    include_contests: StrictBool = True
 
 
 def verification_payload(
@@ -76,6 +129,7 @@ def chart_payload(
         "practice_details": chart.practice_details,
         "source": chart.source,
         "credits_awarded": chart.credits_awarded,
+        "include_contests": chart.include_contests,
         "created_at": chart.created_at.isoformat(),
         "verification": (
             verification_payload(verification, verifier)
@@ -133,6 +187,27 @@ def list_student_practice_charts(request: Request):
         }
 
 
+@router.get("/streak")
+def student_practice_streak(request: Request):
+    with SessionLocal() as session:
+        profile = current_profile(request, session)
+        if profile is None:
+            raise HTTPException(status_code=401, detail="Student sign-in is required.")
+        return {
+            "streak": profile_practice_streak(session, profile.id),
+            "qualifying_day": "A calendar day with at least one persisted P-Chart containing practice minutes.",
+        }
+
+
+@router.get("/totals")
+def student_practice_totals(request: Request):
+    with SessionLocal() as session:
+        profile = current_profile(request, session)
+        if profile is None:
+            raise HTTPException(status_code=401, detail="Student sign-in is required.")
+        return practice_totals_payload(session, profile.id)
+
+
 @router.post("", status_code=201)
 def create_student_practice_chart(
     request: Request,
@@ -159,6 +234,7 @@ def create_student_practice_chart(
                 source=submitted.source,
                 credits_awarded=submitted.credits_awarded,
                 submission_key=submitted.submission_key,
+                include_contests=submitted.include_contests,
             )
         except ValueError as error:
             raise HTTPException(
@@ -186,6 +262,7 @@ def create_student_practice_chart(
 
         return {
             "created": created.created,
+            "streak": profile_practice_streak(session, profile.id),
             "chart": chart_payload(
                 created.chart,
                 created.verification,

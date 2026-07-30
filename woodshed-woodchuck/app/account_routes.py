@@ -8,9 +8,12 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from .accounts import (
+    ProfileChangeCooldown,
     authenticate_woodchuck,
     create_woodchuck_profile,
     update_profile_instrument,
+    update_profile_display_name,
+    update_profile_level,
 )
 from .instruments import INSTRUMENTS_BY_LABEL
 from .db import SessionLocal
@@ -26,6 +29,14 @@ class InstrumentUpdate(BaseModel):
     instrument: str
 
 
+class DisplayNameUpdate(BaseModel):
+    display_name: str
+
+
+class LevelUpdate(BaseModel):
+    level: str
+
+
 def profile_payload(profile: WoodchuckProfile) -> dict[str, object]:
     return {
         "id": profile.id,
@@ -34,6 +45,9 @@ def profile_payload(profile: WoodchuckProfile) -> dict[str, object]:
         "instrument": profile.instrument,
         "level": profile.level,
         "goal": profile.goal,
+        # This is the authoritative server-side account/profile creation time.
+        # Keep the complete timestamp intact so clients never need to infer it.
+        "created_at": profile.created_at.isoformat(),
     }
 
 
@@ -164,6 +178,33 @@ def change_profile_instrument(
             "instrument": updated.instrument,
             "instrument_definition": dict(definition),
         }
+
+
+def _change_profile_value(request: Request, submitted: BaseModel, updater):
+    with SessionLocal() as session:
+        profile = current_profile(request, session)
+        if profile is None:
+            raise HTTPException(status_code=401, detail="Student sign-in is required.")
+        try:
+            updated = updater(session, profile=profile, **submitted.model_dump())
+        except ProfileChangeCooldown as error:
+            raise HTTPException(status_code=429, detail=str(error)) from error
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+        except RuntimeError as error:
+            raise HTTPException(status_code=500, detail="The profile could not be changed.") from error
+        field = next(iter(submitted.model_dump()))
+        return {"updated": True, field: getattr(updated, field)}
+
+
+@router.patch("/profile/name")
+def change_profile_name(request: Request, submitted: DisplayNameUpdate):
+    return _change_profile_value(request, submitted, update_profile_display_name)
+
+
+@router.patch("/profile/level")
+def change_profile_level(request: Request, submitted: LevelUpdate):
+    return _change_profile_value(request, submitted, update_profile_level)
 
 
 
