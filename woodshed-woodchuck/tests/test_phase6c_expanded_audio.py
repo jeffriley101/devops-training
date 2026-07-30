@@ -24,14 +24,14 @@ def test_six_expanded_effects_and_original_eight_are_registered():
     assert "background music" not in AUDIO.casefold()
 
 
-def test_goat_pool_is_local_nonrepeating_nonoverlapping_and_silent_when_empty():
+def test_goat_pool_is_local_nonrepeating_nonoverlapping_and_failure_safe():
     expected = [
-        "/static/audio/goats/baby-goat-1.mp3",
-        "/static/audio/goats/baby-goat-2.mp3",
-        "/static/audio/goats/baby-goat-3.mp3",
-        "/static/audio/goats/baby-goat-4.mp3",
+        "/static/audio/goats/goat-01.mp3",
+        "/static/audio/goats/goat-02.mp3",
+        "/static/audio/goats/goat-03.mp3",
+        "/static/audio/goats/goat-04.mp3",
+        "/static/audio/goats/goat-05.mp3",
     ]
-    assert "const GOAT_CLIP_URLS = [];" in AUDIO
     for url in expected:
         assert f'"{url}"' in AUDIO
     assert "new Tone.Player" in AUDIO
@@ -44,10 +44,15 @@ def test_goat_pool_is_local_nonrepeating_nonoverlapping_and_silent_when_empty():
     assert "if (length > 1 && index === lastGoatIndex)" in AUDIO
     assert "if (player.state === \"started\") player.stop()" in AUDIO
     assert AUDIO.count("readyPlayers[index].start()") == 1
-    assert "if (!readyPlayers.length) return false" in AUDIO
-    assert not list(GOAT_DIR.glob("*.mp3"))
+    assert "if (!readyPlayers.length)" in AUDIO
+    assert "if (goatPoolLoading) goatPlayPending = true" in AUDIO
+    assert "if (enabled && Date.now() >= crownUntil) playGoat()" in AUDIO
+    assert sorted(path.name for path in GOAT_DIR.glob("*.mp3")) == [
+        "goat-01.mp3", "goat-02.mp3", "goat-03.mp3", "goat-04.mp3", "goat-05.mp3",
+    ]
     assert not list(GOAT_DIR.glob("*.ogg"))
     assert not list(GOAT_DIR.glob("*.wav"))
+    assert (GOAT_DIR / "SOURCES.md").is_file()
     assert "http://" not in AUDIO and "https://" not in AUDIO
 
 

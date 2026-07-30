@@ -1,16 +1,16 @@
 # GOAT Tracker clip pool
 
-No audio recordings are included yet. Add only user-supplied, original,
-public-domain, or clearly licensed short baby-goat recordings.
+Five approved, locally hosted baby-goat recordings are included. Their source
+and processing documentation is retained alongside them.
 
 Expected local filenames:
 
-- `baby-goat-1.mp3`
-- `baby-goat-2.mp3`
-- `baby-goat-3.mp3`
-- `baby-goat-4.mp3`
+- `goat-01.mp3`
+- `goat-02.mp3`
+- `goat-03.mp3`
+- `goat-04.mp3`
+- `goat-05.mp3`
 
-After approved files are added here, list their local URLs in
-`GOAT_CLIP_URLS` in `static/js/audio.js`. The pool accepts three to five clips,
-uses `Tone.Player`, routes through the shared effects master, stops overlap, and
-avoids immediately repeating the same loaded clip.
+The pool uses `Tone.Player`, loads only after audio unlock, routes through the
+shared effects master, stops overlap, and avoids immediately repeating the same
+loaded clip.

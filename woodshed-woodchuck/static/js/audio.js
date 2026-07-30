@@ -10,14 +10,19 @@
     "secretReward", "goatTracker", "questCompleted", "bandCampBonus",
     "marchingCompleted", "practiceRoomOpen", "medalEarned",
   ];
-  // Add only approved local recordings here after placing them in static/audio/goats/.
-  // The empty pool is intentional until licensed clips are supplied.
-  const GOAT_CLIP_URLS = [];
+  const GOAT_CLIP_URLS = [
+    "/static/audio/goats/goat-01.mp3",
+    "/static/audio/goats/goat-02.mp3",
+    "/static/audio/goats/goat-03.mp3",
+    "/static/audio/goats/goat-04.mp3",
+    "/static/audio/goats/goat-05.mp3",
+  ];
   const EXPECTED_GOAT_CLIP_URLS = [
-    "/static/audio/goats/baby-goat-1.mp3",
-    "/static/audio/goats/baby-goat-2.mp3",
-    "/static/audio/goats/baby-goat-3.mp3",
-    "/static/audio/goats/baby-goat-4.mp3",
+    "/static/audio/goats/goat-01.mp3",
+    "/static/audio/goats/goat-02.mp3",
+    "/static/audio/goats/goat-03.mp3",
+    "/static/audio/goats/goat-04.mp3",
+    "/static/audio/goats/goat-05.mp3",
   ];
   let enabled = readBoolean(STORAGE_ENABLED, true);
   let volume = readVolume();
@@ -27,6 +32,7 @@
   let crownUntil = 0;
   let goatPlayers = [];
   let goatPoolLoading = false;
+  let goatPlayPending = false;
   let lastGoatIndex = -1;
   const lastPlayed = new Map();
 
@@ -133,6 +139,10 @@
     });
     Promise.all(loads).then(function (players) {
       goatPlayers = players.filter(Boolean);
+      if (goatPlayPending) {
+        goatPlayPending = false;
+        if (enabled && Date.now() >= crownUntil) playGoat();
+      }
     }).catch(function () {}).finally(function () {
       goatPoolLoading = false;
     });
@@ -149,7 +159,10 @@
     const readyPlayers = goatPlayers.filter(function (player) {
       return player && player.loaded === true;
     });
-    if (!readyPlayers.length) return false;
+    if (!readyPlayers.length) {
+      if (goatPoolLoading) goatPlayPending = true;
+      return false;
+    }
     const index = chooseGoatIndex(readyPlayers.length, Math.random());
     if (index < 0) return false;
     goatPlayers.forEach(function (player) {
