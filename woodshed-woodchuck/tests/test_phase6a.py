@@ -115,8 +115,8 @@ def test_board_phase6a_feedback_success_and_placeholder_contract() -> None:
     board = (ROOT / "templates/quest.html").read_text(encoding="utf-8")
     javascript = (ROOT / "static/js/app.js").read_text(encoding="utf-8")
     css = (ROOT / "static/css/styles.css").read_text(encoding="utf-8")
-    assert 'id="trivia-selected-answer"' in board
-    assert "Your answer: ${selectedAnswerText}" in javascript
+    assert 'id="trivia-selected-answer"' not in board
+    assert "Your answer:" not in board + javascript
     assert 'fetch("/contests/trivia/answer"' in javascript
     assert "checkedAnswer.correct === true" in javascript
     assert "No reward was earned today" in javascript

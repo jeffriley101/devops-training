@@ -86,7 +86,7 @@ def test_share_uses_one_canonical_url_and_accessible_qr(monkeypatch) -> None:
     monkeypatch.setattr(main, "qr_data_uri", lambda value: captured.append(value) or "data:image/svg+xml;base64,SAFE")
     response = TestClient(main.app).get("/store")
     assert response.status_code == 200
-    assert captured == ["https://woodshed.example/"]
+    assert captured == ["https://woodshed-woodchuck.onrender.com/"]
     assert "profile=private" not in response.text and "#session" not in response.text
     assert "QR code for the public Woodshed Woodchuck website" in response.text
     javascript = JS.read_text(encoding="utf-8")
@@ -94,21 +94,12 @@ def test_share_uses_one_canonical_url_and_accessible_qr(monkeypatch) -> None:
     assert 'Website address copied.' in javascript
 
 
-def test_artist_email_is_configured_safely_or_has_fallback(monkeypatch) -> None:
-    monkeypatch.setenv("ART_SUBMISSION_EMAIL", "art@example.org")
+def test_artist_email_is_fixed_public_project_address(monkeypatch) -> None:
+    monkeypatch.setenv("ART_SUBMISSION_EMAIL", "private@example.org?bcc=other@example.org")
     configured = TestClient(main.app).get("/store").text
-    assert "mailto:art@example.org?subject=Woodshed%20Woodchuck%20Artwork" in configured
+    assert "mailto:woodshedwoodchuck@gmail.com?subject=Woodshed%20Woodchuck%20Artwork" in configured
     assert "Artwork email coming soon." not in configured
-
-    monkeypatch.delenv("ART_SUBMISSION_EMAIL")
-    missing = TestClient(main.app).get("/store").text
-    assert "Artwork email coming soon." in missing
-    assert "mailto:" not in missing
-
-    monkeypatch.setenv("ART_SUBMISSION_EMAIL", "art@example.org?bcc=private@example.org")
-    unsafe = TestClient(main.app).get("/store").text
-    assert "Artwork email coming soon." in unsafe
-    assert "bcc=" not in unsafe
+    assert "private@example.org" not in configured and "bcc=" not in configured
 
 
 def test_mobile_css_avoids_fixed_width_overflow() -> None:

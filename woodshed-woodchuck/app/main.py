@@ -2,7 +2,7 @@ import os
 import base64
 from io import BytesIO
 from pathlib import Path
-from urllib.parse import quote, urlsplit, urlunsplit
+from urllib.parse import quote
 
 import qrcode
 import qrcode.image.svg
@@ -26,6 +26,7 @@ from .contests import router as contest_router
 from .contest_admin import router as contest_admin_router
 from .db import SessionLocal
 from .content import (
+    ART_SUBMISSION_EMAIL,
     GOAL_OPTIONS,
     INSTRUMENT_OPTIONS,
     LEVEL_OPTIONS,
@@ -33,6 +34,7 @@ from .content import (
     PRACTICE_DEFINITION,
     SAX_VIKING_MESSAGES,
     SAX_VIKING_WELCOME,
+    SHOP_SHARE_URL,
 )
 from .instruments import instrument_definition_payloads
 from .models import WoodchuckState
@@ -101,18 +103,7 @@ def _render(request: Request, template_name: str, **context: object):
 
 
 def public_site_url(request: Request) -> str:
-    candidate = os.getenv("PUBLIC_BASE_URL", "").strip() or str(request.base_url)
-    parsed = urlsplit(candidate)
-    if (parsed.scheme not in {"http", "https"} or not parsed.netloc
-            or parsed.username is not None or parsed.password is not None):
-        raise ValueError("PUBLIC_BASE_URL must be an absolute HTTP or HTTPS URL.")
-    return urlunsplit((parsed.scheme, parsed.netloc, "/", "", ""))
-
-
-def uses_local_share_fallback(request: Request) -> bool:
-    if os.getenv("PUBLIC_BASE_URL", "").strip():
-        return False
-    return request.url.hostname in {"localhost", "127.0.0.1", "::1", "testserver"}
+    return SHOP_SHARE_URL
 
 
 def qr_data_uri(value: str) -> str:
@@ -123,14 +114,8 @@ def qr_data_uri(value: str) -> str:
     return f"data:image/svg+xml;base64,{encoded}"
 
 
-def art_submission_mailto() -> str | None:
-    address = os.getenv("ART_SUBMISSION_EMAIL", "").strip()
-    if not address or any(character in address for character in "\r\n?&#"):
-        return None
-    local, separator, domain = address.rpartition("@")
-    if not separator or not local or "." not in domain or " " in address:
-        return None
-    return f"mailto:{quote(address, safe='@.+-_')}?subject=Woodshed%20Woodchuck%20Artwork"
+def art_submission_mailto() -> str:
+    return f"mailto:{quote(ART_SUBMISSION_EMAIL, safe='@.+-_')}?subject=Woodshed%20Woodchuck%20Artwork"
 
 
 @app.get("/")
@@ -285,5 +270,4 @@ def store(request: Request):
         public_site_url=site_url, public_site_qr=qr_data_uri(site_url),
         practice_definition=PRACTICE_DEFINITION,
         art_submission_mailto=art_submission_mailto(),
-        local_share_fallback=uses_local_share_fallback(request),
     )

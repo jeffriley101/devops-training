@@ -14,7 +14,7 @@
       <div id="dandelion-object" class="shop-scene-control shop-dandelion-control" aria-label="0 dandelions">
         <span class="shop-control-emoji" aria-hidden="true">🌼</span>
         <span class="sr-only">Dandelions</span>
-        <strong id="credits-value" class="sr-only">0</strong>
+        <strong id="credits-value" class="shop-dandelion-count">0</strong>
       </div>
       <button class="shop-scene-control" type="button" data-shop-panel="crown" aria-label="Open Crown Progress">
         <span class="shop-control-emoji" aria-hidden="true">👑</span><span class="sr-only">Crown Progress</span>
@@ -90,7 +90,6 @@
         <p>Scan this code or use the website link to invite someone to Woodshed Woodchuck.</p>
         <img class="shop-qr-image" src="{{ public_site_qr }}" alt="QR code for the public Woodshed Woodchuck website at {{ public_site_url }}" />
         <p><a href="{{ public_site_url }}">{{ public_site_url }}</a></p>
-        {% if local_share_fallback %}<p class="shop-share-development-note">Development address — configure PUBLIC_BASE_URL before sharing publicly.</p>{% endif %}
         <p id="shop-qr-status" role="status" aria-live="polite"></p>
       </section>
       <section data-shop-panel-content="clothing" hidden>
@@ -108,7 +107,7 @@
       </section>
       <section data-shop-panel-content="artist" hidden>
         <p>Draw a new HOME, SHED, or SHOP scene. Ask an adult before emailing your artwork to Woodshed Woodchuck. We may feature selected artwork in the app.</p>
-        {% if art_submission_mailto %}<p><a class="btn btn-secondary" href="{{ art_submission_mailto }}">Email artwork instructions</a></p>{% else %}<p><strong>Artwork email coming soon.</strong></p>{% endif %}
+        <p><a class="btn btn-secondary" href="{{ art_submission_mailto }}">Email artwork instructions</a></p>
       </section>
     </div>
   </dialog>

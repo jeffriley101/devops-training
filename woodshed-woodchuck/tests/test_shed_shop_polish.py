@@ -139,7 +139,7 @@ def test_qr_receives_only_configured_public_site_url(monkeypatch: pytest.MonkeyP
     monkeypatch.setattr(main, "qr_data_uri", lambda value: captured.append(value) or "data:image/svg+xml;base64,SAFE")
     response = TestClient(main.app).get("/store")
     assert response.status_code == 200
-    assert captured == ["https://woodshed.example/"]
+    assert captured == ["https://woodshed-woodchuck.onrender.com/"]
     assert "private=ignored" not in response.text
     assert "Website address copied" in (ROOT / "static/js/app.js").read_text(encoding="utf-8")
     assert "navigator.clipboard.writeText(address)" in (ROOT / "static/js/app.js").read_text(encoding="utf-8")

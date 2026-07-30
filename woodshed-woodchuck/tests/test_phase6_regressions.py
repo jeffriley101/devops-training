@@ -165,7 +165,8 @@ def test_trivia_client_never_displays_raw_response_index_and_summarizes_result()
     band_camp = javascript[javascript.index("function wireBandCamp"):javascript.index("function wirePlungeBurrow")]
     assert "selected_answer_text" in band_camp
     assert "checkedAnswer.selected_answer\n" not in band_camp
-    assert "Your answer: ${selectedAnswerText}" in band_camp
+    assert "Your answer:" not in band_camp
+    assert "input.checked = option === selectedAnswerText" in band_camp
     assert "legacyTriviaAnswerText" in band_camp
     assert "+1 Camp Point · +1 dandelion" in band_camp
     assert "Attempt used" in band_camp
@@ -210,17 +211,14 @@ def test_shop_photo_only_scene_and_unboxed_accessible_emoji_controls() -> None:
 
 
 def test_qr_library_payload_and_all_share_surfaces_use_canonical_root(monkeypatch) -> None:
-    monkeypatch.setenv(
-        "PUBLIC_BASE_URL",
-        "https://public.example/private/path?account=WC-PRIVATE&session=secret#profile",
-    )
+    monkeypatch.setenv("PUBLIC_BASE_URL", "https://public.example/private/path?account=private")
     request = Request({
         "type": "http", "method": "GET", "path": "/store", "headers": [],
         "query_string": b"", "scheme": "http", "server": ("127.0.0.1", 8000),
         "session": {},
     })
     canonical = main.public_site_url(request)
-    assert canonical == "https://public.example/"
+    assert canonical == "https://woodshed-woodchuck.onrender.com/"
     qr = qrcode.QRCode()
     qr.add_data(canonical)
     qr.make(fit=True)
@@ -236,17 +234,15 @@ def test_qr_library_payload_and_all_share_surfaces_use_canonical_root(monkeypatc
     context = response.context
     assert captured == [canonical]
     assert context["public_site_url"] == canonical
-    assert context["local_share_fallback"] is False
+    assert "local_share_fallback" not in context
 
 
-def test_local_share_fallback_is_identified_only_without_configuration(monkeypatch) -> None:
+def test_share_url_never_falls_back_to_local_request_origin(monkeypatch) -> None:
     request = Request({
         "type": "http", "method": "GET", "path": "/store", "headers": [],
         "query_string": b"", "scheme": "http", "server": ("127.0.0.1", 8000),
         "session": {},
     })
     monkeypatch.delenv("PUBLIC_BASE_URL", raising=False)
-    assert main.uses_local_share_fallback(request) is True
-    assert main.public_site_url(request) == "http://127.0.0.1:8000/"
-    monkeypatch.setenv("PUBLIC_BASE_URL", "https://public.example/")
-    assert main.uses_local_share_fallback(request) is False
+    assert main.public_site_url(request) == "https://woodshed-woodchuck.onrender.com/"
+    assert not hasattr(main, "uses_local_share_fallback")

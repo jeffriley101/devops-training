@@ -572,6 +572,12 @@ select {
 
 .shed-readout-level {
   letter-spacing: 0.04em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.5rem;
+  min-height: 3.5rem;
+  padding: 0;
 }
 
 .shed-secret-button {
@@ -579,13 +585,16 @@ select {
   bottom: 0.45rem;
   left: 0.45rem;
   z-index: 5;
-  width: 2rem;
-  height: 2rem;
-  color: #fff4d4;
+  width: 3rem;
+  height: 3rem;
+  padding: 0;
+  color: #d7263d;
   font-weight: 900;
-  background: rgba(58, 35, 22, 0.82);
-  border: 2px solid #c9a96b;
-  border-radius: 50%;
+  font-size: 1.3rem;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  text-shadow: 0 1px 2px rgba(255,255,255,.8), 0 2px 2px rgba(35,20,12,.6);
   cursor: pointer;
 }
 
@@ -595,8 +604,12 @@ select {
 }
 
 .shed-secret-button:focus-visible {
-  outline: 3px solid #fff4d4;
-  outline-offset: 3px;
+  outline: 3px dashed #fff;
+  outline-offset: 1px;
+}
+
+@media (max-width: 640px) {
+  .shed-readout-level { width: 2.4rem; min-height: 2.4rem; }
 }
 
 .shed-icon-object,
@@ -1123,6 +1136,74 @@ select {
 .trivia-option input {
   width: auto;
   margin: 0;
+}
+
+.trivia-option.is-selected {
+  border: 3px solid #315f8f;
+  padding: calc(0.55rem - 2px) calc(0.65rem - 2px);
+  box-shadow: 0 0 0 2px rgba(255,255,255,.72), 0 3px 7px rgba(35,24,16,.25);
+  font-weight: 900;
+}
+
+.trivia-option.is-selected:not(.is-confirmed-success)::after {
+  content: "Selected";
+  margin-left: auto;
+  font-size: .75rem;
+  font-weight: 900;
+}
+
+.quest-stereo-dial {
+  position: relative;
+  display: inline-flex;
+  width: clamp(7.5rem, 20vw, 9rem);
+  min-width: 7.5rem;
+  min-height: 7.5rem;
+  aspect-ratio: 1;
+  padding: 1.1rem;
+  align-items: center;
+  justify-content: center;
+  border: 5px ridge #8c6416;
+  border-radius: 50%;
+  color: #2d210c;
+  background:
+    radial-gradient(circle at 34% 27%, rgba(255,255,255,.88) 0 5%, transparent 20%),
+    radial-gradient(circle, #fff0a8 0 18%, #e8b83f 48%, #9b6812 78%, #f5ce62 100%);
+  box-shadow:
+    inset 0 0 0 3px rgba(255,246,185,.72),
+    inset -8px -10px 14px rgba(91,54,4,.38),
+    0 7px 0 #69430b,
+    0 11px 18px rgba(44,28,7,.38);
+  font-weight: 950;
+  line-height: 1.12;
+  text-align: center;
+  text-shadow: 0 1px rgba(255,255,255,.7);
+}
+
+.quest-stereo-dial:hover {
+  transform: translateY(-2px);
+}
+
+.quest-stereo-dial:active {
+  transform: translateY(3px);
+  box-shadow:
+    inset 0 0 0 3px rgba(255,246,185,.72),
+    inset -8px -10px 14px rgba(91,54,4,.38),
+    0 3px 0 #69430b,
+    0 6px 10px rgba(44,28,7,.32);
+}
+
+.quest-stereo-dial:focus-visible {
+  outline: 4px solid #fff;
+  outline-offset: 4px;
+  box-shadow: 0 0 0 8px #315f8f, 0 7px 0 #69430b, 0 11px 18px rgba(44,28,7,.38);
+}
+
+.bonus-challenge-section .button-row {
+  justify-content: center;
+}
+
+.bonus-challenge-section .stack-form .quest-stereo-dial {
+  justify-self: center;
 }
 
 .board-scoreboard {
@@ -3103,7 +3184,13 @@ select {
 .shop-scene-control:focus-visible { outline: 4px solid #1565c0; outline-offset: 3px; }
 .shop-control-emoji { font-size: clamp(2.25rem, 5vw, 3.25rem); line-height: 1; filter: drop-shadow(0 2px 2px rgba(255,255,255,.9)) drop-shadow(0 3px 3px rgba(28,16,8,.7)); }
 .shop-share-arrow { font-weight: 950; }
-.shop-dandelion-control { cursor: default; }
+.shop-dandelion-control { flex-direction: row; gap: .2rem; cursor: default; }
+.shop-dandelion-count {
+  color: #fff;
+  font-size: 1.05rem;
+  line-height: 1;
+  text-shadow: 0 2px 2px rgba(35,20,10,.95), 0 0 5px rgba(35,20,10,.75);
+}
 
 .shop-feature-dialog {
   width: min(92vw, 570px);
@@ -3128,7 +3215,6 @@ select {
 .shop-practice-definition { font-size: 1.1rem; line-height: 1.55; }
 .shop-panel-sign { display: inline-block; padding: .35rem .75rem; border: 3px dashed #7f5429; transform: rotate(-2deg); font-weight: 950; background: #f4d35e; }
 .shop-crown-history-note { font-size: .9rem; }
-.shop-share-development-note { font-size: .8rem; font-weight: 700; }
 .crown-category-card small { grid-column: 1 / -1; font-size: .75rem; }
 
 @media (max-width: 430px) {
@@ -3139,6 +3225,7 @@ select {
   .shop-object-column-right { right: 1.5%; }
   .shop-scene-control { min-height: 68px; padding: .2rem; }
   .shop-control-emoji { font-size: 2.25rem; }
+  .shop-dandelion-count { font-size: .95rem; }
   .practice-tool-grid { grid-template-columns: 1fr; }
   .crown-category-card { min-width: 0; overflow-wrap: anywhere; }
 }

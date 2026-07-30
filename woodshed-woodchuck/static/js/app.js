@@ -1133,7 +1133,6 @@
     const triviaOptionsEl = document.getElementById("trivia-options");
     const triviaButton = document.getElementById("trivia-button");
     const triviaStatusEl = document.getElementById("trivia-status");
-    const triviaSelectedEl = document.getElementById("trivia-selected-answer");
     const triviaActivity = document.getElementById("trivia-activity");
     const triviaSummaryEl = document.getElementById("trivia-summary");
 
@@ -1357,6 +1356,9 @@
       if (!triviaOptionsEl) return;
 
       triviaOptionsEl.replaceChildren();
+      const daily = current.bandCamp.daily;
+      const selectedAnswerText = serverConfirmedTriviaAttempt?.selected_answer_text
+        || legacyTriviaAnswerText(daily.triviaSelectedAnswer);
 
       trivia.options.forEach((option, index) => {
         const label = document.createElement("label");
@@ -1366,7 +1368,14 @@
         input.type = "radio";
         input.name = "trivia-answer";
         input.value = String(index);
-        input.disabled = current.bandCamp.daily.triviaAttempted;
+        input.checked = option === selectedAnswerText;
+        input.disabled = daily.triviaAttempted;
+
+        label.classList.toggle("is-selected", input.checked);
+        label.classList.toggle(
+          "is-confirmed-success",
+          input.checked && daily.triviaAttempted && daily.triviaCorrect
+        );
 
         const text = document.createElement("span");
         text.textContent = option;
@@ -1436,15 +1445,6 @@
             ? "Correct answer—point earned"
             : "Try a new question tomorrow";
         }
-        const selectedAnswerText = serverConfirmedTriviaAttempt?.selected_answer_text
-          || legacyTriviaAnswerText(daily.triviaSelectedAnswer);
-        if (triviaSelectedEl && selectedAnswerText) {
-          triviaSelectedEl.textContent = `Your answer: ${selectedAnswerText}`;
-          triviaSelectedEl.classList.remove("hidden");
-        } else if (triviaSelectedEl) {
-          triviaSelectedEl.textContent = "";
-          triviaSelectedEl.classList.add("hidden");
-        }
       } else if (triviaStatusEl) {
         triviaStatusEl.textContent = "One attempt per day";
       }
@@ -1473,6 +1473,15 @@
     loadPersistedCampAwards().catch(() => {
       // Leave activities open when server completion cannot be confirmed.
     });
+
+    if (triviaOptionsEl) {
+      triviaOptionsEl.addEventListener("change", function () {
+        triviaOptionsEl.querySelectorAll(".trivia-option").forEach((label) => {
+          const input = label.querySelector('input[name="trivia-answer"]');
+          label.classList.toggle("is-selected", Boolean(input && input.checked));
+        });
+      });
+    }
 
     if (hoursCheckbox) {
       hoursCheckbox.addEventListener("change", async function () {
