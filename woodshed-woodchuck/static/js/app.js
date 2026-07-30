@@ -167,7 +167,6 @@
     const woodchuckNameEl = document.getElementById("woodchuck-name-value");
     const instrumentObjectEl = document.getElementById("instrument-object");
     const levelEl = document.getElementById("level-value");
-    const campLevelEl = document.getElementById("camp-level-value");
     const totalPChartsEl = document.getElementById("total-p-charts-value");
     const dandelionObjectEl = document.getElementById("dandelion-object");
 
@@ -192,10 +191,6 @@
       );
     }
 
-    if (campLevelEl) {
-      campLevelEl.textContent = "Chuckling";
-    }
-
     if (instrumentObjectEl) {
       if (window.WWInstruments) {
         window.WWInstruments.renderInstrument(instrumentObjectEl, instrument);
@@ -213,11 +208,14 @@
 
     if (levelEl) {
       const profileLevel = state.profile.level || "Level not set";
-      levelEl.textContent = profileLevel;
+      levelEl.textContent = profileLevel === "Level not set"
+        ? "—"
+        : profileLevel.charAt(0).toUpperCase();
       levelEl.setAttribute(
         "aria-label",
-        `Change student level. Current level: ${profileLevel}`
+        `Level: ${profileLevel}. Change level.`
       );
+      levelEl.title = `Level: ${profileLevel}. Change level.`;
     }
 
     if (streakEl) {
@@ -1069,15 +1067,21 @@
     const hoursInput = document.getElementById("camp-hours");
     const hoursButton = document.getElementById("camp-hours-button");
     const hoursStatusEl = document.getElementById("camp-hours-status");
+    const hoursActivity = document.getElementById("camp-hours-activity");
+    const hoursSummaryEl = document.getElementById("camp-hours-summary");
 
     const careButton = document.getElementById("instrument-care-button");
     const careStatusEl = document.getElementById("instrument-care-status");
+    const careActivity = document.getElementById("instrument-care-activity");
+    const careSummaryEl = document.getElementById("instrument-care-summary");
 
     const triviaForm = document.getElementById("trivia-form");
     const triviaQuestionEl = document.getElementById("trivia-question");
     const triviaOptionsEl = document.getElementById("trivia-options");
     const triviaButton = document.getElementById("trivia-button");
     const triviaStatusEl = document.getElementById("trivia-status");
+    const triviaActivity = document.getElementById("trivia-activity");
+    const triviaSummaryEl = document.getElementById("trivia-summary");
 
     const marchingTextEl = document.getElementById(
       "marching-challenge-text"
@@ -1088,6 +1092,8 @@
     const marchingStatusEl = document.getElementById(
       "marching-challenge-status"
     );
+    const marchingActivity = document.getElementById("marching-activity");
+    const marchingSummaryEl = document.getElementById("marching-challenge-summary");
 
     const feedbackEl = document.getElementById("board-feedback");
 
@@ -1173,6 +1179,7 @@
     }
 
     const campAwardsInFlight = new Set();
+    const serverConfirmedAwards = new Set();
 
     async function persistCampPoint(activityType) {
       if (campAwardsInFlight.has(activityType)) return null;
@@ -1191,11 +1198,60 @@
         if (!response.ok) {
           throw new Error(payload.detail || "Camp points could not be saved.");
         }
+        if (payload.award && payload.award.activity_type) {
+          serverConfirmedAwards.add(payload.award.activity_type);
+        }
         window.dispatchEvent(new CustomEvent("ww:camp-points-saved"));
         return payload;
       } finally {
         campAwardsInFlight.delete(activityType);
       }
+    }
+
+    function renderActivityDisclosure(details, summary, activityType) {
+      if (!details || !summary) return;
+      const complete = serverConfirmedAwards.has(activityType);
+      summary.textContent = complete
+        ? "Completed · +1 Camp Point · +1 dandelion"
+        : activityType === "trivia"
+          ? "One attempt per day"
+          : "Not completed today";
+
+      if (complete && details.dataset.serverComplete !== "true") {
+        details.open = false;
+      } else if (!complete) {
+        details.open = true;
+      }
+      details.dataset.serverComplete = String(complete);
+    }
+
+    async function loadPersistedCampAwards() {
+      const response = await fetch(
+        `/contests/camp-points/awards/${encodeURIComponent(today)}`,
+        { credentials: "same-origin", cache: "no-store" }
+      );
+      if (!response.ok) return;
+      const payload = await response.json();
+      const awards = Array.isArray(payload.awards) ? payload.awards : [];
+      const next = prepareCurrentDay(stateApi.getState());
+
+      awards.forEach((award) => {
+        const activityType = award && award.activity_type;
+        if (!["hours", "care", "trivia", "marching"].includes(activityType)) return;
+        serverConfirmedAwards.add(activityType);
+        if (!next.bandCamp.daily.awarded.includes(activityType)) {
+          next.bandCamp.daily.awarded.push(activityType);
+        }
+        if (activityType === "care") next.bandCamp.daily.careComplete = true;
+        if (activityType === "trivia") {
+          next.bandCamp.daily.triviaAttempted = true;
+          next.bandCamp.daily.triviaCorrect = true;
+        }
+        if (activityType === "marching") next.bandCamp.daily.marchingComplete = true;
+      });
+
+      stateApi.saveState(next);
+      renderBoard(next);
     }
 
     function setButtonComplete(button, text) {
@@ -1233,6 +1289,11 @@
       const points = current.bandCamp.totals.points;
       const daily = current.bandCamp.daily;
 
+      renderActivityDisclosure(hoursActivity, hoursSummaryEl, "hours");
+      renderActivityDisclosure(careActivity, careSummaryEl, "care");
+      renderActivityDisclosure(triviaActivity, triviaSummaryEl, "trivia");
+      renderActivityDisclosure(marchingActivity, marchingSummaryEl, "marching");
+
       playerNameEl.textContent = name;
 
       if (playerPointsEl) {
@@ -1248,8 +1309,9 @@
       if (hasAward(current, "hours")) {
         setButtonComplete(hoursButton, "Added to Board");
         if (hoursStatusEl) {
-          hoursStatusEl.textContent =
-            `${daily.hours} camp hours recorded today`;
+          hoursStatusEl.textContent = daily.hours === null
+            ? "Completed today"
+            : `${daily.hours} camp hours recorded today`;
         }
       } else if (hoursStatusEl) {
         hoursStatusEl.textContent = "Not completed today";
@@ -1306,6 +1368,9 @@
 
     let current = prepareCurrentDay(stateApi.getState());
     renderBoard(current);
+    loadPersistedCampAwards().catch(() => {
+      // Leave activities open when server completion cannot be confirmed.
+    });
 
     if (hoursForm) {
       hoursForm.addEventListener("submit", async function (event) {

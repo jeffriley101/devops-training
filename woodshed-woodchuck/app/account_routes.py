@@ -45,6 +45,9 @@ def profile_payload(profile: WoodchuckProfile) -> dict[str, object]:
         "instrument": profile.instrument,
         "level": profile.level,
         "goal": profile.goal,
+        # This is the authoritative server-side account/profile creation time.
+        # Keep the complete timestamp intact so clients never need to infer it.
+        "created_at": profile.created_at.isoformat(),
     }
 
 

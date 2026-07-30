@@ -34,10 +34,7 @@
       instrument: profile.instrument,
       level: profile.level,
       goal: profile.goal,
-      createdAt:
-        state.profile && state.profile.createdAt
-          ? state.profile.createdAt
-          : new Date().toISOString(),
+      createdAt: profile.created_at,
     };
 
     return state;
@@ -482,13 +479,18 @@
         next.profile[stateKey] = payload[payloadKey];
         stateApi.saveState(next);
         feedback.textContent = `${kind === "name" ? "Name" : "Level"} changed successfully.`;
-        openButton.textContent = payload[payloadKey];
+        openButton.textContent = kind === "level"
+          ? payload[payloadKey].charAt(0).toUpperCase()
+          : payload[payloadKey];
         openButton.setAttribute(
           "aria-label",
           kind === "name"
             ? `Change Woodchuck name. Current name: ${payload[payloadKey]}`
-            : `Change student level. Current level: ${payload[payloadKey]}`
+            : `Level: ${payload[payloadKey]}. Change level.`
         );
+        if (kind === "level") {
+          openButton.title = `Level: ${payload[payloadKey]}. Change level.`;
+        }
       } catch (error) {
         feedback.classList.add("error-text");
         feedback.textContent = error.message || `The ${kind} could not be changed.`;

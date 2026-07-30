@@ -216,6 +216,17 @@ def setup_submit(
 
 @app.get("/home")
 def home(request: Request):
+    member_since = None
+    with SessionLocal() as session:
+        profile = current_profile(request, session)
+        if profile is not None:
+            created_at = profile.created_at
+            member_since = {
+                "timestamp": created_at.isoformat(),
+                "compact": created_at.strftime("%b %Y"),
+                "full": created_at.strftime("%B %d, %Y"),
+            }
+
     return _render(
         request,
         "home.html",
@@ -223,6 +234,7 @@ def home(request: Request):
         active_nav="home",
         instruments=INSTRUMENT_OPTIONS,
         levels=LEVEL_OPTIONS,
+        member_since=member_since,
     )
 
 

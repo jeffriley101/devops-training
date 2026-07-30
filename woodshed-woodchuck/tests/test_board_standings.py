@@ -301,6 +301,23 @@ def test_camp_point_actions_persist_and_guard_duplicate_clicks() -> None:
     assert '"Camp points"' in javascript
 
 
+def test_completed_band_camp_activities_use_server_backed_disclosures() -> None:
+    root = Path(__file__).resolve().parents[1]
+    markup = (root / "templates" / "quest.html").read_text(encoding="utf-8")
+    javascript = (root / "static" / "js" / "app.js").read_text(encoding="utf-8")
+    css = (root / "static" / "css" / "styles.css").read_text(encoding="utf-8")
+
+    assert markup.count('<details id="') >= 4
+    assert markup.count("<summary>") >= 4
+    for activity in ("camp-hours", "instrument-care", "trivia", "marching"):
+        assert f'id="{activity}-activity"' in markup
+    assert '`/contests/camp-points/awards/${encodeURIComponent(today)}`' in javascript
+    assert "serverConfirmedAwards.has(activityType)" in javascript
+    assert "details.open = false" in javascript
+    assert "Leave activities open when server completion cannot be confirmed" in javascript
+    assert 'content: "▶"' in css
+
+
 def test_past_winners_renders_weekly_camp_points() -> None:
     markup = TestClient(app).get("/quest").text
     javascript = (

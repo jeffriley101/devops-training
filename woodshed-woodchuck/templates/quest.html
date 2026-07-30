@@ -24,10 +24,14 @@
 
   <div class="board-layout">
     <section class="board-contests" aria-label="Band Camp contests">
-      <article class="board-contest-card">
+      <details id="camp-hours-activity" class="board-contest-card board-activity" open>
+        <summary>
+          <span>Band Camp Hours Bonus</span>
+          <small id="camp-hours-summary">Not completed today</small>
+        </summary>
+        <div class="board-activity-body">
         <span class="board-contest-icon" aria-hidden="true">⛺</span>
         <div>
-          <h3>Band Camp Hours Bonus</h3>
           <p>Complete this daily bonus for its existing Camp reward. Actual practice time comes from submitted P-Charts and appears in This Week’s Practice and Career Practice.</p>
 
           <form id="camp-hours-form" class="board-inline-form">
@@ -51,12 +55,17 @@
 
           <small id="camp-hours-status">Not completed today</small>
         </div>
-      </article>
+        </div>
+      </details>
 
-      <article class="board-contest-card">
+      <details id="instrument-care-activity" class="board-contest-card board-activity" open>
+        <summary>
+          <span>Instrument Care</span>
+          <small id="instrument-care-summary">Not completed today</small>
+        </summary>
+        <div class="board-activity-body">
         <span class="board-contest-icon" aria-hidden="true">✨</span>
         <div>
-          <h3>Instrument Care</h3>
           <p>Did you clean or shine your instrument today?</p>
           <button
             id="instrument-care-button"
@@ -67,12 +76,17 @@
           </button>
           <small id="instrument-care-status">Not completed today</small>
         </div>
-      </article>
+        </div>
+      </details>
 
-      <article class="board-contest-card">
+      <details id="trivia-activity" class="board-contest-card board-activity" open>
+        <summary>
+          <span>Daily Trivia</span>
+          <small id="trivia-summary">One attempt per day</small>
+        </summary>
+        <div class="board-activity-body">
         <span class="board-contest-icon" aria-hidden="true">❓</span>
         <div>
-          <h3>Daily Trivia</h3>
           <p id="trivia-question">Loading today’s question...</p>
 
           <form id="trivia-form">
@@ -93,12 +107,17 @@
 
           <small id="trivia-status">One attempt per day</small>
         </div>
-      </article>
+        </div>
+      </details>
 
-      <article class="board-contest-card">
+      <details id="marching-activity" class="board-contest-card board-activity" open>
+        <summary>
+          <span>Marching Challenge</span>
+          <small id="marching-challenge-summary">Not completed today</small>
+        </summary>
+        <div class="board-activity-body">
         <span class="board-contest-icon" aria-hidden="true">🥁</span>
         <div>
-          <h3>Marching Challenge</h3>
           <p id="marching-challenge-text">
             Loading today’s challenge...
           </p>
@@ -113,7 +132,8 @@
             Not completed today
           </small>
         </div>
-      </article>
+        </div>
+      </details>
     </section>
 
     <aside class="board-scoreboard">

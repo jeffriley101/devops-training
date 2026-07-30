@@ -25,13 +25,15 @@
           Name your Woodchuck
         </button>
 
-        <div
+        <time
           id="camp-level-value"
-          class="shed-readout shed-readout-class"
-          title="Class"
+          class="shed-readout shed-readout-class shed-member-since"
+          {% if member_since %}datetime="{{ member_since.timestamp }}"
+          title="Member since {{ member_since.full }}"
+          aria-label="Member since {{ member_since.full }}"{% endif %}
         >
-          Chuckling
-        </div>
+          Member Since{% if member_since %} {{ member_since.compact }}{% endif %}
+        </time>
 
         <button
           id="instrument-object"
@@ -54,7 +56,7 @@
           aria-label="Change student level"
           title="Change student level"
         >
-          Beginner
+          B
         </button>
 
         <a
@@ -73,7 +75,7 @@
           aria-label="Open Quest Book"
           title="Quest Book"
         >
-          <span class="room-object-icon" aria-hidden="true">📔</span>
+          <span class="room-object-icon" aria-hidden="true">📋</span>
         </a>
       </div>
 

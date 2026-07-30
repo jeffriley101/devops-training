@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -7,6 +8,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app import main
+from app.account_routes import profile_payload
 from app.accounts import create_woodchuck_profile, update_profile_level
 from app.content import LEVEL_OPTIONS
 from app.db import Base
@@ -78,6 +80,32 @@ def test_shed_profile_displays_are_semantic_keyboard_controls() -> None:
     ):
         assert old_id not in home
     assert 'addEventListener("click"' in account_js
+
+
+def test_shed_uses_server_member_date_board_clipboard_and_compact_level() -> None:
+    home = (ROOT / "templates/home.html").read_text(encoding="utf-8")
+    app_js = (ROOT / "static/js/app.js").read_text(encoding="utf-8")
+    account_js = (ROOT / "static/js/account.js").read_text(encoding="utf-8")
+
+    assert "Chuckling" not in home + app_js
+    assert "Member Since" in home
+    assert 'aria-label="Member since {{ member_since.full }}"' in home
+    assert ">📋<" in home
+    assert ">📔<" not in home
+    assert "profileLevel.charAt(0).toUpperCase()" in app_js
+    assert 'Level: ${profileLevel}. Change level.' in app_js
+    assert 'kind === "level"' in account_js
+
+
+def test_profile_payload_preserves_authoritative_creation_timestamp() -> None:
+    created_at = datetime(2024, 2, 3, 4, 5, 6, 789012, tzinfo=timezone.utc)
+    profile = WoodchuckProfile(
+        id=7, woodchuck_id="WC-DATE", display_name="Date", pin_hash="private",
+        instrument="Flute", level="Intermediate", goal="Practice",
+        created_at=created_at,
+    )
+
+    assert profile_payload(profile)["created_at"] == created_at.isoformat()
 
 
 def test_practice_room_is_local_expandable_and_has_tool_slots() -> None:

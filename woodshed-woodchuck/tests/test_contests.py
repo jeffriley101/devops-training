@@ -252,14 +252,25 @@ def test_camp_point_award_endpoint_is_authenticated_idempotent_and_private(
     assert unauthorized.value.status_code == 401
     first = contest_module.award_camp_points(request_with_session(student.id), submitted)
     repeated = contest_module.award_camp_points(request_with_session(student.id), submitted)
+    persisted = contest_module.daily_camp_point_awards(
+        submitted.activity_date, request_with_session(student.id)
+    )
 
     assert first["created"] is True
     assert repeated["created"] is False
     assert first["award"]["points_awarded"] == 1
+    assert persisted["activity_date"] == submitted.activity_date.isoformat()
+    assert persisted["awards"] == [first["award"]]
     assert session.scalar(select(func.count()).select_from(CampPointAward)) == 1
     serialized = repr(first).casefold()
     for private in ("profile_id", "woodchuck_id", "wc-camp-private", "pin", "email", "verifier"):
         assert private not in serialized
+
+    with pytest.raises(HTTPException) as unauthorized_read:
+        contest_module.daily_camp_point_awards(
+            submitted.activity_date, request_with_session()
+        )
+    assert unauthorized_read.value.status_code == 401
 
 
 def test_weekly_practice_divisions_and_boundaries(

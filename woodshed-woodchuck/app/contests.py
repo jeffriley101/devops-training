@@ -1169,6 +1169,34 @@ def current_contests(request: Request) -> dict[str, object]:
         )
 
 
+@router.get("/camp-points/awards/{activity_date}")
+def daily_camp_point_awards(
+    activity_date: date,
+    request: Request,
+) -> dict[str, object]:
+    """Return persisted completion records for one student's requested day."""
+    with SessionLocal() as session:
+        profile = current_profile(request, session)
+        if profile is None:
+            raise HTTPException(status_code=401, detail="Student sign-in is required.")
+        prefix = f"band-camp:{activity_date.isoformat()}:"
+        awards = session.scalars(select(CampPointAward).where(
+            CampPointAward.profile_id == profile.id,
+            CampPointAward.duplicate_key.like(f"{prefix}%"),
+        )).all()
+        return {
+            "activity_date": activity_date.isoformat(),
+            "awards": [
+                {
+                    "activity_type": award.activity_type,
+                    "points_awarded": award.points_awarded,
+                    "occurred_at": utc_iso(award.occurred_at),
+                }
+                for award in awards
+            ],
+        }
+
+
 @router.post("/camp-points/awards")
 def award_camp_points(
     request: Request,

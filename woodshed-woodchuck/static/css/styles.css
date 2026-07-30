@@ -443,6 +443,66 @@ select {
   font-size: clamp(1.05rem, 2.3vw, 1.55rem);
 }
 
+.shed-member-since {
+  max-width: 10rem;
+  font-size: clamp(0.72rem, 1.65vw, 1rem);
+  line-height: 1.2;
+}
+
+.board-contest-card.board-activity {
+  display: block;
+}
+
+.board-activity > summary {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-height: 2.75rem;
+  cursor: pointer;
+  font-weight: 900;
+  list-style: none;
+}
+
+.board-activity > summary::-webkit-details-marker {
+  display: none;
+}
+
+.board-activity > summary::before {
+  content: "▶";
+  flex: 0 0 auto;
+  font-size: 0.8em;
+  transition: transform 120ms ease;
+}
+
+.board-activity[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.board-activity > summary small {
+  margin-left: auto;
+  text-align: right;
+  font-weight: 700;
+}
+
+.board-activity-body {
+  display: flex;
+  gap: 1rem;
+  padding-top: 0.65rem;
+}
+
+@media (max-width: 640px) {
+  .board-activity > summary {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .board-activity > summary small {
+    width: 100%;
+    margin-left: 1.45rem;
+    text-align: left;
+  }
+}
+
 .shed-readout-level {
   letter-spacing: 0.04em;
 }
