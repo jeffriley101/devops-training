@@ -19,7 +19,7 @@ def test_secret_u_is_plain_red_with_transparent_hit_target_and_unchanged_flow() 
     css = source("static/css/styles.css")
     javascript = source("static/js/app.js")
     home = source("templates/home.html")
-    block = css[css.index(".shed-secret-button {"):css.index(".shed-secret-panel {")]
+    block = css[css.index(".woodshed-scene > .shed-secret-button {"):css.index(".shed-secret-panel {")]
     assert 'id="shed-secret-button"' in home
     assert 'type="button"' in home
     assert 'aria-controls="shed-secret-panel"' in home
@@ -31,6 +31,30 @@ def test_secret_u_is_plain_red_with_transparent_hit_target_and_unchanged_flow() 
     assert 'fetch("/account/daily-secret"' in javascript
     assert 'body: JSON.stringify({ passcode: input.value })' in javascript
     assert 'feedback.textContent = payload.redeemed ? "+20 dandelions"' in javascript
+
+
+def test_secret_u_is_a_scene_anchored_mobile_bottom_control() -> None:
+    css = source("static/css/styles.css")
+    home = source("templates/home.html")
+    scene = home[
+        home.index('<div class="woodshed-scene"'):
+        home.index('<div class="woodshed-foreground"')
+    ]
+    assert 'id="shed-secret-button"' in scene
+    assert ".woodshed-scene > .shed-secret-button {" in css
+    mobile = css[
+        css.index(
+            "@media (max-width: 640px) {",
+            css.index(".woodshed-scene > .shed-secret-button:focus-visible"),
+        ):
+    ]
+    rule_start = mobile.index(".woodshed-scene > .shed-secret-button {")
+    secret_rule = mobile[rule_start:mobile.index("  }", rule_start)]
+    assert "top: auto" in secret_rule
+    assert "bottom: 0.45rem" in secret_rule
+    assert "left: 0.45rem" in secret_rule
+    assert "color: #d7263d" in secret_rule
+    assert "top: 0" not in secret_rule
 
 
 def test_level_control_is_centered_with_full_accessible_dynamic_label() -> None:
