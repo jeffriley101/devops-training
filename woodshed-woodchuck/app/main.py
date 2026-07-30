@@ -262,6 +262,16 @@ def quest(request: Request):
     return _render(request, "quest.html", title="board", active_nav="quest")
 
 
+@app.get("/plunge-burrow")
+def plunge_burrow(request: Request):
+    return _render(
+        request,
+        "plunge_burrow.html",
+        title="Plunge Burrow",
+        active_nav="quest",
+    )
+
+
 @app.get("/store")
 def store(request: Request):
     site_url = public_site_url(request)

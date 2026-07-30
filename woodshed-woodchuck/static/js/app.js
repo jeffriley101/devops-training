@@ -130,7 +130,7 @@
   function routeGuard(state) {
     const path = window.location.pathname;
 
-    if (["/home", "/p-book", "/quest", "/store"].includes(path) && !hasProfile(state)) {
+    if (["/home", "/p-book", "/quest", "/store", "/plunge-burrow"].includes(path) && !hasProfile(state)) {
       window.location.replace("/setup");
       return false;
     }
@@ -1725,18 +1725,8 @@
   }
 
   function wirePlungeBurrow() {
-    const button = document.getElementById("plunge-burrow-button");
-    const panel = document.getElementById("plunge-burrow-panel");
-    const close = document.getElementById("plunge-burrow-close");
-    if (!button || !panel || !close) return;
-    button.addEventListener("click", function () {
-      panel.hidden = false; panel.classList.remove("hidden");
-      button.setAttribute("aria-expanded", "true"); close.focus();
-    });
-    close.addEventListener("click", function () {
-      panel.hidden = true; panel.classList.add("hidden");
-      button.setAttribute("aria-expanded", "false"); button.focus();
-    });
+    // Plunge Burrow is now a dedicated page. This hook remains intentionally
+    // side-effect free so the global application script never starts a game.
   }
 
   function wireBandCampStandings() {

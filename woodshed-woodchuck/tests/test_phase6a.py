@@ -125,7 +125,7 @@ def test_board_phase6a_feedback_success_and_placeholder_contract() -> None:
     assert "confirmed-checkmark" in javascript + css
     assert '<span class="sr-only"> Completed</span>' in javascript
     assert "is-confirmed-success" in javascript + css
-    assert 'id="plunge-burrow-button"' in board and "🕳️" in board and "Coming Soon" in board
+    assert 'id="plunge-burrow-button"' in board and "🕳️" in board and 'href="/plunge-burrow"' in board
     plunge = javascript[javascript.index("function wirePlungeBurrow"):javascript.index("function wireBandCampStandings")]
     assert "fetch(" not in plunge and "saveState" not in plunge and "award" not in plunge.casefold()
     assert 'id="complete-quest-btn"' in board and "Quest Complete" in javascript

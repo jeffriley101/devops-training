@@ -3986,3 +3986,145 @@ select {
     bottom: calc(4.5rem + env(safe-area-inset-bottom));
   }
 }
+
+/* Plunge Burrow prototype */
+.plunge-burrow-page {
+  max-width: 70rem;
+  margin-inline: auto;
+  overflow: hidden;
+  background: linear-gradient(160deg, #f4dfb9 0%, #d6a96f 100%);
+}
+
+.plunge-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.plunge-header h1 { margin: 0.1rem 0 0.3rem; color: #4b2b19; }
+.plunge-header p { margin: 0; }
+.plunge-kicker { color: #76502f; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; }
+
+.plunge-status {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.6rem;
+  margin-bottom: 0.8rem;
+}
+
+.plunge-status p {
+  margin: 0;
+  padding: 0.65rem 0.8rem;
+  border: 2px solid #86552e;
+  border-radius: 0.8rem;
+  background: #fff3d3;
+  color: #4a2a17;
+  text-align: center;
+}
+
+#plunge-hearts { color: #a72e2e; letter-spacing: 0.08em; }
+.plunge-layout { display: grid; grid-template-columns: minmax(0, 1fr) 15rem; align-items: start; gap: 1rem; }
+
+.plunge-board-wrap {
+  position: relative;
+  width: min(100%, 38rem);
+  aspect-ratio: 1;
+  margin-inline: auto;
+  border: 0.55rem solid #3c2519;
+  border-radius: 1.2rem;
+  overflow: hidden;
+  background: #5a351f;
+  box-shadow: inset 0 0 0 0.2rem #94663d, 0 0.6rem 1.2rem rgba(52, 30, 16, 0.25);
+  touch-action: none;
+}
+
+#plunge-canvas { display: block; width: 100%; height: 100%; outline-offset: -0.3rem; }
+#plunge-canvas:focus-visible { outline: 0.25rem solid #ffd75b; }
+#plunge-canvas.is-hit { filter: sepia(0.35) brightness(1.22); }
+
+.plunge-overlay {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: min(19rem, calc(100% - 2rem));
+  transform: translate(-50%, -50%);
+  padding: 0.85rem;
+  border: 2px solid #f2d491;
+  border-radius: 0.85rem;
+  background: rgba(58, 34, 22, 0.92);
+  color: #fff7df;
+  text-align: center;
+  pointer-events: none;
+}
+
+.plunge-overlay[hidden] { display: none; }
+.plunge-overlay strong, .plunge-overlay span { display: block; }
+.plunge-overlay strong { margin-bottom: 0.25rem; font-size: 1.25rem; }
+.plunge-controls { display: grid; gap: 1rem; }
+.plunge-action-row { display: grid; gap: 0.55rem; }
+
+.plunge-direction-pad {
+  display: grid;
+  grid-template: repeat(3, 3.25rem) / repeat(3, 3.25rem);
+  justify-content: center;
+  gap: 0.25rem;
+}
+
+.plunge-direction {
+  min-width: 3.25rem;
+  min-height: 3.25rem;
+  border: 2px solid #57351f;
+  border-radius: 0.8rem;
+  background: #f0c56e;
+  color: #3f2718;
+  font: inherit;
+  font-size: 1.3rem;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 0.18rem 0 #704326;
+}
+
+.plunge-direction:focus-visible { outline: 0.2rem solid #1e5f8b; outline-offset: 0.15rem; }
+.plunge-direction:active { transform: translateY(0.12rem); box-shadow: none; }
+.plunge-up { grid-area: 1 / 2; }
+.plunge-left { grid-area: 2 / 1; }
+.plunge-down { grid-area: 2 / 2; }
+.plunge-right { grid-area: 2 / 3; }
+
+.plunge-music {
+  display: grid;
+  gap: 0.45rem;
+  min-width: 0;
+  padding: 0.8rem;
+  border: 2px solid #86552e;
+  border-radius: 0.85rem;
+  background: rgba(255, 243, 211, 0.78);
+}
+
+.plunge-music legend { padding-inline: 0.3rem; font-weight: 800; }
+.plunge-music input[type="range"] { width: 100%; }
+.plunge-coming-soon { margin: 0; color: #76502f; font-size: 0.9rem; font-weight: 700; }
+.plunge-instructions { margin: 1rem 0 0; text-align: center; color: #4b2b19; }
+
+@media (max-width: 760px) {
+  .plunge-burrow-page { padding-inline: 0.65rem; }
+  .plunge-header { align-items: stretch; flex-direction: column; }
+  .plunge-header .btn { align-self: flex-start; }
+  .plunge-status { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .plunge-layout { grid-template-columns: minmax(0, 1fr); }
+  .plunge-controls { grid-template-columns: minmax(0, 1fr) minmax(10rem, 1fr); }
+  .plunge-action-row { align-content: start; }
+}
+
+@media (max-width: 460px) {
+  .plunge-controls { grid-template-columns: 1fr; }
+  .plunge-action-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .plunge-action-row .btn { min-width: 0; padding-inline: 0.35rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plunge-direction { transition: none; }
+  .plunge-direction:active { transform: none; }
+  #plunge-canvas.is-hit { filter: none; }
+}
