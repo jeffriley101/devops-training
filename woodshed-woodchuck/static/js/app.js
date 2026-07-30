@@ -2,6 +2,22 @@
   const stateApi = window.WWState;
   if (!stateApi) return;
 
+  function playSound(effectName) {
+    if (window.WoodshedAudio) window.WoodshedAudio.play(effectName);
+  }
+
+  function playCampReward(includeTriviaChime) {
+    if (window.WoodshedAudio) {
+      window.WoodshedAudio.playCampReward(Boolean(includeTriviaChime));
+    }
+  }
+
+  function playNewCrownIfConfirmed(payload) {
+    if (payload && payload.crown_newly_earned === true) {
+      playSound("crownEarned");
+    }
+  }
+
   function celebrateSuccess(origin) {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const burst = document.createElement("div");
@@ -286,13 +302,17 @@
         });
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.detail || "The secret could not be checked.");
+        playNewCrownIfConfirmed(payload);
         const next = stateApi.getState();
         if (Number.isInteger(payload.credits)) next.progress.credits = payload.credits;
         if (Number.isInteger(payload.revision)) next.account.serverRevision = payload.revision;
         stateApi.saveState(next, { sync: false });
         hydrateHome(next);
         feedback.textContent = payload.redeemed ? "+20 dandelions" : "Already found today. Come back tomorrow!";
-        if (payload.redeemed) celebrateSuccess(form);
+        if (payload.redeemed) {
+          celebrateSuccess(form);
+          playSound("secretReward");
+        }
       } catch (error) {
         feedback.textContent = error.message || "That passcode did not match. Try again.";
       } finally {
@@ -450,11 +470,15 @@
     }
 
     if (chooseQuestBtn) {
-      chooseQuestBtn.addEventListener("click", renderQuestChoices);
+      chooseQuestBtn.addEventListener("click", function () {
+        playSound("dialClick");
+        renderQuestChoices();
+      });
     }
 
     if (skipQuestBtn) {
       skipQuestBtn.addEventListener("click", function () {
+        playSound("dialClick");
         const next = stateApi.getState();
         const quests = questPool[next.profile.instrument] || [];
 
@@ -501,6 +525,7 @@
 
     form.addEventListener("submit", async function (event) {
       event.preventDefault();
+      playSound("dialClick");
       errorEl.textContent = "";
 
       const next = stateApi.getState();
@@ -559,6 +584,7 @@
           errorEl.textContent = "Quest completion could not be saved. Please try again.";
           return;
         }
+        playSound("dandelionEarned");
       } else {
         stateApi.saveState(next);
       }
@@ -1219,6 +1245,7 @@
         if (!response.ok) {
           throw new Error(payload.detail || "Camp points could not be saved.");
         }
+        playNewCrownIfConfirmed(payload);
         if (payload.award && payload.award.activity_type) {
           serverConfirmedAwards.add(payload.award.activity_type);
         }
@@ -1459,6 +1486,7 @@
           }
           if (persistedAward.created === true) {
             awardContest(next, "hours");
+            playCampReward(false);
           } else if (!hasAward(next, "hours")) {
             next.bandCamp.daily.awarded.push("hours");
           }
@@ -1487,7 +1515,10 @@
         if (next.bandCamp.daily.careComplete) return;
 
         try {
-          await persistCampPoint("care");
+          const persistedAward = await persistCampPoint("care");
+          if (persistedAward && persistedAward.created === true) {
+            playCampReward(false);
+          }
         } catch (error) {
           feedbackEl.textContent = error.message || "Camp points could not be saved.";
           return;
@@ -1537,6 +1568,7 @@
           return;
         }
         const isCorrect = checkedAnswer.correct === true;
+        playNewCrownIfConfirmed(checkedAnswer);
 
         serverConfirmedTriviaAttempt = {
           selected_answer_id: checkedAnswer.selected_answer_id,
@@ -1558,13 +1590,18 @@
           if (checkedAnswer.award_created === true) {
             celebrateSuccess(triviaForm);
             awardContest(next, "trivia");
-          } else if (!next.bandCamp.daily.awarded.includes("trivia")) {
-            next.bandCamp.daily.awarded.push("trivia");
+            playCampReward(true);
+          } else {
+            if (checkedAnswer.created === true) playSound("correctTrivia");
+            if (!next.bandCamp.daily.awarded.includes("trivia")) {
+              next.bandCamp.daily.awarded.push("trivia");
+            }
           }
           window.dispatchEvent(new CustomEvent("ww:camp-points-saved"));
           feedbackEl.textContent =
             "Correct! +1 Camp Point and +1 dandelion.";
         } else {
+          if (checkedAnswer.created === true) playSound("incorrectTrivia");
           feedbackEl.textContent =
             "Not quite. No reward was earned today—thanks for giving it a try.";
         }
@@ -1600,6 +1637,7 @@
         next.bandCamp.daily.marchingComplete = true;
         if (persistedAward.created === true) {
           awardContest(next, "marching");
+          playCampReward(false);
         } else if (!hasAward(next, "marching")) {
           next.bandCamp.daily.awarded.push("marching");
         }
@@ -3392,8 +3430,10 @@
         if (!serverChart || !Number.isInteger(serverChart.id)) {
           throw new Error("The saved P-Chart response could not be read.");
         }
+        playNewCrownIfConfirmed(createdPayload);
         if (createdPayload.created === true) {
           celebrateSuccess(form);
+          playSound("pChartSubmitted");
         }
 
         next.progress.credits =

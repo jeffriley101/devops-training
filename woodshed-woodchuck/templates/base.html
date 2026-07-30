@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{{ title }} · Woodshed Woodchuck</title>
-  <link rel="stylesheet" href="/static/css/styles.css?v=57" />
+  <link rel="stylesheet" href="/static/css/styles.css?v=58" />
 
   <!-- Woodshed app icons -->
   <link
@@ -45,6 +45,17 @@
     </main>
 
     {% if nav_items and active_nav %}
+    <div class="sound-effects-controls">
+      <button id="sound-effects-button" class="sound-effects-button" type="button" aria-label="Sound Effects On. Open settings." aria-controls="sound-effects-panel" aria-expanded="false">🔊</button>
+      <div id="sound-effects-panel" class="sound-effects-panel" hidden>
+        <label class="sound-effects-toggle" for="sound-effects-enabled">
+          <span>Sound Effects</span>
+          <input id="sound-effects-enabled" type="checkbox" checked />
+        </label>
+        <label for="sound-effects-volume">Volume <output id="sound-effects-volume-value" for="sound-effects-volume">35%</output></label>
+        <input id="sound-effects-volume" type="range" min="0" max="100" step="1" value="35" aria-label="Sound Effects volume" aria-valuetext="35 percent" />
+      </div>
+    </div>
     <nav class="main-nav" aria-label="Primary navigation">
       {% for item in nav_items %}
       <a class="nav-pill {% if item.key == active_nav %}active{% endif %}" href="{{ item.href }}">{{ item.label }}</a>
@@ -59,7 +70,9 @@
   <script id="account-state-bootstrap" type="application/json">{{ account_state_bootstrap | tojson }}</script>
   <script src="/static/js/state.js?v=7"></script>
   <script src="/static/js/instruments.js?v=3"></script>
-  <script src="/static/js/app.js?v=20"></script>
+  <script src="/static/vendor/tone/Tone.js?v=15.1.22"></script>
+  <script src="/static/js/audio.js?v=1"></script>
+  <script src="/static/js/app.js?v=21"></script>
   <script src="/static/js/account.js?v=12"></script>
   {% block page_scripts %}{% endblock %}
 </body>
