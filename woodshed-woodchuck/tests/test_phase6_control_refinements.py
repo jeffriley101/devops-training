@@ -107,16 +107,12 @@ def test_trivia_restores_native_checked_and_visual_selected_state() -> None:
     assert "Attempt used" in band_camp
 
 
-def test_three_quest_actions_are_accessible_gold_stereo_dials() -> None:
+def test_bonus_progress_action_is_an_accessible_gold_stereo_dial() -> None:
     board = source("templates/quest.html")
     css = source("static/css/styles.css")
     javascript = source("static/js/app.js")
-    assert board.count("quest-stereo-dial") == 3
-    for control_id, label in (
-        ("choose-quest-btn", "Choose Another Challenge"),
-        ("skip-quest-btn", "Skip Challenge"),
-        ("complete-quest-btn", "I Played It"),
-    ):
+    assert board.count("quest-stereo-dial") == 1
+    for control_id, label in (("complete-quest-btn", "I Played It"),):
         assert f'id="{control_id}"' in board
         assert label in board
         assert f'getElementById("{control_id}")' in javascript

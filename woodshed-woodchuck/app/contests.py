@@ -131,7 +131,7 @@ class QuestCompletionSubmission(BaseModel):
 
 class BonusChallengeProgressSubmission(BaseModel):
     activity_date: date
-    challenge_id: str = Field(min_length=1, max_length=100)
+    challenge_instance: str = Field(min_length=1, max_length=200)
     minutes: int = Field(ge=1, le=1440)
     note: str = Field(default="", max_length=500)
 
@@ -1729,6 +1729,62 @@ def quest_definition(instrument: str, quest_id: str) -> dict[str, object] | None
     )
 
 
+def resolve_current_bonus_challenge(
+    session: Session,
+    *,
+    profile: WoodchuckProfile,
+    now: datetime,
+) -> dict[str, object] | None:
+    """Resolve one authoritative Bonus Challenge instance for BOARD and POST."""
+    central_date = now.astimezone(CENTRAL).date()
+    configured = list(QUEST_POOL.get(profile.instrument, ()))
+    if not configured:
+        return None
+
+    selected = None
+    completion = session.scalar(select(QuestCompletion).where(
+        QuestCompletion.profile_id == profile.id,
+        QuestCompletion.activity_date == central_date,
+    ))
+    if completion is not None:
+        selected = quest_definition(profile.instrument, completion.quest_id)
+
+    state = session.get(WoodchuckState, profile.id)
+    state_json = state.state_json if state is not None else {}
+    daily = state_json.get("daily") if isinstance(state_json, dict) else {}
+    if selected is None and isinstance(daily, dict) and daily.get("dateKey") == central_date.isoformat():
+        selected = quest_definition(profile.instrument, str(daily.get("questId") or ""))
+    if selected is None:
+        selected = configured[central_date.timetuple().tm_yday % len(configured)]
+
+    challenge_id = str(selected["id"])
+    instance_key = (
+        f"{central_date.isoformat()}:{profile.instrument.casefold()}:{challenge_id}"
+    )
+    logged_minutes = 0
+    completed = False
+    if completion is not None and completion.quest_id == challenge_id:
+        logged_minutes = completion.logged_minutes
+        completed = True
+    elif isinstance(daily, dict) and (
+        daily.get("dateKey") == central_date.isoformat()
+        and daily.get("questId") == challenge_id
+    ):
+        value = daily.get("loggedMinutes", 0)
+        if isinstance(value, int) and not isinstance(value, bool):
+            logged_minutes = max(0, value)
+        completed = daily.get("completed") is True
+    return {
+        "instance_key": instance_key,
+        "challenge_id": challenge_id,
+        "task": str(selected["text"]),
+        "target_minutes": int(selected["target_minutes"]),
+        "logged_minutes": logged_minutes,
+        "completed": completed,
+        "activity_date": central_date,
+    }
+
+
 def quest_completion_payload(
     session: Session,
     *,
@@ -1810,6 +1866,27 @@ def bonus_challenge_progress_payload(
     }
 
 
+@router.get("/bonus-challenge/current")
+def current_bonus_challenge(request: Request) -> dict[str, object]:
+    with SessionLocal() as session:
+        profile = current_profile(request, session)
+        if profile is None:
+            raise HTTPException(status_code=401, detail="Student sign-in is required.")
+        now = datetime.now(timezone.utc)
+        resolved = resolve_current_bonus_challenge(
+            session, profile=profile, now=now
+        )
+        if resolved is None:
+            return {"available": False, "message": "No Bonus Challenge is available."}
+        return {
+            "available": True,
+            "challenge": {
+                **resolved,
+                "activity_date": resolved["activity_date"].isoformat(),
+            },
+        }
+
+
 @router.post("/bonus-challenge/progress")
 def record_bonus_challenge_progress(
     request: Request,
@@ -1821,16 +1898,24 @@ def record_bonus_challenge_progress(
         if profile is None:
             raise HTTPException(status_code=401, detail="Student sign-in is required.")
         now = datetime.now(timezone.utc)
-        today = now.astimezone(CENTRAL).date()
+        resolved = resolve_current_bonus_challenge(
+            session, profile=profile, now=now
+        )
+        if resolved is None:
+            raise HTTPException(status_code=400, detail="No Bonus Challenge is available.")
+        today = resolved["activity_date"]
         if submitted.activity_date != today:
             raise HTTPException(
                 status_code=400,
                 detail="Bonus Challenge progress can only be recorded for today.",
             )
-        definition = quest_definition(profile.instrument, submitted.challenge_id)
-        if definition is None:
-            raise HTTPException(status_code=400, detail="This Bonus Challenge is unavailable.")
-        target_minutes = int(definition["target_minutes"])
+        if submitted.challenge_instance != resolved["instance_key"]:
+            raise HTTPException(
+                status_code=409,
+                detail="This Bonus Challenge changed. Refresh BOARD and try again.",
+            )
+        challenge_id = str(resolved["challenge_id"])
+        target_minutes = int(resolved["target_minutes"])
 
         existing = session.scalar(select(QuestCompletion).where(
             QuestCompletion.profile_id == profile.id,
@@ -1841,7 +1926,7 @@ def record_bonus_challenge_progress(
                 session,
                 profile_id=profile.id,
                 activity_date=today,
-                challenge_id=existing.quest_id,
+                challenge_id=challenge_id,
                 target_minutes=target_minutes,
                 logged_minutes=existing.logged_minutes,
                 completed=True,
@@ -1859,7 +1944,7 @@ def record_bonus_challenge_progress(
         daily = dict(state_json.get("daily") or {})
         same_instance = (
             daily.get("dateKey") == today.isoformat()
-            and daily.get("questId") == submitted.challenge_id
+            and daily.get("questId") == challenge_id
         )
         current_minutes = daily.get("loggedMinutes", 0) if same_instance else 0
         if not isinstance(current_minutes, int) or isinstance(current_minutes, bool):
@@ -1869,8 +1954,9 @@ def record_bonus_challenge_progress(
         completed_at = now.isoformat() if completed else None
         daily.update({
             "dateKey": today.isoformat(),
-            "questId": submitted.challenge_id,
-            "questText": definition["text"],
+            "questId": challenge_id,
+            "bonusInstanceKey": resolved["instance_key"],
+            "questText": resolved["task"],
             "targetMinutes": target_minutes,
             "rewardCredits": 5,
             "loggedMinutes": logged_minutes,
@@ -1880,7 +1966,7 @@ def record_bonus_challenge_progress(
         state_json["daily"] = daily
         state_json["quest"] = {
             "dateKey": today.isoformat(),
-            "text": definition["text"],
+            "text": resolved["task"],
             "targetMinutes": target_minutes,
             "completed": completed,
             "rewardCredits": 5,
@@ -1891,7 +1977,7 @@ def record_bonus_challenge_progress(
             "dateKey": today.isoformat(),
             "minutes": submitted.minutes,
             "note": submitted.note.strip(),
-            "questId": submitted.challenge_id,
+            "questId": challenge_id,
             "creditsAwarded": 5 if completed else 0,
             "loggedAt": now.isoformat(),
             "source": "quest" if completed else "quest-progress",
@@ -1902,12 +1988,12 @@ def record_bonus_challenge_progress(
             session.add(QuestCompletion(
                 profile_id=profile.id,
                 activity_date=today,
-                quest_id=submitted.challenge_id,
+                quest_id=challenge_id,
                 logged_minutes=logged_minutes,
                 reward_amount=5,
                 completed_at=now,
             ))
-            source_key = f"bonus-challenge:{today.isoformat()}:{submitted.challenge_id}"
+            source_key = f"bonus-challenge:{resolved['instance_key']}"
             session.add(RewardGrant(
                 profile_id=profile.id,
                 contest_result_id=None,
@@ -1962,7 +2048,7 @@ def record_bonus_challenge_progress(
                 session,
                 profile_id=profile.id,
                 activity_date=today,
-                challenge_id=existing.quest_id,
+                challenge_id=challenge_id,
                 target_minutes=target_minutes,
                 logged_minutes=existing.logged_minutes,
                 completed=True,
@@ -1973,7 +2059,7 @@ def record_bonus_challenge_progress(
             session,
             profile_id=profile.id,
             activity_date=today,
-            challenge_id=submitted.challenge_id,
+            challenge_id=challenge_id,
             target_minutes=target_minutes,
             logged_minutes=logged_minutes,
             completed=completed,

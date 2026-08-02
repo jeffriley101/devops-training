@@ -511,10 +511,6 @@
     const errorEl = document.getElementById("practice-error");
     const feedbackEl = document.getElementById("quest-feedback");
     const completeBtn = document.getElementById("complete-quest-btn");
-    const chooseQuestBtn = document.getElementById("choose-quest-btn");
-    const skipQuestBtn = document.getElementById("skip-quest-btn");
-    const questChoicePanel = document.getElementById("quest-choice-panel");
-    const questChoiceList = document.getElementById("quest-choice-list");
 
     if (!form || !questTextEl || !questTargetEl || !questStatusEl) return;
     if (form.dataset.bonusChallengeWired === "true") return;
@@ -522,6 +518,7 @@
 
     const today = stateApi.localDateKey();
     let completionInFlight = false;
+    let currentChallengeInstance = null;
 
     function setQuestFeedback(message) {
       if (feedbackEl) feedbackEl.textContent = message;
@@ -546,113 +543,69 @@
       }
     }
 
-    function activateQuest(next, quest) {
-      const todayKey = stateApi.localDateKey();
-
-      next.daily = {
-        dateKey: todayKey,
-        questId: quest.id,
-        questText: quest.text,
-        targetMinutes: quest.target_minutes,
-        rewardCredits: BONUS_CHALLENGE_DANDELIONS,
-        loggedMinutes: 0,
-        completed: false,
-        completedAt: null,
-        encouragement: "",
-      };
-
-      next.quest = {
-        dateKey: todayKey,
-        text: quest.text,
-        targetMinutes: quest.target_minutes,
-        completed: false,
-        rewardCredits: BONUS_CHALLENGE_DANDELIONS,
-      };
-    }
-
-    function renderQuestChoices() {
-      if (!questChoicePanel || !questChoiceList) return;
-
-      const current = stateApi.getState();
-      const quests = questPool[current.profile.instrument] || [];
-
-      if (!quests.length) {
-        questChoiceList.innerHTML = "<p>No alternate quests found for this instrument yet.</p>";
-        questChoicePanel.classList.remove("hidden");
-        return;
+    async function loadAuthoritativeBonusChallenge() {
+      if (completeBtn) {
+        completeBtn.disabled = true;
+        completeBtn.textContent = "Loading Challenge…";
       }
-
-      questChoiceList.innerHTML = quests
-        .map((quest) => `
-          <button class="quest-choice-card" type="button" data-quest-id="${quest.id}">
-            <strong>${quest.text}</strong>
-            <small>${quest.target_minutes} minutes · ${BONUS_CHALLENGE_DANDELIONS} dandelions</small>
-          </button>
-        `)
-        .join("");
-
-      questChoicePanel.classList.remove("hidden");
+      try {
+        const response = await fetch("/contests/bonus-challenge/current", {
+          credentials: "same-origin", cache: "no-store",
+        });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.detail || "Bonus Challenge could not be loaded.");
+        if (payload.available !== true || !payload.challenge) {
+          currentChallengeInstance = null;
+          questTextEl.textContent = payload.message || "No Bonus Challenge is available.";
+          questTargetEl.textContent = "—";
+          questStatusEl.textContent = "Unavailable";
+          if (questProgressEl) questProgressEl.textContent = "0";
+          if (completeBtn) completeBtn.textContent = "Unavailable";
+          return;
+        }
+        const challenge = payload.challenge;
+        currentChallengeInstance = challenge.instance_key;
+        const next = stateApi.getState();
+        next.daily = {
+          dateKey: challenge.activity_date,
+          questId: challenge.challenge_id,
+          bonusInstanceKey: challenge.instance_key,
+          questText: challenge.task,
+          targetMinutes: challenge.target_minutes,
+          rewardCredits: BONUS_CHALLENGE_DANDELIONS,
+          loggedMinutes: challenge.logged_minutes,
+          completed: challenge.completed === true,
+          completedAt: challenge.completed ? next.daily?.completedAt || null : null,
+          encouragement: next.daily?.encouragement || "",
+        };
+        next.quest = {
+          dateKey: challenge.activity_date,
+          text: challenge.task,
+          targetMinutes: challenge.target_minutes,
+          completed: challenge.completed === true,
+          rewardCredits: BONUS_CHALLENGE_DANDELIONS,
+        };
+        stateApi.saveState(next, {sync: false});
+        renderQuestStatus(next);
+        if (challenge.completed === true) setQuestFeedback(pickMessage("already_done", challenge.activity_date));
+      } catch (error) {
+        currentChallengeInstance = null;
+        questTextEl.textContent = "Bonus Challenge unavailable";
+        questTargetEl.textContent = "—";
+        questStatusEl.textContent = "Unavailable";
+        if (completeBtn) {
+          completeBtn.disabled = true;
+          completeBtn.textContent = "Unavailable";
+        }
+        if (errorEl) errorEl.textContent = error.message || "Bonus Challenge could not be loaded.";
+      }
     }
 
-    renderQuestStatus(state);
+    loadAuthoritativeBonusChallenge();
     updateInstrumentAdvice(state);
 
     if (state.daily.completed && feedbackEl) {
       setQuestFeedback(pickMessage("already_done", today));
-    }
-
-    if (chooseQuestBtn) {
-      chooseQuestBtn.addEventListener("click", function () {
-        playSound("dialClick");
-        renderQuestChoices();
-      });
-    }
-
-    if (skipQuestBtn) {
-      skipQuestBtn.addEventListener("click", function () {
-        playSound("dialClick");
-        const next = stateApi.getState();
-        const quests = questPool[next.profile.instrument] || [];
-
-        if (!quests.length) return;
-
-        const currentIndex = quests.findIndex((quest) => quest.id === next.daily.questId);
-        const nextQuest = quests[(currentIndex + 1) % quests.length];
-
-        activateQuest(next, nextQuest);
-        stateApi.saveState(next);
-        renderQuestStatus(next);
-        hydrateHome(next);
-        updateInstrumentAdvice(next);
-
-        if (feedbackEl) {
-          setQuestFeedback("Quest skipped. Pick up momentum with this one instead.");
-        }
-      });
-    }
-
-    if (questChoiceList) {
-      questChoiceList.addEventListener("click", function (event) {
-        const button = event.target.closest("[data-quest-id]");
-        if (!button) return;
-
-        const next = stateApi.getState();
-        const quests = questPool[next.profile.instrument] || [];
-        const selectedQuest = quests.find((quest) => quest.id === button.dataset.questId);
-
-        if (!selectedQuest) return;
-
-        activateQuest(next, selectedQuest);
-        stateApi.saveState(next);
-        renderQuestStatus(next);
-        hydrateHome(next);
-        updateInstrumentAdvice(next);
-
-        if (questChoicePanel) questChoicePanel.classList.add("hidden");
-        if (feedbackEl) {
-          setQuestFeedback("Quest selected. Keep moving.");
-        }
-      });
     }
 
     form.addEventListener("submit", async function (event) {
@@ -662,8 +615,11 @@
       if (errorEl) errorEl.textContent = "";
 
       const next = stateApi.getState();
-      ensureTodayQuest(next);
-      const dateKey = stateApi.localDateKey();
+      if (!currentChallengeInstance) {
+        if (errorEl) errorEl.textContent = "No Bonus Challenge is available.";
+        return;
+      }
+      const dateKey = next.daily.dateKey;
       const minutes = Number(minutesEl?.value);
       const note = noteEl?.value.trim() || "";
 
@@ -689,7 +645,7 @@
           headers: {"Content-Type": "application/json"},
           body: JSON.stringify({
             activity_date: dateKey,
-            challenge_id: next.daily.questId,
+            challenge_instance: currentChallengeInstance,
             minutes,
             note,
           }),

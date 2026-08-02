@@ -39,10 +39,13 @@ def test_bonus_challenge_reward_is_threshold_only_and_not_daily_replacement() ->
     assert 'points_awarded=2' in route
     assert 'team_id=None' in route
     assert 'completed = logged_minutes >= target_minutes' in route
-    assert 'source_key = f"bonus-challenge:{today.isoformat()}:{submitted.challenge_id}"' in route
+    assert 'source_key = f"bonus-challenge:{resolved[\'instance_key\']}"' in route
     assert '@router.get("/bonus-challenge/i-played-it")' not in source
     assert '@router.post("/bonus-challenge/i-played-it")' not in source
     assert "I_PLAYED_IT_DANDELIONS" not in source
+    assert source.count("resolve_current_bonus_challenge(") >= 3
+    assert '@router.get("/bonus-challenge/current")' in source
+    assert "submitted.challenge_instance != resolved[\"instance_key\"]" in route
 
 
 def test_bonus_completion_model_has_no_chart_or_contest_side_effects() -> None:

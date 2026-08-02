@@ -160,9 +160,11 @@ def test_bonus_progress_endpoint_persists_increment_then_rewards_threshold(
     with TestClient(app) as client:
         create_student(client, credits=7)
         today = datetime.now(CENTRAL).date().isoformat()
+        current = client.get("/contests/bonus-challenge/current").json()["challenge"]
+        assert current["task"] and current["target_minutes"] == 10
         first = client.post("/contests/bonus-challenge/progress", json={
             "activity_date": today,
-            "challenge_id": "flute-trill",
+            "challenge_instance": current["instance_key"],
             "minutes": 4,
             "note": "First increment",
         })
@@ -181,7 +183,7 @@ def test_bonus_progress_endpoint_persists_increment_then_rewards_threshold(
 
         completed = client.post("/contests/bonus-challenge/progress", json={
             "activity_date": today,
-            "challenge_id": "flute-trill",
+            "challenge_instance": current["instance_key"],
             "minutes": 6,
             "note": "Threshold increment",
         })
@@ -195,7 +197,7 @@ def test_bonus_progress_endpoint_persists_increment_then_rewards_threshold(
 
         duplicate = client.post("/contests/bonus-challenge/progress", json={
             "activity_date": today,
-            "challenge_id": "flute-trill",
+            "challenge_instance": current["instance_key"],
             "minutes": 6,
         })
         assert duplicate.status_code == 200
@@ -207,6 +209,65 @@ def test_bonus_progress_endpoint_persists_increment_then_rewards_threshold(
             assert session.scalar(select(func.count()).select_from(PracticeChart)) == 0
             award = session.scalar(select(CampPointAward))
             assert award.points_awarded == 2 and award.team_id is None
+
+
+def test_shared_resolver_replaces_stale_cross_instrument_client_state(
+    quest_database,
+) -> None:
+    with TestClient(app) as client:
+        profile_id = create_student(client, credits=0)
+        today = datetime.now(CENTRAL).date().isoformat()
+        with quest_database() as session:
+            state = session.get(WoodchuckState, profile_id)
+            state.state_json = {
+                **state.state_json,
+                "daily": {
+                    "dateKey": today,
+                    "questId": "trumpet-lip-slur",
+                    "questText": "Stale trumpet challenge",
+                    "targetMinutes": 10,
+                    "loggedMinutes": 3,
+                },
+            }
+            session.commit()
+
+        current = client.get("/contests/bonus-challenge/current")
+        assert current.status_code == 200
+        challenge = current.json()["challenge"]
+        assert challenge["challenge_id"] in {
+            item["id"] for item in contests.QUEST_POOL["Flute"]
+        }
+        assert challenge["task"] != "Stale trumpet challenge"
+        assert challenge["logged_minutes"] == 0
+
+        stale = client.post("/contests/bonus-challenge/progress", json={
+            "activity_date": today,
+            "challenge_instance": f"{today}:trumpet:trumpet-lip-slur",
+            "minutes": 1,
+        })
+        assert stale.status_code == 409
+        valid = client.post("/contests/bonus-challenge/progress", json={
+            "activity_date": today,
+            "challenge_instance": challenge["instance_key"],
+            "minutes": 1,
+        })
+        assert valid.status_code == 200
+        assert valid.json()["logged_minutes"] == 1
+
+
+def test_genuinely_missing_bonus_configuration_is_controlled(
+    quest_database, monkeypatch,
+) -> None:
+    without_flute = dict(contests.QUEST_POOL)
+    without_flute.pop("Flute")
+    monkeypatch.setattr(contests, "QUEST_POOL", without_flute)
+    with TestClient(app) as client:
+        create_student(client)
+        payload = client.get("/contests/bonus-challenge/current").json()
+        assert payload == {
+            "available": False,
+            "message": "No Bonus Challenge is available.",
+        }
 
 
 def test_multiple_tabs_are_idempotent(quest_database) -> None:
@@ -278,4 +339,5 @@ def test_browser_handler_is_single_request_confirmed_ui_and_audio_safe() -> None
     assert "playSound(\"questCompleted\")" in quest
     assert "try {\n      if (window.WoodshedAudio)" in app_js
     assert "Choose Another Challenge" not in quest  # Labels remain template-owned.
-    assert "Quest skipped. Pick up momentum" in quest
+    assert 'fetch("/contests/bonus-challenge/current"' in quest
+    assert "currentChallengeInstance = challenge.instance_key" in quest
