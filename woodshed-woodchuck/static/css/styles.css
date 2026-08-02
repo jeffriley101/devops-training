@@ -4006,6 +4006,118 @@ select {
   overflow-y: auto;
 }
 
+/* Phase 8 main-page polish */
+.welcome-enter-button {
+  color: #fff;
+  background: linear-gradient(145deg, #4a83ad, #235477);
+  border-color: #173e5a;
+}
+
+.shed-readout-name {
+  position: relative;
+  min-width: 10rem;
+  padding: 0.65rem 1rem;
+  border: 3px ridge #8b6728;
+  border-radius: 5px;
+  color: #2d210f;
+  background: linear-gradient(145deg, #e9cf75, #a87b25 55%, #e5c565);
+  font-size: clamp(1rem, 2.2vw, 1.45rem);
+  box-shadow: inset 0 0 0 2px rgba(255,245,174,.45), 0 4px 7px rgba(44,28,12,.45);
+}
+.shed-readout-name::before,
+.shed-readout-name::after { content: ""; position: absolute; top: 0.35rem; width: 0.3rem; height: 0.3rem; border-radius: 50%; background: #5f491f; }
+.shed-readout-name::before { left: 0.35rem; }
+.shed-readout-name::after { right: 0.35rem; }
+.shed-readout-level {
+  width: auto;
+  min-width: 44px;
+  min-height: 44px;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  font-weight: 1000;
+}
+.woodshed-scene > .shed-secret-button {
+  position: fixed;
+  left: max(0.75rem, env(safe-area-inset-left));
+  bottom: calc(4.75rem + env(safe-area-inset-bottom));
+  width: 44px;
+  height: 44px;
+  font-size: 1.9rem;
+  z-index: 6;
+}
+
+.board-page { position: relative; }
+.board-plunge-button {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 2px solid #76502d;
+  border-radius: 50%;
+  background: #f5d890;
+  text-decoration: none;
+  font-size: 1.5rem;
+  z-index: 2;
+}
+.contest-points-section > h4,
+.contest-camp-points-section > h4,
+.contest-instrument-section > h4,
+.team-competition > h3 { font-size: clamp(1.25rem, 2.5vw, 1.8rem); }
+.contest-description-warm { color: #5d3c16; background: #fff0b0; border-color: #c3943d; }
+.team-competition { margin-top: 1rem; padding-top: 1rem; border-top: 3px solid #9a6b28; }
+.team-leaderboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr)); gap: 0.8rem; }
+.team-leaderboard-card { min-width: 0; padding: 0.75rem; border: 2px solid #aa792c; border-radius: 12px; background: #fff0b5; }
+
+.medal-board,
+.hall-of-champions {
+  border: 7px ridge #77736b;
+  background: linear-gradient(145deg, #aba69b, #716e67 52%, #aaa59a);
+  box-shadow: inset 0 0 0 3px rgba(45,42,37,.38), 0 8px 16px rgba(40,29,19,.3);
+}
+.medal-board > h3,
+.hall-of-champions > h3 {
+  padding: 0.55rem;
+  border: 3px ridge #9b7023;
+  border-radius: 5px;
+  color: #2e210c;
+  background: linear-gradient(145deg, #f0d577, #ad7d27);
+  text-align: center;
+}
+.medal-row,
+.champions-row { border: 1px solid #7e673f; background: #f7e4ae; }
+
+.bonus-challenge-section {
+  overflow: hidden;
+  border: 5px ridge #a8751f;
+  border-radius: 14px;
+  background: linear-gradient(145deg, #f5d76e, #bb8526);
+}
+.bonus-challenge-section > * { margin-block: 0; padding: 1rem; }
+.bonus-challenge-section > * + * { border-top: 2px solid rgba(113,73,16,.45); }
+
+.practice-room-emoji-control {
+  display: grid;
+  place-items: center;
+  min-width: 64px;
+  min-height: 64px;
+  border: 2px solid #755029;
+  border-radius: 14px;
+  background: #ffe8a2;
+  font-size: 2rem;
+  text-decoration: none;
+}
+.practice-room-emoji-control:disabled { opacity: 0.58; cursor: not-allowed; }
+
+@media (max-width: 640px) {
+  .shed-readout-name { min-width: 7.5rem; }
+  .woodshed-scene > .shed-secret-button { bottom: calc(4.75rem + env(safe-area-inset-bottom)); left: max(0.75rem, env(safe-area-inset-left)); }
+  .team-leaderboard-grid { grid-template-columns: 1fr; }
+}
+
 /* Plunge Burrow prototype */
 .plunge-burrow-page {
   max-width: 70rem;

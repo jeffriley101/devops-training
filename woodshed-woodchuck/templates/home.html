@@ -102,16 +102,9 @@
           0
         </div>
 
-        <a
-          id="dandelion-object"
-          class="room-object dandelion-object"
-          href="/store"
-          aria-label="Open the shop"
-          title="Dandelions and Shop"
-        >
-          <span class="room-object-icon" aria-hidden="true">🌼</span>
-          <span id="credits-value" class="dandelion-count">0</span>
-        </a>
+        <button id="shed-team-button" class="room-object dandelion-object" type="button" aria-controls="shed-team-panel" aria-expanded="false" aria-label="Choose a team" title="Choose a team">
+          <span id="shed-team-emblem" class="room-object-icon" aria-hidden="true">⬡</span>
+        </button>
 
         <button
           id="metronome-open-button"
@@ -151,6 +144,18 @@
       </div>
     </div>
   </div>
+
+  <section id="shed-team-panel" class="mentor-card hidden" hidden aria-labelledby="shed-team-title">
+    <h2 id="shed-team-title">Choose Your Team</h2>
+    <p id="shed-team-current" aria-live="polite">Loading teams…</p>
+    <div id="shed-team-options" class="team-tile-grid" role="radiogroup" aria-label="Available teams"></div>
+    <label for="shed-team-name">Create a New Team</label>
+    <input id="shed-team-name" maxlength="30" />
+    <label for="shed-team-emblem-choice">Approved emblem</label>
+    <select id="shed-team-emblem-choice"><option value="">Choose an emblem</option></select>
+    <button id="shed-team-create" class="btn btn-secondary" type="button">Create and Join Team</button>
+    <p id="shed-team-feedback" role="status" aria-live="polite"></p>
+  </section>
 
   <section id="shed-secret-panel" class="mentor-card shed-secret-panel hidden" hidden aria-labelledby="shed-secret-title">
     <h2 id="shed-secret-title">Secret</h2>

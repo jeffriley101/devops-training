@@ -114,12 +114,12 @@ def test_practice_room_is_local_expandable_and_has_tool_slots() -> None:
     assert "🚪" in store
     assert 'data-shop-panel="practice-room"' in store
     assert 'data-shop-panel-content="practice-room"' in store
-    assert "Trombone Practice Tool" in store
-    assert "More Practice Tools" in store
+    assert "Open Spectrogram" in store
+    assert "Pristine P-Chart — Coming Soon" in store
     assert store.count("Coming Soon") >= 2
     practice_section = store[store.index('data-shop-panel-content="practice-room"'):store.index('data-shop-panel-content="artist"')]
-    assert "href=" not in practice_section
-    assert "http://" not in practice_section and "https://" not in practice_section
+    assert 'href="https://brassspectrogram.netlify.app/"' in practice_section
+    assert 'rel="noopener noreferrer"' in practice_section
 
 
 def test_donate_moved_once_to_shop_and_qr_is_accessible() -> None:

@@ -97,16 +97,16 @@ def test_shed_book_and_board_cleanup_markup_and_behavior() -> None:
     assert book.index("Manage Trusted Verifiers") > book.index('id="p-book-verifier"')
     for trigger in ("woodchuck-name-value", "level-value", "instrument-object"):
         assert f'id="{trigger}"' in home
-    for label in ("Submit to Log Book", "Copy to Clipboard", "Email Your Chart"):
-        assert label in book
-    assert "btn-book-copy" in book and ".btn-book-copy" in css
-    assert "Submit as Open only, or choose a trusted verifier?" in book
-    assert "openSubmissionConfirmed" in app_js
+    assert "Submit P-Chart" in book
+    for label in ("Copy to Clipboard", "Email Your Chart"):
+        assert label not in book
+    assert "Submit this P-Chart?" in book
+    assert "confirmationApproved" in app_js
     assert "form.requestSubmit()" in app_js
-    assert "verifierSelectEl.focus()" in app_js
+    assert "Choose a Parent or Mentor" in app_js
     assert 'method: "POST"' in app_js and "submissionKey" in app_js
     assert "Your Position" not in board
-    for title in ("TOP FIVE MINUTES LEADERS", "WEEKLY PRACTICE BY INSTRUMENT", "WEEKLY BAND CAMP POINTS"):
+    for title in ("Practice Minutes Leaderboard", "WEEKLY PRACTICE BY INSTRUMENT", "WEEKLY BAND CAMP POINTS"):
         assert title in board
     assert "Medal Board of Past Winners" in board
     assert "Hall of Champions" in board

@@ -2,6 +2,7 @@
 
 {% block content %}
 <section class="card board-page">
+  <a id="plunge-burrow-button" class="board-plunge-button" href="/plunge-burrow" aria-label="Play Plunge Burrow" title="Play Plunge Burrow"><span aria-hidden="true">🕳️</span></a>
   <div class="section-head">
     <h2 class="board-season-title" aria-label="Band Camp">
       <span>B</span><span>a</span><span>n</span><span>d</span>
@@ -192,7 +193,8 @@
           aria-labelledby="contest-open-tab"
         >
           <section class="contest-points-section" aria-labelledby="open-points-title">
-            <h4 id="open-points-title">TOP FIVE MINUTES LEADERS</h4>
+            <h4 id="open-points-title">Practice Minutes Leaderboard</h4>
+            <p class="contest-division-explanation">All contest-enabled P-Charts count toward weekly practice minutes. Verified standings include only charts that have been verified.</p>
             <div id="contest-open-points" class="contest-ranked-list" role="list" aria-label="Open minutes leaders"></div>
             <p id="contest-open-points-empty" class="contest-empty-state hidden">
               No P-Charts have been submitted this week yet.
@@ -210,7 +212,7 @@
 
           <section class="contest-instrument-section" aria-labelledby="open-instruments-title">
             <h4 id="open-instruments-title">WEEKLY PRACTICE BY INSTRUMENT</h4>
-            <p class="contest-division-explanation">All submitted P-Charts</p>
+            <p class="contest-division-explanation contest-description-warm">All submitted P-Charts</p>
             <div id="contest-open-standings" class="contest-ranked-list" role="list" aria-label="Open instrument standings"></div>
           </section>
           <p id="contest-open-empty" class="contest-empty-state hidden">
@@ -226,7 +228,8 @@
           hidden
         >
           <section class="contest-points-section" aria-labelledby="verified-points-title">
-            <h4 id="verified-points-title">TOP FIVE MINUTES LEADERS</h4>
+            <h4 id="verified-points-title">Practice Minutes Leaderboard</h4>
+            <p class="contest-division-explanation">All contest-enabled P-Charts count toward weekly practice minutes. Verified standings include only charts that have been verified.</p>
             <div id="contest-verified-points" class="contest-ranked-list" role="list" aria-label="Verified minutes leaders"></div>
             <p id="contest-verified-points-empty" class="contest-empty-state hidden">
               No verified P-Charts have been approved this week yet.
@@ -242,6 +245,25 @@
             No verified P-Charts have been approved this week yet.
           </p>
         </div>
+
+        <section id="team-competition" class="team-competition" aria-labelledby="team-competition-title">
+          <h3 id="team-competition-title">Team Competition</h3>
+          <div class="team-leaderboard-grid">
+          {% for key, title in [
+            ('team-weekly-practice', 'Team Practice Minutes This Week'),
+            ('team-seasonal-points', 'Team Seasonal Points'),
+            ('team-average-practice', 'Team Average Practice'),
+            ('team-season-practice', 'Total Practice Minutes This Season')
+          ] %}
+            <article class="team-leaderboard-card" data-team-board="{{ key }}">
+              <h4>{{ title }}</h4>
+              <h5>Open standings</h5><div id="{{ key }}-open" class="contest-ranked-list" role="list"></div>
+              <h5>Verified standings</h5><div id="{{ key }}-verified" class="contest-ranked-list" role="list"></div>
+              <p id="{{ key }}-empty" class="contest-empty-state">No team scores yet.</p>
+            </article>
+          {% endfor %}
+          </div>
+        </section>
       </section>
 
       <section
@@ -313,7 +335,7 @@
             {% if division == "verified" %}hidden{% endif %}
           >
             <section class="medal-contest" aria-labelledby="past-{{ division }}-points-title">
-              <h4 id="past-{{ division }}-points-title">TOP FIVE MINUTES LEADERS</h4>
+              <h4 id="past-{{ division }}-points-title">Practice Minutes Leaderboard</h4>
               <div id="past-winners-{{ division }}-points" class="medal-rows"></div>
               <p id="past-winners-{{ division }}-points-empty" class="contest-empty-state hidden">
                 No podium results for this contest and division.
@@ -332,6 +354,11 @@
               <p id="past-winners-{{ division }}-camp-points-empty" class="contest-empty-state hidden">
                 No podium results for this contest and division.
               </p>
+            </section>
+            <section class="medal-contest" aria-labelledby="past-{{ division }}-teams-title">
+              <h4 id="past-{{ division }}-teams-title">TEAM COMPETITION</h4>
+              <div id="past-winners-{{ division }}-teams" class="medal-rows"></div>
+              <p id="past-winners-{{ division }}-teams-empty" class="contest-empty-state hidden">No team podium results in this division.</p>
             </section>
           </div>
           {% endfor %}
@@ -401,13 +428,7 @@
     </aside>
   </div>
 
-  <p id="board-feedback" class="board-feedback" aria-live="polite">
-    Each contest win earns one Camp Point and one dandelion.
-  </p>
-
-  <section class="board-panel plunge-burrow" aria-labelledby="plunge-burrow-title">
-    <a id="plunge-burrow-button" class="btn btn-secondary" href="/plunge-burrow"><span aria-hidden="true">🕳️</span> <span id="plunge-burrow-title">Play Plunge Burrow</span></a>
-  </section>
+  <p id="board-feedback" class="board-feedback" aria-live="polite"></p>
 
   <section class="board-practice-section bonus-challenge-section" aria-labelledby="bonus-challenge-title">
     <div class="section-head">

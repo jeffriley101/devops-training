@@ -332,6 +332,62 @@
     });
   }
 
+  function wireShedTeamBadge() {
+    const trigger = document.getElementById("shed-team-button");
+    const panel = document.getElementById("shed-team-panel");
+    const options = document.getElementById("shed-team-options");
+    const status = document.getElementById("shed-team-current");
+    const feedback = document.getElementById("shed-team-feedback");
+    const emblem = document.getElementById("shed-team-emblem");
+    const emblemChoice = document.getElementById("shed-team-emblem-choice");
+    if (!trigger || !panel || !options) return;
+    async function load() {
+      try {
+        const response = await fetch("/teams", {credentials: "same-origin", cache: "no-store"});
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.detail || "Teams could not be loaded.");
+        const current = payload.membership?.team || null;
+        emblem.textContent = current?.emblem?.value || "⬡";
+        trigger.setAttribute("aria-label", current ? `Team ${current.name}` : "Choose a team");
+        trigger.title = current ? current.name : "Choose a team";
+        status.textContent = current
+          ? `${current.emblem.value} ${current.name} — ⭐ ${current.captain.display_name} (Team Captain)`
+          : "Choose an existing team or create one.";
+        options.replaceChildren();
+        (payload.teams || []).forEach((team) => {
+          const label = document.createElement("label"); label.className = "team-radio-tile";
+          const radio = document.createElement("input"); radio.type = "radio"; radio.name = "shed-team-choice";
+          radio.checked = current?.id === team.id;
+          radio.addEventListener("change", async function () {
+            const change = await fetch("/teams/selection", {method: "POST", credentials: "same-origin", headers: {"Content-Type": "application/json"}, body: JSON.stringify({team_id: team.id})});
+            const result = await change.json();
+            feedback.textContent = change.ok ? "Team selected." : result.detail;
+            await load();
+          });
+          const text = document.createElement("span");
+          text.textContent = `${team.emblem.value} ${team.name} — ⭐ ${team.captain.display_name} (Team Captain)`;
+          label.append(radio, text); options.append(label);
+        });
+        if (emblemChoice.options.length <= 1) (payload.approved_emblems || []).forEach((item) => emblemChoice.append(new Option(`${item.value} ${item.key}`, item.key)));
+        if (payload.membership?.locked) feedback.textContent = `Team changes unlock ${new Date(payload.membership.next_change_at).toLocaleString()}.`;
+      } catch (error) { feedback.textContent = error.message || "Teams could not be loaded."; }
+    }
+    trigger.addEventListener("click", function () {
+      const opening = panel.hidden;
+      panel.hidden = !opening; panel.classList.toggle("hidden", !opening);
+      trigger.setAttribute("aria-expanded", String(opening));
+      if (opening) load();
+    });
+    document.getElementById("shed-team-create")?.addEventListener("click", async function () {
+      const response = await fetch("/teams", {method: "POST", credentials: "same-origin", headers: {"Content-Type": "application/json"}, body: JSON.stringify({
+        name: document.getElementById("shed-team-name").value, emblem_key: emblemChoice.value,
+      })});
+      const payload = await response.json(); feedback.textContent = response.ok ? "Team created and selected." : payload.detail;
+      if (response.ok) await load();
+    });
+    load();
+  }
+
   async function refreshPracticeStreak() {
     const streakEl = document.getElementById("streak-value");
     if (!streakEl) return;
@@ -1972,6 +2028,39 @@
       }
     }
 
+    function renderTeamBoards(standings) {
+      const emoji = {lion: "🦁", goat: "🐐", bear: "🐻", eagle: "🦅", wolf: "🐺", bee: "🐝", dragon: "🐉", cat: "🐱", dog: "🐶", star: "⭐", fire: "🔥", moon: "🌙", lightning: "⚡"};
+      const emblemText = (key) => {
+        const [kind, value] = String(key || "").split(":");
+        if (kind === "emoji") return emoji[value] || "⬡";
+        if (kind === "letter") return `[${value}]`;
+        if (kind === "shield") return `🛡 ${value}`;
+        return "⬡";
+      };
+      const boardKeys = ["team-weekly-practice", "team-seasonal-points", "team-average-practice", "team-season-practice"];
+      boardKeys.forEach((key) => {
+        let anyRows = false;
+        ["open", "verified"].forEach((division) => {
+          const list = document.getElementById(`${key}-${division}`);
+          if (!list) return;
+          list.replaceChildren();
+          const rows = Array.isArray(standings[key]?.[division]) ? standings[key][division] : [];
+          rows.forEach((row) => {
+            anyRows = true;
+            const item = document.createElement("article"); item.className = `contest-ranked-row contest-rank-${Math.min(row.rank, 4)}`; item.setAttribute("role", "listitem");
+            const rank = document.createElement("span"); rank.className = "contest-rank-badge"; rank.textContent = String(row.rank);
+            const subject = document.createElement("span"); subject.className = "contest-ranked-subject";
+            subject.textContent = `${emblemText(row.emblem_key)} ${row.team_name} — ⭐ ${row.captain_name} (${row.captain_label})`;
+            const score = document.createElement("strong"); score.className = "contest-ranked-score";
+            score.textContent = key === "team-average-practice" ? `${(row.score / 100).toFixed(2)} min · ${row.active_member_count} active` : String(row.score);
+            item.setAttribute("aria-label", `Rank ${row.rank}, ${row.team_name}, ${score.textContent}`);
+            item.append(rank, subject, score); list.append(item);
+          });
+        });
+        document.getElementById(`${key}-empty`)?.classList.toggle("hidden", anyRows);
+      });
+    }
+
     function showError(message) {
       if (loadingEl) loadingEl.classList.add("hidden");
       if (errorMessageEl) errorMessageEl.textContent = message;
@@ -2075,6 +2164,7 @@
           campPointsStandings.current_user_position.open,
           "camp-points"
         );
+        renderTeamBoards(payload.standings);
         selectDivision(selectedDivision, false);
         if (loadingEl) loadingEl.classList.add("hidden");
         if (errorEl) errorEl.classList.add("hidden");
@@ -2194,7 +2284,9 @@
     });
 
     function renderContest(division, contestKey, results) {
-      const type = contestKey === "weekly-points-leaders"
+      const type = contestKey === "team"
+        ? "teams"
+        : contestKey === "weekly-points-leaders"
         ? "points"
         : contestKey === "weekly-camp-points"
           ? "camp-points"
@@ -2208,17 +2300,17 @@
       const rows = results.filter((result) => {
         const medal = result && medals[result.rank];
         const contest = result && result.contest;
-        const subject = result && (type === "instruments" ? result.instrument : result.display_name);
+        const subject = result && (type === "instruments" ? result.instrument : type === "teams" ? result.team_name : result.display_name);
         return medal && result.medal === medal.key &&
-          result.division === division && contest && contest.key === contestKey &&
+          result.division === division && contest && (contestKey === "team" ? result.subject_type === "team" : contest.key === contestKey) &&
           typeof subject === "string" && subject.trim() &&
           Number.isInteger(result.score) && result.score >= 0;
       });
 
       rows.forEach((result) => {
         const medal = medals[result.rank];
-        const isStudent = type !== "instruments";
-        const subject = isStudent ? result.display_name : result.instrument;
+        const isStudent = type !== "instruments" && type !== "teams";
+        const subject = type === "teams" ? result.team_name : isStudent ? result.display_name : result.instrument;
         const row = document.createElement("article");
         row.className = "medal-row";
         const icon = document.createElement("span");
@@ -2231,7 +2323,7 @@
         const teamName = !isStudent && window.WWInstruments
           ? window.WWInstruments.teamLabel(subject)
           : null;
-        name.textContent = isStudent ? subject : `🎵 ${teamName || subject}`;
+        name.textContent = type === "teams" ? `🛡 ${subject}` : isStudent ? subject : `🎵 ${teamName || subject}`;
         const rank = document.createElement("small");
         rank.textContent = `${medal.label} · Rank ${result.rank}`;
         subjectBlock.append(name, rank);
@@ -2252,6 +2344,7 @@
         renderContest(division, "weekly-points-leaders", results);
         renderContest(division, "weekly-practice-by-instrument", results);
         renderContest(division, "weekly-camp-points", results);
+        renderContest(division, "team", results);
       });
     }
 
@@ -2765,7 +2858,7 @@
       crown: "Crown Progress", goat: "The GOAT Tracker",
       "practice-definition": "Practice Definition", share: "Share Woodshed",
       clothing: "Clothing Shelf", gear: "Gear Shelf",
-      "practice-room": "Practice Room", artist: "Artist",
+      "practice-room": "Practice Rooms", artist: "Artist",
     };
     let activator = null;
 
@@ -3739,6 +3832,7 @@
   wireSetupForm(state);
   hydrateHome(state);
   wireShedSecret();
+  wireShedTeamBadge();
   refreshPracticeStreak();
   wireMetronome();
   wireTuner();

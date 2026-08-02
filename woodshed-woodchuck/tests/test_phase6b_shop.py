@@ -50,8 +50,8 @@ def test_right_controls_and_donation_are_unique() -> None:
     markup = shop_markup()
     controls = ["🧢", "🧃", "🚪", "🎨", "💝"]
     assert [markup.index(item) for item in controls] == sorted(markup.index(item) for item in controls)
-    assert "Trombone Practice Tool" in markup
-    assert "More Practice Tools" in markup
+    assert "Open Spectrogram" in markup
+    assert "Pristine P-Chart — Coming Soon" in markup
     assert "water bottles" in markup and "instrument cases" in markup
     assert "direct file upload" not in markup
     assert markup.count("venmo.com/u/jeffriley101") == 1

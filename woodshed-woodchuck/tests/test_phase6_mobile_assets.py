@@ -47,7 +47,10 @@ def test_served_stylesheet_contains_final_mobile_scene_rules() -> None:
         "color: #d7263d",
     ):
         assert declaration in secret_rule
-    assert css.rfind(".woodshed-scene > .shed-secret-button {") == secret_mobile
+    final_secret = css.rfind(".woodshed-scene > .shed-secret-button {")
+    final_rule = css[final_secret:css.index("}", final_secret)]
+    assert "env(safe-area-inset-bottom)" in final_rule
+    assert "width: 44px" in css and "height: 44px" in css
 
     shop_mobile = css.index("@media (max-width: 430px)", css.index("/* SHOP */"))
     shop_scene = css.index(".shop-scene {", shop_mobile)

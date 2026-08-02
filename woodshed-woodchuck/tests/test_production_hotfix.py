@@ -46,7 +46,7 @@ def test_verifier_mailto_uses_percent_spaces_and_preserves_real_plus() -> None:
     assert 'params.set("subject", subject)' in javascript
     assert 'params.set("body", message)' in javascript
     assert '.replace(/\\+/g, "%20")' in javascript
-    assert '.replace(/\\+/g, "%20")' in app_javascript
+    assert 'id="email-p-chart-btn"' not in (ROOT / "templates/p_book.html").read_text(encoding="utf-8")
     assert "?${params.toString()}" not in javascript
     assert "?${params.toString()}" not in app_javascript
     assert "trusted-verifiers.js?v=8" in template
