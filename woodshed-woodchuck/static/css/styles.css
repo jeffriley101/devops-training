@@ -3056,8 +3056,42 @@ select {
 
 .p-book-page .practice-total-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .p-book-page .practice-stat-stone { min-width: 0; }
-.p-book-page .pirate-logbook { padding: 1rem; border-radius: 14px; }
+.p-book-page .practice-timer-metal {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+}
+.p-book-page .practice-timer-row { grid-row: 1; min-width: 0; }
+.p-book-page .practice-timer-status {
+  position: static;
+  grid-row: 2;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.p-book-page .pirate-logbook {
+  display: block;
+  padding: 1rem;
+  border-radius: 14px;
+}
 .p-book-page .pirate-logbook > .p-book-title { border-bottom-color: #4e5960; font-family: inherit; }
+.p-book-page .p-book-entry-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.65rem;
+  width: 100%;
+}
+.p-book-page .p-book-entry-list > p {
+  display: block;
+  min-width: 0;
+  margin: 0;
+  padding: 0.65rem;
+  border: 1px solid rgba(58,67,72,.48);
+  border-radius: 9px;
+  background: rgba(239,243,244,.58);
+  overflow-wrap: anywhere;
+}
 
 .p-book-page .btn {
   min-height: 44px;
@@ -3133,10 +3167,115 @@ select {
     background: repeating-radial-gradient(ellipse at center, transparent 0 7px, #f4f7f8 8px 10px, #69747a 11px 13px, transparent 14px 25px);
   }
   .p-book-page #submit-p-chart-btn { width: 100px; height: 100px; min-height: 100px; }
+  .p-book-page .practice-timer-row { flex-wrap: wrap; }
+  .p-book-page .practice-timer-status { grid-column: 1 / -1; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .p-book-page #submit-p-chart-btn.p-book-submit-gold { animation: none; box-shadow: 0 0 0 4px #b78718; }
+}
+
+/* SHED: compact, accessible team selection hierarchy. */
+.woodshed-page #shed-team-panel {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+  gap: 0.9rem;
+}
+
+.shed-team-current,
+.shed-team-subsection { min-width: 0; }
+.shed-team-subsection {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.65rem;
+  padding-top: 0.8rem;
+  border-top: 1px solid #b68a4c;
+}
+.shed-team-subsection[hidden] { display: none; }
+.shed-team-subsection h3 { margin: 0; }
+.shed-team-choice-card {
+  position: relative;
+  display: block;
+  min-width: 0;
+  min-height: 54px;
+  padding: 0.7rem 0.8rem;
+  border: 2px solid #8c6a35;
+  border-radius: 12px;
+  color: #2a1d12;
+  background: #fff1b8;
+  cursor: pointer;
+}
+.shed-team-choice-card.is-selected {
+  border-color: #356d42;
+  background: linear-gradient(145deg, #f6e8ad, #d6e5bd);
+  box-shadow: inset 0 0 0 2px rgba(66,115,70,.25);
+  cursor: default;
+}
+.team-radio-native {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.shed-team-choice-card:has(.team-radio-native:focus-visible) {
+  outline: 3px solid #356da0;
+  outline-offset: 3px;
+}
+.shed-team-choice-card:has(.team-radio-native:disabled):not(.is-selected) {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+.shed-team-choice-content { display: grid; gap: 0.3rem; min-width: 0; }
+.shed-team-choice-main { display: flex; align-items: center; gap: 0.55rem; min-width: 0; }
+.shed-team-choice-main strong { overflow-wrap: anywhere; }
+.shed-team-choice-captain { font-size: 0.88rem; color: #51422f; }
+.shed-team-selected-status {
+  width: fit-content;
+  padding: 0.12rem 0.48rem;
+  border-radius: 999px;
+  color: #f7fff4;
+  background: #356d42;
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+.shed-team-create-section input,
+.shed-team-create-section select {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 44px;
+  padding: 0.65rem;
+  border: 1px solid #aa7834;
+  border-radius: 10px;
+  color: #2a1d12;
+  background: #fff1b8;
+}
+.shed-team-emblem-field {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 0.55rem;
+  align-items: center;
+}
+.shed-team-emblem-preview {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid #aa7834;
+  border-radius: 10px;
+  background: #fff1b8;
+}
+.shed-team-create-section .btn-green {
+  justify-self: start;
+  min-height: 44px;
+  color: #f7fff4;
+  background: linear-gradient(145deg, #74a965, #2f6d3d 55%, #4d8951);
+  border-color: #244e2d;
 }
 
 /* BOARD: centered public-events heading */

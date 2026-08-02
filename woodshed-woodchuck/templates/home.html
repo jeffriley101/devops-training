@@ -137,13 +137,22 @@
 
   <section id="shed-team-panel" class="mentor-card hidden" hidden aria-labelledby="shed-team-title">
     <h2 id="shed-team-title">Choose Your Team</h2>
-    <p id="shed-team-current" aria-live="polite">Loading teams…</p>
-    <div id="shed-team-options" class="team-tile-grid" role="radiogroup" aria-label="Available teams"></div>
-    <label for="shed-team-name">Create a New Team</label>
-    <input id="shed-team-name" maxlength="30" />
-    <label for="shed-team-emblem-choice">Approved emblem</label>
-    <select id="shed-team-emblem-choice"><option value="">Choose an emblem</option></select>
-    <button id="shed-team-create" class="btn btn-secondary" type="button">Create and Join Team</button>
+    <div id="shed-team-current" class="shed-team-current" aria-live="polite">Loading teams…</div>
+    <section id="shed-team-other-section" class="shed-team-subsection" hidden>
+      <h3>Join Another Team</h3>
+      <div id="shed-team-options" class="team-tile-grid" role="radiogroup" aria-label="Other available teams"></div>
+    </section>
+    <section class="shed-team-subsection shed-team-create-section" aria-labelledby="shed-team-create-title">
+      <h3 id="shed-team-create-title">Create a New Team</h3>
+      <label for="shed-team-name">New team name</label>
+      <input id="shed-team-name" maxlength="30" />
+      <label for="shed-team-emblem-choice">Choose an emblem</label>
+      <div class="shed-team-emblem-field">
+        <span id="shed-team-emblem-preview" class="shed-team-emblem-preview" aria-live="polite"></span>
+        <select id="shed-team-emblem-choice"><option value="">Choose an emblem</option></select>
+      </div>
+      <button id="shed-team-create" class="btn btn-green" type="button">Create and Join Team</button>
+    </section>
     <p id="shed-team-feedback" role="status" aria-live="polite"></p>
   </section>
 

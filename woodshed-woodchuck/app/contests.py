@@ -1994,18 +1994,6 @@ def record_bonus_challenge_progress(
             "rewardCredits": 5,
         }
 
-        practice_log = list(state_json.get("practiceLog") or [])
-        practice_log.insert(0, {
-            "dateKey": today.isoformat(),
-            "minutes": submitted.minutes,
-            "note": submitted.note.strip(),
-            "questId": challenge_id,
-            "creditsAwarded": 5 if completed else 0,
-            "loggedAt": now.isoformat(),
-            "source": "quest" if completed else "quest-progress",
-        })
-        state_json["practiceLog"] = practice_log[:50]
-
         if completed:
             session.add(QuestCompletion(
                 profile_id=profile.id,

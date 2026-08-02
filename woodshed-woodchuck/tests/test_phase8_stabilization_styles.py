@@ -26,7 +26,8 @@ def test_captain_star_and_accessible_label_are_shared() -> None:
     label = APP[APP.index("function appendTeamLabel"):APP.index("const questPool")]
     assert 'aria-hidden="true">⭐' in label
     assert 'accessible.textContent = " Team Captain"' in label
-    assert APP.count("appendTeamLabel(") >= 3
+    assert "function createShedTeamCard" in label
+    assert 'star.textContent = "⭐ "' in label
 
 
 def test_member_since_is_only_on_board_beneath_name() -> None:

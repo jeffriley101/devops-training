@@ -271,6 +271,7 @@ def test_piano_keyboard_get_and_post_share_canonical_challenge(
         refreshed = client.get("/contests/bonus-challenge/current").json()["challenge"]
         assert refreshed["instance_key"] == current["instance_key"]
         assert refreshed["logged_minutes"] == 4
+        assert client.get("/account/state").json()["state"]["practiceLog"] == []
 
         stale = client.post("/contests/bonus-challenge/progress", json={
             "activity_date": current["activity_date"],
@@ -302,6 +303,7 @@ def test_piano_keyboard_get_and_post_share_canonical_challenge(
                 CampPointAward.profile_id == profile_id
             ))
             assert award is not None and award.team_id is None
+            assert session.get(WoodchuckState, profile_id).state_json["practiceLog"] == []
 
 
 def test_shared_resolver_replaces_stale_cross_instrument_client_state(

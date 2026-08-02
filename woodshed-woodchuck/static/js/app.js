@@ -61,8 +61,17 @@
     bee: "🐝", dragon: "🐉", cat: "🐱", dog: "🐶", star: "⭐",
     fire: "🔥", moon: "🌙", lightning: "⚡",
   };
+  const TEAM_EMOJI_NAMES = {
+    lion: "Lion", goat: "Goat", bear: "Bear", eagle: "Eagle", wolf: "Wolf",
+    bee: "Bee", dragon: "Dragon", cat: "Cat", dog: "Dog", star: "Star",
+    fire: "Fire", moon: "Moon", lightning: "Lightning",
+  };
 
   function normalizedEmblem(emblem) {
+    if (emblem && emblem.key) {
+      const [kind, value] = String(emblem.key).split(":");
+      return { kind, value, key: `${kind}:${value}` };
+    }
     if (emblem && emblem.kind && emblem.value) return emblem;
     const [kind, value] = String(emblem?.key || emblem || "").split(":");
     return { kind, value, key: `${kind}:${value}` };
@@ -74,6 +83,18 @@
     if (normalized.kind === "letter") return `Letter ${normalized.value}`;
     if (normalized.kind === "shield") return `${normalized.value} shield`;
     return "Team emblem";
+  }
+
+  function emblemDisplayName(emblem) {
+    const normalized = normalizedEmblem(emblem);
+    if (normalized.kind === "emoji") {
+      return TEAM_EMOJI_NAMES[normalized.value] || "Team Emblem";
+    }
+    if (normalized.kind === "letter") return `Letter ${normalized.value}`;
+    if (normalized.kind === "shield") {
+      return `${normalized.value.charAt(0).toUpperCase()}${normalized.value.slice(1)} Shield`;
+    }
+    return "Team Emblem";
   }
 
   function renderTeamEmblem(container, emblem) {
@@ -111,6 +132,49 @@
     accessible.textContent = " Team Captain";
     captain.append(accessible);
     container.replaceChildren(emblem, name, captain);
+  }
+
+  function createShedTeamCard(team, { current = false, locked = false } = {}) {
+    const label = document.createElement("label");
+    label.className = `shed-team-choice-card${current ? " is-selected" : ""}`;
+    const radio = document.createElement("input");
+    radio.type = "radio";
+    radio.name = "shed-team-choice";
+    radio.value = String(team.id);
+    radio.checked = current;
+    radio.disabled = current || locked;
+    radio.className = "team-radio-native";
+
+    const content = document.createElement("span");
+    content.className = "shed-team-choice-content";
+    const main = document.createElement("span");
+    main.className = "shed-team-choice-main";
+    const emblem = document.createElement("span");
+    renderTeamEmblem(emblem, team.emblem || team.emblem_key);
+    const name = document.createElement("strong");
+    name.textContent = team.name;
+    main.append(emblem, name);
+
+    const captain = document.createElement("span");
+    captain.className = "shed-team-choice-captain";
+    captain.append(document.createTextNode("Captain: "));
+    const star = document.createElement("span");
+    star.setAttribute("aria-hidden", "true");
+    star.textContent = "⭐ ";
+    captain.append(star, document.createTextNode(team.captain.display_name));
+    const accessible = document.createElement("span");
+    accessible.className = "sr-only";
+    accessible.textContent = " Team Captain";
+    captain.append(accessible);
+    content.append(main, captain);
+    if (current) {
+      const selected = document.createElement("span");
+      selected.className = "shed-team-selected-status";
+      selected.textContent = "Selected";
+      content.append(selected);
+    }
+    label.append(radio, content);
+    return { label, radio };
   }
 
   const questPool = parseJsonFromId("quest-pool-data", {});
@@ -398,7 +462,19 @@
     const feedback = document.getElementById("shed-team-feedback");
     const emblem = document.getElementById("shed-team-emblem");
     const emblemChoice = document.getElementById("shed-team-emblem-choice");
-    if (!trigger || !panel || !options) return;
+    const emblemPreview = document.getElementById("shed-team-emblem-preview");
+    const otherSection = document.getElementById("shed-team-other-section");
+    if (!trigger || !panel || !options || !status || !emblemChoice) return;
+    function updateEmblemPreview() {
+      if (!emblemPreview || !emblemChoice) return;
+      if (!emblemChoice.value) {
+        emblemPreview.replaceChildren();
+        emblemPreview.setAttribute("aria-label", "No emblem selected");
+        return;
+      }
+      renderTeamEmblem(emblemPreview, emblemChoice.value);
+    }
+    emblemChoice?.addEventListener("change", updateEmblemPreview);
     async function load() {
       try {
         const response = await fetch("/teams", {credentials: "same-origin", cache: "no-store"});
@@ -408,24 +484,35 @@
         renderTeamEmblem(emblem, current?.emblem || "");
         trigger.setAttribute("aria-label", current ? `Team ${current.name}` : "Choose a team");
         trigger.title = current ? current.name : "Choose a team";
-        if (current) appendTeamLabel(status, current);
-        else status.textContent = "Choose an existing team or create one.";
+        status.replaceChildren();
+        if (current) {
+          const currentCard = createShedTeamCard(current, {current: true});
+          status.append(currentCard.label);
+        } else {
+          const empty = document.createElement("p");
+          empty.textContent = "No team selected.";
+          status.append(empty);
+        }
         options.replaceChildren();
-        (payload.teams || []).forEach((team) => {
-          const label = document.createElement("label"); label.className = "team-radio-tile";
-          const radio = document.createElement("input"); radio.type = "radio"; radio.name = "shed-team-choice";
-          radio.checked = current?.id === team.id;
+        const otherTeams = (payload.teams || []).filter((team) => team.id !== current?.id);
+        if (otherSection) otherSection.hidden = otherTeams.length === 0;
+        otherTeams.forEach((team) => {
+          const card = createShedTeamCard(team, {locked: payload.membership?.locked === true});
+          const radio = card.radio;
           radio.addEventListener("change", async function () {
             const change = await fetch("/teams/selection", {method: "POST", credentials: "same-origin", headers: {"Content-Type": "application/json"}, body: JSON.stringify({team_id: team.id})});
             const result = await change.json();
             feedback.textContent = change.ok ? "Team selected." : result.detail;
             await load();
           });
-          const text = document.createElement("span");
-          appendTeamLabel(text, team);
-          label.append(radio, text); options.append(label);
+          options.append(card.label);
         });
-        if (emblemChoice.options.length <= 1) (payload.approved_emblems || []).forEach((item) => emblemChoice.append(new Option(`${item.value} ${item.key}`, item.key)));
+        if (emblemChoice.options.length <= 1) {
+          (payload.approved_emblems || []).forEach((item) => {
+            emblemChoice.append(new Option(emblemDisplayName(item), item.key));
+          });
+          updateEmblemPreview();
+        }
         if (payload.membership?.locked) feedback.textContent = `Team changes unlock ${new Date(payload.membership.next_change_at).toLocaleString()}.`;
       } catch (error) { feedback.textContent = error.message || "Teams could not be loaded."; }
     }

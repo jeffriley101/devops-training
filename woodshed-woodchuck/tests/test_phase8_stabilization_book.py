@@ -66,7 +66,7 @@ def test_team_boards_render_public_team_only_but_shed_keeps_captain() -> None:
     assert "appendTeamLabel" not in board
     assert "active_member_count" not in board
     shed = script[script.index("function wireShedTeamBadge"):script.index("async function refreshPracticeStreak")]
-    assert "appendTeamLabel(status, current)" in shed
+    assert "createShedTeamCard(current, {current: true})" in shed
     assert "Team Captain" in script
 
 
@@ -131,7 +131,50 @@ def test_book_history_uses_accessible_verified_and_pristine_badges() -> None:
 
 def test_book_asset_versions_are_advanced() -> None:
     base = (ROOT / "templates/base.html").read_text(encoding="utf-8")
-    assert "/static/css/styles.css?v=66" in base
-    assert "/static/js/app.js?v=31" in base
-    assert "styles.css?v=65" not in base
-    assert "app.js?v=30" not in base
+    assert "/static/css/styles.css?v=67" in base
+    assert "/static/js/app.js?v=32" in base
+    assert "styles.css?v=66" not in base
+    assert "app.js?v=31" not in base
+
+
+def test_timer_status_and_history_have_independent_full_width_rows() -> None:
+    template = (ROOT / "templates/p_book.html").read_text(encoding="utf-8")
+    css = (ROOT / "static/css/styles.css").read_text(encoding="utf-8")
+    timer_row = template.index('class="practice-timer-row"')
+    status_row = template.index('class="body-copy practice-timer-status"')
+    assert timer_row < status_row
+    assert ".p-book-page .practice-timer-status" in css
+    timer_css = css[css.index(".p-book-page .practice-timer-status"):]
+    assert "position: static" in timer_css[:300]
+    assert "grid-row: 2" in timer_css[:300]
+    heading = template.index('<h2 class="p-book-title">Practice Book</h2>')
+    entries = template.index('id="p-book-entries" class="p-book-entry-list"')
+    assert heading < entries
+    assert ".p-book-page .pirate-logbook {\n  display: block;" in css
+    assert ".p-book-page .p-book-entry-list" in css
+    assert "grid-template-columns: minmax(0, 1fr)" in css[css.index(".p-book-page .p-book-entry-list"):][:220]
+
+
+def test_shed_team_selector_has_one_current_card_and_polished_emblems() -> None:
+    template = (ROOT / "templates/home.html").read_text(encoding="utf-8")
+    script = (ROOT / "static/js/app.js").read_text(encoding="utf-8")
+    css = (ROOT / "static/css/styles.css").read_text(encoding="utf-8")
+    assert template.count('id="shed-team-current"') == 1
+    assert "Join Another Team" in template
+    assert 'id="shed-team-other-section"' in template
+    assert "New team name" in template
+    assert "Choose an emblem" in template
+    assert 'id="shed-team-emblem-preview"' in template
+    assert "otherTeams = (payload.teams || []).filter((team) => team.id !== current?.id)" in script
+    assert "otherSection.hidden = otherTeams.length === 0" in script
+    assert 'document.createTextNode("Captain: ")' in script
+    assert 'star.textContent = "⭐ "' in script
+    assert 'accessible.textContent = " Team Captain"' in script
+    assert "Letter ${normalized.value}" in script
+    assert "Shield`" in script
+    assert "${item.value} ${item.key}" not in script
+    assert "emblemChoice.append(new Option(emblemDisplayName(item), item.key))" in script
+    assert "if (emblem && emblem.key)" in script
+    assert 'cat: "Cat"' in script and 'dog: "Dog"' in script
+    assert ".team-radio-native" in css and "clip-path: inset(50%)" in css
+    assert ".shed-team-choice-card.is-selected" in css

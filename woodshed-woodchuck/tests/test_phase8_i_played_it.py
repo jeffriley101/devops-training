@@ -55,6 +55,7 @@ def test_bonus_completion_model_has_no_chart_or_contest_side_effects() -> None:
     for forbidden in (
         "PracticeChart(", "PracticeChartVerification(", "ContestResult(",
         "CrownProgress(", "send_email", "finalize", "participation",
+        "practice_log.insert",
     ):
         assert forbidden not in route
 
