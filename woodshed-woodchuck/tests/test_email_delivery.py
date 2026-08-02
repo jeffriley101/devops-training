@@ -213,6 +213,39 @@ def test_password_and_token_are_absent_from_failure_logs(mail_database, monkeypa
     assert response.json()["invitation_token"] not in logs
 
 
+def test_ordinary_practice_book_email_uses_owned_preset_and_is_idempotent(mail_database) -> None:
+    with TestClient(app) as client:
+        profile_id = create_student(client)
+        preset_response = client.post("/practice-charts/email-presets", json={
+            "display_name": "Band Teacher", "email": "teacher+music@example.test",
+        })
+        assert preset_response.status_code == 201
+        preset_id = preset_response.json()["preset"]["id"]
+        assert client.get("/practice-charts/email-presets").json()["presets"] == [{
+            "id": preset_id, "display_name": "Band Teacher", "email": "teacher+music@example.test",
+        }]
+        submitted = {
+            "practice_date": "2026-07-30", "minutes": 20,
+            "note": "Air & tone", "practice_details": ["Long Tones"],
+            "submission_key": "ordinary-email-chart", "ordinary_email_preset_id": preset_id,
+        }
+        first = client.post("/practice-charts", json=submitted)
+        duplicate = client.post("/practice-charts", json=submitted)
+        assert first.status_code == 201 and first.json()["ordinary_email_delivery"]["sent"] is True
+        assert first.json()["chart"]["verification"] is None
+        assert duplicate.status_code == 201 and duplicate.json()["created"] is False
+        assert duplicate.json()["ordinary_email_delivery"] is None
+        with mail_database() as session:
+            chart = session.scalar(select(PracticeChart).where(PracticeChart.profile_id == profile_id))
+            assert chart.ordinary_email_preset_id == preset_id
+            assert chart.ordinary_email_sent_at is not None
+            assert session.scalar(select(func.count()).select_from(PracticeChartVerification)) == 0
+        assert len(CapturingSMTP.messages) == 1
+        message = CapturingSMTP.messages[0]
+        assert message["To"] == "teacher+music@example.test"
+        assert "not a verification request" in message.get_body(preferencelist=("plain",)).get_content().lower()
+
+
 def test_confirmation_ui_is_status_only_and_original_controls_remain() -> None:
     pbook = (ROOT / "templates/p_book.html").read_text(encoding="utf-8")
     invitations = (ROOT / "templates/trusted_verifiers.html").read_text(encoding="utf-8")
@@ -234,8 +267,8 @@ def test_confirmation_ui_is_status_only_and_original_controls_remain() -> None:
     assert 'id="trusted-verifier-open-email"' not in invitations
     assert 'id="trusted-verifier-resend-email"' not in invitations
 
-    assert 'type="submit">Submit to Log Book</button>' in pbook
-    assert 'id="email-p-chart-btn"' in pbook
+    assert 'type="submit">Submit P-Chart</button>' in pbook
+    assert 'id="email-p-chart-btn"' not in pbook
     assert 'id="trusted-verifier-invite-form"' in invitations
     assert 'id="trusted-verifier-copy-link"' in invitations
     assert "showReviewDeliveryStatus" in app_js

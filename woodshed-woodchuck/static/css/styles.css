@@ -2838,6 +2838,32 @@ select {
 .contest-opt-in-control input { width: 1.2rem; height: 1.2rem; margin-top: 0.1rem; }
 .contest-opt-in-control span { display: grid; gap: 0.2rem; }
 .contest-opt-in-control small { font-weight: 600; line-height: 1.35; }
+.p-book-option-card { margin-top: 0.35rem; }
+.p-book-option-detail {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.75rem;
+  border: 1px solid #bd8c3e;
+  border-radius: 0 0 12px 12px;
+  background: #fff1b8;
+}
+.p-book-warm-field,
+.p-book-work-field { border-radius: 12px; background: #fff1b8; }
+.team-tile-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: 0.45rem; }
+.team-radio-tile { display: flex; gap: 0.45rem; align-items: center; min-height: 44px; padding: 0.5rem; border: 1px solid #8b6330; border-radius: 9px; background: #fff8db; }
+.team-radio-tile input { width: 1.2rem; height: 1.2rem; }
+.p-book-submit-gold {
+  color: #2f220d;
+  background: linear-gradient(145deg, #ffe88a, #d8a832);
+  box-shadow: 0 0 0.7rem rgba(210, 158, 28, 0.7);
+  animation: p-book-gold-pulse 2.4s ease-in-out infinite;
+}
+@keyframes p-book-gold-pulse {
+  50% { box-shadow: 0 0 1.15rem rgba(210, 158, 28, 0.9); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .p-book-submit-gold { animation: none; box-shadow: 0 0 0 3px #b78718; }
+}
 
 .crown-category-chart { margin-top: 1rem; padding-top: 0.8rem; border-top: 2px solid rgba(92, 63, 32, 0.3); }
 .crown-category-list { display: grid; gap: 0.5rem; }

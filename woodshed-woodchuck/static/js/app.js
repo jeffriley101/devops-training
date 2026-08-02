@@ -2823,20 +2823,23 @@
     const feedbackEl = document.getElementById("p-book-feedback");
     const deliveryStatusEl = document.getElementById("p-book-email-delivery-status");
     const entriesEl = document.getElementById("p-book-entries");
-    const exportBtn = document.getElementById("export-p-chart-btn");
-    const emailBtn = document.getElementById("email-p-chart-btn");
-    const teacherEmailEl = document.getElementById("teacher-email");
-    const parentEmailEl = document.getElementById("parent-email");
-    const teacherEmailOptionsEl = document.getElementById("teacher-email-options");
-    const parentEmailOptionsEl = document.getElementById("parent-email-options");
     const verifierSelectEl = document.getElementById("p-book-verifier");
     const includeContestsEl = document.getElementById("p-book-include-contests");
+    const includeTeamEl = document.getElementById("p-book-include-team");
+    const emailCopyEl = document.getElementById("p-book-email-copy");
+    const requestValidationEl = document.getElementById("p-book-request-validation");
+    const emailPresetEl = document.getElementById("p-book-email-preset");
     const verifierHelpEl = document.getElementById("p-book-verifier-help");
     const submitBtn = form.querySelector("button[type='submit']");
-    const openDialog = document.getElementById("open-chart-confirmation");
-    const submitOpenBtn = document.getElementById("submit-open-chart");
-    const chooseVerifierBtn = document.getElementById("choose-chart-verifier");
-    const cancelOpenBtn = document.getElementById("cancel-open-chart");
+    const missingDialog = document.getElementById("p-book-missing-selection");
+    const finalDialog = document.getElementById("p-book-final-confirmation");
+    const missingMessageEl = document.getElementById("p-book-missing-message");
+    const chooseMissingBtn = document.getElementById("p-book-choose-missing");
+    const withoutMissingBtn = document.getElementById("p-book-without-missing");
+    const missingBackBtn = document.getElementById("p-book-missing-back");
+    const confirmValuesEl = document.getElementById("p-book-confirm-values");
+    const confirmSubmitBtn = document.getElementById("p-book-confirm-submit");
+    const confirmBackBtn = document.getElementById("p-book-confirm-back");
 
     const weekPracticeEl = document.getElementById("p-book-week-practice");
     const careerPracticeEl = document.getElementById("p-book-career-practice");
@@ -2846,27 +2849,21 @@
     const DANDELION_DAILY_CAP = 75;
     let submissionInFlight = false;
     let pendingSubmissionKey = null;
-    let openSubmissionConfirmed = false;
+    let confirmationApproved = false;
+    let currentTeam = null;
     function showReviewDeliveryStatus(payload) {
       if (!deliveryStatusEl || !payload.chart?.verification) return;
       deliveryStatusEl.hidden = false;
       deliveryStatusEl.textContent = payload.email_delivery?.message || "P-Chart saved; no new email was sent.";
     }
 
-    if (openDialog && submitOpenBtn && chooseVerifierBtn && cancelOpenBtn) {
-      submitOpenBtn.addEventListener("click", function () {
-        openSubmissionConfirmed = true;
-        openDialog.close();
-        form.requestSubmit();
-      });
-      chooseVerifierBtn.addEventListener("click", function () {
-        openDialog.close();
-        verifierSelectEl.focus();
-      });
-      cancelOpenBtn.addEventListener("click", function () {
-        openDialog.close();
-      });
-    }
+    if (confirmSubmitBtn) confirmSubmitBtn.addEventListener("click", function () {
+      confirmationApproved = true;
+      finalDialog.close();
+      form.requestSubmit();
+    });
+    if (confirmBackBtn) confirmBackBtn.addEventListener("click", () => finalDialog.close());
+    if (missingBackBtn) missingBackBtn.addEventListener("click", () => missingDialog.close());
 
     function verifierRoleLabel(role) {
       return String(role || "")
@@ -2950,8 +2947,7 @@
                 "Select a trusted verifier, or leave this Open."
               )
             : (
-                "No trusted verifiers are connected yet. " +
-                "This chart can still be saved as Open."
+                "Connect a parent or mentor before requesting validation."
               );
         }
       } catch (error) {
@@ -2970,6 +2966,106 @@
       }
     }
 
+    async function loadTeams() {
+      const optionsEl = document.getElementById("p-book-team-options");
+      const currentEl = document.getElementById("p-book-current-team");
+      const emblemEl = document.getElementById("p-book-team-emblem");
+      const lockEl = document.getElementById("p-book-team-lock");
+      if (!optionsEl) return;
+      try {
+        const response = await fetch("/teams", {credentials: "same-origin", cache: "no-store"});
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.detail || "Teams could not be loaded.");
+        currentTeam = payload.membership?.team || null;
+        currentEl.textContent = currentTeam
+          ? `Current team: ${currentTeam.name}`
+          : "No team selected yet.";
+        lockEl.textContent = payload.membership?.locked
+          ? `Team changes unlock ${new Date(payload.membership.next_change_at).toLocaleString()}.`
+          : "You may make your team choice for this contest week.";
+        optionsEl.replaceChildren();
+        (payload.teams || []).forEach((team) => {
+          const label = document.createElement("label");
+          label.className = "team-radio-tile";
+          const input = document.createElement("input");
+          input.type = "radio"; input.name = "p-book-team-choice";
+          input.value = String(team.id); input.checked = Boolean(currentTeam && currentTeam.id === team.id);
+          input.addEventListener("change", async function () {
+            if (!input.checked) return;
+            const changed = await fetch("/teams/selection", {
+              method: "POST", credentials: "same-origin",
+              headers: {"Content-Type": "application/json"},
+              body: JSON.stringify({team_id: team.id}),
+            });
+            const result = await changed.json();
+            if (!changed.ok) { errorEl.textContent = result.detail || "Team could not be selected."; await loadTeams(); return; }
+            await loadTeams();
+          });
+          const text = document.createElement("span");
+          text.textContent = `${team.emblem.value} ${team.name} — ⭐ ${team.captain.display_name} (Team Captain)`;
+          label.append(input, text); optionsEl.append(label);
+        });
+        if (emblemEl && emblemEl.options.length <= 1) {
+          (payload.approved_emblems || []).forEach((emblem) => {
+            emblemEl.append(new Option(`${emblem.value} ${emblem.key}`, emblem.key));
+          });
+        }
+      } catch (error) {
+        currentEl.textContent = error.message || "Teams could not be loaded.";
+      }
+    }
+
+    async function loadEmailPresets() {
+      if (!emailPresetEl) return;
+      try {
+        const response = await fetch("/practice-charts/email-presets", {credentials: "same-origin", cache: "no-store"});
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.detail || "Email presets could not be loaded.");
+        emailPresetEl.replaceChildren(new Option("Choose a saved recipient", ""));
+        (payload.presets || []).forEach((preset) => {
+          emailPresetEl.append(new Option(`${preset.display_name} — ${preset.email}`, String(preset.id)));
+        });
+      } catch (error) {
+        errorEl.textContent = error.message || "Email presets could not be loaded.";
+      }
+    }
+
+    const createTeamBtn = document.getElementById("p-book-create-team");
+    if (createTeamBtn) createTeamBtn.addEventListener("click", async function () {
+      createTeamBtn.disabled = true; errorEl.textContent = "";
+      try {
+        const response = await fetch("/teams", {
+          method: "POST", credentials: "same-origin", headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({
+            name: document.getElementById("p-book-new-team-name").value,
+            emblem_key: document.getElementById("p-book-team-emblem").value,
+          }),
+        });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.detail || "Team could not be created.");
+        await loadTeams();
+      } catch (error) { errorEl.textContent = error.message; }
+      finally { createTeamBtn.disabled = false; }
+    });
+
+    const savePresetBtn = document.getElementById("p-book-save-preset");
+    if (savePresetBtn) savePresetBtn.addEventListener("click", async function () {
+      savePresetBtn.disabled = true; errorEl.textContent = "";
+      try {
+        const response = await fetch("/practice-charts/email-presets", {
+          method: "POST", credentials: "same-origin", headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({
+            display_name: document.getElementById("p-book-preset-name").value,
+            email: document.getElementById("p-book-preset-email").value,
+          }),
+        });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.detail || "Preset could not be saved.");
+        await loadEmailPresets(); emailPresetEl.value = String(payload.preset.id);
+      } catch (error) { errorEl.textContent = error.message; }
+      finally { savePresetBtn.disabled = false; }
+    });
+
     async function createPersistentPracticeChart({
       verifierId,
       dateKey,
@@ -2979,6 +3075,8 @@
       creditsAwarded,
       submissionKey,
       includeContests,
+      includeTeamContests,
+      ordinaryEmailPresetId,
     }) {
       const response = await fetch(
         "/practice-charts",
@@ -2998,6 +3096,8 @@
             credits_awarded: creditsAwarded,
             submission_key: submissionKey,
             include_contests: includeContests,
+            include_team_contests: includeTeamContests,
+            ordinary_email_preset_id: ordinaryEmailPresetId,
           }),
         }
       );
@@ -3420,8 +3520,20 @@
     renderEmailOptions(state);
     wirePracticeTimer();
     loadVerifierOptions();
+    loadTeams();
+    loadEmailPresets();
     loadPersistentPracticeCharts();
     loadPracticeTotals();
+
+    function updateSubmitGlow() {
+      const glowing = [includeContestsEl, includeTeamEl, requestValidationEl]
+        .every((checkbox) => checkbox && checkbox.checked);
+      submitBtn.classList.toggle("p-book-submit-gold", glowing);
+    }
+    [includeContestsEl, includeTeamEl, requestValidationEl].forEach((checkbox) => {
+      if (checkbox) checkbox.addEventListener("change", updateSubmitGlow);
+    });
+    updateSubmitGlow();
 
     form.addEventListener("submit", async function (event) {
       event.preventDefault();
@@ -3459,7 +3571,7 @@
         dateKey
       );
 
-      const verifierId = verifierSelectEl
+      const verifierId = requestValidationEl?.checked && verifierSelectEl
         ? Number(verifierSelectEl.value)
         : 0;
 
@@ -3469,9 +3581,46 @@
           ? verifierSelectEl.selectedOptions[0].textContent
           : "";
       const includeContests = includeContestsEl ? includeContestsEl.checked : true;
+      const includeTeamContests = Boolean(includeTeamEl?.checked);
+      const ordinaryEmailPresetId = emailCopyEl?.checked ? Number(emailPresetEl?.value) : 0;
 
-      if (!verifierId && !openSubmissionConfirmed && openDialog) {
-        if (!openDialog.open) openDialog.showModal();
+      const missing = includeTeamContests && !currentTeam
+        ? {message: "Choose a team, or continue without Team Competition.", choose: "Choose a Team", without: "Submit Without Team Competition", target: document.getElementById("p-book-team-selector"), checkbox: includeTeamEl}
+        : emailCopyEl?.checked && !ordinaryEmailPresetId
+          ? {message: "Choose a saved recipient, or continue without emailing.", choose: "Choose a Recipient", without: "Submit Without Emailing", target: emailPresetEl, checkbox: emailCopyEl}
+          : requestValidationEl?.checked && !verifierId
+            ? {message: "Choose a connected parent or mentor, or continue without validation.", choose: "Choose a Parent or Mentor", without: "Submit Without Validation Request", target: verifierSelectEl, checkbox: requestValidationEl}
+            : null;
+      if (missing && missingDialog) {
+        missingMessageEl.textContent = missing.message;
+        chooseMissingBtn.textContent = missing.choose;
+        withoutMissingBtn.textContent = missing.without;
+        chooseMissingBtn.onclick = function () {
+          missingDialog.close();
+          missing.target?.scrollIntoView({block: "center"});
+          missing.target?.focus?.();
+        };
+        withoutMissingBtn.onclick = function () {
+          missing.checkbox.checked = false;
+          updateSubmitGlow();
+          missingDialog.close();
+          form.requestSubmit();
+        };
+        missingDialog.showModal();
+        return;
+      }
+
+      if (!confirmationApproved && finalDialog) {
+        const presetText = ordinaryEmailPresetId && emailPresetEl.selectedOptions.length
+          ? emailPresetEl.selectedOptions[0].textContent : "Not sent";
+        confirmValuesEl.replaceChildren();
+        [
+          `Band Camp contest: ${includeContests ? "Included" : "Not included"}`,
+          `Team Competition: ${includeTeamContests && currentTeam ? `${currentTeam.emblem.value} ${currentTeam.name}` : "Not included"}`,
+          `Practice Book email: ${presetText}`,
+          `Validation request: ${verifierId ? verifierName : "Not requested"}`,
+        ].forEach((text) => { const item = document.createElement("li"); item.textContent = text; confirmValuesEl.append(item); });
+        finalDialog.showModal();
         return;
       }
 
@@ -3495,6 +3644,8 @@
           creditsAwarded: dandelionsEarned,
           submissionKey: pendingSubmissionKey,
           includeContests,
+          includeTeamContests,
+          ordinaryEmailPresetId: ordinaryEmailPresetId || null,
         });
         const serverChart = createdPayload && createdPayload.chart;
         if (!serverChart || !Number.isInteger(serverChart.id)) {
@@ -3507,9 +3658,9 @@
           playSound("pChartSubmitted");
         }
 
-        next.progress.credits =
-          (next.progress.credits || 0) +
-          dandelionsEarned;
+        if (createdPayload.created === true) {
+          next.progress.credits = (next.progress.credits || 0) + dandelionsEarned;
+        }
         if (Number.isInteger(createdPayload.streak)) {
           next.progress.streak = createdPayload.streak;
         }
@@ -3531,7 +3682,25 @@
               `A new Open P-Chart was saved. ` +
               `+${dandelionsEarned} dandelions added.`
             );
-        if (verifierId) showReviewDeliveryStatus(createdPayload);
+        const deliveryMessages = [
+          createdPayload.ordinary_email_delivery?.message,
+          createdPayload.email_delivery?.message,
+        ].filter(Boolean);
+        if (deliveryStatusEl && deliveryMessages.length) {
+          deliveryStatusEl.hidden = false;
+          deliveryStatusEl.textContent = deliveryMessages.join(" · ");
+        }
+
+        const exportText = buildExportText(stateApi.getState());
+        try {
+          await navigator.clipboard.writeText(exportText);
+          feedbackEl.textContent += " P-Chart copied to your clipboard.";
+          window.setTimeout(() => {
+            if (feedbackEl.textContent.includes("copied to your clipboard")) feedbackEl.textContent = "";
+          }, 5000);
+        } catch (_clipboardError) {
+          feedbackEl.textContent += " P-Chart saved, but it could not be copied automatically.";
+        }
 
         minutesEl.value = "";
         noteEl.value = "";
@@ -3540,6 +3709,10 @@
           checkbox.checked = false;
         });
         if (includeContestsEl) includeContestsEl.checked = true;
+        if (includeTeamEl) includeTeamEl.checked = true;
+        if (emailCopyEl) emailCopyEl.checked = true;
+        if (requestValidationEl) requestValidationEl.checked = true;
+        updateSubmitGlow();
 
         pendingSubmissionKey = null;
         hydrateHome(next);
@@ -3549,7 +3722,7 @@
           error.message ||
           "The P-Chart could not be submitted.";
       } finally {
-        openSubmissionConfirmed = false;
+        confirmationApproved = false;
         submissionInFlight = false;
         if (submitBtn) {
           submitBtn.disabled = false;
@@ -3557,42 +3730,6 @@
       }
     });
 
-    if (exportBtn) {
-      exportBtn.addEventListener("click", async function () {
-        const next = stateApi.getState();
-        const exportText = buildExportText(next);
-
-        try {
-          await navigator.clipboard.writeText(exportText);
-          feedbackEl.textContent = "P-Chart copied. You can paste it into a message or email for your band director.";
-        } catch (_err) {
-          feedbackEl.textContent = exportText;
-        }
-      });
-    }
-
-    if (emailBtn) {
-      emailBtn.addEventListener("click", function () {
-        const next = stateApi.getState();
-        const exportText = buildExportText(next);
-        const teacherEmail = teacherEmailEl ? teacherEmailEl.value.trim() : "";
-        const parentEmail = parentEmailEl ? parentEmailEl.value.trim() : "";
-        saveRecentEmail(next, "teacherEmails", teacherEmail);
-        saveRecentEmail(next, "parentEmails", parentEmail);
-        stateApi.saveState(next);
-        renderEmailOptions(next);
-        const subject = "Woodshed Woodchuck Practice Chart";
-
-        const params = new URLSearchParams();
-        if (parentEmail) params.set("cc", parentEmail);
-        params.set("subject", subject);
-        params.set("body", exportText);
-
-        const mailtoQuery = params.toString().replace(/\+/g, "%20");
-        const mailtoUrl = `mailto:${encodeURIComponent(teacherEmail)}?${mailtoQuery}`;
-        window.location.href = mailtoUrl;
-      });
-    }
   }
 
   const state = ensureTodayQuest(stateApi.getState());

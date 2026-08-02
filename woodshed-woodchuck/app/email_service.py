@@ -150,3 +150,37 @@ class EmailService:
             to_email=recipient, subject="A Woodshed Woodchuck P-Chart is ready for your review",
             plain_text=plain, html_body=body, config=self.config,
         ))
+
+    def send_practice_book_copy(
+        self, *, recipient: str, student_name: str, practice_date: str,
+        minutes: int, instrument: str, note: str, practice_details: list[str],
+    ) -> DeliveryResult:
+        """Send a normal chart copy; this carries no approval capability."""
+        if self.config is None:
+            return DeliveryResult(False, "not_configured")
+        details = ", ".join(practice_details) if practice_details else "Not specified"
+        plain = (
+            "Woodshed Woodchuck Practice Book\n\n"
+            f"Student: {student_name}\nPractice date: {practice_date}\n"
+            f"Practice minutes: {minutes}\nInstrument: {instrument}\n"
+            f"What they worked on: {details}\nShort note: {note or 'None'}\n\n"
+            "This is a copy of a saved P-Chart. It is not a verification request."
+        )
+        safe = {key: html.escape(str(value)) for key, value in {
+            "student": student_name, "date": practice_date, "minutes": minutes,
+            "instrument": instrument, "details": details, "note": note or "None",
+        }.items()}
+        body = (
+            "<h1>Woodshed Woodchuck Practice Book</h1>"
+            f"<p><strong>Student:</strong> {safe['student']}<br>"
+            f"<strong>Practice date:</strong> {safe['date']}<br>"
+            f"<strong>Practice minutes:</strong> {safe['minutes']}<br>"
+            f"<strong>Instrument:</strong> {safe['instrument']}<br>"
+            f"<strong>What they worked on:</strong> {safe['details']}<br>"
+            f"<strong>Short note:</strong> {safe['note']}</p>"
+            "<p>This is a copy of a saved P-Chart. It is not a verification request.</p>"
+        )
+        return self.send(build_message(
+            to_email=recipient, subject="Woodshed Woodchuck Practice Book",
+            plain_text=plain, html_body=body, config=self.config,
+        ))

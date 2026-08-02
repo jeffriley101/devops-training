@@ -470,6 +470,12 @@ class PracticeChart(Base):
     team_id: Mapped[int | None] = mapped_column(
         ForeignKey("teams.id", ondelete="SET NULL"), nullable=True, index=True
     )
+    ordinary_email_preset_id: Mapped[int | None] = mapped_column(
+        ForeignKey("practice_email_presets.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    ordinary_email_attempted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    ordinary_email_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    ordinary_email_error_code: Mapped[str | None] = mapped_column(String(40), nullable=True)
 
     credits_awarded: Mapped[int] = mapped_column(
         Integer,
@@ -551,6 +557,21 @@ class PracticeChartVerification(Base):
         onupdate=utc_now,
         nullable=False,
     )
+
+
+class PracticeEmailPreset(Base):
+    __tablename__ = "practice_email_presets"
+    __table_args__ = (
+        UniqueConstraint("profile_id", "email", name="uq_practice_email_preset_profile_email"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    profile_id: Mapped[int] = mapped_column(
+        ForeignKey("woodchuck_profiles.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    display_name: Mapped[str] = mapped_column(String(80), nullable=False)
+    email: Mapped[str] = mapped_column(String(254), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
 
 
 class CampPointAward(Base):

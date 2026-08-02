@@ -98,9 +98,7 @@ def test_book_phase6a_timer_text_structure_and_stone_hooks() -> None:
 def test_book_actions_precede_divider_and_blue_statistics_region() -> None:
     book = (ROOT / "templates/p_book.html").read_text(encoding="utf-8")
     css = (ROOT / "static/css/styles.css").read_text(encoding="utf-8")
-    action_positions = [book.index(label) for label in (
-        "Submit to Log Book", "Copy to Clipboard", "Email Your Chart",
-    )]
+    action_positions = [book.index("Submit P-Chart")]
     divider = book.index("p-book-bold-divider")
     lower = book.index("p-book-lower-region")
     stats = book.index("This Week’s Practice")
