@@ -4130,11 +4130,11 @@ select {
 .contest-instrument-section > h4,
 .team-competition > h3 { font-size: clamp(1.25rem, 2.5vw, 1.8rem); }
 .contest-description-warm { color: #5d3c16; background: #fff0b0; border-color: #c3943d; }
-.contest-description-cherry {
-  color: #fff7df;
-  background: #9c2936;
-  border-color: #681722;
-}
+.contest-description-plain { color: #38260f; background: transparent; border-color: transparent; }
+.p-book-team-summary { align-items: start; }
+.p-book-team-summary #p-book-current-team,
+.p-book-team-summary #p-book-current-team > span { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
+.p-book-team-summary .btn { justify-self: start; }
 .team-competition { margin-top: 1rem; padding-top: 1rem; border-top: 3px solid #9a6b28; }
 .team-leaderboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr)); gap: 0.8rem; }
 .team-leaderboard-card {

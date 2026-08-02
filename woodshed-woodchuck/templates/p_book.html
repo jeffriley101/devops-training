@@ -88,15 +88,9 @@
       <input id="p-book-include-team" name="include-team" type="checkbox" checked />
       <span><strong>Include this chart in the Team Competition</strong><small>Uncheck to prevent being added to this contest.</small></span>
     </label>
-    <section id="p-book-team-selector" class="p-book-option-detail" aria-label="Team selection">
+    <section id="p-book-team-selector" class="p-book-option-detail p-book-team-summary" aria-label="Current team">
       <p id="p-book-current-team" class="body-copy">Loading current team…</p>
-      <div id="p-book-team-options" class="team-tile-grid" role="radiogroup" aria-label="Available teams"></div>
-      <label for="p-book-new-team-name">Create a New Team</label>
-      <input id="p-book-new-team-name" maxlength="30" autocomplete="off" />
-      <label for="p-book-team-emblem">Approved team emblem</label>
-      <select id="p-book-team-emblem"><option value="">Choose an emblem</option></select>
-      <button id="p-book-create-team" class="btn btn-secondary" type="button">Create and Join Team</button>
-      <p id="p-book-team-lock" class="body-copy" aria-live="polite"></p>
+      <a id="p-book-team-shed-link" class="btn btn-secondary" href="/home#shed-team-panel">Choose a Team in SHED</a>
     </section>
 
     <label class="contest-opt-in-control p-book-option-card" for="p-book-email-copy">

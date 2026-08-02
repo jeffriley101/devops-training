@@ -26,7 +26,7 @@ def test_captain_star_and_accessible_label_are_shared() -> None:
     label = APP[APP.index("function appendTeamLabel"):APP.index("const questPool")]
     assert 'aria-hidden="true">⭐' in label
     assert 'accessible.textContent = " Team Captain"' in label
-    assert APP.count("appendTeamLabel(") >= 4
+    assert APP.count("appendTeamLabel(") >= 3
 
 
 def test_member_since_is_only_on_board_beneath_name() -> None:
@@ -41,10 +41,11 @@ def test_member_since_is_only_on_board_beneath_name() -> None:
 
 def test_board_heading_cherry_description_and_team_contrast_hooks() -> None:
     assert BOARD.count("PRACTICE MINUTES LEADERBOARD") >= 3
-    assert 'contest-description-cherry">All submitted P-Charts' in BOARD
-    cherry_at = CSS.index(".contest-description-cherry")
-    cherry = CSS[cherry_at:cherry_at + 180]
-    assert "#9c2936" in cherry and "#fff7df" in cherry
+    assert 'contest-description-plain">All submitted P-Charts' in BOARD
+    assert "contest-description-cherry" not in BOARD
+    plain_at = CSS.index(".contest-description-plain")
+    plain = CSS[plain_at:plain_at + 150]
+    assert "background: transparent" in plain
     team = CSS[CSS.index(".team-leaderboard-card {"):CSS.index(".medal-board,")]
     assert "color: #38260f" in team
     assert ".contest-empty-state" in team

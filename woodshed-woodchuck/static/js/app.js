@@ -119,6 +119,7 @@
     supportive: ["Keep going — you can do this."],
     already_done: ["You already completed today's quest."],
   });
+  const BONUS_CHALLENGE_DANDELIONS = 5;
 
   function hasProfile(s) {
     return Boolean(s.profile.instrument && s.profile.level && s.profile.goal);
@@ -137,7 +138,7 @@
         id: "fallback-quest",
         text: "Practice one scale slowly with good tone.",
         target_minutes: 15,
-        reward_credits: 20,
+        reward_credits: BONUS_CHALLENGE_DANDELIONS,
       };
     }
 
@@ -166,7 +167,7 @@
       questId: quest.id,
       questText: quest.text,
       targetMinutes: quest.target_minutes,
-      rewardCredits: quest.reward_credits,
+      rewardCredits: BONUS_CHALLENGE_DANDELIONS,
       loggedMinutes: 0,
       completed: false,
       completedAt: null,
@@ -178,7 +179,7 @@
       text: quest.text,
       targetMinutes: quest.target_minutes,
       completed: false,
-      rewardCredits: quest.reward_credits,
+      rewardCredits: BONUS_CHALLENGE_DANDELIONS,
     };
 
     return state;
@@ -442,6 +443,7 @@
       if (response.ok) await load();
     });
     load();
+    if (window.location.hash === "#shed-team-panel") trigger.click();
   }
 
   async function refreshPracticeStreak() {
@@ -504,6 +506,8 @@
     const questStatusEl = document.getElementById("quest-status");
     const questProgressEl = document.getElementById("quest-progress");
     const form = document.getElementById("practice-form");
+    const minutesEl = document.getElementById("practice-minutes");
+    const noteEl = document.getElementById("practice-note");
     const errorEl = document.getElementById("practice-error");
     const feedbackEl = document.getElementById("quest-feedback");
     const completeBtn = document.getElementById("complete-quest-btn");
@@ -516,7 +520,6 @@
 
     const today = stateApi.localDateKey();
     let completionInFlight = false;
-    let iPlayedItClaimed = false;
 
     function setQuestFeedback(message) {
       if (feedbackEl) feedbackEl.textContent = message;
@@ -528,11 +531,11 @@
       questStatusEl.textContent = s.daily.completed ? "Complete ✅" : "Not completed";
 
       if (questProgressEl) {
-        questProgressEl.textContent = `${s.daily.loggedMinutes || 0}/${s.daily.targetMinutes} minutes logged`;
+        questProgressEl.textContent = `${s.daily.loggedMinutes || 0} of ${s.daily.targetMinutes}`;
       }
 
-      if (completeBtn && iPlayedItClaimed) {
-        completeBtn.textContent = "Completed Today";
+      if (completeBtn && s.daily.completed) {
+        completeBtn.textContent = "Quest Complete";
         completeBtn.classList.add("is-confirmed-success");
         completeBtn.disabled = true;
       } else if (completeBtn) {
@@ -549,7 +552,7 @@
         questId: quest.id,
         questText: quest.text,
         targetMinutes: quest.target_minutes,
-        rewardCredits: quest.reward_credits,
+        rewardCredits: BONUS_CHALLENGE_DANDELIONS,
         loggedMinutes: 0,
         completed: false,
         completedAt: null,
@@ -561,7 +564,7 @@
         text: quest.text,
         targetMinutes: quest.target_minutes,
         completed: false,
-        rewardCredits: quest.reward_credits,
+        rewardCredits: BONUS_CHALLENGE_DANDELIONS,
       };
     }
 
@@ -581,7 +584,7 @@
         .map((quest) => `
           <button class="quest-choice-card" type="button" data-quest-id="${quest.id}">
             <strong>${quest.text}</strong>
-            <small>${quest.target_minutes} minutes · ${quest.reward_credits} dandelions</small>
+            <small>${quest.target_minutes} minutes · ${BONUS_CHALLENGE_DANDELIONS} dandelions</small>
           </button>
         `)
         .join("");
@@ -591,20 +594,6 @@
 
     renderQuestStatus(state);
     updateInstrumentAdvice(state);
-
-    fetch("/contests/bonus-challenge/i-played-it", {
-      credentials: "same-origin",
-    })
-      .then((response) => response.ok ? response.json() : null)
-      .then((payload) => {
-        if (!payload) return;
-        iPlayedItClaimed = payload.claimed === true;
-        renderQuestStatus(stateApi.getState());
-        if (iPlayedItClaimed) setQuestFeedback("Already claimed today.");
-      })
-      .catch(() => {
-        // The action remains usable; the POST endpoint is authoritative.
-      });
 
     if (state.daily.completed && feedbackEl) {
       setQuestFeedback(pickMessage("already_done", today));
@@ -671,8 +660,37 @@
       if (errorEl) errorEl.textContent = "";
 
       const next = stateApi.getState();
-      if (iPlayedItClaimed) {
-        setQuestFeedback("Already claimed today.");
+      ensureTodayQuest(next);
+      const dateKey = stateApi.localDateKey();
+      const minutes = Number(minutesEl?.value);
+      const note = noteEl?.value.trim() || "";
+
+      if (!Number.isFinite(minutes) || minutes <= 0) {
+        if (errorEl) errorEl.textContent = "Enter a positive number of minutes.";
+        return;
+      }
+      if (next.daily.completed && next.daily.dateKey === dateKey) {
+        setQuestFeedback(pickMessage("already_done", dateKey));
+        renderQuestStatus(next);
+        return;
+      }
+
+      const loggedMinutes = (next.daily.loggedMinutes || 0) + minutes;
+      if (loggedMinutes < next.daily.targetMinutes) {
+        next.practiceLog.unshift({
+          dateKey, minutes, note, questId: next.daily.questId,
+          creditsAwarded: 0, loggedAt: new Date().toISOString(), source: "quest-progress",
+        });
+        next.practiceLog = next.practiceLog.slice(0, 50);
+        next.daily.loggedMinutes = loggedMinutes;
+        const message = `${pickMessage("supportive", dateKey)} (${loggedMinutes}/${next.daily.targetMinutes} minutes)`;
+        next.daily.encouragement = message;
+        setQuestFeedback(message);
+        stateApi.saveState(next);
+        renderQuestStatus(next);
+        hydrateHome(next);
+        minutesEl.value = "";
+        noteEl.value = "";
         return;
       }
 
@@ -682,19 +700,43 @@
         completeBtn.textContent = "Saving Quest…";
       }
       try {
-        const response = await fetch("/contests/bonus-challenge/i-played-it", {
+        const response = await fetch("/contests/quest/completions", {
           method: "POST",
           credentials: "same-origin",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({
+            activity_date: dateKey,
+            quest_id: next.daily.questId,
+            minutes,
+            logged_minutes: loggedMinutes,
+            note,
+          }),
         });
         const payload = await response.json();
         if (!response.ok) {
-          throw new Error(payload.detail || "The daily reward could not be saved.");
+          throw new Error(payload.detail || "Quest completion could not be saved.");
         }
-        iPlayedItClaimed = payload.claimed === true;
+        const completion = payload.completion;
+        if (!completion || completion.quest_id !== next.daily.questId) {
+          throw new Error("The saved Bonus Challenge response could not be read.");
+        }
+        if (payload.created === true) {
+          next.practiceLog.unshift({
+            dateKey, minutes, note, questId: completion.quest_id,
+            creditsAwarded: completion.reward_amount,
+            loggedAt: completion.completed_at, source: "quest",
+          });
+          next.practiceLog = next.practiceLog.slice(0, 50);
+        }
+        next.daily.loggedMinutes = completion.logged_minutes;
+        next.daily.completed = true;
+        next.daily.completedAt = completion.completed_at;
+        next.quest.completed = true;
         next.progress.credits = payload.credits;
         const rewardMessage = payload.created === true
-          ? `Bonus claimed: +5 dandelions and +2 Camp Points. Total: ${payload.credits} dandelions.`
-          : "Already claimed today.";
+          ? `Challenge complete: +5 dandelions and +2 Camp Points. Total: ${payload.credits} dandelions.`
+          : "Challenge already completed. No additional reward was added.";
+        next.daily.encouragement = rewardMessage;
         stateApi.saveState(next, { sync: false });
 
         const weeklyPoints = document.getElementById("board-player-weekly-points");
@@ -710,17 +752,19 @@
         setQuestFeedback(rewardMessage);
         renderQuestStatus(next);
         hydrateHome(next);
-        if (payload.created === true) {
+        minutesEl.value = "";
+        noteEl.value = "";
+        if (payload.created === true && payload.reward_created === true) {
           playSound("questCompleted");
         }
       } catch (error) {
         if (errorEl) {
-          errorEl.textContent = error.message || "The daily reward could not be saved. Please try again.";
+          errorEl.textContent = error.message || "Quest completion could not be saved. Please try again.";
         }
         renderQuestStatus(next);
       } finally {
         completionInFlight = false;
-        if (completeBtn && !iPlayedItClaimed) {
+        if (completeBtn && !next.daily.completed) {
           completeBtn.disabled = false;
           completeBtn.textContent = "I Played It";
         }
@@ -2049,13 +2093,15 @@
             const item = document.createElement("article"); item.className = `contest-ranked-row contest-rank-${Math.min(row.rank, 4)}`; item.setAttribute("role", "listitem");
             const rank = document.createElement("span"); rank.className = "contest-rank-badge"; rank.textContent = String(row.rank);
             const subject = document.createElement("span"); subject.className = "contest-ranked-subject team-ranked-subject";
-            appendTeamLabel(subject, {
-              name: row.team_name,
-              emblem_key: row.emblem_key,
-              captain: {display_name: row.captain_name},
-            });
+            const emblem = document.createElement("span");
+            renderTeamEmblem(emblem, row.emblem_key);
+            const teamName = document.createElement("span"); teamName.textContent = row.team_name;
+            subject.append(emblem, teamName);
             const score = document.createElement("strong"); score.className = "contest-ranked-score";
-            score.textContent = key === "team-average-practice" ? `${(row.score / 100).toFixed(2)} min · ${row.active_member_count} active` : String(row.score);
+            const scoreValue = key === "team-average-practice" ? `${(row.score / 100).toFixed(2)} min` : String(row.score);
+            score.textContent = Number.isInteger(row.active_member_count)
+              ? `${scoreValue} · ${row.active_member_count} active`
+              : scoreValue;
             item.setAttribute("aria-label", `Rank ${row.rank}, ${row.team_name}, ${score.textContent}`);
             item.append(rank, subject, score); list.append(item);
           });
@@ -3041,12 +3087,8 @@
 
         if (verifierHelpEl) {
           verifierHelpEl.textContent = connections.length
-            ? (
-                "Select a trusted verifier, or leave this Open."
-              )
-            : (
-                "No connected parent or mentor yet. Use Manage Trusted Verifiers to add one."
-              );
+            ? "Select a trusted verifier, or leave this Open."
+            : "";
         }
       } catch (error) {
         verifierSelectEl.replaceChildren(
@@ -3066,52 +3108,31 @@
     }
 
     async function loadTeams() {
-      const optionsEl = document.getElementById("p-book-team-options");
       const currentEl = document.getElementById("p-book-current-team");
-      const emblemEl = document.getElementById("p-book-team-emblem");
-      const lockEl = document.getElementById("p-book-team-lock");
-      if (!optionsEl || !currentEl || !emblemEl || !lockEl) return;
+      const shedLink = document.getElementById("p-book-team-shed-link");
+      if (!currentEl || !shedLink) return;
       try {
         const response = await fetch("/teams", {credentials: "same-origin", cache: "no-store"});
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.detail || "Teams could not be loaded.");
         currentTeam = payload.membership?.team || null;
-        currentEl.textContent = currentTeam
-          ? `Current team: ${currentTeam.name}`
-          : "No team selected yet.";
-        lockEl.textContent = payload.membership?.locked
-          ? `Team changes unlock ${new Date(payload.membership.next_change_at).toLocaleString()}.`
-          : "You may make your team choice for this contest week.";
-        optionsEl.replaceChildren();
-        (payload.teams || []).forEach((team) => {
-          const label = document.createElement("label");
-          label.className = "team-radio-tile";
-          const input = document.createElement("input");
-          input.type = "radio"; input.name = "p-book-team-choice";
-          input.value = String(team.id); input.checked = Boolean(currentTeam && currentTeam.id === team.id);
-          input.addEventListener("change", async function () {
-            if (!input.checked) return;
-            const changed = await fetch("/teams/selection", {
-              method: "POST", credentials: "same-origin",
-              headers: {"Content-Type": "application/json"},
-              body: JSON.stringify({team_id: team.id}),
-            });
-            const result = await changed.json();
-            if (!changed.ok) { errorEl.textContent = result.detail || "Team could not be selected."; await loadTeams(); return; }
-            await loadTeams();
-          });
-          const text = document.createElement("span");
-          appendTeamLabel(text, team);
-          label.append(input, text); optionsEl.append(label);
-        });
-        if (emblemEl && emblemEl.options.length <= 1) {
-          (payload.approved_emblems || []).forEach((emblem) => {
-            emblemEl.append(new Option(`${emblem.value} ${emblem.key}`, emblem.key));
-          });
+        if (currentTeam) {
+          const prefix = document.createElement("strong");
+          prefix.textContent = "Current team: ";
+          const publicTeam = document.createElement("span");
+          const visual = document.createElement("span");
+          renderTeamEmblem(visual, currentTeam.emblem);
+          const name = document.createElement("span");
+          name.textContent = currentTeam.name;
+          publicTeam.append(visual, name);
+          currentEl.replaceChildren(prefix, publicTeam);
+          shedLink.textContent = "Choose or Change Team in SHED";
+        } else {
+          currentEl.textContent = "No team selected";
+          shedLink.textContent = "Choose a Team in SHED";
         }
       } catch (error) {
         currentEl.textContent = error.message || "Teams could not be loaded.";
-        lockEl.textContent = "Team choices are temporarily unavailable. Retry by reloading this section or page.";
       }
     }
 
@@ -3135,24 +3156,6 @@
         errorEl.textContent = error.message || "Email presets could not be loaded.";
       }
     }
-
-    const createTeamBtn = document.getElementById("p-book-create-team");
-    if (createTeamBtn) createTeamBtn.addEventListener("click", async function () {
-      createTeamBtn.disabled = true; errorEl.textContent = "";
-      try {
-        const response = await fetch("/teams", {
-          method: "POST", credentials: "same-origin", headers: {"Content-Type": "application/json"},
-          body: JSON.stringify({
-            name: document.getElementById("p-book-new-team-name").value,
-            emblem_key: document.getElementById("p-book-team-emblem").value,
-          }),
-        });
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload.detail || "Team could not be created.");
-        await loadTeams();
-      } catch (error) { errorEl.textContent = error.message; }
-      finally { createTeamBtn.disabled = false; }
-    });
 
     const savePresetBtn = document.getElementById("p-book-save-preset");
     if (savePresetBtn) savePresetBtn.addEventListener("click", async function () {
@@ -3665,7 +3668,7 @@
       const ordinaryEmailPresetId = emailCopyEl?.checked ? Number(emailPresetEl?.value) : 0;
 
       const missing = includeTeamContests && !currentTeam
-        ? {message: "Choose a team, or continue without Team Competition.", choose: "Choose a Team", without: "Submit Without Team Competition", target: document.getElementById("p-book-team-selector"), checkbox: includeTeamEl}
+        ? {message: "Choose a team, or continue without Team Competition.", choose: "Choose a Team", without: "Submit Without Team Competition", navigate: "/home#shed-team-panel", checkbox: includeTeamEl}
         : emailCopyEl?.checked && !ordinaryEmailPresetId
           ? {message: "Choose a saved recipient, or continue without emailing.", choose: "Choose a Recipient", without: "Submit Without Emailing", target: emailPresetEl, checkbox: emailCopyEl}
           : requestValidationEl?.checked && !verifierId
@@ -3677,8 +3680,12 @@
         withoutMissingBtn.textContent = missing.without;
         chooseMissingBtn.onclick = function () {
           missingDialog.close();
-          missing.target?.scrollIntoView({block: "center"});
-          missing.target?.focus?.();
+          if (missing.navigate) {
+            window.location.assign(missing.navigate);
+          } else {
+            missing.target?.scrollIntoView({block: "center"});
+            missing.target?.focus?.();
+          }
         };
         withoutMissingBtn.onclick = function () {
           missing.checkbox.checked = false;

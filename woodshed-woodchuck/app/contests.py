@@ -1739,10 +1739,16 @@ def quest_completion_payload(
     streak = progress.get("streak", 0) if isinstance(progress, dict) else 0
     if not isinstance(streak, int) or isinstance(streak, bool):
         streak = 0
+    camp_point = session.scalar(select(CampPointAward).where(
+        CampPointAward.profile_id == completion.profile_id,
+        CampPointAward.duplicate_key == (
+            f"bonus-challenge:{completion.activity_date.isoformat()}:{completion.quest_id}"
+        ),
+    ))
     return {
         "created": created,
         "reward_created": reward_created,
-        "camp_point_created": False,
+        "camp_point_created": created and camp_point is not None,
         "crown_newly_earned": False,
         "credits": credits,
         "streak": streak,
@@ -1759,131 +1765,6 @@ def quest_completion_payload(
             session, profile_id=completion.profile_id, now=now
         ),
     }
-
-
-I_PLAYED_IT_DANDELIONS = 5
-I_PLAYED_IT_CAMP_POINTS = 2
-
-
-def i_played_it_payload(
-    session: Session,
-    *,
-    profile_id: int,
-    activity_date: date,
-    created: bool,
-    now: datetime,
-) -> dict[str, object]:
-    state = session.get(WoodchuckState, profile_id)
-    state_json = state.state_json if state is not None else {}
-    progress = state_json.get("progress") if isinstance(state_json, dict) else {}
-    credits = progress.get("credits", 0) if isinstance(progress, dict) else 0
-    if not isinstance(credits, int) or isinstance(credits, bool):
-        credits = 0
-    return {
-        "created": created,
-        "claimed": True,
-        "activity_date": activity_date.isoformat(),
-        "dandelions_awarded": I_PLAYED_IT_DANDELIONS if created else 0,
-        "camp_points_awarded": I_PLAYED_IT_CAMP_POINTS if created else 0,
-        "credits": credits,
-        **student_camp_point_totals(session, profile_id=profile_id, now=now),
-    }
-
-
-@router.get("/bonus-challenge/i-played-it")
-def i_played_it_status(request: Request) -> dict[str, object]:
-    """Return today's server-authoritative claim state without changing it."""
-    with SessionLocal() as session:
-        profile = current_profile(request, session)
-        if profile is None:
-            raise HTTPException(status_code=401, detail="Student sign-in is required.")
-        now = datetime.now(timezone.utc)
-        today = now.astimezone(CENTRAL).date()
-        source_key = f"bonus-i-played-it:{today.isoformat()}"
-        claimed = session.scalar(select(RewardGrant.id).where(
-            RewardGrant.profile_id == profile.id,
-            RewardGrant.source_key == source_key,
-            RewardGrant.reward_type == "dandelion",
-        )) is not None
-        if claimed:
-            return i_played_it_payload(
-                session, profile_id=profile.id, activity_date=today,
-                created=False, now=now,
-            )
-        return {
-            "created": False,
-            "claimed": False,
-            "activity_date": today.isoformat(),
-            "dandelions_awarded": 0,
-            "camp_points_awarded": 0,
-        }
-
-
-@router.post("/bonus-challenge/i-played-it")
-def claim_i_played_it(request: Request) -> dict[str, object]:
-    """Grant only the daily Bonus Challenge reward, once per Central date.
-
-    The Camp Point deliberately has no team attribution. This playful action is
-    not practice, a quest completion, or a Team Seasonal Points contribution.
-    """
-    with SessionLocal() as session:
-        profile = current_profile(request, session)
-        if profile is None:
-            raise HTTPException(status_code=401, detail="Student sign-in is required.")
-        now = datetime.now(timezone.utc)
-        today = now.astimezone(CENTRAL).date()
-        source_key = f"bonus-i-played-it:{today.isoformat()}"
-        duplicate_key = f"bonus-i-played-it:{today.isoformat()}"
-        existing = session.scalar(select(RewardGrant).where(
-            RewardGrant.profile_id == profile.id,
-            RewardGrant.source_key == source_key,
-            RewardGrant.reward_type == "dandelion",
-        ))
-        if existing is not None:
-            return i_played_it_payload(
-                session, profile_id=profile.id, activity_date=today,
-                created=False, now=now,
-            )
-
-        _add_dandelion(session, profile.id, I_PLAYED_IT_DANDELIONS)
-        session.add(RewardGrant(
-            profile_id=profile.id,
-            contest_result_id=None,
-            source_key=source_key,
-            reward_type="dandelion",
-            category_key="bonus-i-played-it",
-            amount=I_PLAYED_IT_DANDELIONS,
-        ))
-        session.add(CampPointAward(
-            profile_id=profile.id,
-            activity_type="bonus-i-played-it",
-            points_awarded=I_PLAYED_IT_CAMP_POINTS,
-            occurred_at=now,
-            duplicate_key=duplicate_key,
-            team_id=None,
-        ))
-        try:
-            session.commit()
-        except IntegrityError:
-            session.rollback()
-            existing = session.scalar(select(RewardGrant).where(
-                RewardGrant.profile_id == profile.id,
-                RewardGrant.source_key == source_key,
-                RewardGrant.reward_type == "dandelion",
-            ))
-            if existing is None:
-                raise HTTPException(
-                    status_code=500,
-                    detail="The daily reward could not be saved.",
-                )
-            return i_played_it_payload(
-                session, profile_id=profile.id, activity_date=today,
-                created=False, now=now,
-            )
-        return i_played_it_payload(
-            session, profile_id=profile.id, activity_date=today,
-            created=True, now=now,
-        )
 
 
 @router.post("/quest/completions")
@@ -1904,7 +1785,7 @@ def complete_quest(
         if definition is None:
             raise HTTPException(status_code=400, detail="Choose a current quest for your instrument.")
         target_minutes = int(definition["target_minutes"])
-        reward_amount = int(definition["reward_credits"])
+        reward_amount = 5
         if submitted.logged_minutes < target_minutes:
             raise HTTPException(
                 status_code=400,
@@ -1931,7 +1812,7 @@ def complete_quest(
             completed_at=now,
         )
         session.add(completion)
-        source_key = f"quest:{today.isoformat()}"
+        source_key = f"bonus-challenge:{today.isoformat()}:{submitted.quest_id}"
         session.add(RewardGrant(
             profile_id=profile.id,
             contest_result_id=None,
@@ -1939,6 +1820,16 @@ def complete_quest(
             reward_type="dandelion",
             category_key=None,
             amount=reward_amount,
+        ))
+        # Bonus Challenge Camp Points are intentionally excluded from Team
+        # Seasonal Points, so this immutable award has no team attribution.
+        session.add(CampPointAward(
+            profile_id=profile.id,
+            activity_type="bonus-challenge",
+            points_awarded=2,
+            occurred_at=now,
+            duplicate_key=source_key,
+            team_id=None,
         ))
 
         if state is None:
