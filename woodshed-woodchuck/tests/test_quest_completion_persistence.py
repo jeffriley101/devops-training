@@ -17,6 +17,7 @@ from app.main import app
 from app.models import (
     CampPointAward,
     CrownProgress,
+    PracticeChart,
     QuestCompletion,
     RewardGrant,
     WoodchuckState,
@@ -153,6 +154,61 @@ def test_server_grants_nothing_before_configured_threshold(quest_database) -> No
             assert session.scalar(select(WoodchuckState)).state_json["progress"]["credits"] == 4
 
 
+def test_bonus_progress_endpoint_persists_increment_then_rewards_threshold(
+    quest_database,
+) -> None:
+    with TestClient(app) as client:
+        create_student(client, credits=7)
+        today = datetime.now(CENTRAL).date().isoformat()
+        first = client.post("/contests/bonus-challenge/progress", json={
+            "activity_date": today,
+            "challenge_id": "flute-trill",
+            "minutes": 4,
+            "note": "First increment",
+        })
+        assert first.status_code == 200
+        assert first.json()["logged_minutes"] == 4
+        assert first.json()["completed"] is False
+        assert first.json()["dandelions_awarded"] == 0
+        assert first.json()["camp_points_awarded"] == 0
+        with quest_database() as session:
+            assert session.scalar(select(func.count()).select_from(QuestCompletion)) == 0
+            assert session.scalar(select(func.count()).select_from(RewardGrant)) == 0
+            assert session.scalar(select(func.count()).select_from(CampPointAward)) == 0
+            assert session.scalar(select(func.count()).select_from(PracticeChart)) == 0
+        refreshed = client.get("/account/state").json()["state"]
+        assert refreshed["daily"]["loggedMinutes"] == 4
+
+        completed = client.post("/contests/bonus-challenge/progress", json={
+            "activity_date": today,
+            "challenge_id": "flute-trill",
+            "minutes": 6,
+            "note": "Threshold increment",
+        })
+        assert completed.status_code == 200
+        payload = completed.json()
+        assert payload["created"] is True and payload["completed"] is True
+        assert payload["logged_minutes"] == 10
+        assert payload["dandelions_awarded"] == 5
+        assert payload["camp_points_awarded"] == 2
+        assert payload["credits"] == 12
+
+        duplicate = client.post("/contests/bonus-challenge/progress", json={
+            "activity_date": today,
+            "challenge_id": "flute-trill",
+            "minutes": 6,
+        })
+        assert duplicate.status_code == 200
+        assert duplicate.json()["created"] is False
+        with quest_database() as session:
+            assert session.scalar(select(func.count()).select_from(QuestCompletion)) == 1
+            assert session.scalar(select(func.count()).select_from(RewardGrant)) == 1
+            assert session.scalar(select(func.count()).select_from(CampPointAward)) == 1
+            assert session.scalar(select(func.count()).select_from(PracticeChart)) == 0
+            award = session.scalar(select(CampPointAward))
+            assert award.points_awarded == 2 and award.team_id is None
+
+
 def test_multiple_tabs_are_idempotent(quest_database) -> None:
     with TestClient(app) as first_client:
         create_student(first_client, credits=0)
@@ -206,14 +262,18 @@ def test_failed_reward_insert_rolls_back_completion_and_state(quest_database) ->
 def test_browser_handler_is_single_request_confirmed_ui_and_audio_safe() -> None:
     app_js = (Path(__file__).resolve().parents[1] / "static/js/app.js").read_text()
     quest = app_js[app_js.index("function wireQuestForm"):app_js.index("const STORE_ITEMS")]
-    assert quest.count('fetch("/contests/quest/completions"') == 1
+    assert 'fetch("/contests/quest/completions"' not in quest
+    assert quest.count('fetch("/contests/bonus-challenge/progress"') == 1
     assert 'fetch("/contests/bonus-challenge/i-played-it"' not in quest
+    assert 'form.addEventListener("submit"' in quest
+    assert 'completeBtn.addEventListener' not in quest
+    assert 'form.dataset.bonusChallengeWired === "true"' in quest
     assert "if (completionInFlight) return" in quest
     assert "stateApi.saveState(next, { sync: false })" in quest
     assert "window.WWAccountSync.syncNow" not in quest
     assert "payload.created === true && payload.reward_created === true" in quest
-    assert "next.daily.completed = true" in quest
-    assert "const loggedMinutes = (next.daily.loggedMinutes || 0) + minutes" in quest
+    assert "next.daily.completed = payload.completed === true" in quest
+    assert "next.daily.loggedMinutes = payload.logged_minutes" in quest
     assert "ww:camp-points-saved" in quest
     assert "playSound(\"questCompleted\")" in quest
     assert "try {\n      if (window.WoodshedAudio)" in app_js

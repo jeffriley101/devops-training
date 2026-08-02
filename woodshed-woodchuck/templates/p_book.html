@@ -48,9 +48,9 @@
     <label for="p-book-note">Short note (optional)</label>
     <textarea id="p-book-note" class="p-book-warm-field" name="p-book-note" rows="3" maxlength="180" placeholder="Scales, band music, rhythm work..."></textarea>
 
-    <details class="mentor-card p-book-work-field">
-      <summary>What did you work on?</summary>
-      <p class="body-copy">Check anything that fits this practice chart.</p>
+    <label id="p-book-work-label" class="p-book-work-label">What did you work on?</label>
+    <details class="mentor-card p-book-work-field" aria-labelledby="p-book-work-label">
+      <summary>Check anything that fits this practice chart.</summary>
 
       <div class="practice-detail-grid">
         <label><input type="checkbox" name="practice-detail" value="Long Tones" /> Long Tones</label>
@@ -176,6 +176,7 @@
   </div>
 
   <article class="mentor-card mt-md pirate-logbook">
+    <h2 class="p-book-title">Practice Book</h2>
     <div id="p-book-entries">
       <p>No practice charts logged yet.</p>
     </div>

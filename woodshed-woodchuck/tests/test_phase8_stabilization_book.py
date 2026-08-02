@@ -34,6 +34,9 @@ def test_book_loaders_resolve_empty_and_failure_states() -> None:
     assert 'currentEl.textContent = "No team selected"' in script
     assert "No saved recipients yet" in script
     assert "No connected parent or mentor yet." not in script
+    assert "Saved recipients unavailable" in script
+    assert "Teams could not be loaded." in script
+    assert "Trusted verifiers unavailable" in script
 
 
 def test_book_team_section_is_compact_and_shed_owned() -> None:
@@ -61,12 +64,25 @@ def test_team_boards_render_public_team_only_but_shed_keeps_captain() -> None:
     assert "row.team_name" in board and "row.emblem_key" in board
     assert "row.captain_name" not in board
     assert "appendTeamLabel" not in board
+    assert "active_member_count" not in board
     shed = script[script.index("function wireShedTeamBadge"):script.index("async function refreshPracticeStreak")]
     assert "appendTeamLabel(status, current)" in shed
     assert "Team Captain" in script
-    assert "Saved recipients unavailable" in script
-    assert "Teams could not be loaded." in script
-    assert "Trusted verifiers unavailable" in script
+
+
+def test_practice_book_title_and_work_disclosure_copy() -> None:
+    template = (ROOT / "templates/p_book.html").read_text(encoding="utf-8")
+    css = (ROOT / "static/css/styles.css").read_text(encoding="utf-8")
+    assert '<h2 class="p-book-title">Practice Book</h2>' in template
+    assert "Captain's Practice Log" not in template
+    assert "Captain’s Practice Log" not in template + css
+    label_at = template.index('class="p-book-work-label">What did you work on?</label>')
+    details_at = template.index('class="mentor-card p-book-work-field"')
+    summary_at = template.index("<summary>Check anything that fits this practice chart.</summary>")
+    assert label_at < details_at < summary_at
+    assert template.count("What did you work on?") == 1
+    assert template.count('name="practice-detail"') >= 20
+    assert "practiceDetailEls" in (ROOT / "static/js/app.js").read_text(encoding="utf-8")
 
 
 def test_submission_keeps_warnings_confirmation_and_single_clipboard_attempt() -> None:

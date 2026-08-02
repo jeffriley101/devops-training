@@ -23,23 +23,23 @@ def test_bonus_challenge_uses_configured_task_threshold_and_original_increment()
     assert 'id="quest-text"' in (ROOT / "templates/quest.html").read_text()
     assert 'id="quest-target"' in (ROOT / "templates/quest.html").read_text()
     assert 'id="quest-progress"' in (ROOT / "templates/quest.html").read_text()
-    assert "const loggedMinutes = (next.daily.loggedMinutes || 0) + minutes" in quest
-    assert "loggedMinutes < next.daily.targetMinutes" in quest
-    assert "next.daily.loggedMinutes = loggedMinutes" in quest
-    assert "stateApi.saveState(next);" in quest
-    assert 'fetch("/contests/quest/completions"' in quest
+    assert "next.daily.loggedMinutes = payload.logged_minutes" in quest
+    assert "payload.completed === true" in quest
+    assert "stateApi.saveState(next, { sync: false });" in quest
+    assert 'fetch("/contests/bonus-challenge/progress"' in quest
+    assert 'fetch("/contests/quest/completions"' not in quest
     assert 'bonus-challenge/i-played-it' not in quest
 
 
 def test_bonus_challenge_reward_is_threshold_only_and_not_daily_replacement() -> None:
     source = Path(contests.__file__).read_text(encoding="utf-8")
-    route = source[source.index('@router.post("/quest/completions")'):
-                   source.index('@router.get("/current")')]
-    assert 'reward_amount = 5' in route
+    route = source[source.index('@router.post("/bonus-challenge/progress")'):
+                   source.index('@router.post("/quest/completions")')]
+    assert 'reward_amount=5' in route
     assert 'points_awarded=2' in route
     assert 'team_id=None' in route
-    assert 'submitted.logged_minutes < target_minutes' in route
-    assert 'source_key = f"bonus-challenge:{today.isoformat()}:{submitted.quest_id}"' in route
+    assert 'completed = logged_minutes >= target_minutes' in route
+    assert 'source_key = f"bonus-challenge:{today.isoformat()}:{submitted.challenge_id}"' in route
     assert '@router.get("/bonus-challenge/i-played-it")' not in source
     assert '@router.post("/bonus-challenge/i-played-it")' not in source
     assert "I_PLAYED_IT_DANDELIONS" not in source
@@ -47,7 +47,7 @@ def test_bonus_challenge_reward_is_threshold_only_and_not_daily_replacement() ->
 
 def test_bonus_completion_model_has_no_chart_or_contest_side_effects() -> None:
     source = Path(contests.__file__).read_text(encoding="utf-8")
-    route = source[source.index('def complete_quest('):source.index('@router.get("/current")')]
+    route = source[source.index('def record_bonus_challenge_progress('):source.index('@router.post("/quest/completions")')]
     assert "QuestCompletion(" in route  # Existing Bonus Challenge completion record.
     for forbidden in (
         "PracticeChart(", "PracticeChartVerification(", "ContestResult(",

@@ -69,8 +69,8 @@ def test_goat_and_practice_room_are_deliberate_shop_activations_only():
 
 def test_bonus_challenge_sound_requires_new_server_confirmation():
     quest = APP[APP.index("function wireQuestForm"):APP.index("const STORE_ITEMS")]
-    assert 'fetch("/contests/quest/completions"' in quest
-    assert 'fetch("/contests/bonus-challenge/i-played-it"' not in quest
+    assert 'fetch("/contests/bonus-challenge/progress"' in quest
+    assert 'fetch("/contests/quest/completions"' not in quest
     assert "if (!response.ok)" in quest
     response_at = quest.index("const response = await fetch")
     committed_at = quest.index("payload.created === true && payload.reward_created === true")

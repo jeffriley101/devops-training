@@ -517,6 +517,8 @@
     const questChoiceList = document.getElementById("quest-choice-list");
 
     if (!form || !questTextEl || !questTargetEl || !questStatusEl) return;
+    if (form.dataset.bonusChallengeWired === "true") return;
+    form.dataset.bonusChallengeWired = "true";
 
     const today = stateApi.localDateKey();
     let completionInFlight = false;
@@ -675,40 +677,20 @@
         return;
       }
 
-      const loggedMinutes = (next.daily.loggedMinutes || 0) + minutes;
-      if (loggedMinutes < next.daily.targetMinutes) {
-        next.practiceLog.unshift({
-          dateKey, minutes, note, questId: next.daily.questId,
-          creditsAwarded: 0, loggedAt: new Date().toISOString(), source: "quest-progress",
-        });
-        next.practiceLog = next.practiceLog.slice(0, 50);
-        next.daily.loggedMinutes = loggedMinutes;
-        const message = `${pickMessage("supportive", dateKey)} (${loggedMinutes}/${next.daily.targetMinutes} minutes)`;
-        next.daily.encouragement = message;
-        setQuestFeedback(message);
-        stateApi.saveState(next);
-        renderQuestStatus(next);
-        hydrateHome(next);
-        minutesEl.value = "";
-        noteEl.value = "";
-        return;
-      }
-
       completionInFlight = true;
       if (completeBtn) {
         completeBtn.disabled = true;
         completeBtn.textContent = "Saving Quest…";
       }
       try {
-        const response = await fetch("/contests/quest/completions", {
+        const response = await fetch("/contests/bonus-challenge/progress", {
           method: "POST",
           credentials: "same-origin",
           headers: {"Content-Type": "application/json"},
           body: JSON.stringify({
             activity_date: dateKey,
-            quest_id: next.daily.questId,
+            challenge_id: next.daily.questId,
             minutes,
-            logged_minutes: loggedMinutes,
             note,
           }),
         });
@@ -716,26 +698,19 @@
         if (!response.ok) {
           throw new Error(payload.detail || "Quest completion could not be saved.");
         }
-        const completion = payload.completion;
-        if (!completion || completion.quest_id !== next.daily.questId) {
+        if (payload.challenge_id !== next.daily.questId) {
           throw new Error("The saved Bonus Challenge response could not be read.");
         }
-        if (payload.created === true) {
-          next.practiceLog.unshift({
-            dateKey, minutes, note, questId: completion.quest_id,
-            creditsAwarded: completion.reward_amount,
-            loggedAt: completion.completed_at, source: "quest",
-          });
-          next.practiceLog = next.practiceLog.slice(0, 50);
-        }
-        next.daily.loggedMinutes = completion.logged_minutes;
-        next.daily.completed = true;
-        next.daily.completedAt = completion.completed_at;
-        next.quest.completed = true;
-        next.progress.credits = payload.credits;
+        next.daily.loggedMinutes = payload.logged_minutes;
+        next.daily.completed = payload.completed === true;
+        next.daily.completedAt = payload.completed ? new Date().toISOString() : null;
+        next.quest.completed = payload.completed === true;
+        if (Number.isInteger(payload.credits)) next.progress.credits = payload.credits;
         const rewardMessage = payload.created === true
           ? `Challenge complete: +5 dandelions and +2 Camp Points. Total: ${payload.credits} dandelions.`
-          : "Challenge already completed. No additional reward was added.";
+          : payload.completed === true
+            ? "Challenge already completed. No additional reward was added."
+            : `${pickMessage("supportive", dateKey)} (${payload.logged_minutes}/${payload.target_minutes} minutes)`;
         next.daily.encouragement = rewardMessage;
         stateApi.saveState(next, { sync: false });
 
@@ -2098,10 +2073,9 @@
             const teamName = document.createElement("span"); teamName.textContent = row.team_name;
             subject.append(emblem, teamName);
             const score = document.createElement("strong"); score.className = "contest-ranked-score";
-            const scoreValue = key === "team-average-practice" ? `${(row.score / 100).toFixed(2)} min` : String(row.score);
-            score.textContent = Number.isInteger(row.active_member_count)
-              ? `${scoreValue} · ${row.active_member_count} active`
-              : scoreValue;
+            score.textContent = key === "team-average-practice"
+              ? `${(row.score / 100).toFixed(2)} min`
+              : String(row.score);
             item.setAttribute("aria-label", `Rank ${row.rank}, ${row.team_name}, ${score.textContent}`);
             item.append(rank, subject, score); list.append(item);
           });

@@ -2978,10 +2978,9 @@ select {
     0 7px 15px rgba(45, 27, 14, 0.2);
 }
 
-.pirate-logbook::before {
-  content: "✦ Captain’s Practice Log ✦";
-  display: block;
+.pirate-logbook > .p-book-title {
   margin-bottom: 1rem;
+  margin-top: 0;
   padding-bottom: 0.7rem;
   border-bottom: 2px solid rgba(72, 40, 17, 0.55);
   font-family: Georgia, "Times New Roman", serif;
@@ -2990,6 +2989,7 @@ select {
   letter-spacing: 0.08em;
   text-align: center;
 }
+.p-book-work-label { display: block; font-weight: 800; }
 
 /* BOARD: centered public-events heading */
 .board-page {

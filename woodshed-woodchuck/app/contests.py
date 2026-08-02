@@ -129,6 +129,13 @@ class QuestCompletionSubmission(BaseModel):
     note: str = Field(default="", max_length=500)
 
 
+class BonusChallengeProgressSubmission(BaseModel):
+    activity_date: date
+    challenge_id: str = Field(min_length=1, max_length=100)
+    minutes: int = Field(ge=1, le=1440)
+    note: str = Field(default="", max_length=500)
+
+
 TRIVIA_QUESTIONS = (
     {"id": "whole-note-44", "question": "How many beats does a whole note receive in 4/4 time?", "choices": (
         {"id": "two", "text": "2"}, {"id": "three", "text": "3"}, {"id": "four", "text": "4"},
@@ -1765,6 +1772,214 @@ def quest_completion_payload(
             session, profile_id=completion.profile_id, now=now
         ),
     }
+
+
+def bonus_challenge_progress_payload(
+    session: Session,
+    *,
+    profile_id: int,
+    activity_date: date,
+    challenge_id: str,
+    target_minutes: int,
+    logged_minutes: int,
+    completed: bool,
+    created: bool,
+    now: datetime,
+) -> dict[str, object]:
+    state = session.get(WoodchuckState, profile_id)
+    state_json = state.state_json if state is not None else {}
+    progress = state_json.get("progress") if isinstance(state_json, dict) else {}
+    credits = progress.get("credits", 0) if isinstance(progress, dict) else 0
+    if not isinstance(credits, int) or isinstance(credits, bool):
+        credits = 0
+    return {
+        "created": created,
+        "progress_recorded": True,
+        "completed": completed,
+        "reward_created": created,
+        "camp_point_created": created,
+        "activity_date": activity_date.isoformat(),
+        "challenge_id": challenge_id,
+        "target_minutes": target_minutes,
+        "logged_minutes": logged_minutes,
+        "dandelions_awarded": 5 if created else 0,
+        "camp_points_awarded": 2 if created else 0,
+        "credits": credits,
+        "revision": state.revision if state is not None else 0,
+        **student_camp_point_totals(session, profile_id=profile_id, now=now),
+    }
+
+
+@router.post("/bonus-challenge/progress")
+def record_bonus_challenge_progress(
+    request: Request,
+    submitted: BonusChallengeProgressSubmission,
+) -> dict[str, object]:
+    """Persist one I Played It increment and reward threshold completion once."""
+    with SessionLocal() as session:
+        profile = current_profile(request, session)
+        if profile is None:
+            raise HTTPException(status_code=401, detail="Student sign-in is required.")
+        now = datetime.now(timezone.utc)
+        today = now.astimezone(CENTRAL).date()
+        if submitted.activity_date != today:
+            raise HTTPException(
+                status_code=400,
+                detail="Bonus Challenge progress can only be recorded for today.",
+            )
+        definition = quest_definition(profile.instrument, submitted.challenge_id)
+        if definition is None:
+            raise HTTPException(status_code=400, detail="This Bonus Challenge is unavailable.")
+        target_minutes = int(definition["target_minutes"])
+
+        existing = session.scalar(select(QuestCompletion).where(
+            QuestCompletion.profile_id == profile.id,
+            QuestCompletion.activity_date == today,
+        ))
+        if existing is not None:
+            return bonus_challenge_progress_payload(
+                session,
+                profile_id=profile.id,
+                activity_date=today,
+                challenge_id=existing.quest_id,
+                target_minutes=target_minutes,
+                logged_minutes=existing.logged_minutes,
+                completed=True,
+                created=False,
+                now=now,
+            )
+
+        state = session.scalar(select(WoodchuckState).where(
+            WoodchuckState.profile_id == profile.id
+        ).with_for_update())
+        if state is None:
+            state = WoodchuckState(profile_id=profile.id, state_json={}, revision=0)
+            session.add(state)
+        state_json = deepcopy(state.state_json or {})
+        daily = dict(state_json.get("daily") or {})
+        same_instance = (
+            daily.get("dateKey") == today.isoformat()
+            and daily.get("questId") == submitted.challenge_id
+        )
+        current_minutes = daily.get("loggedMinutes", 0) if same_instance else 0
+        if not isinstance(current_minutes, int) or isinstance(current_minutes, bool):
+            current_minutes = 0
+        logged_minutes = min(1440, current_minutes + submitted.minutes)
+        completed = logged_minutes >= target_minutes
+        completed_at = now.isoformat() if completed else None
+        daily.update({
+            "dateKey": today.isoformat(),
+            "questId": submitted.challenge_id,
+            "questText": definition["text"],
+            "targetMinutes": target_minutes,
+            "rewardCredits": 5,
+            "loggedMinutes": logged_minutes,
+            "completed": completed,
+            "completedAt": completed_at,
+        })
+        state_json["daily"] = daily
+        state_json["quest"] = {
+            "dateKey": today.isoformat(),
+            "text": definition["text"],
+            "targetMinutes": target_minutes,
+            "completed": completed,
+            "rewardCredits": 5,
+        }
+
+        practice_log = list(state_json.get("practiceLog") or [])
+        practice_log.insert(0, {
+            "dateKey": today.isoformat(),
+            "minutes": submitted.minutes,
+            "note": submitted.note.strip(),
+            "questId": submitted.challenge_id,
+            "creditsAwarded": 5 if completed else 0,
+            "loggedAt": now.isoformat(),
+            "source": "quest" if completed else "quest-progress",
+        })
+        state_json["practiceLog"] = practice_log[:50]
+
+        if completed:
+            session.add(QuestCompletion(
+                profile_id=profile.id,
+                activity_date=today,
+                quest_id=submitted.challenge_id,
+                logged_minutes=logged_minutes,
+                reward_amount=5,
+                completed_at=now,
+            ))
+            source_key = f"bonus-challenge:{today.isoformat()}:{submitted.challenge_id}"
+            session.add(RewardGrant(
+                profile_id=profile.id,
+                contest_result_id=None,
+                source_key=source_key,
+                reward_type="dandelion",
+                category_key=None,
+                amount=5,
+            ))
+            session.add(CampPointAward(
+                profile_id=profile.id,
+                activity_type="bonus-challenge",
+                points_awarded=2,
+                occurred_at=now,
+                duplicate_key=source_key,
+                team_id=None,
+            ))
+            progress = dict(state_json.get("progress") or {})
+            credits = progress.get("credits", 0)
+            if not isinstance(credits, int) or isinstance(credits, bool):
+                credits = 0
+            progress["credits"] = credits + 5
+            last_date = progress.get("lastCompletedDate")
+            yesterday = (today - timedelta(days=1)).isoformat()
+            streak = progress.get("streak", 0)
+            if not isinstance(streak, int) or isinstance(streak, bool):
+                streak = 0
+            if last_date != today.isoformat():
+                progress["streak"] = streak + 1 if last_date == yesterday else 1
+                progress["lastCompletedDate"] = today.isoformat()
+            state_json["progress"] = progress
+
+        state.revision += 1
+        account = dict(state_json.get("account") or {})
+        account["serverRevision"] = state.revision
+        account["lastSyncedAt"] = now.isoformat()
+        state_json["account"] = account
+        state.state_json = state_json
+        try:
+            session.commit()
+        except IntegrityError:
+            session.rollback()
+            existing = session.scalar(select(QuestCompletion).where(
+                QuestCompletion.profile_id == profile.id,
+                QuestCompletion.activity_date == today,
+            ))
+            if existing is None:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Bonus Challenge progress could not be saved.",
+                )
+            return bonus_challenge_progress_payload(
+                session,
+                profile_id=profile.id,
+                activity_date=today,
+                challenge_id=existing.quest_id,
+                target_minutes=target_minutes,
+                logged_minutes=existing.logged_minutes,
+                completed=True,
+                created=False,
+                now=now,
+            )
+        return bonus_challenge_progress_payload(
+            session,
+            profile_id=profile.id,
+            activity_date=today,
+            challenge_id=submitted.challenge_id,
+            target_minutes=target_minutes,
+            logged_minutes=logged_minutes,
+            completed=completed,
+            created=completed,
+            now=now,
+        )
 
 
 @router.post("/quest/completions")
