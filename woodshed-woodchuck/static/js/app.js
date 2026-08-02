@@ -448,8 +448,6 @@
     const questStatusEl = document.getElementById("quest-status");
     const questProgressEl = document.getElementById("quest-progress");
     const form = document.getElementById("practice-form");
-    const minutesEl = document.getElementById("practice-minutes");
-    const noteEl = document.getElementById("practice-note");
     const errorEl = document.getElementById("practice-error");
     const feedbackEl = document.getElementById("quest-feedback");
     const completeBtn = document.getElementById("complete-quest-btn");
@@ -462,6 +460,7 @@
 
     const today = stateApi.localDateKey();
     let completionInFlight = false;
+    let iPlayedItClaimed = false;
 
     function setQuestFeedback(message) {
       if (feedbackEl) feedbackEl.textContent = message;
@@ -476,8 +475,8 @@
         questProgressEl.textContent = `${s.daily.loggedMinutes || 0}/${s.daily.targetMinutes} minutes logged`;
       }
 
-      if (completeBtn && s.daily.completed) {
-        completeBtn.textContent = "Quest Complete";
+      if (completeBtn && iPlayedItClaimed) {
+        completeBtn.textContent = "Completed Today";
         completeBtn.classList.add("is-confirmed-success");
         completeBtn.disabled = true;
       } else if (completeBtn) {
@@ -536,6 +535,20 @@
 
     renderQuestStatus(state);
     updateInstrumentAdvice(state);
+
+    fetch("/contests/bonus-challenge/i-played-it", {
+      credentials: "same-origin",
+    })
+      .then((response) => response.ok ? response.json() : null)
+      .then((payload) => {
+        if (!payload) return;
+        iPlayedItClaimed = payload.claimed === true;
+        renderQuestStatus(stateApi.getState());
+        if (iPlayedItClaimed) setQuestFeedback("Already claimed today.");
+      })
+      .catch(() => {
+        // The action remains usable; the POST endpoint is authoritative.
+      });
 
     if (state.daily.completed && feedbackEl) {
       setQuestFeedback(pickMessage("already_done", today));
@@ -599,44 +612,11 @@
       event.preventDefault();
       playSound("dialClick");
       if (completionInFlight) return;
-      errorEl.textContent = "";
+      if (errorEl) errorEl.textContent = "";
 
       const next = stateApi.getState();
-      ensureTodayQuest(next);
-
-      const dateKey = stateApi.localDateKey();
-      const minutes = Number(minutesEl.value);
-      const note = noteEl.value.trim();
-
-      if (!Number.isFinite(minutes) || minutes <= 0) {
-        errorEl.textContent = "Enter a positive number of minutes.";
-        return;
-      }
-
-      if (next.daily.completed && next.daily.dateKey === dateKey) {
-        setQuestFeedback(pickMessage("already_done", dateKey));
-        renderQuestStatus(next);
-        return;
-      }
-
-      const loggedMinutes = (next.daily.loggedMinutes || 0) + minutes;
-      const completedNow = loggedMinutes >= next.daily.targetMinutes;
-      if (!completedNow) {
-        next.practiceLog.unshift({
-          dateKey, minutes, note, questId: next.daily.questId,
-          creditsAwarded: 0, loggedAt: new Date().toISOString(), source: "quest",
-        });
-        next.practiceLog = next.practiceLog.slice(0, 50);
-        next.daily.loggedMinutes = loggedMinutes;
-        const message =
-          `${pickMessage("supportive", dateKey)} (${loggedMinutes}/${next.daily.targetMinutes} minutes)`;
-        next.daily.encouragement = message;
-        setQuestFeedback(message);
-        stateApi.saveState(next);
-        renderQuestStatus(next);
-        hydrateHome(next);
-        minutesEl.value = "";
-        noteEl.value = "";
+      if (iPlayedItClaimed) {
+        setQuestFeedback("Already claimed today.");
         return;
       }
 
@@ -646,48 +626,19 @@
         completeBtn.textContent = "Saving Quest…";
       }
       try {
-        const response = await fetch("/contests/quest/completions", {
+        const response = await fetch("/contests/bonus-challenge/i-played-it", {
           method: "POST",
           credentials: "same-origin",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            activity_date: dateKey,
-            quest_id: next.daily.questId,
-            minutes,
-            logged_minutes: loggedMinutes,
-            note,
-          }),
         });
         const payload = await response.json();
         if (!response.ok) {
-          throw new Error(payload.detail || "Quest completion could not be saved.");
+          throw new Error(payload.detail || "The daily reward could not be saved.");
         }
-        const completion = payload.completion;
-        if (!completion || completion.quest_id !== next.daily.questId) {
-          throw new Error("The saved Quest response could not be read.");
-        }
-
-        if (payload.created === true) {
-          next.practiceLog.unshift({
-            dateKey, minutes, note, questId: completion.quest_id,
-            creditsAwarded: completion.reward_amount,
-            loggedAt: completion.completed_at, source: "quest",
-          });
-          next.practiceLog = next.practiceLog.slice(0, 50);
-        }
-        next.daily.loggedMinutes = completion.logged_minutes;
-        next.daily.completed = true;
-        next.daily.completedAt = completion.completed_at;
-        next.quest.completed = true;
+        iPlayedItClaimed = payload.claimed === true;
         next.progress.credits = payload.credits;
-        if (Number.isInteger(payload.streak)) next.progress.streak = payload.streak;
-        if (Number.isInteger(payload.revision)) {
-          next.account.serverRevision = payload.revision;
-        }
         const rewardMessage = payload.created === true
-          ? `${pickMessage("reward", dateKey)} +${completion.reward_amount} dandelions earned. Total: ${payload.credits} dandelions.`
-          : "Quest already completed. No additional reward was added.";
-        next.daily.encouragement = rewardMessage;
+          ? `Bonus claimed: +5 dandelions and +2 Camp Points. Total: ${payload.credits} dandelions.`
+          : "Already claimed today.";
         stateApi.saveState(next, { sync: false });
 
         const weeklyPoints = document.getElementById("board-player-weekly-points");
@@ -703,17 +654,17 @@
         setQuestFeedback(rewardMessage);
         renderQuestStatus(next);
         hydrateHome(next);
-        minutesEl.value = "";
-        noteEl.value = "";
-        if (payload.created === true && payload.reward_created === true) {
+        if (payload.created === true) {
           playSound("questCompleted");
         }
       } catch (error) {
-        errorEl.textContent = error.message || "Quest completion could not be saved. Please try again.";
+        if (errorEl) {
+          errorEl.textContent = error.message || "The daily reward could not be saved. Please try again.";
+        }
         renderQuestStatus(next);
       } finally {
         completionInFlight = false;
-        if (completeBtn && !next.daily.completed) {
+        if (completeBtn && !iPlayedItClaimed) {
           completeBtn.disabled = false;
           completeBtn.textContent = "I Played It";
         }

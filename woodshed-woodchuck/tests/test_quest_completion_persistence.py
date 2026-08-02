@@ -188,14 +188,14 @@ def test_failed_reward_insert_rolls_back_completion_and_state(quest_database) ->
 def test_browser_handler_is_single_request_confirmed_ui_and_audio_safe() -> None:
     app_js = (Path(__file__).resolve().parents[1] / "static/js/app.js").read_text()
     quest = app_js[app_js.index("function wireQuestForm"):app_js.index("const STORE_ITEMS")]
-    assert quest.count('fetch("/contests/quest/completions"') == 1
+    assert 'fetch("/contests/quest/completions"' not in quest
+    assert quest.count('fetch("/contests/bonus-challenge/i-played-it"') == 2
     assert "if (completionInFlight) return" in quest
     assert "stateApi.saveState(next, { sync: false })" in quest
     assert "window.WWAccountSync.syncNow" not in quest
-    assert "payload.created === true && payload.reward_created === true" in quest
-    assert quest.index("if (!response.ok)") < quest.index("next.daily.completed = true")
-    completed_at = quest.index("next.daily.completed = true")
-    assert completed_at < quest.index("renderQuestStatus(next)", completed_at)
+    assert "payload.created === true" in quest
+    assert "next.daily.completed = true" not in quest
+    assert "next.practiceLog.unshift" not in quest
     assert "ww:camp-points-saved" in quest
     assert "playSound(\"questCompleted\")" in quest
     assert "try {\n      if (window.WoodshedAudio)" in app_js
