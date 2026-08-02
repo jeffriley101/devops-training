@@ -56,6 +56,63 @@
     }
   }
 
+  const TEAM_EMOJI = {
+    lion: "🦁", goat: "🐐", bear: "🐻", eagle: "🦅", wolf: "🐺",
+    bee: "🐝", dragon: "🐉", cat: "🐱", dog: "🐶", star: "⭐",
+    fire: "🔥", moon: "🌙", lightning: "⚡",
+  };
+
+  function normalizedEmblem(emblem) {
+    if (emblem && emblem.kind && emblem.value) return emblem;
+    const [kind, value] = String(emblem?.key || emblem || "").split(":");
+    return { kind, value, key: `${kind}:${value}` };
+  }
+
+  function emblemAccessibleText(emblem) {
+    const normalized = normalizedEmblem(emblem);
+    if (normalized.kind === "emoji") return TEAM_EMOJI[normalized.value] || "Team emblem";
+    if (normalized.kind === "letter") return `Letter ${normalized.value}`;
+    if (normalized.kind === "shield") return `${normalized.value} shield`;
+    return "Team emblem";
+  }
+
+  function renderTeamEmblem(container, emblem) {
+    if (!container) return;
+    const normalized = normalizedEmblem(emblem);
+    const visual = document.createElement("span");
+    visual.className = "team-emblem-visual";
+    if (normalized.kind === "emoji") {
+      visual.classList.add("team-emblem-emoji");
+      visual.textContent = TEAM_EMOJI[normalized.value] || "⬡";
+    } else if (normalized.kind === "letter") {
+      visual.classList.add("team-emblem-letter");
+      visual.textContent = normalized.value;
+    } else if (normalized.kind === "shield") {
+      visual.classList.add("team-emblem-shield", `team-emblem-shield-${normalized.value.toLowerCase()}`);
+    } else {
+      visual.textContent = "⬡";
+    }
+    visual.setAttribute("role", "img");
+    visual.setAttribute("aria-label", emblemAccessibleText(normalized));
+    container.replaceChildren(visual);
+  }
+
+  function appendTeamLabel(container, team) {
+    const emblem = document.createElement("span");
+    renderTeamEmblem(emblem, team.emblem || team.emblem_key);
+    const name = document.createElement("span");
+    name.textContent = ` ${team.name} — `;
+    const captain = document.createElement("span");
+    captain.className = "team-captain-label";
+    captain.innerHTML = '<span aria-hidden="true">⭐</span> ';
+    captain.append(document.createTextNode(team.captain.display_name));
+    const accessible = document.createElement("span");
+    accessible.className = "sr-only";
+    accessible.textContent = " Team Captain";
+    captain.append(accessible);
+    container.replaceChildren(emblem, name, captain);
+  }
+
   const questPool = parseJsonFromId("quest-pool-data", {});
   const saxVikingMessages = parseJsonFromId("sax-viking-messages-data", {
     reward: ["Great work today!"],
@@ -347,12 +404,11 @@
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.detail || "Teams could not be loaded.");
         const current = payload.membership?.team || null;
-        emblem.textContent = current?.emblem?.value || "⬡";
+        renderTeamEmblem(emblem, current?.emblem || "");
         trigger.setAttribute("aria-label", current ? `Team ${current.name}` : "Choose a team");
         trigger.title = current ? current.name : "Choose a team";
-        status.textContent = current
-          ? `${current.emblem.value} ${current.name} — ⭐ ${current.captain.display_name} (Team Captain)`
-          : "Choose an existing team or create one.";
+        if (current) appendTeamLabel(status, current);
+        else status.textContent = "Choose an existing team or create one.";
         options.replaceChildren();
         (payload.teams || []).forEach((team) => {
           const label = document.createElement("label"); label.className = "team-radio-tile";
@@ -365,7 +421,7 @@
             await load();
           });
           const text = document.createElement("span");
-          text.textContent = `${team.emblem.value} ${team.name} — ⭐ ${team.captain.display_name} (Team Captain)`;
+          appendTeamLabel(text, team);
           label.append(radio, text); options.append(label);
         });
         if (emblemChoice.options.length <= 1) (payload.approved_emblems || []).forEach((item) => emblemChoice.append(new Option(`${item.value} ${item.key}`, item.key)));
@@ -1980,14 +2036,6 @@
     }
 
     function renderTeamBoards(standings) {
-      const emoji = {lion: "🦁", goat: "🐐", bear: "🐻", eagle: "🦅", wolf: "🐺", bee: "🐝", dragon: "🐉", cat: "🐱", dog: "🐶", star: "⭐", fire: "🔥", moon: "🌙", lightning: "⚡"};
-      const emblemText = (key) => {
-        const [kind, value] = String(key || "").split(":");
-        if (kind === "emoji") return emoji[value] || "⬡";
-        if (kind === "letter") return `[${value}]`;
-        if (kind === "shield") return `🛡 ${value}`;
-        return "⬡";
-      };
       const boardKeys = ["team-weekly-practice", "team-seasonal-points", "team-average-practice", "team-season-practice"];
       boardKeys.forEach((key) => {
         let anyRows = false;
@@ -2000,8 +2048,12 @@
             anyRows = true;
             const item = document.createElement("article"); item.className = `contest-ranked-row contest-rank-${Math.min(row.rank, 4)}`; item.setAttribute("role", "listitem");
             const rank = document.createElement("span"); rank.className = "contest-rank-badge"; rank.textContent = String(row.rank);
-            const subject = document.createElement("span"); subject.className = "contest-ranked-subject";
-            subject.textContent = `${emblemText(row.emblem_key)} ${row.team_name} — ⭐ ${row.captain_name} (${row.captain_label})`;
+            const subject = document.createElement("span"); subject.className = "contest-ranked-subject team-ranked-subject";
+            appendTeamLabel(subject, {
+              name: row.team_name,
+              emblem_key: row.emblem_key,
+              captain: {display_name: row.captain_name},
+            });
             const score = document.createElement("strong"); score.className = "contest-ranked-score";
             score.textContent = key === "team-average-practice" ? `${(row.score / 100).toFixed(2)} min · ${row.active_member_count} active` : String(row.score);
             item.setAttribute("aria-label", `Rank ${row.rank}, ${row.team_name}, ${score.textContent}`);
@@ -3049,7 +3101,7 @@
             await loadTeams();
           });
           const text = document.createElement("span");
-          text.textContent = `${team.emblem.value} ${team.name} — ⭐ ${team.captain.display_name} (Team Captain)`;
+          appendTeamLabel(text, team);
           label.append(input, text); optionsEl.append(label);
         });
         if (emblemEl && emblemEl.options.length <= 1) {

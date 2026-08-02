@@ -106,7 +106,7 @@ def test_shed_book_and_board_cleanup_markup_and_behavior() -> None:
     assert "Choose a Parent or Mentor" in app_js
     assert 'method: "POST"' in app_js and "submissionKey" in app_js
     assert "Your Position" not in board
-    for title in ("Practice Minutes Leaderboard", "WEEKLY PRACTICE BY INSTRUMENT", "WEEKLY BAND CAMP POINTS"):
+    for title in ("PRACTICE MINUTES LEADERBOARD", "WEEKLY PRACTICE BY INSTRUMENT", "WEEKLY BAND CAMP POINTS"):
         assert title in board
     assert "Medal Board of Past Winners" in board
     assert "Hall of Champions" in board

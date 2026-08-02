@@ -26,16 +26,6 @@
           Name your Woodchuck
         </button>
 
-        <time
-          id="camp-level-value"
-          class="shed-readout shed-readout-class shed-member-since"
-          {% if member_since %}datetime="{{ member_since.timestamp }}"
-          title="Member since {{ member_since.full }}"
-          aria-label="Member since {{ member_since.full }}"{% endif %}
-        >
-          Member Since{% if member_since %} {{ member_since.compact }}{% endif %}
-        </time>
-
         <button
           id="instrument-object"
           class="shed-icon-object shed-profile-field"

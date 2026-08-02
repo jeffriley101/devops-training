@@ -88,8 +88,10 @@ def test_shed_uses_server_member_date_board_clipboard_and_compact_level() -> Non
     account_js = (ROOT / "static/js/account.js").read_text(encoding="utf-8")
 
     assert "Chuckling" not in home + app_js
-    assert "Member Since" in home
-    assert 'aria-label="Member since {{ member_since.full }}"' in home
+    assert "Member Since" not in home
+    board = (ROOT / "templates/quest.html").read_text(encoding="utf-8")
+    assert "Member Since" in board
+    assert 'datetime="{{ member_since.timestamp }}"' in board
     assert ">📋<" in home
     assert ">📔<" not in home
     assert "profileLevel.charAt(0).toUpperCase()" in app_js

@@ -126,7 +126,7 @@ def test_board_phase6a_feedback_success_and_placeholder_contract() -> None:
     assert 'id="plunge-burrow-button"' in board and "🕳️" in board and 'href="/plunge-burrow"' in board
     plunge = javascript[javascript.index("function wirePlungeBurrow"):javascript.index("function wireBandCampStandings")]
     assert "fetch(" not in plunge and "saveState" not in plunge and "award" not in plunge.casefold()
-    assert 'id="complete-quest-btn"' in board and "Quest Complete" in javascript
+    assert 'id="complete-quest-btn"' in board and "Completed Today" in javascript
     assert "The quest is complete. Extra practice" not in board
     assert 'id="quest-feedback"' in board
     assert 'id="instrument-advice"' not in board

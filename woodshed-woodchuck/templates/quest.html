@@ -15,6 +15,14 @@
     <div>
       <p class="board-kicker">Get your name on the Board</p>
       <h3 id="board-player-name">Your Woodchuck</h3>
+      <p class="board-member-since">
+        <strong>Member Since</strong>
+        {% if member_since %}
+        <time datetime="{{ member_since.timestamp }}" title="Member Since {{ member_since.full }}">{{ member_since.compact }}</time>
+        {% else %}
+        <span>Unavailable</span>
+        {% endif %}
+      </p>
       <p>
         This Week’s Camp Points:
         <strong id="board-player-weekly-points">0</strong>
@@ -193,7 +201,7 @@
           aria-labelledby="contest-open-tab"
         >
           <section class="contest-points-section" aria-labelledby="open-points-title">
-            <h4 id="open-points-title">Practice Minutes Leaderboard</h4>
+            <h4 id="open-points-title">PRACTICE MINUTES LEADERBOARD</h4>
             <p class="contest-division-explanation">All contest-enabled P-Charts count toward weekly practice minutes. Verified standings include only charts that have been verified.</p>
             <div id="contest-open-points" class="contest-ranked-list" role="list" aria-label="Open minutes leaders"></div>
             <p id="contest-open-points-empty" class="contest-empty-state hidden">
@@ -212,7 +220,7 @@
 
           <section class="contest-instrument-section" aria-labelledby="open-instruments-title">
             <h4 id="open-instruments-title">WEEKLY PRACTICE BY INSTRUMENT</h4>
-            <p class="contest-division-explanation contest-description-warm">All submitted P-Charts</p>
+            <p class="contest-division-explanation contest-description-cherry">All submitted P-Charts</p>
             <div id="contest-open-standings" class="contest-ranked-list" role="list" aria-label="Open instrument standings"></div>
           </section>
           <p id="contest-open-empty" class="contest-empty-state hidden">
@@ -228,7 +236,7 @@
           hidden
         >
           <section class="contest-points-section" aria-labelledby="verified-points-title">
-            <h4 id="verified-points-title">Practice Minutes Leaderboard</h4>
+            <h4 id="verified-points-title">PRACTICE MINUTES LEADERBOARD</h4>
             <p class="contest-division-explanation">All contest-enabled P-Charts count toward weekly practice minutes. Verified standings include only charts that have been verified.</p>
             <div id="contest-verified-points" class="contest-ranked-list" role="list" aria-label="Verified minutes leaders"></div>
             <p id="contest-verified-points-empty" class="contest-empty-state hidden">
@@ -335,7 +343,7 @@
             {% if division == "verified" %}hidden{% endif %}
           >
             <section class="medal-contest" aria-labelledby="past-{{ division }}-points-title">
-              <h4 id="past-{{ division }}-points-title">Practice Minutes Leaderboard</h4>
+              <h4 id="past-{{ division }}-points-title">PRACTICE MINUTES LEADERBOARD</h4>
               <div id="past-winners-{{ division }}-points" class="medal-rows"></div>
               <p id="past-winners-{{ division }}-points-empty" class="contest-empty-state hidden">
                 No podium results for this contest and division.

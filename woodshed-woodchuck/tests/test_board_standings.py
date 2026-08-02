@@ -27,7 +27,7 @@ def test_board_contains_live_standings_markup() -> None:
     assert 'role="list"' in markup
     assert 'id="contest-open-points"' in markup
     assert 'id="contest-verified-points"' in markup
-    assert "Practice Minutes Leaderboard" in markup
+    assert "PRACTICE MINUTES LEADERBOARD" in markup
     assert 'aria-label="Open minutes leaders"' in markup
     assert 'aria-label="Verified minutes leaders"' in markup
     assert 'aria-label="Open points leaders"' not in markup
@@ -104,7 +104,7 @@ def test_board_contains_past_winners_medal_board_states_and_navigation() -> None
     assert "Medals will appear after a Band Camp week is finalized." in markup
     assert "No podium results for this contest and division." in markup
     assert "WEEKLY PRACTICE BY INSTRUMENT" in markup
-    assert "Practice Minutes Leaderboard" in markup
+    assert "PRACTICE MINUTES LEADERBOARD" in markup
 
 
 def test_past_winners_keeps_live_board_standings_intact() -> None:
