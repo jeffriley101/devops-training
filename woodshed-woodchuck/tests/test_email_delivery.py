@@ -271,7 +271,7 @@ def test_confirmation_ui_is_status_only_and_original_controls_remain() -> None:
     assert 'id="email-p-chart-btn"' not in pbook
     assert 'id="trusted-verifier-invite-form"' in invitations
     assert 'id="trusted-verifier-copy-link"' in invitations
-    assert "showReviewDeliveryStatus" in app_js
+    assert "deliveryMessages" in app_js
     assert "email_delivery?.message" in app_js + verifier_js
     assert '@router.post("/verifications/{verification_id}/resend-email")' in chart_routes
     assert '@router.post("/invitations/{invitation_id}/resend-email")' in invitation_routes

@@ -89,7 +89,7 @@ def test_book_phase6a_timer_text_structure_and_stone_hooks() -> None:
     assert "PRACTICE_TIMER_LIMIT_SECONDS = 120 * 60" in javascript
     assert "Math.min(" in javascript and 'minutesEl.value = "120"' in javascript
     assert "Timer stopped at 2 hours. You can adjust your minutes before submitting." in javascript
-    assert "sessionStorage" in javascript and "form.requestSubmit()" not in javascript[javascript.index("function wirePracticeTimer"):javascript.index("function getRecentEmails")]
+    assert "sessionStorage" in javascript and "form.requestSubmit()" not in javascript[javascript.index("function wirePracticeTimer"):javascript.index("function formatEntry")]
     assert "p-book-bold-divider" in book + css and "p-book-lower-region" in book + css
     assert book.count("practice-stat-stone") == 4
     assert ".practice-stat-stone" in css and "pirate-logbook" in book[book.index("p-book-lower-region"):]

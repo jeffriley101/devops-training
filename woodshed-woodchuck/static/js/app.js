@@ -2902,6 +2902,8 @@
   function wirePBook(state) {
     const form = document.getElementById("p-book-form");
     if (!form) return;
+    if (form.dataset.woodshedPBookWired === "true") return;
+    form.dataset.woodshedPBookWired = "true";
 
     const dateEl = document.getElementById("p-book-date");
     const minutesEl = document.getElementById("p-book-minutes");
@@ -2939,24 +2941,24 @@
     const practiceDaysEl = document.getElementById("p-book-practice-days");
     const pagesCountEl = document.getElementById("p-book-pages-count");
 
+    const requiredElements = [dateEl, minutesEl, noteEl, errorEl, feedbackEl, submitBtn];
+    if (requiredElements.some((element) => !element)) {
+      form.dataset.woodshedPBookWired = "error";
+      return;
+    }
+
     const DANDELION_DAILY_CAP = 75;
     let submissionInFlight = false;
     let pendingSubmissionKey = null;
     let confirmationApproved = false;
     let currentTeam = null;
-    function showReviewDeliveryStatus(payload) {
-      if (!deliveryStatusEl || !payload.chart?.verification) return;
-      deliveryStatusEl.hidden = false;
-      deliveryStatusEl.textContent = payload.email_delivery?.message || "P-Chart saved; no new email was sent.";
-    }
-
-    if (confirmSubmitBtn) confirmSubmitBtn.addEventListener("click", function () {
+    if (confirmSubmitBtn && finalDialog) confirmSubmitBtn.addEventListener("click", function () {
       confirmationApproved = true;
       finalDialog.close();
       form.requestSubmit();
     });
-    if (confirmBackBtn) confirmBackBtn.addEventListener("click", () => finalDialog.close());
-    if (missingBackBtn) missingBackBtn.addEventListener("click", () => missingDialog.close());
+    if (confirmBackBtn && finalDialog) confirmBackBtn.addEventListener("click", () => finalDialog.close());
+    if (missingBackBtn && missingDialog) missingBackBtn.addEventListener("click", () => missingDialog.close());
 
     function verifierRoleLabel(role) {
       return String(role || "")
@@ -3040,7 +3042,7 @@
                 "Select a trusted verifier, or leave this Open."
               )
             : (
-                "Connect a parent or mentor before requesting validation."
+                "No connected parent or mentor yet. Use Manage Trusted Verifiers to add one."
               );
         }
       } catch (error) {
@@ -3050,6 +3052,7 @@
             ""
           )
         );
+        verifierSelectEl.disabled = false;
 
         if (verifierHelpEl) {
           verifierHelpEl.textContent =
@@ -3064,7 +3067,7 @@
       const currentEl = document.getElementById("p-book-current-team");
       const emblemEl = document.getElementById("p-book-team-emblem");
       const lockEl = document.getElementById("p-book-team-lock");
-      if (!optionsEl) return;
+      if (!optionsEl || !currentEl || !emblemEl || !lockEl) return;
       try {
         const response = await fetch("/teams", {credentials: "same-origin", cache: "no-store"});
         const payload = await response.json();
@@ -3105,6 +3108,7 @@
         }
       } catch (error) {
         currentEl.textContent = error.message || "Teams could not be loaded.";
+        lockEl.textContent = "Team choices are temporarily unavailable. Retry by reloading this section or page.";
       }
     }
 
@@ -3115,10 +3119,16 @@
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.detail || "Email presets could not be loaded.");
         emailPresetEl.replaceChildren(new Option("Choose a saved recipient", ""));
-        (payload.presets || []).forEach((preset) => {
+        const presets = Array.isArray(payload.presets) ? payload.presets : [];
+        if (!presets.length) {
+          emailPresetEl.options[0].textContent = "No saved recipients yet";
+        }
+        presets.forEach((preset) => {
           emailPresetEl.append(new Option(`${preset.display_name} — ${preset.email}`, String(preset.id)));
         });
       } catch (error) {
+        emailPresetEl.replaceChildren(new Option("Saved recipients unavailable", ""));
+        emailPresetEl.disabled = false;
         errorEl.textContent = error.message || "Email presets could not be loaded.";
       }
     }
@@ -3253,16 +3263,15 @@
         let verificationChanged = false;
 
         serverCharts.forEach((serverChart) => {
-          const verification =
-            serverChart.verification || {};
+          const verification = serverChart.verification;
 
           const serverId = String(serverChart.id);
-          const status = verification.status || "pending";
+          const status = verification ? (verification.status || "pending") : "open";
           const responseNote =
-            verification.response_note || "";
+            verification ? (verification.response_note || "") : "";
 
           const verifierName =
-            verification.verifier &&
+            verification && verification.verifier &&
             verification.verifier.display_name
               ? verification.verifier.display_name
               : "";
@@ -3309,7 +3318,7 @@
             serverChartId: serverChart.id,
             verificationStatus: status,
             verificationResponseNote: responseNote,
-            verifierId: verification.verifier_id || null,
+            verifierId: verification ? (verification.verifier_id || null) : null,
             verifierName,
             includeContests: serverChart.include_contests !== false,
           });
@@ -3465,43 +3474,7 @@
           renderTimerRunning(true);
         }
       }
-    }
-
-    function getRecentEmails(s, type) {
-      const contacts = s.exportContacts || {};
-      const emails = contacts[type] || [];
-      return Array.isArray(emails) ? emails : [];
-    }
-
-    function isValidEmail(email) {
-      return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email);
-    }
-
-    function saveRecentEmail(state, type, email) {
-      const cleanEmail = email.trim().toLowerCase();
-      if (!cleanEmail || !isValidEmail(cleanEmail)) return;
-
-      state.exportContacts = state.exportContacts || {};
-      const current = getRecentEmails(state, type);
-      const nextEmails = [cleanEmail, ...current.filter((item) => item !== cleanEmail)].slice(0, 5);
-      state.exportContacts[type] = nextEmails;
-    }
-
-    function renderEmailOptions(s) {
-      const teacherEmails = getRecentEmails(s, "teacherEmails");
-      const parentEmails = getRecentEmails(s, "parentEmails");
-
-      if (teacherEmailOptionsEl) {
-        teacherEmailOptionsEl.innerHTML = teacherEmails
-          .map((email) => `<option value="${email}"></option>`)
-          .join("");
-      }
-
-      if (parentEmailOptionsEl) {
-        parentEmailOptionsEl.innerHTML = parentEmails
-          .map((email) => `<option value="${email}"></option>`)
-          .join("");
-      }
+      window.addEventListener("pagehide", stopPracticeTimerInterval, { once: true });
     }
 
     function formatEntry(entry) {
@@ -3610,13 +3583,24 @@
     dateEl.value = stateApi.localDateKey();
     renderEntries(state);
     renderPBookSummary(state);
-    renderEmailOptions(state);
-    wirePracticeTimer();
-    loadVerifierOptions();
-    loadTeams();
-    loadEmailPresets();
-    loadPersistentPracticeCharts();
-    loadPracticeTotals();
+    const initializeFeature = (initializer, failureMessage) => {
+      try {
+        const result = initializer();
+        if (result && typeof result.catch === "function") {
+          result.catch(() => {
+            if (errorEl && !errorEl.textContent) errorEl.textContent = failureMessage;
+          });
+        }
+      } catch (_error) {
+        if (errorEl && !errorEl.textContent) errorEl.textContent = failureMessage;
+      }
+    };
+    initializeFeature(wirePracticeTimer, "The practice timer could not be started.");
+    initializeFeature(loadVerifierOptions, "Trusted verifiers could not be loaded.");
+    initializeFeature(loadTeams, "Teams could not be loaded.");
+    initializeFeature(loadEmailPresets, "Saved recipients could not be loaded.");
+    initializeFeature(loadPersistentPracticeCharts, "Practice history could not be loaded.");
+    initializeFeature(loadPracticeTotals, "Practice totals could not be loaded.");
 
     function updateSubmitGlow() {
       const glowing = [includeContestsEl, includeTeamEl, requestValidationEl]
@@ -3784,15 +3768,22 @@
           deliveryStatusEl.textContent = deliveryMessages.join(" · ");
         }
 
-        const exportText = buildExportText(stateApi.getState());
-        try {
-          await navigator.clipboard.writeText(exportText);
-          feedbackEl.textContent += " P-Chart copied to your clipboard.";
-          window.setTimeout(() => {
-            if (feedbackEl.textContent.includes("copied to your clipboard")) feedbackEl.textContent = "";
-          }, 5000);
-        } catch (_clipboardError) {
-          feedbackEl.textContent += " P-Chart saved, but it could not be copied automatically.";
+        if (createdPayload.created === true) {
+          const exportText = buildExportText(stateApi.getState());
+          try {
+            if (!navigator.clipboard || typeof navigator.clipboard.writeText !== "function") {
+              throw new Error("Clipboard unavailable");
+            }
+            await navigator.clipboard.writeText(exportText);
+            feedbackEl.textContent += " P-Chart copied to your clipboard.";
+            window.setTimeout(() => {
+              if (feedbackEl.textContent.includes("copied to your clipboard")) feedbackEl.textContent = "";
+            }, 5000);
+          } catch (_clipboardError) {
+            feedbackEl.textContent += " P-Chart saved, but it could not be copied automatically.";
+          }
+        } else {
+          feedbackEl.textContent = "This P-Chart was already saved. No duplicate actions were performed.";
         }
 
         minutesEl.value = "";
