@@ -17,6 +17,8 @@ from .models import (
     PracticeChartVerification,
     StudentVerifierConnection,
     TrustedVerifier,
+    TeamMembership,
+    Season,
 )
 from .practice_charts import (
     create_practice_chart_verification_request,
@@ -116,6 +118,7 @@ class PracticeChartCreate(BaseModel):
     credits_awarded: int = 0
     submission_key: str | None = Field(default=None, min_length=1, max_length=64)
     include_contests: StrictBool = True
+    include_team_contests: StrictBool = True
 
 
 def verification_payload(
@@ -164,6 +167,8 @@ def chart_payload(
         "source": chart.source,
         "credits_awarded": chart.credits_awarded,
         "include_contests": chart.include_contests,
+        "include_team_contests": chart.include_team_contests,
+        "team_id": chart.team_id,
         "created_at": chart.created_at.isoformat(),
         "verification": (
             verification_payload(verification, verifier)
@@ -257,6 +262,16 @@ def create_student_practice_chart(
             )
 
         try:
+            active_season = session.scalar(select(Season).where(Season.status == "active"))
+            team_membership = (
+                session.scalar(select(TeamMembership).where(
+                    TeamMembership.profile_id == profile.id,
+                    TeamMembership.season_id == active_season.id,
+                    TeamMembership.ended_at.is_(None),
+                ))
+                if active_season is not None and submitted.include_team_contests
+                else None
+            )
             created = create_practice_chart_verification_request(
                 session,
                 profile=profile,
@@ -269,6 +284,8 @@ def create_student_practice_chart(
                 credits_awarded=submitted.credits_awarded,
                 submission_key=submitted.submission_key,
                 include_contests=submitted.include_contests,
+                include_team_contests=submitted.include_team_contests,
+                team_id=team_membership.team_id if team_membership else None,
             )
         except ValueError as error:
             raise HTTPException(

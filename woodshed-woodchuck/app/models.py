@@ -8,10 +8,12 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     JSON,
     String,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -461,6 +463,14 @@ class PracticeChart(Base):
         Boolean, default=True, server_default="1", nullable=False
     )
 
+    include_team_contests: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default="1", nullable=False
+    )
+
+    team_id: Mapped[int | None] = mapped_column(
+        ForeignKey("teams.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+
     credits_awarded: Mapped[int] = mapped_column(
         Integer,
         default=0,
@@ -566,6 +576,9 @@ class CampPointAward(Base):
         DateTime(timezone=True), nullable=False, index=True
     )
     duplicate_key: Mapped[str] = mapped_column(String(100), nullable=False)
+    team_id: Mapped[int | None] = mapped_column(
+        ForeignKey("teams.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
     )
@@ -656,6 +669,64 @@ class Season(Base):
     )
 
 
+class Team(Base):
+    __tablename__ = "teams"
+    __table_args__ = (
+        UniqueConstraint("season_id", "normalized_name", name="uq_team_season_name"),
+        UniqueConstraint("season_id", "emblem_key", name="uq_team_season_emblem"),
+        UniqueConstraint("season_id", "creator_profile_id", name="uq_team_season_creator"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    season_id: Mapped[int] = mapped_column(
+        ForeignKey("seasons.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    display_name: Mapped[str] = mapped_column(String(30), nullable=False)
+    normalized_name: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    emblem_key: Mapped[str] = mapped_column(String(50), nullable=False)
+    creator_profile_id: Mapped[int | None] = mapped_column(
+        ForeignKey("woodchuck_profiles.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+
+class TeamMembership(Base):
+    __tablename__ = "team_memberships"
+    __table_args__ = (
+        Index(
+            "uq_team_membership_active_profile_season", "profile_id", "season_id",
+            unique=True, sqlite_where=text("ended_at IS NULL"),
+            postgresql_where=text("ended_at IS NULL"),
+        ),
+        Index("ix_team_membership_season_team", "season_id", "team_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    season_id: Mapped[int] = mapped_column(ForeignKey("seasons.id", ondelete="CASCADE"), nullable=False, index=True)
+    team_id: Mapped[int] = mapped_column(ForeignKey("teams.id", ondelete="CASCADE"), nullable=False, index=True)
+    profile_id: Mapped[int] = mapped_column(ForeignKey("woodchuck_profiles.id", ondelete="CASCADE"), nullable=False, index=True)
+    selected_week_start: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+
+class TeamWeekMembershipSnapshot(Base):
+    __tablename__ = "team_week_membership_snapshots"
+    __table_args__ = (
+        UniqueConstraint("contest_week_id", "profile_id", name="uq_team_week_snapshot_profile"),
+        Index("ix_team_week_snapshot_week_team", "contest_week_id", "team_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    contest_week_id: Mapped[int] = mapped_column(ForeignKey("contest_weeks.id", ondelete="CASCADE"), nullable=False, index=True)
+    profile_id: Mapped[int] = mapped_column(ForeignKey("woodchuck_profiles.id", ondelete="CASCADE"), nullable=False, index=True)
+    team_id: Mapped[int | None] = mapped_column(ForeignKey("teams.id", ondelete="SET NULL"), nullable=True, index=True)
+    membership_id: Mapped[int | None] = mapped_column(ForeignKey("team_memberships.id", ondelete="SET NULL"), nullable=True)
+    snapshot_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+
 class Contest(Base):
     __tablename__ = "contests"
     __table_args__ = (
@@ -664,7 +735,7 @@ class Contest(Base):
             name="ck_contest_metric_type",
         ),
         CheckConstraint(
-            "subject_type IN ('student', 'instrument')",
+            "subject_type IN ('student', 'instrument', 'team')",
             name="ck_contest_subject_type",
         ),
     )
@@ -743,7 +814,7 @@ class ContestResult(Base):
             name="ck_contest_result_division",
         ),
         CheckConstraint(
-            "subject_type IN ('student', 'instrument')",
+            "subject_type IN ('student', 'instrument', 'team')",
             name="ck_contest_result_subject_type",
         ),
         CheckConstraint(
@@ -772,6 +843,10 @@ class ContestResult(Base):
         nullable=True,
     )
     instrument: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    team_id: Mapped[int | None] = mapped_column(
+        ForeignKey("teams.id", ondelete="SET NULL"), index=True, nullable=True
+    )
+    active_member_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     display_name_snapshot: Mapped[str] = mapped_column(String(100), nullable=False)
     score: Mapped[int] = mapped_column(Integer, nullable=False)
     rank: Mapped[int] = mapped_column(Integer, nullable=False)

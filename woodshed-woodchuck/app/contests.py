@@ -28,6 +28,7 @@ from .models import (
     QuestCompletion,
     RewardGrant,
     Season,
+    TeamMembership,
     WoodchuckProfile,
     WoodchuckState,
 )
@@ -586,10 +587,28 @@ def create_camp_point_award(
         points_awarded=1,
         occurred_at=now.astimezone(timezone.utc),
         duplicate_key=duplicate_key,
+        team_id=_active_team_id_for_event(session, profile.id, now),
     )
     session.add(award)
     session.flush()
     return award, True
+
+
+def _active_team_id_for_event(session: Session, profile_id: int, now: datetime) -> int | None:
+    """Snapshot team attribution at the earning event; legacy awards remain null."""
+    season = session.scalar(select(Season).where(
+        Season.status == "active",
+        Season.starts_on <= now.astimezone(CENTRAL).date(),
+    ).order_by(Season.starts_on.desc()))
+    if season is None:
+        return None
+    membership = session.scalar(select(TeamMembership).where(
+        TeamMembership.profile_id == profile_id,
+        TeamMembership.season_id == season.id,
+        TeamMembership.started_at <= now.astimezone(timezone.utc),
+        TeamMembership.ended_at.is_(None),
+    ))
+    return membership.team_id if membership else None
 
 
 def utc_iso(value: datetime | None) -> str | None:

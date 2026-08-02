@@ -28,6 +28,7 @@ def test_camp_point_award_has_weekly_ledger_fields() -> None:
     assert set(CampPointAward.__table__.columns.keys()) == {
         "id", "profile_id", "activity_type", "points_awarded",
         "occurred_at", "duplicate_key", "created_at",
+        "team_id",
     }
 from app.practice_chart_routes import PracticeChartCreate, chart_payload
 from app.practice_charts import create_practice_chart_verification_request
@@ -299,7 +300,8 @@ def test_contest_models_match_approved_foundation() -> None:
         },
         ContestResult: {
             "id", "contest_week_id", "contest_id", "division",
-            "subject_type", "subject_key", "profile_id", "instrument",
+                "subject_type", "subject_key", "profile_id", "instrument",
+                "team_id", "active_member_count",
             "display_name_snapshot", "score", "rank", "medal", "created_at",
         },
         RewardGrant: {
@@ -313,7 +315,8 @@ def test_contest_models_match_approved_foundation() -> None:
         PracticeChart: {
             "id", "profile_id", "practice_date", "minutes", "instrument",
                 "note", "practice_details", "source", "submission_key",
-                "include_contests", "credits_awarded", "created_at", "updated_at",
+                "include_contests", "include_team_contests", "team_id",
+                "credits_awarded", "created_at", "updated_at",
         },
     }
 

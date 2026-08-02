@@ -78,6 +78,8 @@ def create_practice_chart_verification_request(
     credits_awarded: int = 0,
     submission_key: str | None = None,
     include_contests: bool = True,
+    include_team_contests: bool = True,
+    team_id: int | None = None,
 ) -> CreatedPracticeChartRequest:
     if profile.id is None:
         raise ValueError("The student account must be saved first.")
@@ -107,6 +109,8 @@ def create_practice_chart_verification_request(
         raise ValueError("Unsupported P-Chart source.")
     if type(include_contests) is not bool:
         raise ValueError("Contest inclusion must be true or false.")
+    if type(include_team_contests) is not bool:
+        raise ValueError("Team contest inclusion must be true or false.")
 
     if (
         isinstance(credits_awarded, bool)
@@ -181,6 +185,8 @@ def create_practice_chart_verification_request(
         credits_awarded=credits_awarded,
         submission_key=submission_key,
         include_contests=include_contests,
+        include_team_contests=include_team_contests,
+        team_id=team_id if include_team_contests else None,
     )
 
     session.add(chart)
