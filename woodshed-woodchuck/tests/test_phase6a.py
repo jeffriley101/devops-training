@@ -95,17 +95,17 @@ def test_book_phase6a_timer_text_structure_and_stone_hooks() -> None:
     assert ".practice-stat-stone" in css and "pirate-logbook" in book[book.index("p-book-lower-region"):]
 
 
-def test_book_actions_precede_divider_and_blue_statistics_region() -> None:
+def test_book_actions_precede_spiral_and_metallic_statistics_page() -> None:
     book = (ROOT / "templates/p_book.html").read_text(encoding="utf-8")
     css = (ROOT / "static/css/styles.css").read_text(encoding="utf-8")
     action_positions = [book.index("Submit P-Chart")]
-    divider = book.index("p-book-bold-divider")
+    divider = book.index("p-book-spiral")
     lower = book.index("p-book-lower-region")
     stats = book.index("This Week’s Practice")
     logbook = book.index("pirate-logbook")
     assert max(action_positions) < divider < lower < stats < logbook
-    assert "p-book-lower-spacer" in book and ".p-book-lower-spacer" in css
-    assert "background: linear-gradient" in css[css.index(".p-book-lower-region"):css.index(".practice-stat-stone")]
+    assert "p-book-page-right" in book and ".p-book-page-right" in css
+    assert ".p-book-page .practice-stat-stone" in css
     assert "p-book-lower-actions" not in book + css
 
 

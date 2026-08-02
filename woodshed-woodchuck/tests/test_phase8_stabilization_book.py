@@ -96,3 +96,42 @@ def test_submission_keeps_warnings_confirmation_and_single_clipboard_attempt() -
     assert "if (createdPayload.created === true)" in script
     assert script.count("await navigator.clipboard.writeText(exportText)") == 1
     assert "No duplicate actions were performed." in script
+
+
+def test_book_uses_responsive_metallic_spiral_layout_and_scoped_controls() -> None:
+    template = (ROOT / "templates/p_book.html").read_text(encoding="utf-8")
+    css = (ROOT / "static/css/styles.css").read_text(encoding="utf-8")
+    assert 'class="card p-book-page"' in template
+    assert 'class="p-book-notebook"' in template
+    assert 'class="p-book-spiral" aria-hidden="true"' in template
+    assert "grid-template-columns: minmax(0, 1fr) 46px minmax(0, 1fr)" in css
+    assert "@media (max-width: 760px)" in css
+    assert ".p-book-spiral { min-height: 42px" in css
+    assert ".p-book-page .practice-stat-stone" in css
+    assert ".p-book-page .pirate-logbook" in css
+    assert ".p-book-page .btn" in css
+    assert ".p-book-page #p-book-team-shed-link" in css
+    assert ".p-book-page .p-book-verifier-manage" in css
+    assert ".p-book-page #submit-p-chart-btn" in css
+    assert "border-radius: 50%" in css
+    assert ".p-book-page #submit-p-chart-btn.p-book-submit-gold" in css
+    assert "@media (prefers-reduced-motion: reduce)" in css
+    assert "body .btn" not in css
+
+
+def test_book_history_uses_accessible_verified_and_pristine_badges() -> None:
+    script = (ROOT / "static/js/app.js").read_text(encoding="utf-8")
+    formatter = script[script.index("function formatEntry"):script.index("function renderEntries")]
+    assert 'class="p-book-entry-badge p-book-verified-badge"' in formatter
+    assert 'aria-label="Verified" title="Verified">V</span>' in formatter
+    assert 'class="p-book-entry-badge p-book-pristine-badge"' in formatter
+    assert 'aria-label="Pristine P-Chart" title="Pristine P-Chart">🥇</span>' in formatter
+    assert "`${verificationText}${pristineText}${verifierNoteText}`" in formatter
+
+
+def test_book_asset_versions_are_advanced() -> None:
+    base = (ROOT / "templates/base.html").read_text(encoding="utf-8")
+    assert "/static/css/styles.css?v=66" in base
+    assert "/static/js/app.js?v=31" in base
+    assert "styles.css?v=65" not in base
+    assert "app.js?v=30" not in base

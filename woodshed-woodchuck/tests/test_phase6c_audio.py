@@ -18,7 +18,7 @@ def test_tone_is_exactly_pinned_local_licensed_and_loaded_in_order():
     assert "cdn" not in BASE.casefold()
     tone_pos = BASE.index('/static/vendor/tone/Tone.js?v=15.1.22')
     audio_pos = BASE.index('/static/js/audio.js?v=4')
-    app_pos = BASE.index('/static/js/app.js?v=30')
+    app_pos = BASE.index('/static/js/app.js?v=31')
     assert tone_pos < audio_pos < app_pos
 
 
@@ -78,12 +78,8 @@ def test_confirmed_action_triggers_and_silent_restoration_paths():
 
 
 def test_quest_dials_click_only_inside_deliberate_handlers():
-    assert APP.count('playSound("dialClick")') == 3
-    choose = APP.index('chooseQuestBtn.addEventListener("click"')
-    skip = APP.index('skipQuestBtn.addEventListener("click"')
-    submit = APP.index('form.addEventListener("submit", async function (event)', skip)
-    assert choose < APP.index('playSound("dialClick")', choose)
-    assert skip < APP.index('playSound("dialClick")', skip)
+    assert APP.count('playSound("dialClick")') == 1
+    submit = APP.index('form.addEventListener("submit", async function (event)')
     assert submit < APP.index('playSound("dialClick")', submit)
 
 

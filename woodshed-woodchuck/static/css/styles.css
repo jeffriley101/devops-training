@@ -2991,6 +2991,154 @@ select {
 }
 .p-book-work-label { display: block; font-weight: 800; }
 
+/* BOOK: open metallic spiral Practice Book */
+.p-book-page {
+  padding: clamp(0.55rem, 1.5vw, 1rem);
+  overflow-x: clip;
+  background: linear-gradient(145deg, #6f7b83, #c9d0d4 48%, #69747b);
+}
+
+.p-book-notebook {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 46px minmax(0, 1fr);
+  align-items: stretch;
+  max-width: 100%;
+}
+
+.p-book-page-sheet {
+  min-width: 0;
+  padding: clamp(0.8rem, 2vw, 1.3rem);
+  color: #20272b;
+  background:
+    linear-gradient(105deg, rgba(255,255,255,.52), transparent 18%),
+    linear-gradient(145deg, #d9dee1, #a8b0b5 52%, #e0e4e6);
+  border: 2px solid #626c72;
+  box-shadow: inset 0 0 0 2px rgba(255,255,255,.38), inset 0 -12px 24px rgba(45,54,59,.16);
+}
+
+.p-book-page-left { border-radius: 18px 4px 4px 18px; }
+.p-book-page-right { border-radius: 4px 18px 18px 4px; }
+
+.p-book-spiral {
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(90deg, #505a60, #dfe5e8 35%, #737e84 65%, #edf1f2);
+  box-shadow: inset 5px 0 8px rgba(17,25,29,.32), inset -5px 0 8px rgba(255,255,255,.48);
+}
+
+.p-book-spiral::after {
+  content: "";
+  position: absolute;
+  inset: 7px -8px;
+  background: repeating-radial-gradient(ellipse at center, transparent 0 7px, #f4f7f8 8px 10px, #69747a 11px 13px, transparent 14px 25px);
+  filter: drop-shadow(1px 2px 1px rgba(20,28,32,.42));
+}
+
+.p-book-page .practice-timer-metal,
+.p-book-page .practice-stat-stone,
+.p-book-page .pirate-logbook,
+.p-book-page .p-book-lower-region {
+  color: #172027;
+  background: linear-gradient(145deg, #e0e4e6 0%, #90999f 35%, #d9dde0 58%, #7b858b 100%);
+  border: 3px solid #59636a;
+  box-shadow: inset 0 0 0 2px rgba(255,255,255,.42), inset 0 -8px 16px rgba(35,40,44,.2), 0 5px 10px rgba(29,38,43,.2);
+  text-shadow: 0 1px rgba(255,255,255,.48);
+}
+
+.p-book-page .p-book-lower-region {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+.p-book-page .practice-total-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.p-book-page .practice-stat-stone { min-width: 0; }
+.p-book-page .pirate-logbook { padding: 1rem; border-radius: 14px; }
+.p-book-page .pirate-logbook > .p-book-title { border-bottom-color: #4e5960; font-family: inherit; }
+
+.p-book-page .btn {
+  min-height: 44px;
+  color: #172027;
+  background: linear-gradient(145deg, #f0f3f4, #90999f 48%, #dce1e3);
+  border: 2px solid #555f65;
+  border-radius: 10px;
+  box-shadow: inset 0 2px 1px rgba(255,255,255,.72), inset 0 -3px 4px rgba(45,54,59,.28), 0 4px 0 #485158;
+  text-shadow: 0 1px rgba(255,255,255,.7);
+}
+
+.p-book-page .btn:hover,
+.p-book-page .btn:focus-visible { background: linear-gradient(145deg, #fff, #a3acb1 50%, #e5e9ea); }
+.p-book-page .btn:active { transform: translateY(3px); box-shadow: inset 0 2px 5px rgba(32,40,44,.32), 0 1px 0 #485158; }
+
+.p-book-page #p-book-team-shed-link,
+.p-book-page .p-book-verifier-manage {
+  color: #f7fff4;
+  background: linear-gradient(145deg, #74a965, #2f6d3d 55%, #4d8951);
+  border-color: #244e2d;
+  text-shadow: 0 1px #17331d;
+}
+
+.p-book-page #submit-p-chart-btn {
+  width: 112px;
+  height: 112px;
+  min-height: 112px;
+  padding: 0.8rem;
+  align-self: center;
+  border-radius: 50%;
+  color: #f8fff4;
+  background: radial-gradient(circle at 35% 28%, #9bc486, #367744 48%, #1f4c2c 76%);
+  border: 5px ridge #5f7863;
+  box-shadow: inset 4px 4px 7px rgba(255,255,255,.34), inset -5px -6px 9px rgba(17,49,25,.44), 0 7px 0 #263f2d, 0 10px 16px rgba(25,36,30,.35);
+  text-shadow: 0 1px 2px #17331d;
+}
+
+.p-book-page #submit-p-chart-btn.p-book-submit-gold {
+  color: #302309;
+  background: radial-gradient(circle at 35% 28%, #fff2a5, #d5a52c 50%, #936512 78%);
+  border-color: #9b761e;
+  box-shadow: inset 4px 4px 7px rgba(255,255,255,.42), inset -5px -6px 9px rgba(92,59,5,.35), 0 7px 0 #73520f, 0 0 1rem rgba(222,170,38,.75);
+}
+
+.p-book-entry-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.65rem;
+  min-height: 1.65rem;
+  margin-inline-start: 0.3rem;
+  vertical-align: middle;
+}
+
+.p-book-verified-badge {
+  border: 2px ridge #a7c4ae;
+  border-radius: 50%;
+  color: #f3fff2;
+  background: linear-gradient(145deg, #65a874, #1f6337 58%, #8ac294);
+  box-shadow: inset 0 1px 2px rgba(255,255,255,.5), 0 2px 3px rgba(22,48,29,.28);
+  font-weight: 950;
+  text-shadow: 0 1px #163d24;
+}
+
+.p-book-pristine-badge { font-size: 1.35rem; }
+
+@media (max-width: 760px) {
+  .p-book-notebook { grid-template-columns: minmax(0, 1fr); }
+  .p-book-page-left { border-radius: 16px 16px 4px 4px; }
+  .p-book-page-right { border-radius: 4px 4px 16px 16px; }
+  .p-book-spiral { min-height: 42px; background: linear-gradient(180deg, #505a60, #dfe5e8 35%, #737e84 65%, #edf1f2); }
+  .p-book-spiral::after {
+    inset: -8px 7px;
+    background: repeating-radial-gradient(ellipse at center, transparent 0 7px, #f4f7f8 8px 10px, #69747a 11px 13px, transparent 14px 25px);
+  }
+  .p-book-page #submit-p-chart-btn { width: 100px; height: 100px; min-height: 100px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .p-book-page #submit-p-chart-btn.p-book-submit-gold { animation: none; box-shadow: 0 0 0 4px #b78718; }
+}
+
 /* BOARD: centered public-events heading */
 .board-page {
   background:

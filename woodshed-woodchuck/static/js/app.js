@@ -3426,10 +3426,14 @@
         entry.verificationStatus === "pending"
           ? " — Verification pending"
           : entry.verificationStatus === "approved"
-            ? " — Verified"
+            ? ' <span class="p-book-entry-badge p-book-verified-badge" aria-label="Verified" title="Verified">V</span>'
             : entry.verificationStatus === "rejected"
               ? " — Needs correction"
               : "";
+
+      const pristineText = entry.pristine === true || entry.isPristine === true
+        ? ' <span class="p-book-entry-badge p-book-pristine-badge" aria-label="Pristine P-Chart" title="Pristine P-Chart">🥇</span>'
+        : "";
 
       const verifierNoteText =
         entry.verificationResponseNote
@@ -3442,7 +3446,7 @@
       return (
         `${entry.dateKey} — ${entry.minutes} minutes` +
         `${detailText}${noteText}` +
-        `${verificationText}${verifierNoteText}`
+        `${verificationText}${pristineText}${verifierNoteText}`
       );
     }
 

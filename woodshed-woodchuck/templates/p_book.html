@@ -1,7 +1,9 @@
 {% extends "base.html" %}
 
 {% block content %}
-<section class="card">
+<section class="card p-book-page">
+  <div class="p-book-notebook">
+  <div class="p-book-page-sheet p-book-page-left">
   <article class="mentor-card practice-timer-metal" aria-label="Practice timer">
     <div class="practice-timer-row">
       <button
@@ -152,10 +154,12 @@
       <button id="p-book-confirm-back" class="btn btn-secondary" type="button">Go Back</button>
     </div>
   </dialog>
+  </div>
 
-  <hr class="section-divider p-book-bold-divider" />
+  <div class="p-book-spiral" aria-hidden="true"></div>
+
+  <div class="p-book-page-sheet p-book-page-right">
   <div class="p-book-lower-region">
-  <div class="p-book-lower-spacer" aria-hidden="true"></div>
   <div class="stats-grid mt-md practice-total-cards" aria-label="Persisted practice totals">
     <article class="stat-card practice-stat-stone">
       <h3>This Week’s Practice</h3>
@@ -181,6 +185,8 @@
       <p>No practice charts logged yet.</p>
     </div>
   </article>
+  </div>
+  </div>
   </div>
 </section>
 
