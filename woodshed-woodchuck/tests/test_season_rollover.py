@@ -167,8 +167,12 @@ def test_successful_rollover_generates_complete_central_weeks_and_is_idempotent(
     assert {contest.name for contest in session.scalars(select(Contest))} == {
         "Top Five Minutes Leaders",
         "Weekly Practice Minutes by Instrument",
-        "Weekly Band Camp Points",
-    }
+            "Weekly Band Camp Points",
+            "Team Practice Minutes This Week",
+            "Team Seasonal Points",
+            "Team Average Practice",
+            "Total Practice Minutes This Season",
+        }
 
 
 def test_duplicate_key_and_conflicting_dates_are_rejected_safely(

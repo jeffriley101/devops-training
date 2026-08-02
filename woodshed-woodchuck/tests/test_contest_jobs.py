@@ -122,6 +122,7 @@ def add_week_activity(
         practice_chart_id=chart.id,
         verifier_id=None,
         status="approved",
+        responded_at=week.verification_deadline_at - timedelta(minutes=1),
     ))
     session.add(CampPointAward(
         profile_id=profile.id,

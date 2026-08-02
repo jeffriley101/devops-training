@@ -113,6 +113,10 @@ def add_chart(
                 practice_chart_id=chart.id,
                 verifier_id=None,
                 status=verification_status,
+                responded_at=(
+                    datetime(2026, 8, 1, 12, tzinfo=timezone.utc)
+                    if verification_status in {"approved", "rejected"} else None
+                ),
             )
         )
     session.flush()
@@ -152,12 +156,16 @@ def test_band_camp_records_are_created_idempotently(
     assert first[0].id == second[0].id
     assert first[2].id == second[2].id
     assert session.scalar(select(func.count()).select_from(Season)) == 1
-    assert session.scalar(select(func.count()).select_from(Contest)) == 3
+    assert session.scalar(select(func.count()).select_from(Contest)) == 7
     assert session.scalar(select(func.count()).select_from(ContestWeek)) == 1
     assert {contest.key for contest in second[1]} == {
         "weekly-points-leaders",
         "weekly-practice-by-instrument",
         "weekly-camp-points",
+        "team-weekly-practice",
+        "team-seasonal-points",
+        "team-average-practice",
+        "team-season-practice",
     }
     minutes = next(
         contest for contest in second[1] if contest.key == "weekly-points-leaders"
@@ -735,7 +743,7 @@ def test_successful_finalization_medals_rewards_crown_and_idempotence(
         for grant in session.scalars(select(RewardGrant))
     )
     crown = session.scalar(select(CrownProgress).where(CrownProgress.profile_id == alpha.id))
-    assert crown is not None and crown.qualifying_wins == 1
+    assert crown is not None and crown.qualifying_wins == 2
 
 
 def test_existing_finalized_student_scores_are_not_rewritten(
@@ -812,9 +820,10 @@ def test_camp_points_finalize_once_with_medals_reward_and_crown(
     grants = session.scalars(select(RewardGrant).where(
         RewardGrant.source_key.like("%:weekly-camp-points:%")
     )).all()
-    assert [(grant.profile_id, grant.reward_type) for grant in grants] == [
-        (gold.id, "dandelion"), (gold.id, "crown_win")
-    ]
+    assert {(grant.profile_id, grant.reward_type, grant.amount) for grant in grants} == {
+        (gold.id, "dandelion", 50), (gold.id, "crown_win", 1),
+        (silver.id, "dandelion", 25), (bronze.id, "dandelion", 15),
+    }
     camp_crown = session.scalar(select(CrownProgress).where(
         CrownProgress.profile_id == gold.id,
         CrownProgress.category_key == "weekly-camp-points",
@@ -853,12 +862,12 @@ def test_olympic_ties_and_open_verified_gold_pay_once(
     for student in students[:2]:
         gold_grants = session.scalars(select(RewardGrant).where(
             RewardGrant.profile_id == student.id,
-            RewardGrant.source_key.like("%:gold"),
+            RewardGrant.source_key.like("%:weekly-points-leaders:%"),
         )).all()
         assert {grant.reward_type for grant in gold_grants} == {"dandelion", "crown_win"}
-        assert len(gold_grants) == 2
+        assert len(gold_grants) == 4
         crown = session.scalar(select(CrownProgress).where(CrownProgress.profile_id == student.id))
-        assert crown is not None and crown.qualifying_wins == 1
+        assert crown is not None and crown.qualifying_wins == 2
 
 
 def test_tenth_win_sets_crown_once_and_progress_never_resets(
@@ -906,9 +915,11 @@ def test_instrument_participation_threshold_and_division_deduplication(
     session.commit()
 
     participation = session.scalars(select(RewardGrant).where(
-        RewardGrant.source_key.like("%:participant:%")
+        RewardGrant.source_key.like("%:weekly-practice-by-instrument:%")
     )).all()
-    assert [(grant.profile_id, grant.amount) for grant in participation] == [(eligible.id, 1)]
+    assert [(grant.profile_id, grant.amount) for grant in participation] == [
+        (eligible.id, 50), (eligible.id, 50),
+    ]
     assert all(grant.reward_type == "dandelion" and grant.category_key is None for grant in participation)
 
 
@@ -1499,6 +1510,7 @@ def test_open_p_chart_submission_is_idempotent_listed_and_updates_standings(
     session.add(PracticeChartVerification(
         practice_chart_id=first["chart"]["id"], verifier_id=None,
         status="approved",
+        responded_at=datetime(2026, 8, 1, 12, tzinfo=timezone.utc),
     ))
     session.commit()
     approved_payload = current_contests_payload(

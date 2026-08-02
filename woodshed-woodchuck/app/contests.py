@@ -28,7 +28,9 @@ from .models import (
     QuestCompletion,
     RewardGrant,
     Season,
+    Team,
     TeamMembership,
+    TeamWeekMembershipSnapshot,
     WoodchuckProfile,
     WoodchuckState,
 )
@@ -60,7 +62,35 @@ CONTEST_DEFINITIONS = (
         "name": "Weekly Band Camp Points",
         "metric_type": "points",
         "subject_type": "student",
-        "crown_category": None,
+        "crown_category": "weekly-camp-points",
+    },
+    {
+        "key": "team-weekly-practice",
+        "name": "Team Practice Minutes This Week",
+        "metric_type": "practice_minutes",
+        "subject_type": "team",
+        "crown_category": "team-crown",
+    },
+    {
+        "key": "team-seasonal-points",
+        "name": "Team Seasonal Points",
+        "metric_type": "points",
+        "subject_type": "team",
+        "crown_category": "team-crown",
+    },
+    {
+        "key": "team-average-practice",
+        "name": "Team Average Practice",
+        "metric_type": "practice_minutes",
+        "subject_type": "team",
+        "crown_category": "team-crown",
+    },
+    {
+        "key": "team-season-practice",
+        "name": "Total Practice Minutes This Season",
+        "metric_type": "practice_minutes",
+        "subject_type": "team",
+        "crown_category": "team-crown",
     },
 )
 
@@ -210,6 +240,8 @@ def ensure_contest_definitions(session: Session) -> list[Contest]:
         else:
             contest.name = definition["name"]
             contest.metric_type = definition["metric_type"]
+            contest.subject_type = definition["subject_type"]
+            contest.crown_category = definition["crown_category"]
         contests.append(contest)
     return contests
 
@@ -648,6 +680,9 @@ def _charts_and_approved_ids(
                 select(PracticeChartVerification.practice_chart_id).where(
                     PracticeChartVerification.practice_chart_id.in_(chart_ids),
                     PracticeChartVerification.status == "approved",
+                    PracticeChartVerification.responded_at.is_not(None),
+                    PracticeChartVerification.responded_at
+                    <= contest_week.verification_deadline_at,
                 )
             ).all()
         )
@@ -655,6 +690,153 @@ def _charts_and_approved_ids(
         else set()
     )
     return charts, approved
+
+
+def _team_rankings(
+    session: Session,
+    scores: dict[int, int],
+    member_counts: dict[int, int] | None = None,
+) -> list[dict[str, object]]:
+    teams = {
+        team.id: team for team in session.scalars(
+            select(Team).where(Team.id.in_(scores))
+        ).all()
+    } if scores else {}
+    ordered = sorted(scores.items(), key=lambda item: (
+        -item[1], teams[item[0]].display_name.casefold(), teams[item[0]].display_name,
+    ))
+    rows: list[dict[str, object]] = []
+    previous: int | None = None
+    rank = 0
+    for position, (team_id, score) in enumerate(ordered, start=1):
+        if score != previous:
+            rank, previous = position, score
+        team = teams[team_id]
+        rows.append({
+            "rank": rank, "team_id": team_id, "team_name": team.display_name,
+            "emblem_key": team.emblem_key, "score": score,
+            "active_member_count": (member_counts or {}).get(team_id, 0),
+        })
+    return rows
+
+
+def _weekly_team_scores(
+    session: Session, contest_week: ContestWeek
+) -> dict[str, dict[str, dict[int, int]]]:
+    """Cap each profile/team contribution at 300 minutes before summing."""
+    charts, approved_ids = _charts_and_approved_ids(session, contest_week)
+    contributions = {"open": {}, "verified": {}}
+    for chart in charts:
+        if not chart.include_team_contests or chart.team_id is None:
+            continue
+        divisions = ["open"] + (["verified"] if chart.id in approved_ids else [])
+        for division in divisions:
+            key = (chart.team_id, chart.profile_id)
+            contributions[division][key] = contributions[division].get(key, 0) + chart.minutes
+    result: dict[str, dict[str, dict[int, int]]] = {}
+    for division in ("open", "verified"):
+        scores: dict[int, int] = {}
+        members: dict[int, int] = {}
+        for (team_id, _profile_id), minutes in contributions[division].items():
+            scores[team_id] = scores.get(team_id, 0) + min(minutes, 300)
+            members[team_id] = members.get(team_id, 0) + 1
+        averages = {
+            team_id: round(scores[team_id] * 100 / members[team_id])
+            for team_id in scores
+        }
+        result[division] = {"totals": scores, "members": members, "averages": averages}
+    return result
+
+
+def _season_team_practice_scores(
+    session: Session, season: Season, through_week: ContestWeek
+) -> dict[str, dict[int, int]]:
+    charts = session.scalars(select(PracticeChart).where(
+        PracticeChart.practice_date >= season.starts_on,
+        PracticeChart.practice_date < through_week.week_end,
+        PracticeChart.include_contests.is_(True),
+        PracticeChart.include_team_contests.is_(True),
+        PracticeChart.team_id.is_not(None),
+    )).all()
+    weeks = {
+        week.week_start: week for week in session.scalars(select(ContestWeek).where(
+            ContestWeek.season_id == season.id,
+            ContestWeek.week_start < through_week.week_end,
+        )).all()
+    }
+    contributions = {"open": {}, "verified": {}}
+    for chart in charts:
+        week_start = chart.practice_date - timedelta(days=chart.practice_date.weekday())
+        week = weeks.get(week_start)
+        if week is None:
+            continue
+        _, approved = _charts_and_approved_ids(session, week)
+        for division in ["open"] + (["verified"] if chart.id in approved else []):
+            key = (week_start, chart.team_id, chart.profile_id)
+            contributions[division][key] = contributions[division].get(key, 0) + chart.minutes
+    return {
+        division: _sum_capped_team_contributions(values)
+        for division, values in contributions.items()
+    }
+
+
+def _sum_capped_team_contributions(values: dict[tuple[date, int, int], int]) -> dict[int, int]:
+    scores: dict[int, int] = {}
+    for (_week, team_id, _profile), minutes in values.items():
+        scores[team_id] = scores.get(team_id, 0) + min(minutes, 300)
+    return scores
+
+
+def _seasonal_team_point_scores(
+    session: Session, season: Season, through_week: ContestWeek
+) -> dict[str, dict[int, int]]:
+    """Team points require that week's Open/Verified P-Chart eligibility.
+
+    Awards at or after the week currently being finalized are excluded, avoiding
+    circular scoring; newly granted finalization points enter a later view.
+    """
+    cutoff = datetime.combine(through_week.week_end, time.min, CENTRAL).astimezone(timezone.utc)
+    awards = session.scalars(select(CampPointAward).where(
+        CampPointAward.team_id.is_not(None), CampPointAward.occurred_at < cutoff,
+    )).all()
+    weeks = session.scalars(select(ContestWeek).where(
+        ContestWeek.season_id == season.id,
+        ContestWeek.week_start < through_week.week_end,
+    )).all()
+    eligibility: dict[tuple[date, int], set[str]] = {}
+    for week in weeks:
+        charts, approved = _charts_and_approved_ids(session, week)
+        for chart in charts:
+            key = (week.week_start, chart.profile_id)
+            eligibility.setdefault(key, set()).add("open")
+            if chart.id in approved:
+                eligibility[key].add("verified")
+    scores = {"open": {}, "verified": {}}
+    for award in awards:
+        local_date = aware_utc(award.occurred_at).astimezone(CENTRAL).date()
+        week_start = local_date - timedelta(days=local_date.weekday())
+        for division in eligibility.get((week_start, award.profile_id), set()):
+            scores[division][award.team_id] = scores[division].get(award.team_id, 0) + award.points_awarded
+    return scores
+
+
+def team_leaderboards(
+    session: Session, *, season: Season, contest_week: ContestWeek
+) -> dict[str, dict[str, list[dict[str, object]]]]:
+    weekly = _weekly_team_scores(session, contest_week)
+    seasonal_practice = _season_team_practice_scores(session, season, contest_week)
+    seasonal_points = _seasonal_team_point_scores(session, season, contest_week)
+    payload = {
+        "team-weekly-practice": {}, "team-average-practice": {},
+        "team-season-practice": {}, "team-seasonal-points": {},
+    }
+    for division in ("open", "verified"):
+        counts = weekly[division]["members"]
+        payload["team-weekly-practice"][division] = _team_rankings(session, weekly[division]["totals"], counts)
+        payload["team-average-practice"][division] = _team_rankings(session, weekly[division]["averages"], counts)
+        payload["team-season-practice"][division] = _team_rankings(session, seasonal_practice[division])
+        payload["team-seasonal-points"][division] = _team_rankings(session, seasonal_points[division])
+    return payload
 
 
 def _ranked_student_scores(
@@ -682,7 +864,7 @@ def _ranked_student_scores(
     return rows
 
 
-def _add_dandelion(session: Session, profile_id: int) -> None:
+def _add_dandelion(session: Session, profile_id: int, amount: int = 1) -> None:
     state = session.get(WoodchuckState, profile_id)
     if state is None:
         state = WoodchuckState(profile_id=profile_id, state_json={}, revision=0)
@@ -695,7 +877,7 @@ def _add_dandelion(session: Session, profile_id: int) -> None:
         if isinstance(credits, int) and not isinstance(credits, bool)
         else 0
     )
-    progress["credits"] = current_credits + 1
+    progress["credits"] = current_credits + amount
     payload["progress"] = progress
     state.state_json = payload
     state.revision += 1
@@ -709,6 +891,7 @@ def _grant_once(
     source_key: str,
     reward_type: str,
     category_key: str | None = None,
+    amount: int = 1,
 ) -> bool:
     existing = session.scalar(select(RewardGrant.id).where(
         RewardGrant.profile_id == profile_id,
@@ -720,12 +903,12 @@ def _grant_once(
     session.add(RewardGrant(
         profile_id=profile_id, contest_result_id=result_id,
         source_key=source_key, reward_type=reward_type,
-        category_key=category_key, amount=1,
+        category_key=category_key, amount=amount,
     ))
     return True
 
 
-def finalize_contest_week(
+def _legacy_finalize_contest_week(
     session: Session, *, week_start: date, now: datetime
 ) -> ContestWeek:
     if now.tzinfo is None or now.utcoffset() is None:
@@ -971,6 +1154,221 @@ def finalize_contest_week(
     return contest_week
 
 
+PLACEMENT_DANDELIONS = {1: 50, 2: 25, 3: 15}
+PLACEMENT_CAMP_POINTS = 3
+PARTICIPATION_DANDELIONS = 5
+
+
+def _increment_crown_progress(
+    session: Session, *, profile_id: int, category: str, now: datetime
+) -> None:
+    progress = session.scalar(select(CrownProgress).where(
+        CrownProgress.profile_id == profile_id,
+        CrownProgress.category_key == category,
+    ).with_for_update())
+    if progress is None:
+        progress = CrownProgress(profile_id=profile_id, category_key=category, qualifying_wins=0)
+        session.add(progress)
+    progress.qualifying_wins += 1
+    if progress.qualifying_wins >= 10 and progress.crown_earned_at is None:
+        progress.crown_earned_at = now
+
+
+def _snapshot_memberships(session: Session, contest_week: ContestWeek) -> list[TeamWeekMembershipSnapshot]:
+    at = datetime.combine(contest_week.week_end, time.min, CENTRAL).astimezone(timezone.utc)
+    existing = session.scalars(select(TeamWeekMembershipSnapshot).where(
+        TeamWeekMembershipSnapshot.contest_week_id == contest_week.id
+    )).all()
+    if existing:
+        return list(existing)
+    memberships = session.scalars(select(TeamMembership).where(
+        TeamMembership.season_id == contest_week.season_id,
+        TeamMembership.started_at <= at,
+    ).order_by(TeamMembership.profile_id, TeamMembership.started_at.desc())).all()
+    chosen: dict[int, TeamMembership] = {}
+    for membership in memberships:
+        if membership.profile_id in chosen:
+            continue
+        if membership.ended_at is None or aware_utc(membership.ended_at) > at:
+            chosen[membership.profile_id] = membership
+    rows = [TeamWeekMembershipSnapshot(
+        contest_week_id=contest_week.id, profile_id=membership.profile_id,
+        team_id=membership.team_id, membership_id=membership.id, snapshot_at=at,
+    ) for membership in chosen.values()]
+    session.add_all(rows); session.flush()
+    return rows
+
+
+def _reward_contest_result(
+    session: Session, *, result: ContestResult, contest: Contest,
+    recipients: set[int], snapshot_team_ids: dict[int, int | None], now: datetime,
+) -> None:
+    amount = PLACEMENT_DANDELIONS[result.rank]
+    for profile_id in recipients:
+        source = (
+            f"contest:{result.contest_week_id}:{contest.key}:{result.division}:"
+            f"{result.subject_type}:{result.subject_key}:rank:{result.rank}:profile:{profile_id}"
+        )
+        if _grant_once(
+            session, profile_id=profile_id, result_id=result.id, source_key=source,
+            reward_type="dandelion", amount=amount,
+        ):
+            _add_dandelion(session, profile_id, amount)
+        camp_key = f"{source}:camp-points"
+        existing_camp = session.scalar(select(CampPointAward.id).where(
+            CampPointAward.profile_id == profile_id,
+            CampPointAward.duplicate_key == camp_key,
+        ))
+        if existing_camp is None:
+            session.add(CampPointAward(
+                profile_id=profile_id, activity_type="contest-placement",
+                points_awarded=PLACEMENT_CAMP_POINTS, occurred_at=now,
+                duplicate_key=camp_key, team_id=snapshot_team_ids.get(profile_id),
+            ))
+        if result.rank == 1:
+            category = "team-crown" if result.subject_type == "team" else contest.crown_category
+            if category and _grant_once(
+                session, profile_id=profile_id, result_id=result.id, source_key=source,
+                reward_type="crown_win", category_key=category,
+            ):
+                _increment_crown_progress(session, profile_id=profile_id, category=category, now=now)
+
+
+def finalize_contest_week(
+    session: Session, *, week_start: date, now: datetime
+) -> ContestWeek:
+    """Finalize individual and team contests in one idempotent transaction."""
+    if now.tzinfo is None or now.utcoffset() is None:
+        raise ValueError("The current time must be timezone-aware.")
+    week = session.scalar(select(ContestWeek).join(Season).where(
+        ContestWeek.week_start == week_start,
+        Season.key.like("band-camp-%"),
+    ).with_for_update())
+    if week is None:
+        raise HTTPException(status_code=404, detail="Contest week not found.")
+    if week.status == "finalized":
+        return week
+    now_utc = now.astimezone(timezone.utc)
+    week_end_at = datetime.combine(week.week_end, time.min, CENTRAL).astimezone(timezone.utc)
+    if now_utc < week_end_at:
+        raise HTTPException(status_code=409, detail="Contest week has not ended.")
+    if now_utc <= aware_utc(week.verification_deadline_at):
+        raise HTTPException(status_code=409, detail="Verification deadline has not passed.")
+    if now_utc <= aware_utc(week.finalize_after):
+        raise HTTPException(status_code=409, detail="Finalization time has not passed.")
+    season = session.get(Season, week.season_id)
+    contests = {row.key: row for row in session.scalars(select(Contest).where(
+        Contest.key.in_([definition["key"] for definition in CONTEST_DEFINITIONS])
+    )).all()}
+    if len(contests) != len(CONTEST_DEFINITIONS):
+        raise RuntimeError("Band Camp contest definitions are missing.")
+
+    charts, approved_ids = _charts_and_approved_ids(session, week)
+    profile_ids = {chart.profile_id for chart in charts}
+    profiles = {row.id: row for row in session.scalars(select(WoodchuckProfile).where(
+        WoodchuckProfile.id.in_(profile_ids)
+    )).all()} if profile_ids else {}
+    student_scores = {"open": {}, "verified": {}}
+    instrument_scores = {"open": {}, "verified": {}}
+    instrument_contributors: dict[tuple[str, str], set[int]] = {}
+    for chart in charts:
+        divisions = ["open"] + (["verified"] if chart.id in approved_ids else [])
+        instrument_key, instrument_name = normalize_instrument(chart.instrument)
+        for division in divisions:
+            student_scores[division][chart.profile_id] = student_scores[division].get(chart.profile_id, 0) + chart.minutes
+            previous = instrument_scores[division].get(instrument_key, (instrument_name, 0))
+            instrument_scores[division][instrument_key] = (previous[0], previous[1] + chart.minutes)
+            if chart.minutes >= 15:
+                instrument_contributors.setdefault((division, instrument_key), set()).add(chart.profile_id)
+
+    results: list[tuple[ContestResult, Contest, set[int]]] = []
+    for division in ("open", "verified"):
+        for profile_id, display, score, rank in _ranked_student_scores(student_scores[division], profiles):
+            if rank not in PLACEMENT_DANDELIONS:
+                continue
+            result = ContestResult(
+                contest_week_id=week.id, contest_id=contests["weekly-points-leaders"].id,
+                division=division, subject_type="student", subject_key=str(profile_id),
+                profile_id=profile_id, display_name_snapshot=display, score=score,
+                rank=rank, medal=medal_for_rank(rank),
+            )
+            session.add(result); results.append((result, contests["weekly-points-leaders"], {profile_id}))
+        for row in olympic_rankings(instrument_scores[division]):
+            rank = int(row["rank"])
+            if rank not in PLACEMENT_DANDELIONS:
+                continue
+            key, _ = normalize_instrument(str(row["instrument"]))
+            result = ContestResult(
+                contest_week_id=week.id, contest_id=contests["weekly-practice-by-instrument"].id,
+                division=division, subject_type="instrument", subject_key=key,
+                instrument=str(row["instrument"]), display_name_snapshot=str(row["instrument"]),
+                score=int(row["total_minutes"]), rank=rank, medal=medal_for_rank(rank),
+            )
+            session.add(result); results.append((result, contests["weekly-practice-by-instrument"], instrument_contributors.get((division, key), set())))
+
+    start_at, end_at = _week_utc_bounds(week)
+    camp_awards = session.scalars(select(CampPointAward).where(
+        CampPointAward.occurred_at >= start_at, CampPointAward.occurred_at < end_at,
+    )).all()
+    camp_scores: dict[int, int] = {}
+    for award in camp_awards:
+        camp_scores[award.profile_id] = camp_scores.get(award.profile_id, 0) + award.points_awarded
+    camp_profiles = {row.id: row for row in session.scalars(select(WoodchuckProfile).where(
+        WoodchuckProfile.id.in_(camp_scores)
+    )).all()} if camp_scores else {}
+    for profile_id, display, score, rank in _ranked_student_scores(camp_scores, camp_profiles):
+        if rank not in PLACEMENT_DANDELIONS:
+            continue
+        result = ContestResult(
+            contest_week_id=week.id, contest_id=contests["weekly-camp-points"].id,
+            division="open", subject_type="student", subject_key=str(profile_id),
+            profile_id=profile_id, display_name_snapshot=display, score=score,
+            rank=rank, medal=medal_for_rank(rank),
+        )
+        session.add(result); results.append((result, contests["weekly-camp-points"], {profile_id}))
+
+    snapshots = _snapshot_memberships(session, week)
+    snapshot_team_ids = {row.profile_id: row.team_id for row in snapshots}
+    has_chart = set(session.scalars(select(PracticeChart.profile_id).distinct()).all())
+    team_members: dict[int, set[int]] = {}
+    for snapshot in snapshots:
+        if snapshot.team_id is not None and snapshot.profile_id in has_chart:
+            team_members.setdefault(snapshot.team_id, set()).add(snapshot.profile_id)
+    boards = team_leaderboards(session, season=season, contest_week=week)
+    for contest_key, divisions in boards.items():
+        contest = contests[contest_key]
+        for division, rows in divisions.items():
+            for row in rows:
+                rank = int(row["rank"])
+                if rank not in PLACEMENT_DANDELIONS:
+                    continue
+                result = ContestResult(
+                    contest_week_id=week.id, contest_id=contest.id, division=division,
+                    subject_type="team", subject_key=str(row["team_id"]), team_id=int(row["team_id"]),
+                    display_name_snapshot=str(row["team_name"]), score=int(row["score"]),
+                    active_member_count=int(row["active_member_count"]), rank=rank,
+                    medal=medal_for_rank(rank),
+                )
+                session.add(result); results.append((result, contest, team_members.get(int(row["team_id"]), set())))
+    session.flush()
+
+    for result, contest, recipients in results:
+        _reward_contest_result(
+            session, result=result, contest=contest, recipients=recipients,
+            snapshot_team_ids=snapshot_team_ids, now=now_utc,
+        )
+    for profile_id in {chart.profile_id for chart in charts}:
+        source = f"contest:{week.id}:weekly-participation:profile:{profile_id}"
+        if _grant_once(
+            session, profile_id=profile_id, result_id=None, source_key=source,
+            reward_type="participation_dandelion", amount=PARTICIPATION_DANDELIONS,
+        ):
+            _add_dandelion(session, profile_id, PARTICIPATION_DANDELIONS)
+    week.status = "finalized"; week.finalized_at = now_utc
+    session.flush()
+    return week
+
+
 def contest_results_payload(
     session: Session, contest_week: ContestWeek
 ) -> dict[str, object]:
@@ -991,7 +1389,12 @@ def contest_results_payload(
         "results": [{
             "contest": {"key": contest.key, "name": contest.name},
             "division": result.division, "rank": result.rank, "medal": result.medal,
-            ("display_name" if result.subject_type == "student" else "instrument"): result.display_name_snapshot,
+            "subject_type": result.subject_type,
+            ("team_name" if result.subject_type == "team" else
+             "display_name" if result.subject_type == "student" else "instrument"):
+                result.display_name_snapshot,
+            "team_id": result.team_id,
+            "active_member_count": result.active_member_count,
             "score": result.score,
         } for result, contest in rows],
     }
@@ -1096,6 +1499,30 @@ def hall_of_champions_payload(session: Session) -> dict[str, object]:
 
         _increment_medal(champion["medals"], result.medal)
         _increment_medal(champion["by_division"][result.division], result.medal)
+        champion["divisions"].add(result.division)
+
+    # Team champion wins are public Hall credit for each snapshotted,
+    # P-Chart-eligible recipient, represented by the idempotent crown grant.
+    team_wins = session.execute(
+        select(RewardGrant, ContestResult, WoodchuckProfile)
+        .join(ContestResult, ContestResult.id == RewardGrant.contest_result_id)
+        .join(WoodchuckProfile, WoodchuckProfile.id == RewardGrant.profile_id)
+        .where(
+            RewardGrant.reward_type == "crown_win",
+            RewardGrant.category_key == "team-crown",
+            ContestResult.subject_type == "team",
+            ContestResult.rank == 1,
+        )
+    ).all()
+    for _grant, result, profile in team_wins:
+        champion = students_by_profile.setdefault(profile.id, {
+            "display_name": public_woodchuck_name(profile),
+            "medals": _empty_medal_counts(),
+            "by_division": {"open": _empty_medal_counts(), "verified": _empty_medal_counts()},
+            "divisions": set(),
+        })
+        _increment_medal(champion["medals"], "gold")
+        _increment_medal(champion["by_division"][result.division], "gold")
         champion["divisions"].add(result.division)
 
     points_contest = session.scalar(
@@ -1242,6 +1669,9 @@ def current_contests_payload(
         contest_week=contest_week,
         current_profile_id=current_profile_id,
     )
+    team_standings = team_leaderboards(
+        session, season=season, contest_week=contest_week,
+    )
     return {
         "season": {
             "key": season.key,
@@ -1274,6 +1704,7 @@ def current_contests_payload(
             "weekly-points-leaders": points_standings,
             "weekly-practice-by-instrument": standings,
             "weekly-camp-points": camp_points_standings,
+            **team_standings,
         },
     }
 
