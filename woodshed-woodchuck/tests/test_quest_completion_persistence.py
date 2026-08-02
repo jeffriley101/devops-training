@@ -14,12 +14,14 @@ from sqlalchemy.orm import sessionmaker
 from app import account_routes, contests
 from app.db import Base
 from app.main import app
+from app.instruments import canonical_instrument_key
 from app.models import (
     CampPointAward,
     CrownProgress,
     PracticeChart,
     QuestCompletion,
     RewardGrant,
+    WoodchuckProfile,
     WoodchuckState,
 )
 
@@ -42,7 +44,9 @@ def quest_database(tmp_path, monkeypatch):
     engine.dispose()
 
 
-def create_student(client: TestClient, *, credits: int = 7) -> int:
+def create_student(
+    client: TestClient, *, credits: int = 7, instrument: str = "Flute"
+) -> int:
     initial_state = {
         "version": 4,
         "account": {"authenticated": False, "serverRevision": 0},
@@ -55,7 +59,7 @@ def create_student(client: TestClient, *, credits: int = 7) -> int:
     response = client.post("/account/create", data={
         "display_name": "Quest Tester",
         "pin": "2468",
-        "instrument": "Flute",
+        "instrument": instrument,
         "level": "Beginner",
         "goal": "Build daily consistency",
         "initial_state": json.dumps(initial_state),
@@ -83,6 +87,30 @@ def test_existing_quest_rules_define_both_reward_amounts_and_no_camp_activity() 
     assert rewards == {15, 20}  # Task configuration remains unchanged.
     assert "quest" not in contests.CAMP_POINT_ACTIVITIES
     assert "quest" not in contests.ACTIVITY_CROWN_KEYS
+
+
+@pytest.mark.parametrize("value", [
+    "Piano/Keyboard", "Piano / Keyboard", "Piano", "Keyboard",
+    "piano-keyboard", "  PIANO / keyboard  ",
+])
+def test_piano_keyboard_aliases_share_one_canonical_key(value: str) -> None:
+    assert canonical_instrument_key(value) == "piano-keyboard"
+
+
+def test_unrelated_instruments_keep_distinct_canonical_keys() -> None:
+    assert canonical_instrument_key("Flute") == "flute"
+    assert canonical_instrument_key("Accordion") == "accordion"
+    assert canonical_instrument_key("Flute") != "piano-keyboard"
+
+
+def test_piano_keyboard_bonus_configuration_is_approved_copy() -> None:
+    challenge = contests.QUEST_POOL["piano-keyboard"][0]
+    assert challenge == {
+        "id": "piano-keyboard-scale-chord-progression",
+        "text": "Practice a scale or chord progression with both hands.",
+        "target_minutes": 10,
+        "reward_credits": 15,
+    }
 
 
 def test_full_completion_route_persists_reward_once_and_returns_authority(
@@ -209,6 +237,71 @@ def test_bonus_progress_endpoint_persists_increment_then_rewards_threshold(
             assert session.scalar(select(func.count()).select_from(PracticeChart)) == 0
             award = session.scalar(select(CampPointAward))
             assert award.points_awarded == 2 and award.team_id is None
+
+
+def test_piano_keyboard_get_and_post_share_canonical_challenge(
+    quest_database,
+) -> None:
+    with TestClient(app) as client:
+        profile_id = create_student(
+            client, credits=0, instrument="Piano / Keyboard"
+        )
+        with quest_database() as session:
+            profile = session.get(WoodchuckProfile, profile_id)
+            profile.instrument = "Piano/Keyboard"
+            session.commit()
+        current_response = client.get("/contests/bonus-challenge/current")
+        assert current_response.status_code == 200
+        current = current_response.json()["challenge"]
+        assert current["task"] == (
+            "Practice a scale or chord progression with both hands."
+        )
+        assert current["target_minutes"] == 10
+        assert ":piano-keyboard:" in current["instance_key"]
+
+        partial = client.post("/contests/bonus-challenge/progress", json={
+            "activity_date": current["activity_date"],
+            "challenge_instance": current["instance_key"],
+            "minutes": 4,
+        })
+        assert partial.status_code == 200
+        assert partial.json()["logged_minutes"] == 4
+        assert partial.json()["dandelions_awarded"] == 0
+        assert partial.json()["camp_points_awarded"] == 0
+        refreshed = client.get("/contests/bonus-challenge/current").json()["challenge"]
+        assert refreshed["instance_key"] == current["instance_key"]
+        assert refreshed["logged_minutes"] == 4
+
+        stale = client.post("/contests/bonus-challenge/progress", json={
+            "activity_date": current["activity_date"],
+            "challenge_instance": current["instance_key"].replace(
+                ":piano-keyboard:", ":flute:"
+            ),
+            "minutes": 6,
+        })
+        assert stale.status_code == 409
+        completed = client.post("/contests/bonus-challenge/progress", json={
+            "activity_date": current["activity_date"],
+            "challenge_instance": current["instance_key"],
+            "minutes": 6,
+        })
+        assert completed.status_code == 200
+        assert completed.json()["dandelions_awarded"] == 5
+        assert completed.json()["camp_points_awarded"] == 2
+        duplicate = client.post("/contests/bonus-challenge/progress", json={
+            "activity_date": current["activity_date"],
+            "challenge_instance": current["instance_key"],
+            "minutes": 6,
+        })
+        assert duplicate.status_code == 200
+        assert duplicate.json()["dandelions_awarded"] == 0
+        assert duplicate.json()["camp_points_awarded"] == 0
+        with quest_database() as session:
+            assert session.scalar(select(func.count()).select_from(PracticeChart)) == 0
+            award = session.scalar(select(CampPointAward).where(
+                CampPointAward.profile_id == profile_id
+            ))
+            assert award is not None and award.team_id is None
 
 
 def test_shared_resolver_replaces_stale_cross_instrument_client_state(

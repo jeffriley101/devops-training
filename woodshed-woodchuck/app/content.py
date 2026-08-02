@@ -23,6 +23,14 @@ ART_SUBMISSION_EMAIL = "woodshedwoodchuck@gmail.com"
 SHOP_SHARE_URL = "https://woodshed-woodchuck.onrender.com/"
 
 QUEST_POOL = {
+    "piano-keyboard": [
+        {
+            "id": "piano-keyboard-scale-chord-progression",
+            "text": "Practice a scale or chord progression with both hands.",
+            "target_minutes": 10,
+            "reward_credits": 15,
+        },
+    ],
     "Flute": [
         {
             "id": "flute-trill",

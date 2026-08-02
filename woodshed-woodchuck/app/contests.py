@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from .account_routes import current_profile
 from .content import QUEST_POOL
 from .db import SessionLocal
-from .instruments import INSTRUMENTS_BY_LABEL
+from .instruments import INSTRUMENTS_BY_LABEL, canonical_instrument_key
 from .models import (
     CampPointAward,
     DailyTriviaAttempt,
@@ -1722,9 +1722,27 @@ def current_contests_payload(
     }
 
 
+def configured_bonus_challenges(instrument: str) -> list[dict[str, object]]:
+    """Look up Bonus Challenges using the canonical server instrument key."""
+    try:
+        canonical_key = canonical_instrument_key(instrument)
+    except ValueError:
+        return []
+    direct = QUEST_POOL.get(canonical_key)
+    if direct is not None:
+        return list(direct)
+    for configured_key, challenges in QUEST_POOL.items():
+        try:
+            if canonical_instrument_key(configured_key) == canonical_key:
+                return list(challenges)
+        except ValueError:
+            continue
+    return []
+
+
 def quest_definition(instrument: str, quest_id: str) -> dict[str, object] | None:
     return next(
-        (quest for quest in QUEST_POOL.get(instrument, ()) if quest["id"] == quest_id),
+        (quest for quest in configured_bonus_challenges(instrument) if quest["id"] == quest_id),
         None,
     )
 
@@ -1737,7 +1755,11 @@ def resolve_current_bonus_challenge(
 ) -> dict[str, object] | None:
     """Resolve one authoritative Bonus Challenge instance for BOARD and POST."""
     central_date = now.astimezone(CENTRAL).date()
-    configured = list(QUEST_POOL.get(profile.instrument, ()))
+    try:
+        instrument_key = canonical_instrument_key(profile.instrument)
+    except ValueError:
+        return None
+    configured = configured_bonus_challenges(profile.instrument)
     if not configured:
         return None
 
@@ -1759,7 +1781,7 @@ def resolve_current_bonus_challenge(
 
     challenge_id = str(selected["id"])
     instance_key = (
-        f"{central_date.isoformat()}:{profile.instrument.casefold()}:{challenge_id}"
+        f"{central_date.isoformat()}:{instrument_key}:{challenge_id}"
     )
     logged_minutes = 0
     completed = False

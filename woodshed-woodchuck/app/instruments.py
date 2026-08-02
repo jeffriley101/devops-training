@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 
 def instrument(
     key: str,
@@ -56,6 +58,27 @@ INSTRUMENT_OPTIONS = [item["label"] for item in INSTRUMENT_DEFINITIONS]
 INSTRUMENTS_BY_LABEL = {
     item["label"].casefold(): item for item in INSTRUMENT_DEFINITIONS
 }
+
+_PIANO_KEYBOARD_ALIASES = frozenset({
+    "piano keyboard", "piano", "keyboard",
+})
+
+
+def canonical_instrument_key(value: str) -> str:
+    """Return a stable server-side key for supported instrument aliases."""
+    if not isinstance(value, str):
+        raise ValueError("Choose a supported instrument.")
+    normalized = re.sub(r"[\s/_-]+", " ", value.strip().casefold())
+    if normalized in _PIANO_KEYBOARD_ALIASES:
+        return "piano-keyboard"
+    for definition in INSTRUMENT_DEFINITIONS:
+        key = str(definition["key"])
+        label = re.sub(
+            r"[\s/_-]+", " ", str(definition["label"]).strip().casefold()
+        )
+        if normalized in {label, key.replace("-", " ")}:
+            return key
+    raise ValueError("Choose a supported instrument.")
 
 
 def normalize_supported_instrument(value: str) -> str:
