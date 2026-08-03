@@ -12,6 +12,11 @@ from .content import LEVEL_OPTIONS
 from .security import generate_woodchuck_id, hash_pin, is_valid_pin, verify_pin
 
 
+def _retired_identifier_hash(woodchuck_id: str) -> str:
+    import hashlib
+    return hashlib.sha256(normalize_woodchuck_id(woodchuck_id).encode("utf-8")).hexdigest()
+
+
 def normalize_woodchuck_id(woodchuck_id: str) -> str:
     return woodchuck_id.strip().upper()
 
@@ -43,8 +48,14 @@ def create_woodchuck_profile(
         raise ValueError("PIN must contain exactly four digits.")
 
     for _ in range(10):
+        generated_id = generate_woodchuck_id()
+        if session.scalar(select(WoodchuckProfile.id).where(
+            WoodchuckProfile.retired_woodchuck_id_hash
+            == _retired_identifier_hash(generated_id)
+        )) is not None:
+            continue
         profile = WoodchuckProfile(
-            woodchuck_id=generate_woodchuck_id(),
+            woodchuck_id=generated_id,
             display_name=display_name,
             pin_hash=hash_pin(pin),
             instrument=instrument,
@@ -180,7 +191,8 @@ def authenticate_woodchuck(
 
     profile = session.scalar(
         select(WoodchuckProfile).where(
-            WoodchuckProfile.woodchuck_id == normalized_id
+            WoodchuckProfile.woodchuck_id == normalized_id,
+            WoodchuckProfile.status == "active",
         )
     )
 

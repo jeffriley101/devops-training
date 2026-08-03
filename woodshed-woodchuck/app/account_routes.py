@@ -3,11 +3,13 @@ from __future__ import annotations
 from copy import deepcopy
 from datetime import datetime, timezone
 import json
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Body, Form, HTTPException, Request
 from pydantic import BaseModel
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -24,11 +26,21 @@ from .instruments import INSTRUMENTS_BY_LABEL
 from .content import LEVEL_OPTIONS
 from .db import SessionLocal
 from .models import RewardGrant, WoodchuckProfile, WoodchuckState
+from .account_deletion import (
+    DeletionCredentialsError,
+    DeletionRateLimited,
+    anonymize_woodchuck_account,
+    verify_deletion_confirmation,
+)
 
 
 router = APIRouter(prefix="/account", tags=["account"])
 
 SESSION_PROFILE_ID = "woodchuck_profile_id"
+SESSION_PROFILE_VERSION = "woodchuck_session_version"
+templates = Jinja2Templates(
+    directory=str(Path(__file__).resolve().parent.parent / "templates")
+)
 
 
 class InstrumentUpdate(BaseModel):
@@ -76,8 +88,16 @@ def current_profile(
 
     profile = session.get(WoodchuckProfile, profile_id)
 
-    if profile is None:
+    session_version = request.session.get(SESSION_PROFILE_VERSION, 0)
+    if (
+        profile is None
+        or profile.status != "active"
+        or not isinstance(session_version, int)
+        or session_version != profile.session_version
+    ):
         request.session.pop(SESSION_PROFILE_ID, None)
+        request.session.pop(SESSION_PROFILE_VERSION, None)
+        return None
 
     return profile
 
@@ -167,6 +187,7 @@ def create_account(
             raise
 
         request.session[SESSION_PROFILE_ID] = profile.id
+        request.session[SESSION_PROFILE_VERSION] = profile.session_version
 
         return {
             "authenticated": True,
@@ -200,6 +221,7 @@ def login(
             )
 
         request.session[SESSION_PROFILE_ID] = profile.id
+        request.session[SESSION_PROFILE_VERSION] = profile.session_version
 
         return {
             "authenticated": True,
@@ -226,6 +248,50 @@ def logout(request: Request):
     request.session.clear()
 
     return {"authenticated": False}
+
+
+@router.get("/privacy")
+def account_privacy_page(request: Request):
+    with SessionLocal() as session:
+        profile = current_profile(request, session)
+        if profile is None:
+            return RedirectResponse(url="/login", status_code=303)
+        return templates.TemplateResponse(
+            request=request,
+            name="account_privacy.html",
+            context={"profile": profile},
+        )
+
+
+@router.post("/delete")
+def delete_account(
+    request: Request,
+    woodchuck_id: str = Form(...),
+    pin: str = Form(...),
+    confirmation: str = Form(...),
+):
+    now = datetime.now(timezone.utc)
+    with SessionLocal() as session:
+        profile = current_profile(request, session)
+        if profile is None:
+            raise HTTPException(status_code=401, detail="Student sign-in is required.")
+        try:
+            verify_deletion_confirmation(
+                profile, woodchuck_id=woodchuck_id, pin=pin,
+                confirmation=confirmation, now=now,
+            )
+        except DeletionRateLimited as error:
+            raise HTTPException(status_code=429, detail=str(error)) from error
+        except DeletionCredentialsError as error:
+            session.commit()
+            raise HTTPException(
+                status_code=400,
+                detail="Woodchuck ID, PIN, or confirmation did not match.",
+            ) from error
+        anonymize_woodchuck_account(session, profile=profile, now=now)
+        session.commit()
+    request.session.clear()
+    return RedirectResponse(url="/?account_deleted=1", status_code=303)
 
 
 @router.post("/daily-secret")

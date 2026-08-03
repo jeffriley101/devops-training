@@ -29,6 +29,11 @@ SEASON_TIMEZONE = "America/Chicago"
 
 class WoodchuckProfile(Base):
     __tablename__ = "woodchuck_profiles"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('active', 'deleted')", name="ck_woodchuck_profile_status"
+        ),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
 
@@ -46,6 +51,25 @@ class WoodchuckProfile(Base):
     instrument: Mapped[str] = mapped_column(String(50), nullable=False)
     level: Mapped[str] = mapped_column(String(50), nullable=False)
     goal: Mapped[str] = mapped_column(String(100), nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(20), default="active", server_default="active", nullable=False,
+        index=True,
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )
+    retired_woodchuck_id_hash: Mapped[str | None] = mapped_column(
+        String(64), unique=True, nullable=True
+    )
+    session_version: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0", nullable=False
+    )
+    deletion_failed_attempts: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0", nullable=False
+    )
+    deletion_last_failed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     display_name_changed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
@@ -696,6 +720,10 @@ class Team(Base):
         UniqueConstraint("season_id", "normalized_name", name="uq_team_season_name"),
         UniqueConstraint("season_id", "emblem_key", name="uq_team_season_emblem"),
         UniqueConstraint("season_id", "creator_profile_id", name="uq_team_season_creator"),
+        CheckConstraint(
+            "moderation_status IN ('active', 'under_review', 'hidden')",
+            name="ck_team_moderation_status",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -708,7 +736,56 @@ class Team(Base):
     creator_profile_id: Mapped[int | None] = mapped_column(
         ForeignKey("woodchuck_profiles.id", ondelete="SET NULL"), nullable=True, index=True
     )
+    moderation_status: Mapped[str] = mapped_column(
+        String(20), default="active", server_default="active", nullable=False,
+        index=True,
+    )
+    moderation_updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+
+class TeamReport(Base):
+    __tablename__ = "team_reports"
+    __table_args__ = (
+        CheckConstraint(
+            "category IN ('inappropriate_name', 'inappropriate_emblem', "
+            "'impersonation', 'other')",
+            name="ck_team_report_category",
+        ),
+        CheckConstraint(
+            "status IN ('unresolved', 'dismissed', 'actioned')",
+            name="ck_team_report_status",
+        ),
+        Index(
+            "uq_team_report_unresolved_reporter_team",
+            "reporter_profile_id", "team_id", unique=True,
+            sqlite_where=text("status = 'unresolved'"),
+            postgresql_where=text("status = 'unresolved'"),
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    team_id: Mapped[int] = mapped_column(
+        ForeignKey("teams.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    reporter_profile_id: Mapped[int | None] = mapped_column(
+        ForeignKey("woodchuck_profiles.id", ondelete="SET NULL"),
+        nullable=True, index=True,
+    )
+    category: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    details: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    status: Mapped[str] = mapped_column(
+        String(20), default="unresolved", server_default="unresolved",
+        nullable=False, index=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
+    resolved_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
 
 class TeamMembership(Base):

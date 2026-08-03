@@ -4679,3 +4679,27 @@ select {
   #plunge-canvas.is-hit { filter: none; }
   #plunge-canvas.is-portal { filter: none; }
 }
+.account-privacy-page {
+  width: min(760px, calc(100% - 2rem));
+  margin: 1rem auto 5rem;
+}
+
+.account-danger-zone {
+  margin-top: 1.5rem;
+  border: 3px solid #8b1e1e;
+  background: #fff4e5;
+}
+
+.account-danger-zone h2 { color: #751616; }
+.account-danger-zone input { max-width: 28rem; }
+.shed-account-privacy-link {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 6;
+  color: #24180e;
+  background: rgba(255, 244, 205, 0.92);
+  padding: 0.45rem 0.7rem;
+  border-radius: 0.6rem;
+  font-weight: 700;
+}

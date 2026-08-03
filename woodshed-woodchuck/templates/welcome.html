@@ -1,6 +1,9 @@
 {% extends "base.html" %}
 
 {% block content %}
+{% if request.query_params.get('account_deleted') == '1' %}
+<p class="flash-message" role="status">Your Woodchuck account has been deleted.</p>
+{% endif %}
 <section
   class="card hero-card welcome-hero"
   aria-label="Woodchuck companion hero art"

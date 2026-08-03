@@ -251,6 +251,10 @@ def reissue_trusted_verifier_invitation(
             "Only pending invitations can receive a new link."
         )
 
+    profile = session.get(WoodchuckProfile, invitation.profile_id)
+    if profile is None or profile.status != "active":
+        raise ValueError("That trusted-verifier invitation is invalid.")
+
     token = generate_invitation_token()
     now = _utc_now()
 
@@ -298,6 +302,10 @@ def accept_trusted_verifier_invitation(
         raise ValueError(
             "That trusted-verifier invitation has already been used."
         )
+
+    profile = session.get(WoodchuckProfile, invitation.profile_id)
+    if profile is None or profile.status != "active":
+        raise ValueError("That trusted-verifier invitation is invalid.")
 
     now = _utc_now()
 

@@ -528,6 +528,7 @@ def verifier_me(request: Request):
                 StudentVerifierConnection.verifier_id
                 == verifier.id,
                 StudentVerifierConnection.status == "accepted",
+                WoodchuckProfile.status == "active",
             )
             .order_by(
                 StudentVerifierConnection.accepted_at.desc()
@@ -633,6 +634,7 @@ def list_verifier_practice_charts(request: Request):
                 StudentVerifierConnection.verifier_id
                 == verifier.id,
                 StudentVerifierConnection.status == "accepted",
+                WoodchuckProfile.status == "active",
             )
             .order_by(
                 PracticeChartVerification.requested_at.asc(),

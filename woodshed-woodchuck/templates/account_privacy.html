@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block content %}
+<main class="account-privacy-page">
+  <section class="card account-privacy-card">
+    <h1>Account &amp; Privacy</h1>
+    <p>Manage your Woodchuck account and privacy.</p>
+    <a class="btn btn-secondary" href="/home">Back to SHED</a>
+  </section>
+
+  <section class="card account-danger-zone" aria-labelledby="delete-account-title">
+    <h2 id="delete-account-title">Delete Your Woodchuck Account</h2>
+    <p><strong>This is immediate and permanent. Your account cannot be recovered.</strong></p>
+    <ul>
+      <li>You will be signed out everywhere.</li>
+      <li>Your public identity will become Deleted Woodchuck.</li>
+      <li>Your current team membership will end.</li>
+      <li>Existing team and contest history will be preserved anonymously.</li>
+      <li>Saved email addresses and pending private links will be removed.</li>
+      <li>If you are a team captain, the team will remain temporarily without a captain.</li>
+    </ul>
+    <form method="post" action="/account/delete" class="stack-form">
+      <label for="delete-woodchuck-id">Woodchuck ID</label>
+      <input id="delete-woodchuck-id" name="woodchuck_id" required autocomplete="off" />
+      <label for="delete-pin">Current four-digit PIN</label>
+      <input id="delete-pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" required autocomplete="current-password" />
+      <label for="delete-confirmation">Type DELETE to confirm</label>
+      <input id="delete-confirmation" name="confirmation" required autocomplete="off" />
+      <div class="button-row">
+        <button class="btn btn-danger" type="submit">Delete Account</button>
+        <a class="btn btn-secondary" href="/home">Cancel</a>
+      </div>
+    </form>
+  </section>
+</main>
+{% endblock %}
