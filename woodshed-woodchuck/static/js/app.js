@@ -122,16 +122,18 @@
     const emblem = document.createElement("span");
     renderTeamEmblem(emblem, team.emblem || team.emblem_key);
     const name = document.createElement("span");
-    name.textContent = ` ${team.name} — `;
+    name.textContent = team.captain ? ` ${team.name} — ` : ` ${team.name}`;
     const captain = document.createElement("span");
     captain.className = "team-captain-label";
-    captain.innerHTML = '<span aria-hidden="true">⭐</span> ';
-    captain.append(document.createTextNode(team.captain.display_name));
+    if (team.captain) {
+      captain.innerHTML = '<span aria-hidden="true">⭐</span> ';
+      captain.append(document.createTextNode(team.captain.display_name));
+    }
     const accessible = document.createElement("span");
     accessible.className = "sr-only";
     accessible.textContent = " Team Captain";
     captain.append(accessible);
-    container.replaceChildren(emblem, name, captain);
+    container.replaceChildren(...(team.captain ? [emblem, name, captain] : [emblem, name]));
   }
 
   function createShedTeamCard(team, { current = false, locked = false } = {}) {
@@ -161,12 +163,13 @@
     const star = document.createElement("span");
     star.setAttribute("aria-hidden", "true");
     star.textContent = "⭐ ";
-    captain.append(star, document.createTextNode(team.captain.display_name));
+    if (team.captain) captain.append(star, document.createTextNode(team.captain.display_name));
     const accessible = document.createElement("span");
     accessible.className = "sr-only";
     accessible.textContent = " Team Captain";
     captain.append(accessible);
-    content.append(main, captain);
+    content.append(main);
+    if (team.captain) content.append(captain);
     if (current) {
       const selected = document.createElement("span");
       selected.className = "shed-team-selected-status";

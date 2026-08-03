@@ -391,6 +391,19 @@ def public_woodchuck_name(profile: WoodchuckProfile | None) -> str:
     return display_name or "Woodchuck"
 
 
+def public_team_name(team: Team | None, fallback: str = "Team") -> str:
+    """Mask moderated team identity without altering stored contest history."""
+    if team is not None and team.moderation_status == "hidden":
+        return "Hidden Team"
+    return team.display_name if team is not None else fallback
+
+
+def public_team_emblem(team: Team | None) -> str:
+    if team is not None and team.moderation_status == "hidden":
+        return "shield:silver"
+    return team.emblem_key if team is not None else "shield:silver"
+
+
 def student_score_rows(
     scores: dict[int, int],
     profiles: dict[int, WoodchuckProfile],
@@ -510,9 +523,17 @@ def weekly_student_points(
     profiles = {
         profile.id: profile
         for profile in session.scalars(
-            select(WoodchuckProfile).where(WoodchuckProfile.id.in_(profile_ids))
+            select(WoodchuckProfile).where(
+                WoodchuckProfile.id.in_(profile_ids),
+                WoodchuckProfile.status == "active",
+            )
         ).all()
     } if profile_ids else {}
+    active_ids = set(profiles)
+    open_scores = {key: value for key, value in open_scores.items() if key in active_ids}
+    verified_scores = {
+        key: value for key, value in verified_scores.items() if key in active_ids
+    }
     open_rows, open_position = student_minutes_rows(
         open_scores,
         profiles,
@@ -559,9 +580,13 @@ def weekly_camp_points(
     profiles = {
         profile.id: profile
         for profile in session.scalars(
-            select(WoodchuckProfile).where(WoodchuckProfile.id.in_(scores))
+            select(WoodchuckProfile).where(
+                WoodchuckProfile.id.in_(scores),
+                WoodchuckProfile.status == "active",
+            )
         ).all()
     } if scores else {}
+    scores = {key: value for key, value in scores.items() if key in profiles}
     rows, position = student_points_rows(
         scores, profiles, current_profile_id=current_profile_id
     )
@@ -714,7 +739,8 @@ def _team_rankings(
         ).all()
     } if scores else {}
     ordered = sorted(scores.items(), key=lambda item: (
-        -item[1], teams[item[0]].display_name.casefold(), teams[item[0]].display_name,
+        -item[1], public_team_name(teams[item[0]]).casefold(),
+        public_team_name(teams[item[0]]),
     ))
     captain_ids = {team.creator_profile_id for team in teams.values() if team.creator_profile_id}
     captains = {profile.id: profile for profile in session.scalars(select(WoodchuckProfile).where(
@@ -728,11 +754,18 @@ def _team_rankings(
             rank, previous = position, score
         team = teams[team_id]
         rows.append({
-            "rank": rank, "team_id": team_id, "team_name": team.display_name,
-            "emblem_key": team.emblem_key, "score": score,
+            "rank": rank, "team_id": team_id,
+            "team_name": public_team_name(team),
+            "emblem_key": public_team_emblem(team), "score": score,
             "active_member_count": (member_counts or {}).get(team_id, 0),
-            "captain_name": public_woodchuck_name(captains.get(team.creator_profile_id)),
-            "captain_label": "Team Captain",
+            "captain_name": (
+                None if team.moderation_status == "hidden" or team.creator_profile_id is None
+                else public_woodchuck_name(captains.get(team.creator_profile_id))
+            ),
+            "captain_label": (
+                None if team.moderation_status == "hidden" or team.creator_profile_id is None
+                else "Team Captain"
+            ),
         })
     return rows
 
@@ -1483,6 +1516,11 @@ def contest_results_payload(
     ).where(ContestResult.contest_week_id == contest_week.id).order_by(
         Contest.key, ContestResult.division, ContestResult.rank, ContestResult.display_name_snapshot
     )).all()
+    team_ids = {result.team_id for result, _contest in rows if result.team_id is not None}
+    teams = {
+        team.id: team
+        for team in session.scalars(select(Team).where(Team.id.in_(team_ids))).all()
+    } if team_ids else {}
     return {
         "week": {
             "week_start": contest_week.week_start.isoformat(),
@@ -1498,8 +1536,18 @@ def contest_results_payload(
             "subject_type": result.subject_type,
             ("team_name" if result.subject_type == "team" else
              "display_name" if result.subject_type == "student" else "instrument"):
-                result.display_name_snapshot,
+                (
+                    public_team_name(
+                        teams.get(result.team_id), result.display_name_snapshot
+                    )
+                    if result.subject_type == "team"
+                    else result.display_name_snapshot
+                ),
             "team_id": result.team_id,
+            "emblem_key": (
+                public_team_emblem(teams.get(result.team_id))
+                if result.subject_type == "team" else None
+            ),
             "active_member_count": result.active_member_count,
             "score": result.score,
         } for result, contest in rows],
