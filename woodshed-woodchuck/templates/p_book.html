@@ -110,6 +110,7 @@
         <label for="p-book-preset-email">Recipient email</label>
         <input id="p-book-preset-email" type="email" maxlength="254" />
         <button id="p-book-save-preset" class="btn btn-secondary" type="button">Save Preset</button>
+        <div id="p-book-preset-list" class="p-book-preset-list" aria-live="polite"></div>
       </details>
     </div>
 
@@ -122,7 +123,7 @@
       <select id="p-book-verifier" name="p-book-verifier" disabled>
         <option value="">Loading trusted verifiers...</option>
       </select>
-      <a class="btn btn-secondary p-book-verifier-manage" href="/trusted-verifiers">Manage Trusted Verifiers</a>
+      <a id="p-book-verifier-manage" class="btn btn-secondary p-book-verifier-manage" href="/trusted-verifiers?return_to=p-book">Manage Trusted Verifiers</a>
       <p id="p-book-verifier-help" class="body-copy"></p>
     </div>
 

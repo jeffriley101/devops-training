@@ -2990,7 +2990,9 @@
     const emailCopyEl = document.getElementById("p-book-email-copy");
     const requestValidationEl = document.getElementById("p-book-request-validation");
     const emailPresetEl = document.getElementById("p-book-email-preset");
+    const presetListEl = document.getElementById("p-book-preset-list");
     const verifierHelpEl = document.getElementById("p-book-verifier-help");
+    const verifierManageLink = document.getElementById("p-book-verifier-manage");
     const submitBtn = form.querySelector("button[type='submit']");
     const missingDialog = document.getElementById("p-book-missing-selection");
     const finalDialog = document.getElementById("p-book-final-confirmation");
@@ -3018,6 +3020,41 @@
     let pendingSubmissionKey = null;
     let confirmationApproved = false;
     let currentTeam = null;
+    const P_BOOK_DRAFT_KEY = "woodshed:p-book:verifier-draft:v1";
+    const P_BOOK_DRAFT_MAX_AGE_MS = 30 * 60 * 1000;
+    let restoredDraft = null;
+    try {
+      const parsed = JSON.parse(window.sessionStorage.getItem(P_BOOK_DRAFT_KEY) || "null");
+      if (parsed && Number.isFinite(parsed.savedAt) && Date.now() - parsed.savedAt <= P_BOOK_DRAFT_MAX_AGE_MS) {
+        restoredDraft = parsed;
+      }
+      window.sessionStorage.removeItem(P_BOOK_DRAFT_KEY);
+    } catch (_draftReadError) {
+      restoredDraft = null;
+    }
+
+    function saveVerifierDraft() {
+      const safeDraft = {
+        savedAt: Date.now(),
+        minutes: minutesEl.value,
+        practiceDate: dateEl.value,
+        note: noteEl.value,
+        practiceDetails: practiceDetailEls.filter((item) => item.checked).map((item) => item.value),
+        includeContests: includeContestsEl?.checked === true,
+        includeTeam: includeTeamEl?.checked === true,
+        emailCopy: emailCopyEl?.checked === true,
+        requestValidation: requestValidationEl?.checked === true,
+        emailPresetId: emailPresetEl?.value || "",
+        verifierId: verifierSelectEl?.value || "",
+        teamId: currentTeam?.id || null,
+      };
+      try {
+        window.sessionStorage.setItem(P_BOOK_DRAFT_KEY, JSON.stringify(safeDraft));
+      } catch (_draftWriteError) {
+        // Draft persistence is optional and must never block navigation.
+      }
+    }
+    verifierManageLink?.addEventListener("click", saveVerifierDraft);
     if (confirmSubmitBtn && finalDialog) confirmSubmitBtn.addEventListener("click", function () {
       confirmationApproved = true;
       finalDialog.close();
@@ -3101,6 +3138,7 @@
         });
 
         verifierSelectEl.disabled = false;
+        if (restoredDraft?.verifierId) verifierSelectEl.value = String(restoredDraft.verifierId);
 
         if (verifierHelpEl) {
           verifierHelpEl.textContent = connections.length
@@ -3159,14 +3197,47 @@
         const response = await fetch("/practice-charts/email-presets", {credentials: "same-origin", cache: "no-store"});
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.detail || "Email presets could not be loaded.");
+        const selectedBeforeLoad = restoredDraft?.emailPresetId || emailPresetEl.value;
         emailPresetEl.replaceChildren(new Option("Choose a saved recipient", ""));
+        if (presetListEl) presetListEl.replaceChildren();
         const presets = Array.isArray(payload.presets) ? payload.presets : [];
         if (!presets.length) {
           emailPresetEl.options[0].textContent = "No saved recipients yet";
         }
         presets.forEach((preset) => {
           emailPresetEl.append(new Option(`${preset.display_name} — ${preset.email}`, String(preset.id)));
+          if (presetListEl) {
+            const row = document.createElement("div");
+            row.className = "p-book-preset-row";
+            const text = document.createElement("span");
+            text.textContent = `${preset.display_name} — ${preset.email}`;
+            const remove = document.createElement("button");
+            remove.type = "button";
+            remove.className = "btn btn-secondary p-book-delete-preset";
+            remove.textContent = "Delete";
+            remove.addEventListener("click", async function () {
+              if (!window.confirm(`Delete the saved address ${preset.email}?`)) return;
+              remove.disabled = true;
+              try {
+                const deleted = await fetch(`/practice-charts/email-presets/${preset.id}`, {
+                  method: "DELETE", credentials: "same-origin",
+                });
+                const result = await deleted.json();
+                if (!deleted.ok) throw new Error(result.detail || "Preset could not be deleted.");
+                if (emailPresetEl.value === String(preset.id)) emailPresetEl.value = "";
+                await loadEmailPresets();
+              } catch (error) {
+                errorEl.textContent = error.message || "Preset could not be deleted.";
+                remove.disabled = false;
+              }
+            });
+            row.append(text, remove);
+            presetListEl.append(row);
+          }
         });
+        if (selectedBeforeLoad && presets.some((preset) => String(preset.id) === String(selectedBeforeLoad))) {
+          emailPresetEl.value = String(selectedBeforeLoad);
+        }
       } catch (error) {
         emailPresetEl.replaceChildren(new Option("Saved recipients unavailable", ""));
         emailPresetEl.disabled = false;
@@ -3608,6 +3679,17 @@
     }
 
     dateEl.value = stateApi.localDateKey();
+    if (restoredDraft) {
+      minutesEl.value = restoredDraft.minutes || "";
+      dateEl.value = restoredDraft.practiceDate || dateEl.value;
+      noteEl.value = restoredDraft.note || "";
+      const restoredDetails = new Set(Array.isArray(restoredDraft.practiceDetails) ? restoredDraft.practiceDetails : []);
+      practiceDetailEls.forEach((checkbox) => { checkbox.checked = restoredDetails.has(checkbox.value); });
+      if (includeContestsEl) includeContestsEl.checked = restoredDraft.includeContests !== false;
+      if (includeTeamEl) includeTeamEl.checked = restoredDraft.includeTeam !== false;
+      if (emailCopyEl) emailCopyEl.checked = restoredDraft.emailCopy !== false;
+      if (requestValidationEl) requestValidationEl.checked = restoredDraft.requestValidation !== false;
+    }
     renderEntries(state);
     renderPBookSummary(state);
     const initializeFeature = (initializer, failureMessage) => {
@@ -3790,10 +3872,27 @@
               `A new Open P-Chart was saved. ` +
               `+${dandelionsEarned} dandelions added.`
             );
-        const deliveryMessages = [
-          createdPayload.ordinary_email_delivery?.message,
-          createdPayload.email_delivery?.message,
-        ].filter(Boolean);
+        const deliveryMessages = [];
+        const ordinaryStatus = createdPayload.ordinary_email || createdPayload.ordinary_email_delivery;
+        const verificationStatus = createdPayload.verification_email || createdPayload.email_delivery;
+        if (ordinaryStatus?.code && ordinaryStatus.code !== "not_requested") {
+          deliveryMessages.push(
+            ordinaryStatus.code === "sent"
+              ? "Practice Book email sent."
+              : ordinaryStatus.code === "not_configured"
+                ? "Practice Book email was not sent because the email service is not configured."
+                : "Practice Book email could not be delivered."
+          );
+        }
+        if (verificationStatus?.code && verificationStatus.code !== "not_requested") {
+          deliveryMessages.push(
+            verificationStatus.code === "sent"
+              ? "Validation request sent."
+              : verificationStatus.code === "not_configured"
+                ? "Validation request was saved, but its email was not sent because the email service is not configured."
+                : "Validation request was saved, but its email could not be delivered."
+          );
+        }
         if (deliveryStatusEl && deliveryMessages.length) {
           deliveryStatusEl.hidden = false;
           deliveryStatusEl.textContent = deliveryMessages.join(" · ");
@@ -3830,6 +3929,7 @@
         updateSubmitGlow();
 
         pendingSubmissionKey = null;
+        try { window.sessionStorage.removeItem(P_BOOK_DRAFT_KEY); } catch (_draftClearError) {}
         hydrateHome(next);
         window.dispatchEvent(new CustomEvent("ww:p-chart-saved"));
       } catch (error) {

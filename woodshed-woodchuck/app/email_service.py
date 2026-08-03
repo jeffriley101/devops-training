@@ -53,8 +53,9 @@ class DeliveryResult:
     code: str
 
 
-def public_link(path: str) -> str:
-    base = os.getenv("PUBLIC_BASE_URL", SHOP_SHARE_URL).strip() or SHOP_SHARE_URL
+def public_link(path: str, *, local_base_url: str | None = None) -> str:
+    configured = os.getenv("PUBLIC_BASE_URL", "").strip()
+    base = configured or (local_base_url or SHOP_SHARE_URL)
     return urljoin(base.rstrip("/") + "/", path.lstrip("/"))
 
 

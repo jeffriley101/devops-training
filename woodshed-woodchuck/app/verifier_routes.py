@@ -65,7 +65,7 @@ def record_delivery(session: Session, record, result: DeliveryResult) -> None:
 def delivery_payload(result: DeliveryResult, email: str) -> dict[str, object]:
     message = (
         f"Email sent to {email}" if result.sent else
-        "Email service is not configured" if result.code == "not_configured" else
+        "Invitation created, but email service is not configured." if result.code == "not_configured" else
         "Saved, but email could not be sent"
     )
     return {"sent": result.sent, "code": result.code, "message": message}
@@ -225,13 +225,18 @@ def create_student_invitation(
 
         token = created.token
         accept_path = f"/trusted-verifiers/accept/{token}"
-        accept_url = public_link(accept_path)
-        delivery = EmailService().send_invitation(
-            recipient=created.invitation.email,
-            student_name=profile.display_name,
-            role=created.invitation.role,
-            acceptance_url=accept_url,
+        accept_url = public_link(
+            accept_path, local_base_url=str(request.base_url)
         )
+        try:
+            delivery = EmailService().send_invitation(
+                recipient=created.invitation.email,
+                student_name=profile.display_name,
+                role=created.invitation.role,
+                acceptance_url=accept_url,
+            )
+        except Exception:
+            delivery = DeliveryResult(False, "delivery_failed")
         record_delivery(session, created.invitation, delivery)
 
         return {
@@ -413,7 +418,9 @@ def resend_student_invitation_email(request: Request, invitation_id: int):
             raise HTTPException(status_code=429, detail="Please wait 60 seconds before resending.")
         reissued = reissue_trusted_verifier_invitation(session, profile=profile, invitation_id=invitation_id)
         accept_path = f"/trusted-verifiers/accept/{reissued.token}"
-        accept_url = public_link(accept_path)
+        accept_url = public_link(
+            accept_path, local_base_url=str(request.base_url)
+        )
         delivery = EmailService().send_invitation(
             recipient=reissued.invitation.email, student_name=profile.display_name,
             role=reissued.invitation.role, acceptance_url=accept_url,

@@ -61,6 +61,16 @@ def email_delivery_payload(result: DeliveryResult, email: str) -> dict[str, obje
     return {"sent": result.sent, "code": result.code, "message": message}
 
 
+def requested_delivery_payload(
+    result: DeliveryResult | None, *, requested: bool, email: str | None = None
+) -> dict[str, object]:
+    if not requested:
+        return {"sent": False, "code": "not_requested", "message": "Not requested"}
+    if result is None:
+        return {"sent": False, "code": "delivery_failed", "message": "Saved, but email could not be sent"}
+    return email_delivery_payload(result, email or "the selected recipient")
+
+
 def practice_streak(practice_dates: list[date], today: date) -> int:
     days = sorted(set(practice_dates), reverse=True)
     if not days or days[0] < today - timedelta(days=1):
@@ -295,6 +305,23 @@ def create_practice_email_preset(request: Request, submitted: PracticeEmailPrese
         return {"created": True, "preset": {"id": row.id, "display_name": row.display_name, "email": row.email}}
 
 
+@router.delete("/email-presets/{preset_id}")
+def delete_practice_email_preset(request: Request, preset_id: int):
+    with SessionLocal() as session:
+        profile = current_profile(request, session)
+        if profile is None:
+            raise HTTPException(status_code=401, detail="Student sign-in is required.")
+        row = session.scalar(select(PracticeEmailPreset).where(
+            PracticeEmailPreset.id == preset_id,
+            PracticeEmailPreset.profile_id == profile.id,
+        ))
+        if row is None:
+            return {"deleted": False, "preset_id": preset_id}
+        session.delete(row)
+        session.commit()
+        return {"deleted": True, "preset_id": preset_id}
+
+
 @router.post("", status_code=201)
 def create_student_practice_chart(
     request: Request,
@@ -379,7 +406,10 @@ def create_student_practice_chart(
                 StudentVerifierConnection.status == "accepted",
             ))
             verifier_role = connection.role if connection else "trusted_verifier"
-            review_url = public_link(f"/trusted-verifiers/dashboard#verification-{created.verification.id}")
+            review_url = public_link(
+                f"/trusted-verifiers/dashboard#verification-{created.verification.id}",
+                local_base_url=str(request.base_url),
+            )
             if created.created:
                 delivery = EmailService().send_practice_chart(
                     recipient=verifier.email, student_name=profile.display_name,
@@ -423,6 +453,16 @@ def create_student_practice_chart(
             "ordinary_email_delivery": (
                 email_delivery_payload(ordinary_delivery, email_preset.email)
                 if ordinary_delivery and email_preset else None
+            ),
+            "ordinary_email": requested_delivery_payload(
+                ordinary_delivery,
+                requested=email_preset is not None,
+                email=email_preset.email if email_preset else None,
+            ),
+            "verification_email": requested_delivery_payload(
+                delivery,
+                requested=created.verification is not None,
+                email=verifier.email if verifier else None,
             ),
         }
 

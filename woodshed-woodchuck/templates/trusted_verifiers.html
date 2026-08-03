@@ -148,13 +148,13 @@
   </section>
 
   <div class="button-row">
-    <a class="btn btn-secondary" href="/home">
-      Back to the Woodshed
+    <a id="trusted-verifier-return-link" class="btn btn-secondary" href="{% if return_to_p_book %}/p-book?restore_draft=1{% else %}/home{% endif %}">
+      {% if return_to_p_book %}Back to Practice Book{% else %}Back to the Woodshed{% endif %}
     </a>
   </div>
 </section>
 {% endblock %}
 
 {% block page_scripts %}
-<script src="/static/js/trusted-verifiers.js?v=8"></script>
+<script src="/static/js/trusted-verifiers.js?v=9"></script>
 {% endblock %}

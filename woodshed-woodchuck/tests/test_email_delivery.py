@@ -124,6 +124,43 @@ def test_missing_configuration_is_controlled(monkeypatch) -> None:
     assert result.sent is False and result.code == "not_configured"
 
 
+def test_invitation_without_smtp_persists_and_local_link_accepts(
+    mail_database, monkeypatch,
+) -> None:
+    for key in SMTP_ENV:
+        monkeypatch.delenv(key, raising=False)
+    with TestClient(app) as student:
+        profile_id = create_student(student)
+        response = student.post("/trusted-verifiers/invitations", data={
+            "email": "local-adult@example.test", "role": "parent",
+        })
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["created"] is True
+        assert payload["email_delivery"]["code"] == "not_configured"
+        assert payload["email_delivery"]["sent"] is False
+        assert payload["accept_url"].startswith("http://testserver/")
+        token = payload["invitation_token"]
+        with mail_database() as session:
+            row = session.get(TrustedVerifierInvitation, payload["invitation"]["id"])
+            assert row is not None and row.status == "pending" and row.token_hash
+        with TestClient(app) as verifier:
+            accepted = verifier.post(
+                f"/trusted-verifiers/invitations/{token}/accept",
+                data={"display_name": "Local Parent", "pin": "1357"},
+            )
+            assert accepted.status_code == 200
+            assert accepted.json()["connection"]["status"] == "accepted"
+            assert verifier.post(
+                f"/trusted-verifiers/invitations/{token}/accept",
+                data={"display_name": "Local Parent", "pin": "1357"},
+            ).status_code == 400
+        connections = student.get("/trusted-verifiers/invitations").json()["connections"]
+        assert len(connections) == 1
+        assert connections[0]["verifier"]["display_name"] == "Local Parent"
+        assert profile_id > 0
+
+
 def test_invitation_and_pchart_send_after_persistence_and_resend_without_duplicates(mail_database, monkeypatch) -> None:
     with TestClient(app) as student:
         profile_id = create_student(student)
@@ -232,6 +269,8 @@ def test_ordinary_practice_book_email_uses_owned_preset_and_is_idempotent(mail_d
         first = client.post("/practice-charts", json=submitted)
         duplicate = client.post("/practice-charts", json=submitted)
         assert first.status_code == 201 and first.json()["ordinary_email_delivery"]["sent"] is True
+        assert first.json()["ordinary_email"]["code"] == "sent"
+        assert first.json()["verification_email"]["code"] == "not_requested"
         assert first.json()["chart"]["verification"] is None
         assert duplicate.status_code == 201 and duplicate.json()["created"] is False
         assert duplicate.json()["ordinary_email_delivery"] is None
@@ -244,6 +283,58 @@ def test_ordinary_practice_book_email_uses_owned_preset_and_is_idempotent(mail_d
         message = CapturingSMTP.messages[0]
         assert message["To"] == "teacher+music@example.test"
         assert "not a verification request" in message.get_body(preferencelist=("plain",)).get_content().lower()
+
+
+def test_owned_preset_deletion_is_idempotent_and_preserves_chart(mail_database) -> None:
+    with TestClient(app) as owner:
+        create_student(owner)
+        preset = owner.post("/practice-charts/email-presets", json={
+            "display_name": "Teacher", "email": "delete-me@example.test",
+        }).json()["preset"]
+        chart = owner.post("/practice-charts", json={
+            "practice_date": "2026-07-30", "minutes": 12,
+            "submission_key": "delete-preset-chart",
+            "ordinary_email_preset_id": preset["id"],
+        })
+        assert chart.status_code == 201
+        with TestClient(app) as stranger:
+            create_student(stranger)
+            denied = stranger.delete(f"/practice-charts/email-presets/{preset['id']}")
+            assert denied.status_code == 200 and denied.json()["deleted"] is False
+        deleted = owner.delete(f"/practice-charts/email-presets/{preset['id']}")
+        repeated = owner.delete(f"/practice-charts/email-presets/{preset['id']}")
+        assert deleted.json()["deleted"] is True
+        assert repeated.json()["deleted"] is False
+        assert owner.get("/practice-charts/email-presets").json()["presets"] == []
+        with mail_database() as session:
+            persisted = session.scalar(select(PracticeChart).where(
+                PracticeChart.submission_key == "delete-preset-chart"
+            ))
+            assert persisted is not None
+            assert persisted.ordinary_email_attempted_at is not None
+
+
+def test_book_draft_return_and_separate_delivery_status_contracts() -> None:
+    template = (ROOT / "templates/p_book.html").read_text(encoding="utf-8")
+    trusted = (ROOT / "templates/trusted_verifiers.html").read_text(encoding="utf-8")
+    app_js = (ROOT / "static/js/app.js").read_text(encoding="utf-8")
+    verifier_js = (ROOT / "static/js/trusted-verifiers.js").read_text(encoding="utf-8")
+    routes = (ROOT / "app/practice_chart_routes.py").read_text(encoding="utf-8")
+    assert 'href="/trusted-verifiers?return_to=p-book"' in template
+    assert 'id="trusted-verifier-return-link"' in trusted
+    assert "/p-book?restore_draft=1" in trusted + verifier_js
+    assert 'P_BOOK_DRAFT_KEY = "woodshed:p-book:verifier-draft:v1"' in app_js
+    for field in (
+        "minutes", "practiceDate", "note", "practiceDetails", "includeContests",
+        "includeTeam", "emailCopy", "requestValidation", "emailPresetId", "verifierId",
+    ):
+        assert field in app_js
+    assert "P_BOOK_DRAFT_MAX_AGE_MS = 30 * 60 * 1000" in app_js
+    assert "sessionStorage.removeItem(P_BOOK_DRAFT_KEY)" in app_js
+    assert '"ordinary_email"' in routes and '"verification_email"' in routes
+    assert '"not_requested"' in routes
+    assert "ordinaryStatus.code === \"sent\"" in app_js
+    assert "verificationStatus.code === \"sent\"" in app_js
 
 
 def test_confirmation_ui_is_status_only_and_original_controls_remain() -> None:

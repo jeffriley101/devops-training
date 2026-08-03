@@ -31,6 +31,7 @@
   );
 
   let currentInvitationUrl = "";
+  const returnToBook = new URLSearchParams(window.location.search).get("return_to") === "p-book";
 
   const roleLabel = (role) =>
     String(role || "")
@@ -392,6 +393,9 @@
       form.reset();
 
       await loadVerifiers();
+      if (returnToBook && payload.email_delivery?.sent === true) {
+        window.location.assign("/p-book?restore_draft=1");
+      }
     } catch (error) {
       errorText.textContent =
         error.message || "Could not create the invitation.";

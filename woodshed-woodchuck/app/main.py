@@ -203,6 +203,7 @@ def trusted_verifiers_page(request: Request):
         "trusted_verifiers.html",
         title="Trusted Verifiers",
         active_nav="home",
+        return_to_p_book=(request.query_params.get("return_to") == "p-book"),
         # This page already shared SHED's fixed navigation and lower sound
         # position; retain that existing utility-page behavior.
         page_class="main-app-page",
