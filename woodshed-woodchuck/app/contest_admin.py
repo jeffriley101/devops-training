@@ -10,7 +10,7 @@ from pathlib import Path
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .contest_jobs import (
@@ -26,7 +26,7 @@ from .contest_seasons import (
 )
 from .contests import CENTRAL, finalize_contest_week, utc_iso
 from .db import SessionLocal
-from .models import ContestWeek, Season
+from .models import ContestWeek, Season, Team, TeamReport
 
 
 router = APIRouter(prefix="/contests/admin", tags=["contest-admin"])
@@ -146,12 +146,73 @@ def contest_admin_page(request: Request):
     require_contest_admin(request)
     with SessionLocal() as session:
         status = admin_status(session, now=datetime.now(timezone.utc))
+        report_rows = session.execute(
+            select(TeamReport, Team).join(Team, Team.id == TeamReport.team_id)
+            .where(TeamReport.status == "unresolved")
+            .order_by(TeamReport.created_at, TeamReport.id)
+        ).all()
+        unresolved_counts = dict(session.execute(
+            select(TeamReport.team_id, func.count(TeamReport.id))
+            .where(TeamReport.status == "unresolved")
+            .group_by(TeamReport.team_id)
+        ).all())
     flash = request.session.pop("contest_admin_flash", None)
     return templates.TemplateResponse(
         request=request,
         name="contest_admin.html",
-        context={"status": status, "flash": flash},
+        context={
+            "status": status, "flash": flash,
+            "team_reports": [
+                {
+                    "id": report.id, "team_id": team.id,
+                    "team_name": team.display_name, "emblem_key": team.emblem_key,
+                    "category": report.category, "details": report.details,
+                    "created_at": report.created_at,
+                    "moderation_status": team.moderation_status,
+                    "unresolved_count": unresolved_counts.get(team.id, 0),
+                }
+                for report, team in report_rows
+            ],
+        },
     )
+
+
+@router.post("/teams/{team_id}/moderation")
+def moderate_team(
+    team_id: int, request: Request, state: str = Form(...)
+):
+    require_contest_admin(request)
+    if state not in {"active", "under_review", "hidden"}:
+        raise HTTPException(status_code=400, detail="Invalid moderation state.")
+    with SessionLocal() as session:
+        team = session.get(Team, team_id)
+        if team is None:
+            raise HTTPException(status_code=404, detail="Team was not found.")
+        if team.moderation_status != state:
+            team.moderation_status = state
+            team.moderation_updated_at = datetime.now(timezone.utc)
+            session.commit()
+    _flash(request, "success", "Team moderation state updated.")
+    return _redirect()
+
+
+@router.post("/team-reports/{report_id}/resolve")
+def resolve_team_report(
+    report_id: int, request: Request, action: str = Form(...)
+):
+    require_contest_admin(request)
+    if action not in {"dismissed", "actioned"}:
+        raise HTTPException(status_code=400, detail="Invalid report action.")
+    with SessionLocal() as session:
+        report = session.get(TeamReport, report_id)
+        if report is None:
+            raise HTTPException(status_code=404, detail="Report was not found.")
+        if report.status == "unresolved":
+            report.status = action
+            report.resolved_at = datetime.now(timezone.utc)
+            session.commit()
+    _flash(request, "success", "Team report updated.")
+    return _redirect()
 
 
 @router.post("/finalize-current")

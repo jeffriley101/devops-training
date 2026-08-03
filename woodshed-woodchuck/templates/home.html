@@ -139,6 +139,19 @@
   <section id="shed-team-panel" class="mentor-card hidden" hidden aria-labelledby="shed-team-title">
     <h2 id="shed-team-title">Choose Your Team</h2>
     <div id="shed-team-current" class="shed-team-current" aria-live="polite">Loading teams…</div>
+    <details id="shed-team-report-panel" class="shed-team-report" hidden>
+      <summary>Report this team</summary>
+      <label for="shed-team-report-category">Reason</label>
+      <select id="shed-team-report-category">
+        <option value="inappropriate_name">Inappropriate name</option>
+        <option value="inappropriate_emblem">Inappropriate emblem</option>
+        <option value="impersonation">Impersonation</option>
+        <option value="other">Other</option>
+      </select>
+      <label for="shed-team-report-details">Optional details</label>
+      <textarea id="shed-team-report-details" maxlength="500"></textarea>
+      <button id="shed-team-report-submit" class="btn btn-secondary" type="button">Submit Report</button>
+    </details>
     <section id="shed-team-other-section" class="shed-team-subsection" hidden>
       <h3>Join Another Team</h3>
       <div id="shed-team-options" class="team-tile-grid" role="radiogroup" aria-label="Other available teams"></div>

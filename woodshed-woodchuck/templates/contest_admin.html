@@ -82,6 +82,39 @@
       </article>
     </section>
 
+    <section class="contest-admin-actions" aria-labelledby="team-moderation-title">
+      <h2 id="team-moderation-title">Team Moderation</h2>
+      {% if team_reports %}
+        {% for report in team_reports %}
+        <article class="contest-admin-card">
+          <h3>{{ report.team_name }}</h3>
+          <p><strong>Emblem:</strong> {{ report.emblem_key }}</p>
+          <p><strong>Category:</strong> {{ report.category }}</p>
+          <p><strong>Details:</strong> {{ report.details or "No details supplied." }}</p>
+          <p><strong>Created:</strong> {{ report.created_at }}</p>
+          <p><strong>Unresolved reports:</strong> {{ report.unresolved_count }}</p>
+          <p><strong>State:</strong> {{ report.moderation_status }}</p>
+          <div class="contest-admin-button-row">
+            {% for state, label in [("under_review", "Mark under review"), ("hidden", "Hide team"), ("active", "Restore active")] %}
+            <form method="post" action="/contests/admin/teams/{{ report.team_id }}/moderation">
+              <input type="hidden" name="state" value="{{ state }}" />
+              <button class="btn btn-secondary" type="submit">{{ label }}</button>
+            </form>
+            {% endfor %}
+            {% for action, label in [("dismissed", "Dismiss report"), ("actioned", "Resolve as actioned")] %}
+            <form method="post" action="/contests/admin/team-reports/{{ report.id }}/resolve">
+              <input type="hidden" name="action" value="{{ action }}" />
+              <button class="btn btn-secondary" type="submit">{{ label }}</button>
+            </form>
+            {% endfor %}
+          </div>
+        </article>
+        {% endfor %}
+      {% else %}
+      <p>No unresolved team reports.</p>
+      {% endif %}
+    </section>
+
     <section class="contest-admin-actions" aria-labelledby="finalization-actions-title">
       <h2 id="finalization-actions-title">Finalization Actions</h2>
       <div class="contest-admin-button-row">

@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from .account_routes import current_profile
 from .contests import CENTRAL, central_week_boundaries, ensure_band_camp_data
 from .db import SessionLocal
-from .models import Season, Team, TeamMembership, WoodchuckProfile
+from .models import Season, Team, TeamMembership, TeamReport, WoodchuckProfile
 from .team_names import InvalidTeamName, normalized_team_name
 
 
@@ -41,6 +41,19 @@ class TeamJoin(BaseModel):
     team_id: int = Field(gt=0)
 
 
+class TeamReportCreate(BaseModel):
+    category: str = Field(min_length=1, max_length=40)
+    details: str = Field(default="", max_length=500)
+
+
+REPORT_CATEGORIES = {
+    "inappropriate_name": "Inappropriate name",
+    "inappropriate_emblem": "Inappropriate emblem",
+    "impersonation": "Impersonation",
+    "other": "Other",
+}
+
+
 def utc(value: datetime) -> datetime:
     return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
 
@@ -50,12 +63,25 @@ def emblem_payload(key: str) -> dict[str, str]:
     return {"key": key, "kind": kind, "value": APPROVED_EMBLEMS[key]}
 
 
+def public_team_identity(team: Team) -> tuple[str, dict[str, str]]:
+    if team.moderation_status == "hidden":
+        return "Hidden Team", emblem_payload("shield:silver")
+    return team.display_name, emblem_payload(team.emblem_key)
+
+
 def team_payload(team: Team, captain: WoodchuckProfile | None) -> dict[str, object]:
+    name, emblem = public_team_identity(team)
+    captain_visible = (
+        team.moderation_status != "hidden"
+        and captain is not None
+        and captain.status == "active"
+    )
     return {
-        "id": team.id, "name": team.display_name, "emblem": emblem_payload(team.emblem_key),
+        "id": team.id, "name": name, "emblem": emblem,
         "captain": {
-            "display_name": captain.display_name if captain else "Former Woodchuck",
-            "is_team_captain": True, "accessible_label": "Team Captain",
+            "display_name": captain.display_name if captain_visible else None,
+            "is_team_captain": captain_visible,
+            "accessible_label": "Team Captain" if captain_visible else None,
         },
     }
 
@@ -82,11 +108,17 @@ def select_team(session: Session, *, profile: WoodchuckProfile, season: Season,
                 team: Team, now: datetime) -> tuple[TeamMembership, bool]:
     if team.season_id != season.id:
         raise ValueError("That team is not in the active season.")
+    if team.moderation_status == "hidden":
+        raise ValueError("That team is not available.")
     week_start, _, _, _ = central_week_boundaries(now)
     current = active_membership(session, profile_id=profile.id, season_id=season.id)
     if current and current.team_id == team.id:
         return current, False
-    if current and current.selected_week_start == week_start:
+    current_team = session.get(Team, current.team_id) if current else None
+    if (
+        current and current.selected_week_start == week_start
+        and (current_team is None or current_team.moderation_status != "hidden")
+    ):
         raise ValueError("Your team choice is locked until next contest week.")
     now_utc = now.astimezone(timezone.utc)
     if current:
@@ -130,14 +162,25 @@ def create_and_join_team(session: Session, *, profile: WoodchuckProfile,
 def selection_payload(session: Session, *, profile: WoodchuckProfile, now: datetime) -> dict[str, object]:
     season, _, week = ensure_band_camp_data(session, now=now)
     membership = active_membership(session, profile_id=profile.id, season_id=season.id)
-    teams = session.scalars(select(Team).where(Team.season_id == season.id).order_by(
+    teams = session.scalars(select(Team).where(
+        Team.season_id == season.id,
+        Team.moderation_status != "hidden",
+    ).order_by(
         Team.display_name, Team.id
     ).limit(MAX_PUBLIC_TEAMS)).all()
-    captain_ids = {team.creator_profile_id for team in teams if team.creator_profile_id}
-    captains = {row.id: row for row in session.scalars(select(WoodchuckProfile).where(WoodchuckProfile.id.in_(captain_ids))).all()} if captain_ids else {}
     current_team = session.get(Team, membership.team_id) if membership else None
+    visible_teams = list(teams)
+    if current_team is not None and current_team.id not in {team.id for team in visible_teams}:
+        visible_teams.append(current_team)
+    captain_ids = {team.creator_profile_id for team in visible_teams if team.creator_profile_id}
+    captains = {row.id: row for row in session.scalars(select(WoodchuckProfile).where(
+        WoodchuckProfile.id.in_(captain_ids), WoodchuckProfile.status == "active"
+    )).all()} if captain_ids else {}
     current_captain = captains.get(current_team.creator_profile_id) if current_team else None
-    locked = bool(membership and membership.selected_week_start == week.week_start)
+    locked = bool(
+        membership and membership.selected_week_start == week.week_start
+        and (current_team is None or current_team.moderation_status != "hidden")
+    )
     next_at = datetime.combine(week.week_end, time.min, CENTRAL).astimezone(timezone.utc)
     return {
         "season": {"key": season.key, "name": season.name},
@@ -188,7 +231,10 @@ def join_team(request: Request, submitted: TeamJoin):
     with SessionLocal() as session:
         profile, season, now = authenticated_context(request, session)
         team = session.get(Team, submitted.team_id)
-        if team is None or team.season_id != season.id:
+        if (
+            team is None or team.season_id != season.id
+            or team.moderation_status == "hidden"
+        ):
             raise HTTPException(status_code=404, detail="Team was not found.")
         try:
             membership, changed = select_team(session, profile=profile, season=season, team=team, now=now)
@@ -199,3 +245,42 @@ def join_team(request: Request, submitted: TeamJoin):
         payload = selection_payload(session, profile=profile, now=now)
         payload.update({"changed": changed})
         return payload
+
+
+@router.post("/{team_id}/reports", status_code=201)
+def report_team(team_id: int, request: Request, submitted: TeamReportCreate):
+    with SessionLocal() as session:
+        profile = current_profile(request, session)
+        if profile is None:
+            raise HTTPException(status_code=401, detail="Student sign-in is required.")
+        team = session.get(Team, team_id)
+        if team is None or team.moderation_status == "hidden":
+            raise HTTPException(status_code=404, detail="Team was not found.")
+        if submitted.category not in REPORT_CATEGORIES:
+            raise HTTPException(status_code=400, detail="Choose a report category.")
+        details = submitted.details.strip()
+        existing = session.scalar(select(TeamReport).where(
+            TeamReport.team_id == team.id,
+            TeamReport.reporter_profile_id == profile.id,
+            TeamReport.status == "unresolved",
+        ))
+        if existing is not None:
+            return {"created": False, "report_id": existing.id, "status": existing.status}
+        report = TeamReport(
+            team_id=team.id, reporter_profile_id=profile.id,
+            category=submitted.category, details=details or None,
+        )
+        session.add(report)
+        try:
+            session.commit(); session.refresh(report)
+        except IntegrityError:
+            session.rollback()
+            existing = session.scalar(select(TeamReport).where(
+                TeamReport.team_id == team.id,
+                TeamReport.reporter_profile_id == profile.id,
+                TeamReport.status == "unresolved",
+            ))
+            if existing is None:
+                raise HTTPException(status_code=409, detail="The report could not be saved.")
+            return {"created": False, "report_id": existing.id, "status": existing.status}
+        return {"created": True, "report_id": report.id, "status": report.status}

@@ -464,6 +464,8 @@
     const emblemChoice = document.getElementById("shed-team-emblem-choice");
     const emblemPreview = document.getElementById("shed-team-emblem-preview");
     const otherSection = document.getElementById("shed-team-other-section");
+    const reportPanel = document.getElementById("shed-team-report-panel");
+    let currentTeamId = null;
     if (!trigger || !panel || !options || !status || !emblemChoice) return;
     function updateEmblemPreview() {
       if (!emblemPreview || !emblemChoice) return;
@@ -481,6 +483,8 @@
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.detail || "Teams could not be loaded.");
         const current = payload.membership?.team || null;
+        currentTeamId = current?.id || null;
+        if (reportPanel) reportPanel.hidden = !currentTeamId;
         renderTeamEmblem(emblem, current?.emblem || "");
         trigger.setAttribute("aria-label", current ? `Team ${current.name}` : "Choose a team");
         trigger.title = current ? current.name : "Choose a team";
@@ -528,6 +532,21 @@
       })});
       const payload = await response.json(); feedback.textContent = response.ok ? "Team created and selected." : payload.detail;
       if (response.ok) await load();
+    });
+    document.getElementById("shed-team-report-submit")?.addEventListener("click", async function () {
+      if (!currentTeamId) return;
+      const response = await fetch(`/teams/${currentTeamId}/reports`, {
+        method: "POST", credentials: "same-origin",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          category: document.getElementById("shed-team-report-category").value,
+          details: document.getElementById("shed-team-report-details").value,
+        }),
+      });
+      const payload = await response.json();
+      feedback.textContent = response.ok
+        ? (payload.created ? "Team report submitted." : "You already have an unresolved report for this team.")
+        : (payload.detail || "Team report could not be submitted.");
     });
     load();
     if (window.location.hash === "#shed-team-panel") trigger.click();
