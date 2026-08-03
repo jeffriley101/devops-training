@@ -82,7 +82,7 @@ def team_payload(team: Team, captain: WoodchuckProfile | None) -> dict[str, obje
             "display_name": captain.display_name if captain_visible else None,
             "is_team_captain": captain_visible,
             "accessible_label": "Team Captain" if captain_visible else None,
-        },
+        } if captain_visible else None,
     }
 
 

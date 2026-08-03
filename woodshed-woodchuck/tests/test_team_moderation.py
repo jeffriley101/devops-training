@@ -127,6 +127,7 @@ def test_admin_moderation_hidden_behavior_and_restore(moderation_db) -> None:
     member_client = TestClient(app); sign_in(member_client, "WC-MEMBER")
     current = member_client.get("/teams").json()
     assert current["membership"]["team"]["name"] == "Hidden Team"
+    assert current["membership"]["team"]["captain"] is None
     assert current["membership"]["locked"] is False
     escaped = member_client.post("/teams/selection", json={"team_id": escape_id})
     assert escaped.status_code == 200 and escaped.json()["changed"] is True
