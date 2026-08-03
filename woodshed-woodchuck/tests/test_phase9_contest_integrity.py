@@ -20,7 +20,9 @@ from app.db import Base
 from app.models import (
     CampPointAward,
     ContestResult,
+    CrownProgress,
     PracticeChart,
+    PracticeChartVerification,
     RewardGrant,
     Team,
     WoodchuckProfile,
@@ -162,3 +164,28 @@ def test_open_week_finalizes_after_deletion_and_reruns_without_duplicates() -> N
         session.scalar(select(func.count()).select_from(RewardGrant)),
         session.scalar(select(func.count()).select_from(CampPointAward)),
     )
+
+
+def test_open_and_verified_wins_share_one_crown_progress_row() -> None:
+    session = database()
+    season, _contests, week = ensure_band_camp_data(session, now=NOW)
+    student = add_profile(session, 4); session.commit()
+    team, _ = create_and_join_team(
+        session, profile=student, season=season, name="Dual Division",
+        emblem_key="letter:D", now=NOW,
+    )
+    chart = add_chart(session, student, team)
+    session.add(PracticeChartVerification(
+        practice_chart_id=chart.id, status="approved",
+        responded_at=datetime(2026, 8, 1, 12, tzinfo=timezone.utc),
+    ))
+    session.commit()
+
+    finalize_contest_week(session, week_start=week.week_start, now=FINAL_NOW)
+    session.commit()
+    progress = session.scalars(select(CrownProgress).where(
+        CrownProgress.profile_id == student.id,
+        CrownProgress.category_key == "weekly-points-leaders",
+    )).all()
+    assert len(progress) == 1
+    assert progress[0].qualifying_wins == 2

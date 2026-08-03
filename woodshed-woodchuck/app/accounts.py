@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import hashlib
+import hmac
+import os
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
@@ -12,13 +15,24 @@ from .content import LEVEL_OPTIONS
 from .security import generate_woodchuck_id, hash_pin, is_valid_pin, verify_pin
 
 
-def _retired_identifier_hash(woodchuck_id: str) -> str:
-    import hashlib
-    return hashlib.sha256(normalize_woodchuck_id(woodchuck_id).encode("utf-8")).hexdigest()
-
-
 def normalize_woodchuck_id(woodchuck_id: str) -> str:
     return woodchuck_id.strip().upper()
+
+
+def retired_identifier_hash(woodchuck_id: str) -> str:
+    """Return a stable, non-enumerable reservation for a retired login ID.
+
+    SESSION_SECRET is already required to remain stable so authenticated browser
+    sessions survive normal application restarts. Reusing it as HMAC key avoids
+    introducing another deployment secret while preventing offline dictionary
+    testing of a copied retired-ID column.
+    """
+    secret = os.getenv("SESSION_SECRET", "woodshed-local-development-secret")
+    return hmac.new(
+        secret.encode("utf-8"),
+        normalize_woodchuck_id(woodchuck_id).encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
 
 
 def create_woodchuck_profile(
@@ -51,7 +65,7 @@ def create_woodchuck_profile(
         generated_id = generate_woodchuck_id()
         if session.scalar(select(WoodchuckProfile.id).where(
             WoodchuckProfile.retired_woodchuck_id_hash
-            == _retired_identifier_hash(generated_id)
+            == retired_identifier_hash(generated_id)
         )) is not None:
             continue
         profile = WoodchuckProfile(

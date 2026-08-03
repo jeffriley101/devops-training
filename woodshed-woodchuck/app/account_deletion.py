@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import hmac
 import secrets
 from datetime import datetime, timedelta, timezone
@@ -8,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-from .accounts import normalize_woodchuck_id
+from .accounts import normalize_woodchuck_id, retired_identifier_hash
 from .models import (
     ContestResult,
     PracticeChart,
@@ -37,10 +36,6 @@ class DeletionCredentialsError(ValueError):
 
 class DeletionRateLimited(ValueError):
     pass
-
-
-def retired_identifier_hash(woodchuck_id: str) -> str:
-    return hashlib.sha256(normalize_woodchuck_id(woodchuck_id).encode("utf-8")).hexdigest()
 
 
 def _utc(value: datetime) -> datetime:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
+import hashlib
 
 import pytest
 from fastapi.testclient import TestClient
@@ -10,6 +11,7 @@ from sqlalchemy.pool import StaticPool
 
 from app import account_routes, main as main_module, verifier_routes
 from app.account_deletion import DELETED_PUBLIC_NAME, anonymize_woodchuck_account
+from app.accounts import create_woodchuck_profile, normalize_woodchuck_id, retired_identifier_hash
 from app.account_routes import SESSION_PROFILE_ID, SESSION_PROFILE_VERSION
 from app.db import Base
 from app.main import app
@@ -233,6 +235,10 @@ def test_delete_route_requires_exact_credentials_and_revokes_cookie(deletion_db)
     }).status_code == 401
     login = client.post("/account/login", data={"woodchuck_id": old_id, "pin": "1234"})
     assert login.status_code == 200
+    privacy = client.get("/account/privacy")
+    assert privacy.status_code == 200
+    assert "Delete Your Woodchuck Account" in privacy.text
+    assert 'name="pin"' in privacy.text and 'name="pin" value=' not in privacy.text
     second = TestClient(app)
     assert second.post("/account/login", data={"woodchuck_id": old_id, "pin": "1234"}).status_code == 200
     for bad in (
@@ -270,3 +276,37 @@ def test_deleted_invitation_token_is_invalid(deletion_db) -> None:
             accept_trusted_verifier_invitation(
                 session, token="old-token", display_name="Parent", pin="2468"
             )
+
+
+def test_retired_identifier_uses_stable_keyed_reservation(
+    deletion_db, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture,
+) -> None:
+    monkeypatch.setenv("SESSION_SECRET", "stable-test-session-secret")
+    old_id = "WC-RETIRED-PRIVATE"
+    with deletion_db() as session:
+        deleted = WoodchuckProfile(
+            woodchuck_id=old_id, display_name="Private Student",
+            pin_hash=hash_pin("1234"), instrument="Flute", level="Beginner",
+            goal="Practice",
+        )
+        session.add(deleted); session.flush()
+        session.add(WoodchuckState(profile_id=deleted.id, state_json={}, revision=0))
+        session.commit()
+        anonymize_woodchuck_account(session, profile=deleted, now=NOW)
+        session.commit(); session.refresh(deleted)
+
+        normalized = normalize_woodchuck_id(old_id)
+        plain_sha = hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+        assert deleted.retired_woodchuck_id_hash == retired_identifier_hash(old_id)
+        assert retired_identifier_hash(f"  {old_id.lower()}  ") == deleted.retired_woodchuck_id_hash
+        assert deleted.retired_woodchuck_id_hash != plain_sha
+        assert old_id not in deleted.woodchuck_id
+
+        generated = iter([old_id.lower(), "WC-DIFFERENT-AVAILABLE"])
+        monkeypatch.setattr("app.accounts.generate_woodchuck_id", lambda: next(generated))
+        replacement = create_woodchuck_profile(
+            session, display_name="Replacement", pin="5678", instrument="Flute",
+            level="Beginner", goal="Practice",
+        )
+        assert replacement.woodchuck_id == "WC-DIFFERENT-AVAILABLE"
+        assert old_id not in caplog.text

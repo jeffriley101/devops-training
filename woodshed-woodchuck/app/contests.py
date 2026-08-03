@@ -1234,10 +1234,17 @@ PARTICIPATION_DANDELIONS = 5
 def _increment_crown_progress(
     session: Session, *, profile_id: int, category: str, now: datetime
 ) -> None:
-    progress = session.scalar(select(CrownProgress).where(
-        CrownProgress.profile_id == profile_id,
-        CrownProgress.category_key == category,
-    ).with_for_update())
+    progress = next((
+        row for row in session.new
+        if isinstance(row, CrownProgress)
+        and row.profile_id == profile_id
+        and row.category_key == category
+    ), None)
+    if progress is None:
+        progress = session.scalar(select(CrownProgress).where(
+            CrownProgress.profile_id == profile_id,
+            CrownProgress.category_key == category,
+        ).with_for_update())
     if progress is None:
         progress = CrownProgress(profile_id=profile_id, category_key=category, qualifying_wins=0)
         session.add(progress)
