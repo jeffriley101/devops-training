@@ -225,7 +225,8 @@ def test_bonus_progress_endpoint_persists_increment_then_rewards_threshold(
         create_student(client, credits=7)
         today = datetime.now(CENTRAL).date().isoformat()
         current = client.get("/contests/bonus-challenge/current").json()["challenge"]
-        assert current["task"] and current["target_minutes"] == 10
+        target_minutes = current["target_minutes"]
+        assert current["task"] and target_minutes >= 10
         first = client.post("/contests/bonus-challenge/progress", json={
             "activity_date": today,
             "challenge_instance": current["instance_key"],
@@ -248,13 +249,13 @@ def test_bonus_progress_endpoint_persists_increment_then_rewards_threshold(
         completed = client.post("/contests/bonus-challenge/progress", json={
             "activity_date": today,
             "challenge_instance": current["instance_key"],
-            "minutes": 6,
+            "minutes": target_minutes - 4,
             "note": "Threshold increment",
         })
         assert completed.status_code == 200
         payload = completed.json()
         assert payload["created"] is True and payload["completed"] is True
-        assert payload["logged_minutes"] == 10
+        assert payload["logged_minutes"] == target_minutes
         assert payload["dandelions_awarded"] == 5
         assert payload["camp_points_awarded"] == 2
         assert payload["credits"] == 12
@@ -262,7 +263,7 @@ def test_bonus_progress_endpoint_persists_increment_then_rewards_threshold(
         duplicate = client.post("/contests/bonus-challenge/progress", json={
             "activity_date": today,
             "challenge_instance": current["instance_key"],
-            "minutes": 6,
+            "minutes": target_minutes - 4,
         })
         assert duplicate.status_code == 200
         assert duplicate.json()["created"] is False

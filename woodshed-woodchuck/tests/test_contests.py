@@ -415,6 +415,11 @@ def test_endpoint_requires_authentication_and_exposes_no_private_data(
     database: tuple[Session, sessionmaker[Session]],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    class FixedDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):  # type: ignore[no-untyped-def]
+            return NOW if tz is not None else NOW.replace(tzinfo=None)
+
     session, factory = database
     profile = add_student(
         session,
@@ -430,6 +435,7 @@ def test_endpoint_requires_authentication_and_exposes_no_private_data(
     )
     session.commit()
     monkeypatch.setattr(contest_module, "SessionLocal", factory)
+    monkeypatch.setattr(contest_module, "datetime", FixedDateTime)
 
     with pytest.raises(HTTPException) as unauthorized:
         current_contests(request_with_session())

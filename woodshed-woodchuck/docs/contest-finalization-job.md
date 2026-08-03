@@ -26,6 +26,27 @@ cause.
 Never run destructive database resets, table recreation, or data-clearing
 commands as part of cron setup or recovery.
 
+## Read-only history audit and narrow repair
+
+Audit a specific week before considering any repair. The command is dry-run by
+default and reports source-chart and artifact counts without committing changes:
+
+```bash
+python -m app.contest_jobs audit_history --week 2026-07-27
+```
+
+Only after reviewing that output, apply deterministic missing artifacts with:
+
+```bash
+python -m app.contest_jobs audit_history --week 2026-07-27 --apply
+```
+
+The apply form respects the original verification/finalization deadlines,
+preserves existing result snapshots, and uses the existing unique reward keys.
+It cannot make a not-yet-due week finalize. A complete finalized week is a
+no-op. Run this only as a local management command with the same protected
+database access as the scheduler; it is not exposed as a public route.
+
 ## Season readiness and rollover
 
 While signed in, inspect the privacy-safe readiness payload at:

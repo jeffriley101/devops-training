@@ -669,15 +669,19 @@ def medal_for_rank(rank: int) -> str | None:
 
 
 def _charts_and_approved_ids(
-    session: Session, contest_week: ContestWeek
+    session: Session, contest_week: ContestWeek, *,
+    submitted_before: datetime | None = None,
 ) -> tuple[list[PracticeChart], set[int]]:
+    filters = [
+        PracticeChart.practice_date >= contest_week.week_start,
+        PracticeChart.practice_date < contest_week.week_end,
+        PracticeChart.include_contests.is_(True),
+    ]
+    if submitted_before is not None:
+        filters.append(PracticeChart.created_at <= aware_utc(submitted_before))
     charts = list(
         session.scalars(
-            select(PracticeChart).where(
-                PracticeChart.practice_date >= contest_week.week_start,
-                PracticeChart.practice_date < contest_week.week_end,
-                PracticeChart.include_contests.is_(True),
-            )
+            select(PracticeChart).where(*filters)
         ).all()
     )
     chart_ids = [chart.id for chart in charts]
@@ -734,10 +738,13 @@ def _team_rankings(
 
 
 def _weekly_team_scores(
-    session: Session, contest_week: ContestWeek
+    session: Session, contest_week: ContestWeek, *,
+    source_cutoff: datetime | None = None,
 ) -> dict[str, dict[str, dict[int, int]]]:
     """Cap each profile/team contribution at 300 minutes before summing."""
-    charts, approved_ids = _charts_and_approved_ids(session, contest_week)
+    charts, approved_ids = _charts_and_approved_ids(
+        session, contest_week, submitted_before=source_cutoff
+    )
     contributions = {"open": {}, "verified": {}}
     for chart in charts:
         if not chart.include_team_contests or chart.team_id is None:
@@ -762,15 +769,19 @@ def _weekly_team_scores(
 
 
 def _season_team_practice_scores(
-    session: Session, season: Season, through_week: ContestWeek
+    session: Session, season: Season, through_week: ContestWeek, *,
+    source_cutoff: datetime | None = None,
 ) -> dict[str, dict[int, int]]:
-    charts = session.scalars(select(PracticeChart).where(
+    filters = [
         PracticeChart.practice_date >= season.starts_on,
         PracticeChart.practice_date < through_week.week_end,
         PracticeChart.include_contests.is_(True),
         PracticeChart.include_team_contests.is_(True),
         PracticeChart.team_id.is_not(None),
-    )).all()
+    ]
+    if source_cutoff is not None:
+        filters.append(PracticeChart.created_at <= aware_utc(source_cutoff))
+    charts = session.scalars(select(PracticeChart).where(*filters)).all()
     weeks = {
         week.week_start: week for week in session.scalars(select(ContestWeek).where(
             ContestWeek.season_id == season.id,
@@ -783,7 +794,9 @@ def _season_team_practice_scores(
         week = weeks.get(week_start)
         if week is None:
             continue
-        _, approved = _charts_and_approved_ids(session, week)
+        _, approved = _charts_and_approved_ids(
+            session, week, submitted_before=source_cutoff
+        )
         for division in ["open"] + (["verified"] if chart.id in approved else []):
             key = (week_start, chart.team_id, chart.profile_id)
             contributions[division][key] = contributions[division].get(key, 0) + chart.minutes
@@ -801,7 +814,8 @@ def _sum_capped_team_contributions(values: dict[tuple[date, int, int], int]) -> 
 
 
 def _seasonal_team_point_scores(
-    session: Session, season: Season, through_week: ContestWeek
+    session: Session, season: Season, through_week: ContestWeek, *,
+    source_cutoff: datetime | None = None,
 ) -> dict[str, dict[int, int]]:
     """Team points require that week's Open/Verified P-Chart eligibility.
 
@@ -809,16 +823,21 @@ def _seasonal_team_point_scores(
     circular scoring; newly granted finalization points enter a later view.
     """
     cutoff = datetime.combine(through_week.week_end, time.min, CENTRAL).astimezone(timezone.utc)
-    awards = session.scalars(select(CampPointAward).where(
+    award_filters = [
         CampPointAward.team_id.is_not(None), CampPointAward.occurred_at < cutoff,
-    )).all()
+    ]
+    if source_cutoff is not None:
+        award_filters.append(CampPointAward.created_at <= aware_utc(source_cutoff))
+    awards = session.scalars(select(CampPointAward).where(*award_filters)).all()
     weeks = session.scalars(select(ContestWeek).where(
         ContestWeek.season_id == season.id,
         ContestWeek.week_start < through_week.week_end,
     )).all()
     eligibility: dict[tuple[date, int], set[str]] = {}
     for week in weeks:
-        charts, approved = _charts_and_approved_ids(session, week)
+        charts, approved = _charts_and_approved_ids(
+            session, week, submitted_before=source_cutoff
+        )
         for chart in charts:
             key = (week.week_start, chart.profile_id)
             eligibility.setdefault(key, set()).add("open")
@@ -834,11 +853,18 @@ def _seasonal_team_point_scores(
 
 
 def team_leaderboards(
-    session: Session, *, season: Season, contest_week: ContestWeek
+    session: Session, *, season: Season, contest_week: ContestWeek,
+    source_cutoff: datetime | None = None,
 ) -> dict[str, dict[str, list[dict[str, object]]]]:
-    weekly = _weekly_team_scores(session, contest_week)
-    seasonal_practice = _season_team_practice_scores(session, season, contest_week)
-    seasonal_points = _seasonal_team_point_scores(session, season, contest_week)
+    weekly = _weekly_team_scores(
+        session, contest_week, source_cutoff=source_cutoff
+    )
+    seasonal_practice = _season_team_practice_scores(
+        session, season, contest_week, source_cutoff=source_cutoff
+    )
+    seasonal_points = _seasonal_team_point_scores(
+        session, season, contest_week, source_cutoff=source_cutoff
+    )
     payload = {
         "team-weekly-practice": {}, "team-average-practice": {},
         "team-season-practice": {}, "team-seasonal-points": {},
@@ -1247,10 +1273,55 @@ def _reward_contest_result(
                 _increment_crown_progress(session, profile_id=profile_id, category=category, now=now)
 
 
+def _contest_result_once(
+    session: Session,
+    *,
+    contest_week_id: int,
+    contest: Contest,
+    division: str,
+    subject_type: str,
+    subject_key: str,
+    profile_id: int | None,
+    instrument: str | None,
+    team_id: int | None,
+    display_name_snapshot: str,
+    score: int,
+    rank: int,
+    active_member_count: int | None = None,
+) -> tuple[ContestResult, bool]:
+    """Create one deterministic result while preserving an existing snapshot."""
+    existing = session.scalar(select(ContestResult).where(
+        ContestResult.contest_week_id == contest_week_id,
+        ContestResult.contest_id == contest.id,
+        ContestResult.division == division,
+        ContestResult.subject_key == subject_key,
+    ))
+    if existing is not None:
+        return existing, False
+    result = ContestResult(
+        contest_week_id=contest_week_id,
+        contest_id=contest.id,
+        division=division,
+        subject_type=subject_type,
+        subject_key=subject_key,
+        profile_id=profile_id,
+        instrument=instrument,
+        team_id=team_id,
+        display_name_snapshot=display_name_snapshot,
+        score=score,
+        rank=rank,
+        medal=medal_for_rank(rank),
+        active_member_count=active_member_count,
+    )
+    session.add(result)
+    return result, True
+
+
 def finalize_contest_week(
-    session: Session, *, week_start: date, now: datetime
+    session: Session, *, week_start: date, now: datetime,
+    repair_finalized: bool = False,
 ) -> ContestWeek:
-    """Finalize individual and team contests in one idempotent transaction."""
+    """Finalize a week, or fill deterministic gaps when explicitly repairing."""
     if now.tzinfo is None or now.utcoffset() is None:
         raise ValueError("The current time must be timezone-aware.")
     week = session.scalar(select(ContestWeek).join(Season).where(
@@ -1259,15 +1330,16 @@ def finalize_contest_week(
     ).with_for_update())
     if week is None:
         raise HTTPException(status_code=404, detail="Contest week not found.")
-    if week.status == "finalized":
+    was_finalized = week.status == "finalized"
+    if was_finalized and not repair_finalized:
         return week
     now_utc = now.astimezone(timezone.utc)
     week_end_at = datetime.combine(week.week_end, time.min, CENTRAL).astimezone(timezone.utc)
-    if now_utc < week_end_at:
+    if not was_finalized and now_utc < week_end_at:
         raise HTTPException(status_code=409, detail="Contest week has not ended.")
-    if now_utc <= aware_utc(week.verification_deadline_at):
+    if not was_finalized and now_utc <= aware_utc(week.verification_deadline_at):
         raise HTTPException(status_code=409, detail="Verification deadline has not passed.")
-    if now_utc <= aware_utc(week.finalize_after):
+    if not was_finalized and now_utc <= aware_utc(week.finalize_after):
         raise HTTPException(status_code=409, detail="Finalization time has not passed.")
     season = session.get(Season, week.season_id)
     contests = {row.key: row for row in session.scalars(select(Contest).where(
@@ -1276,7 +1348,14 @@ def finalize_contest_week(
     if len(contests) != len(CONTEST_DEFINITIONS):
         raise RuntimeError("Band Camp contest definitions are missing.")
 
-    charts, approved_ids = _charts_and_approved_ids(session, week)
+    source_cutoff = (
+        aware_utc(week.finalized_at)
+        if was_finalized and week.finalized_at is not None
+        else now_utc
+    )
+    charts, approved_ids = _charts_and_approved_ids(
+        session, week, submitted_before=source_cutoff
+    )
     profile_ids = {chart.profile_id for chart in charts}
     profiles = {row.id: row for row in session.scalars(select(WoodchuckProfile).where(
         WoodchuckProfile.id.in_(profile_ids)
@@ -1299,29 +1378,34 @@ def finalize_contest_week(
         for profile_id, display, score, rank in _ranked_student_scores(student_scores[division], profiles):
             if rank not in PLACEMENT_DANDELIONS:
                 continue
-            result = ContestResult(
-                contest_week_id=week.id, contest_id=contests["weekly-points-leaders"].id,
-                division=division, subject_type="student", subject_key=str(profile_id),
-                profile_id=profile_id, display_name_snapshot=display, score=score,
-                rank=rank, medal=medal_for_rank(rank),
+            result, _created = _contest_result_once(
+                session, contest_week_id=week.id,
+                contest=contests["weekly-points-leaders"], division=division,
+                subject_type="student", subject_key=str(profile_id),
+                profile_id=profile_id, instrument=None, team_id=None,
+                display_name_snapshot=display, score=score, rank=rank,
             )
-            session.add(result); results.append((result, contests["weekly-points-leaders"], {profile_id}))
+            results.append((result, contests["weekly-points-leaders"], {profile_id}))
         for row in olympic_rankings(instrument_scores[division]):
             rank = int(row["rank"])
             if rank not in PLACEMENT_DANDELIONS:
                 continue
             key, _ = normalize_instrument(str(row["instrument"]))
-            result = ContestResult(
-                contest_week_id=week.id, contest_id=contests["weekly-practice-by-instrument"].id,
-                division=division, subject_type="instrument", subject_key=key,
-                instrument=str(row["instrument"]), display_name_snapshot=str(row["instrument"]),
-                score=int(row["total_minutes"]), rank=rank, medal=medal_for_rank(rank),
+            result, _created = _contest_result_once(
+                session, contest_week_id=week.id,
+                contest=contests["weekly-practice-by-instrument"], division=division,
+                subject_type="instrument", subject_key=key, profile_id=None,
+                instrument=str(row["instrument"]), team_id=None,
+                display_name_snapshot=str(row["instrument"]),
+                score=int(row["total_minutes"]), rank=rank,
             )
-            session.add(result); results.append((result, contests["weekly-practice-by-instrument"], instrument_contributors.get((division, key), set())))
+            results.append((result, contests["weekly-practice-by-instrument"], instrument_contributors.get((division, key), set())))
 
     start_at, end_at = _week_utc_bounds(week)
     camp_awards = session.scalars(select(CampPointAward).where(
-        CampPointAward.occurred_at >= start_at, CampPointAward.occurred_at < end_at,
+        CampPointAward.occurred_at >= start_at,
+        CampPointAward.occurred_at < end_at,
+        CampPointAward.created_at <= source_cutoff,
     )).all()
     camp_scores: dict[int, int] = {}
     for award in camp_awards:
@@ -1332,22 +1416,27 @@ def finalize_contest_week(
     for profile_id, display, score, rank in _ranked_student_scores(camp_scores, camp_profiles):
         if rank not in PLACEMENT_DANDELIONS:
             continue
-        result = ContestResult(
-            contest_week_id=week.id, contest_id=contests["weekly-camp-points"].id,
-            division="open", subject_type="student", subject_key=str(profile_id),
-            profile_id=profile_id, display_name_snapshot=display, score=score,
-            rank=rank, medal=medal_for_rank(rank),
+        result, _created = _contest_result_once(
+            session, contest_week_id=week.id,
+            contest=contests["weekly-camp-points"], division="open",
+            subject_type="student", subject_key=str(profile_id),
+            profile_id=profile_id, instrument=None, team_id=None,
+            display_name_snapshot=display, score=score, rank=rank,
         )
-        session.add(result); results.append((result, contests["weekly-camp-points"], {profile_id}))
+        results.append((result, contests["weekly-camp-points"], {profile_id}))
 
     snapshots = _snapshot_memberships(session, week)
     snapshot_team_ids = {row.profile_id: row.team_id for row in snapshots}
-    has_chart = set(session.scalars(select(PracticeChart.profile_id).distinct()).all())
+    has_chart = set(session.scalars(select(PracticeChart.profile_id).where(
+        PracticeChart.created_at <= source_cutoff
+    ).distinct()).all())
     team_members: dict[int, set[int]] = {}
     for snapshot in snapshots:
         if snapshot.team_id is not None and snapshot.profile_id in has_chart:
             team_members.setdefault(snapshot.team_id, set()).add(snapshot.profile_id)
-    boards = team_leaderboards(session, season=season, contest_week=week)
+    boards = team_leaderboards(
+        session, season=season, contest_week=week, source_cutoff=source_cutoff
+    )
     for contest_key, divisions in boards.items():
         contest = contests[contest_key]
         for division, rows in divisions.items():
@@ -1355,20 +1444,23 @@ def finalize_contest_week(
                 rank = int(row["rank"])
                 if rank not in PLACEMENT_DANDELIONS:
                     continue
-                result = ContestResult(
-                    contest_week_id=week.id, contest_id=contest.id, division=division,
-                    subject_type="team", subject_key=str(row["team_id"]), team_id=int(row["team_id"]),
-                    display_name_snapshot=str(row["team_name"]), score=int(row["score"]),
-                    active_member_count=int(row["active_member_count"]), rank=rank,
-                    medal=medal_for_rank(rank),
+                result, _created = _contest_result_once(
+                    session, contest_week_id=week.id, contest=contest,
+                    division=division, subject_type="team",
+                    subject_key=str(row["team_id"]), profile_id=None,
+                    instrument=None, team_id=int(row["team_id"]),
+                    display_name_snapshot=str(row["team_name"]),
+                    score=int(row["score"]), rank=rank,
+                    active_member_count=int(row["active_member_count"]),
                 )
-                session.add(result); results.append((result, contest, team_members.get(int(row["team_id"]), set())))
+                results.append((result, contest, team_members.get(int(row["team_id"]), set())))
     session.flush()
 
     for result, contest, recipients in results:
         _reward_contest_result(
             session, result=result, contest=contest, recipients=recipients,
-            snapshot_team_ids=snapshot_team_ids, now=now_utc,
+            snapshot_team_ids=snapshot_team_ids,
+            now=aware_utc(week.finalized_at) if was_finalized and week.finalized_at else now_utc,
         )
     for profile_id in {chart.profile_id for chart in charts}:
         source = f"contest:{week.id}:weekly-participation:profile:{profile_id}"
@@ -1377,7 +1469,8 @@ def finalize_contest_week(
             reward_type="participation_dandelion", amount=PARTICIPATION_DANDELIONS,
         ):
             _add_dandelion(session, profile_id, PARTICIPATION_DANDELIONS)
-    week.status = "finalized"; week.finalized_at = now_utc
+    if not was_finalized:
+        week.status = "finalized"; week.finalized_at = now_utc
     session.flush()
     return week
 

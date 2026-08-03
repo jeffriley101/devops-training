@@ -10,8 +10,17 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app import contest_jobs
-from app.contest_jobs import JobSummary, run_finalize_due_weeks
-from app.contests import ensure_band_camp_data, finalize_contest_week
+from app.contest_jobs import (
+    JobSummary,
+    audit_or_repair_history,
+    run_finalize_due_weeks,
+)
+from app.contests import (
+    ensure_band_camp_data,
+    finalize_contest_week,
+    finalized_weeks_payload,
+    hall_of_champions_payload,
+)
 from app.db import Base
 from app.models import (
     CampPointAward,
@@ -23,6 +32,7 @@ from app.models import (
     RewardGrant,
     Season,
     WoodchuckProfile,
+    WoodchuckState,
 )
 
 
@@ -61,7 +71,9 @@ def test_command_interface_and_usage_exit_codes(
     assert contest_jobs.main([]) == 2
     usage = capsys.readouterr().err
     assert "python -m app.contest_jobs" in usage
-    assert "finalize_due_weeks" in usage and "rollover_season" in usage
+    assert "finalize_due_weeks" in usage
+    assert "audit_history" in usage
+    assert "rollover_season" in usage
 
 
 def add_week(
@@ -357,3 +369,141 @@ def test_finalized_historical_results_are_skipped_and_unchanged(
     assert (result.score, result.rank, result.medal, result.display_name_snapshot) == (
         77, 1, "gold", "Historical Winner"
     )
+
+
+def test_recently_closed_week_audit_respects_deadline_then_finalizes(
+    database: tuple[Session, sessionmaker[Session]],
+) -> None:
+    session, _factory = database
+    _, _, week = ensure_band_camp_data(
+        session, now=datetime(2026, 7, 28, tzinfo=timezone.utc)
+    )
+    student = add_student(session, "RECENT")
+    add_week_activity(session, student, week)
+    source_ids = set(session.scalars(select(PracticeChart.id)).all())
+
+    early = audit_or_repair_history(
+        session,
+        week_start=week.week_start,
+        now=week.finalize_after - timedelta(minutes=1),
+    )
+    assert early["action"] == "not_due"
+    assert early["reason"] == "finalize_after_not_passed"
+    assert session.get(ContestWeek, week.id).status == "open"
+
+    dry_run = audit_or_repair_history(
+        session, week_start=week.week_start, now=NOW, apply=False
+    )
+    assert dry_run["created"]["results"] == 5
+    assert session.scalar(select(func.count()).select_from(ContestResult)) == 0
+
+    applied = audit_or_repair_history(
+        session, week_start=week.week_start, now=NOW, apply=True
+    )
+    session.commit()
+    assert applied["action"] == "repaired"
+    assert session.get(ContestWeek, week.id).status == "finalized"
+    assert finalized_weeks_payload(session)["weeks"][0]["week_start"] == str(
+        week.week_start
+    )
+    hall = hall_of_champions_payload(session)
+    assert any(row["display_name"] == student.display_name for row in hall["students"])
+    assert {"open", "verified"}.issubset(
+        set(next(row for row in hall["students"] if row["display_name"] == student.display_name)["divisions"])
+    )
+    assert set(session.scalars(select(PracticeChart.id)).all()) == source_ids
+
+
+def test_incomplete_finalized_week_repairs_once_without_duplicate_rewards(
+    database: tuple[Session, sessionmaker[Session]],
+) -> None:
+    session, _factory = database
+    season, _, current = ensure_band_camp_data(
+        session, now=datetime(2026, 7, 28, tzinfo=timezone.utc)
+    )
+    incomplete = add_week(
+        session, season, week_start=date(2026, 7, 20), status="finalized"
+    )
+    student = add_student(session, "REPAIR")
+    add_week_activity(session, student, incomplete)
+    source_chart = session.scalar(select(PracticeChart).where(
+        PracticeChart.profile_id == student.id
+    ))
+    source_chart.created_at = incomplete.finalized_at - timedelta(days=1)
+    source_award = session.scalar(select(CampPointAward).where(
+        CampPointAward.profile_id == student.id
+    ))
+    source_award.created_at = incomplete.finalized_at - timedelta(days=1)
+    late_student = add_student(session, "LATE")
+    session.add(PracticeChart(
+        profile_id=late_student.id, practice_date=incomplete.week_start,
+        minutes=999, instrument=late_student.instrument, practice_details=[],
+        source="p-book", credits_awarded=0, include_contests=True,
+        created_at=NOW + timedelta(days=1),
+    ))
+    session.commit()
+    source_rows = [tuple(row) for row in session.execute(select(
+        PracticeChart.id, PracticeChart.profile_id, PracticeChart.minutes,
+        PracticeChart.practice_date,
+    )).all()]
+
+    dry_run = audit_or_repair_history(
+        session, week_start=incomplete.week_start, now=NOW, apply=False
+    )
+    assert dry_run["action"] == "repaired"
+    assert dry_run["created"]["results"] == 5
+    assert session.scalar(select(func.count()).select_from(ContestResult)) == 0
+
+    first = audit_or_repair_history(
+        session, week_start=incomplete.week_start, now=NOW, apply=True
+    )
+    session.commit()
+    counts = {
+        "results": session.scalar(select(func.count()).select_from(ContestResult)),
+        "grants": session.scalar(select(func.count()).select_from(RewardGrant)),
+        "camp": session.scalar(select(func.count()).select_from(CampPointAward)),
+    }
+    state = session.get(WoodchuckState, student.id)
+    balance = state.state_json["progress"]["credits"]
+
+    second = audit_or_repair_history(
+        session, week_start=incomplete.week_start, now=NOW + timedelta(days=1),
+        apply=True,
+    )
+    session.commit()
+    assert first["action"] == "repaired"
+    assert not session.scalars(select(ContestResult).where(
+        ContestResult.profile_id == late_student.id
+    )).all()
+    assert second["action"] == "unchanged"
+    assert all(value == 0 for value in second["created"].values())
+    assert counts == {
+        "results": session.scalar(select(func.count()).select_from(ContestResult)),
+        "grants": session.scalar(select(func.count()).select_from(RewardGrant)),
+        "camp": session.scalar(select(func.count()).select_from(CampPointAward)),
+    }
+    assert session.get(WoodchuckState, student.id).state_json["progress"]["credits"] == balance
+    assert [tuple(row) for row in session.execute(select(
+        PracticeChart.id, PracticeChart.profile_id, PracticeChart.minutes,
+        PracticeChart.practice_date,
+    )).all()] == source_rows
+    assert session.get(ContestWeek, current.id).status == "open"
+
+
+def test_complete_finalized_week_repair_is_unchanged(
+    database: tuple[Session, sessionmaker[Session]],
+) -> None:
+    session, _factory = database
+    _, _, week = ensure_band_camp_data(
+        session, now=datetime(2026, 7, 28, tzinfo=timezone.utc)
+    )
+    add_week_activity(session, add_student(session, "COMPLETE"), week)
+    finalize_contest_week(session, week_start=week.week_start, now=NOW)
+    session.commit()
+
+    report = audit_or_repair_history(
+        session, week_start=week.week_start, now=NOW + timedelta(days=1), apply=True
+    )
+    session.commit()
+    assert report["action"] == "unchanged"
+    assert all(value == 0 for value in report["created"].values())

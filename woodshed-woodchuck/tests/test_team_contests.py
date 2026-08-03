@@ -10,6 +10,7 @@ from app.contests import (
     create_camp_point_award, ensure_band_camp_data, finalize_contest_week,
     hall_of_champions_payload, team_leaderboards,
 )
+from app.contest_jobs import audit_or_repair_history
 from app.db import Base
 from app.models import (
     CampPointAward, Contest, ContestResult, CrownProgress, PracticeChart,
@@ -154,3 +155,54 @@ def test_revised_olympic_rewards_and_weekly_participation() -> None:
     assert not session.scalars(select(CampPointAward).where(
         CampPointAward.activity_type == "participation"
     )).all()
+
+
+def test_repair_preserves_team_and_individual_history_without_duplicates() -> None:
+    session = database()
+    season, _, week = ensure_band_camp_data(session, now=NOW)
+    captain = add_profile(session, 41)
+    member = add_profile(session, 42)
+    session.commit()
+    team, _ = create_and_join_team(
+        session, profile=captain, season=season, name="Repair Band",
+        emblem_key="letter:R", now=NOW,
+    )
+    select_team(session, profile=member, season=season, team=team, now=NOW)
+    add_chart(session, captain, team.id, 45)
+    add_chart(session, member, team.id, 20)
+    week.status = "finalized"
+    week.finalized_at = FINAL_NOW
+    session.commit()
+    chart_ids = set(session.scalars(select(PracticeChart.id)).all())
+
+    first = audit_or_repair_history(
+        session, week_start=week.week_start, now=FINAL_NOW, apply=True
+    )
+    session.commit()
+    results = session.scalars(select(ContestResult).where(
+        ContestResult.contest_week_id == week.id
+    )).all()
+    assert first["action"] == "repaired"
+    assert {row.subject_type for row in results} >= {"student", "instrument", "team"}
+    assert {row.division for row in results} == {"open", "verified"}
+    first_counts = (
+        len(results),
+        session.scalar(select(func.count()).select_from(RewardGrant)),
+        session.scalar(select(func.count()).select_from(CampPointAward)),
+        session.scalar(select(func.sum(CrownProgress.qualifying_wins))),
+    )
+
+    second = audit_or_repair_history(
+        session, week_start=week.week_start, now=FINAL_NOW, apply=True
+    )
+    session.commit()
+    assert second["action"] == "unchanged"
+    assert first_counts == (
+        session.scalar(select(func.count()).select_from(ContestResult)),
+        session.scalar(select(func.count()).select_from(RewardGrant)),
+        session.scalar(select(func.count()).select_from(CampPointAward)),
+        session.scalar(select(func.sum(CrownProgress.qualifying_wins))),
+    )
+    assert set(session.scalars(select(PracticeChart.id)).all()) == chart_ids
+    hall = hall_of_champions_payload(session)
+    assert any(row["display_name"] == captain.display_name for row in hall["students"])
