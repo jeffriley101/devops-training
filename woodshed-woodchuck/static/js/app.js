@@ -627,6 +627,7 @@
       } else if (completeBtn) {
         completeBtn.classList.remove("is-confirmed-success");
         completeBtn.disabled = false;
+        completeBtn.textContent = "I Played It";
       }
     }
 
@@ -635,9 +636,11 @@
         completeBtn.disabled = true;
         completeBtn.textContent = "Loading Challenge…";
       }
+      const controller = new AbortController();
+      const timeoutId = window.setTimeout(() => controller.abort(), 10000);
       try {
         const response = await fetch("/contests/bonus-challenge/current", {
-          credentials: "same-origin", cache: "no-store",
+          credentials: "same-origin", cache: "no-store", signal: controller.signal,
         });
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.detail || "Bonus Challenge could not be loaded.");
@@ -685,6 +688,12 @@
           completeBtn.textContent = "Unavailable";
         }
         if (errorEl) errorEl.textContent = error.message || "Bonus Challenge could not be loaded.";
+      } finally {
+        window.clearTimeout(timeoutId);
+        if (completeBtn && currentChallengeInstance && !stateApi.getState().daily.completed) {
+          completeBtn.disabled = false;
+          completeBtn.textContent = "I Played It";
+        }
       }
     }
 

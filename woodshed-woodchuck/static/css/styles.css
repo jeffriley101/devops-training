@@ -3092,6 +3092,20 @@ select {
   background: rgba(239,243,244,.58);
   overflow-wrap: anywhere;
 }
+.p-book-preset-list { display: grid; gap: 0.5rem; margin-top: 0.55rem; }
+.p-book-preset-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.55rem;
+  align-items: center;
+  min-width: 0;
+  padding: 0.5rem;
+  border: 1px solid #aa7834;
+  border-radius: 9px;
+  background: #fff1b8;
+}
+.p-book-preset-row > span { min-width: 0; overflow-wrap: anywhere; }
+.p-book-page .p-book-delete-preset { width: auto; min-height: 44px; }
 
 .p-book-page .btn {
   min-height: 44px;
@@ -3169,6 +3183,7 @@ select {
   .p-book-page #submit-p-chart-btn { width: 100px; height: 100px; min-height: 100px; }
   .p-book-page .practice-timer-row { flex-wrap: wrap; }
   .p-book-page .practice-timer-status { grid-column: 1 / -1; }
+  .p-book-preset-row { grid-template-columns: minmax(0, 1fr); }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -3722,7 +3737,7 @@ select {
 /* Clean, left-aligned practice checkbox list */
 .practice-detail-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: start;
   justify-items: stretch;
   gap: 0.65rem 1rem;
@@ -3741,6 +3756,16 @@ select {
   padding: 0.35rem 0;
   text-align: left;
   line-height: 1.25;
+}
+
+.p-book-work-field { container-type: inline-size; }
+.practice-work-option > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+@container (max-width: 30rem) {
+  .p-book-page .practice-detail-grid { grid-template-columns: minmax(0, 1fr); }
 }
 
 .practice-detail-grid input[type="checkbox"] {

@@ -131,10 +131,10 @@ def test_book_history_uses_accessible_verified_and_pristine_badges() -> None:
 
 def test_book_asset_versions_are_advanced() -> None:
     base = (ROOT / "templates/base.html").read_text(encoding="utf-8")
-    assert "/static/css/styles.css?v=67" in base
-    assert "/static/js/app.js?v=32" in base
-    assert "styles.css?v=66" not in base
-    assert "app.js?v=31" not in base
+    assert "/static/css/styles.css?v=68" in base
+    assert "/static/js/app.js?v=33" in base
+    assert "styles.css?v=67" not in base
+    assert "app.js?v=32" not in base
 
 
 def test_timer_status_and_history_have_independent_full_width_rows() -> None:
@@ -178,3 +178,29 @@ def test_shed_team_selector_has_one_current_card_and_polished_emblems() -> None:
     assert 'cat: "Cat"' in script and 'dog: "Dog"' in script
     assert ".team-radio-native" in css and "clip-path: inset(50%)" in css
     assert ".shed-team-choice-card.is-selected" in css
+
+
+def test_work_options_use_bounded_grid_without_compression() -> None:
+    template = (ROOT / "templates/p_book.html").read_text(encoding="utf-8")
+    css = (ROOT / "static/css/styles.css").read_text(encoding="utf-8")
+    assert template.count('class="practice-work-option"') == template.count('name="practice-detail"')
+    assert template.count('name="practice-detail"') >= 20
+    assert '<summary>Check anything that fits this practice chart.</summary>' in template
+    final_rules = css[css.index("/* Clean, left-aligned practice checkbox list */"):]
+    assert "grid-template-columns: repeat(2, minmax(0, 1fr))" in final_rules
+    assert "@container (max-width: 30rem)" in final_rules
+    assert ".p-book-page .practice-detail-grid { grid-template-columns: minmax(0, 1fr); }" in final_rules
+    assert "column-count" not in final_rules
+    assert ".practice-work-option > span" in final_rules
+
+
+def test_bonus_loading_state_always_resolves_to_action_or_error() -> None:
+    script = (ROOT / "static/js/app.js").read_text(encoding="utf-8")
+    quest = script[script.index("function wireQuestForm"):script.index("const STORE_ITEMS")]
+    assert 'completeBtn.textContent = "Loading Challenge…"' in quest
+    assert 'completeBtn.textContent = "I Played It"' in quest
+    assert 'completeBtn.textContent = "Unavailable"' in quest
+    assert "const controller = new AbortController()" in quest
+    assert "window.setTimeout(() => controller.abort(), 10000)" in quest
+    assert "window.clearTimeout(timeoutId)" in quest
+    assert quest.count('form.addEventListener("submit"') == 1

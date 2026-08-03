@@ -13,7 +13,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .account_routes import current_profile
-from .content import QUEST_POOL
+from .content import GENERAL_BONUS_CHALLENGE, QUEST_POOL
 from .db import SessionLocal
 from .instruments import INSTRUMENTS_BY_LABEL, canonical_instrument_key
 from .models import (
@@ -1737,7 +1737,7 @@ def configured_bonus_challenges(instrument: str) -> list[dict[str, object]]:
                 return list(challenges)
         except ValueError:
             continue
-    return []
+    return [GENERAL_BONUS_CHALLENGE]
 
 
 def quest_definition(instrument: str, quest_id: str) -> dict[str, object] | None:

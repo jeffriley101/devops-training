@@ -113,6 +113,42 @@ def test_piano_keyboard_bonus_configuration_is_approved_copy() -> None:
     }
 
 
+def test_supported_instruments_without_specific_config_use_general_fallback() -> None:
+    fallback = contests.configured_bonus_challenges("Accordion")
+    assert fallback == [{
+        "id": "general-difficult-passage-slow-evenly",
+        "text": "Practice a difficult passage slowly and evenly.",
+        "target_minutes": 10,
+        "reward_credits": 15,
+    }]
+    assert contests.configured_bonus_challenges("Flute") == contests.QUEST_POOL["Flute"]
+    assert contests.configured_bonus_challenges("Piano/Keyboard") == contests.QUEST_POOL["piano-keyboard"]
+    assert contests.configured_bonus_challenges("Not An Instrument") == []
+
+
+def test_fallback_instances_are_canonical_and_instrument_specific(
+    quest_database,
+) -> None:
+    with TestClient(app) as accordion:
+        create_student(accordion, instrument="Accordion")
+        accordion_current = accordion.get("/contests/bonus-challenge/current").json()["challenge"]
+        assert accordion_current["task"] == "Practice a difficult passage slowly and evenly."
+        assert accordion_current["target_minutes"] == 10
+        assert ":accordion:general-difficult-passage-slow-evenly" in accordion_current["instance_key"]
+        partial = accordion.post("/contests/bonus-challenge/progress", json={
+            "activity_date": accordion_current["activity_date"],
+            "challenge_instance": accordion_current["instance_key"],
+            "minutes": 4,
+        })
+        assert partial.status_code == 200 and partial.json()["logged_minutes"] == 4
+        assert partial.json()["dandelions_awarded"] == 0
+    with TestClient(app) as banjo:
+        create_student(banjo, instrument="Banjo")
+        banjo_current = banjo.get("/contests/bonus-challenge/current").json()["challenge"]
+        assert ":banjo:general-difficult-passage-slow-evenly" in banjo_current["instance_key"]
+        assert banjo_current["instance_key"] != accordion_current["instance_key"]
+
+
 def test_full_completion_route_persists_reward_once_and_returns_authority(
     quest_database,
 ) -> None:
@@ -351,13 +387,14 @@ def test_shared_resolver_replaces_stale_cross_instrument_client_state(
 
 
 def test_genuinely_missing_bonus_configuration_is_controlled(
-    quest_database, monkeypatch,
+    quest_database,
 ) -> None:
-    without_flute = dict(contests.QUEST_POOL)
-    without_flute.pop("Flute")
-    monkeypatch.setattr(contests, "QUEST_POOL", without_flute)
     with TestClient(app) as client:
-        create_student(client)
+        profile_id = create_student(client)
+        with quest_database() as session:
+            profile = session.get(WoodchuckProfile, profile_id)
+            profile.instrument = "Unsupported Legacy Instrument"
+            session.commit()
         payload = client.get("/contests/bonus-challenge/current").json()
         assert payload == {
             "available": False,

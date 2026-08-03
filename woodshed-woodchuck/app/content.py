@@ -131,6 +131,13 @@ QUEST_POOL = {
     ],
 }
 
+GENERAL_BONUS_CHALLENGE = {
+    "id": "general-difficult-passage-slow-evenly",
+    "text": "Practice a difficult passage slowly and evenly.",
+    "target_minutes": 10,
+    "reward_credits": 15,
+}
+
 SAX_VIKING_MESSAGES = {
     "reward": [
         "Legendary effort. Your woodshed spirit grows stronger!",
