@@ -43,6 +43,7 @@ from app.models import (
     PracticeChartVerification,
     RewardGrant,
     Season,
+    Team,
     WoodchuckProfile,
     WoodchuckState,
 )
@@ -94,6 +95,7 @@ def add_chart(
     instrument: str | None = None,
     verification_status: str | None = None,
     include_contests: bool = True,
+    created_at: datetime | None = None,
 ) -> PracticeChart:
     chart = PracticeChart(
         profile_id=profile.id,
@@ -104,6 +106,7 @@ def add_chart(
         source="p-book",
         credits_awarded=0,
         include_contests=include_contests,
+        created_at=created_at,
     )
     session.add(chart)
     session.flush()
@@ -247,8 +250,9 @@ def test_student_camp_point_totals_use_persisted_central_week_and_exclude_future
     database: tuple[Session, sessionmaker[Session]],
 ) -> None:
     session, _ = database
+    season, _, week = ensure_band_camp_data(session, now=NOW)
     student = add_student(session, woodchuck_id="WC-CAMP-TOTALS", instrument="Flute")
-    # NOW is Tuesday in America/Chicago. Only Monday and Tuesday-to-now count weekly.
+    # NOW is Tuesday in America/Chicago. Preseason and future awards do not count.
     for key, occurred_at, points in (
         ("prior", datetime(2026, 7, 26, 20, tzinfo=timezone.utc), 5),
         ("monday", datetime(2026, 7, 27, 6, tzinfo=timezone.utc), 1),
@@ -262,8 +266,139 @@ def test_student_camp_point_totals_use_persisted_central_week_and_exclude_future
     session.commit()
 
     assert student_camp_point_totals(
-        session, profile_id=student.id, now=NOW
-    ) == {"weekly_points": 3, "career_points": 8}
+        session, profile_id=student.id, now=NOW,
+        season=season, contest_week=week,
+    ) == {"camp_points_this_week": 3, "camp_points_season": 3}
+
+
+def test_board_week_and_season_camp_points_share_authoritative_ledger(
+    database: tuple[Session, sessionmaker[Session]],
+) -> None:
+    session, _ = database
+    season, contests, prior_week = ensure_band_camp_data(session, now=NOW)
+    current_now = datetime(2026, 8, 5, 18, tzinfo=timezone.utc)
+    _, _, current_week = ensure_band_camp_data(session, now=current_now)
+    student = add_student(session, woodchuck_id="WC-17-PLUS-15", instrument="Flute")
+    unrelated = add_student(session, woodchuck_id="WC-NOT-IN-TOTAL", instrument="Oboe")
+    team = Team(
+        season_id=season.id,
+        display_name="Ledger Team",
+        normalized_name="ledger team",
+        emblem_key="letter:L",
+        creator_profile_id=student.id,
+    )
+    session.add(team)
+    session.flush()
+
+    award_specs = [
+        ("prior-activities", 12, datetime(2026, 7, 29, 18, tzinfo=timezone.utc), None),
+        (
+            f"contest:{prior_week.id}:weekly-points-leaders:open:camp-points",
+            3,
+            datetime(2026, 8, 3, 18, tzinfo=timezone.utc),
+            team.id,
+        ),
+        ("band-camp:2026-08-03:activities", 8, datetime(2026, 8, 3, 19, tzinfo=timezone.utc), team.id),
+        ("bonus-challenge:2026-08-03:first", 2, datetime(2026, 8, 3, 20, tzinfo=timezone.utc), None),
+        ("bonus-challenge:2026-08-04:second", 2, datetime(2026, 8, 4, 20, tzinfo=timezone.utc), team.id),
+        ("bonus-challenge:2026-08-05:third", 2, datetime(2026, 8, 5, 16, tzinfo=timezone.utc), None),
+        (
+            f"contest:{current_week.id}:weekly-points-leaders:open:camp-points",
+            3,
+            datetime(2026, 8, 5, 17, tzinfo=timezone.utc),
+            team.id,
+        ),
+    ]
+    for duplicate_key, points, occurred_at, team_id in award_specs:
+        session.add(CampPointAward(
+            profile_id=student.id,
+            activity_type=(
+                "contest-placement" if duplicate_key.startswith("contest:")
+                else "bonus-challenge" if duplicate_key.startswith("bonus-challenge:")
+                else "care"
+            ),
+            points_awarded=points,
+            occurred_at=occurred_at,
+            duplicate_key=duplicate_key,
+            team_id=team_id,
+        ))
+    session.add(CampPointAward(
+        profile_id=unrelated.id,
+        activity_type="care",
+        points_awarded=99,
+        occurred_at=datetime(2026, 8, 5, 17, tzinfo=timezone.utc),
+        duplicate_key="unrelated-current-week",
+        team_id=team.id,
+    ))
+    points_contest = next(
+        contest for contest in contests if contest.key == "weekly-points-leaders"
+    )
+    for division in ("open", "verified"):
+        session.add(ContestResult(
+            contest_week_id=current_week.id,
+            contest_id=points_contest.id,
+            division=division,
+            subject_type="student",
+            subject_key=str(student.id),
+            profile_id=student.id,
+            display_name_snapshot=student.display_name,
+            score=42,
+            rank=1,
+            medal="gold",
+        ))
+    prior_week.status = "finalized"
+    prior_week.finalized_at = datetime(2026, 8, 3, 18, tzinfo=timezone.utc)
+    session.commit()
+
+    before_rows = [tuple(row) for row in session.execute(select(
+        CampPointAward.id,
+        CampPointAward.points_awarded,
+        CampPointAward.occurred_at,
+        CampPointAward.duplicate_key,
+        CampPointAward.team_id,
+    ).order_by(CampPointAward.id)).all()]
+    totals = student_camp_point_totals(
+        session, profile_id=student.id, now=current_now,
+        season=season, contest_week=current_week,
+    )
+    assert totals == {"camp_points_this_week": 17, "camp_points_season": 32}
+    assert totals["camp_points_season"] >= totals["camp_points_this_week"]
+
+    payload = current_contests_payload(
+        session, now=current_now, current_profile_id=student.id
+    )
+    assert payload["camp_points_this_week"] == 17
+    assert payload["camp_points_season"] == 32
+    student_position = payload["standings"]["weekly-camp-points"][
+        "current_user_position"
+    ]["open"]
+    assert student_position["total_points"] == 17
+    assert session.scalar(select(func.count()).select_from(CampPointAward).where(
+        CampPointAward.profile_id == student.id,
+        CampPointAward.duplicate_key.like(
+            f"contest:{current_week.id}:%:camp-points"
+        ),
+    )) == 1
+    assert current_contests_payload(
+        session, now=current_now, current_profile_id=student.id
+    )["camp_points_season"] == 32
+
+    finalize_contest_week(
+        session, week_start=prior_week.week_start, now=current_now
+    )
+    session.commit()
+    assert student_camp_point_totals(
+        session, profile_id=student.id, now=current_now,
+        season=season, contest_week=current_week,
+    ) == totals
+    after_rows = [tuple(row) for row in session.execute(select(
+        CampPointAward.id,
+        CampPointAward.points_awarded,
+        CampPointAward.occurred_at,
+        CampPointAward.duplicate_key,
+        CampPointAward.team_id,
+    ).order_by(CampPointAward.id)).all()]
+    assert after_rows == before_rows
 
 
 def test_camp_point_award_endpoint_is_authenticated_idempotent_and_private(
@@ -715,6 +850,7 @@ def test_successful_finalization_medals_rewards_crown_and_idempotence(
             add_chart(
                 session, profile=profile, practice_date=date(2026, 7, 29),
                 minutes=5, verification_status="approved" if profile != beta else None,
+                created_at=NOW,
             )
     session.commit()
 
@@ -750,6 +886,177 @@ def test_successful_finalization_medals_rewards_crown_and_idempotence(
     )
     crown = session.scalar(select(CrownProgress).where(CrownProgress.profile_id == alpha.id))
     assert crown is not None and crown.qualifying_wins == 2
+
+
+def test_open_and_verified_wins_reuse_pending_crown_progress(
+    database: tuple[Session, sessionmaker[Session]],
+) -> None:
+    fixture_session, factory = database
+    fixture_session.close()
+    with factory(autoflush=False) as session:
+        week = ready_week(session)
+        student = add_student(
+            session, woodchuck_id="WC-DUAL-DIVISION", instrument="Flute"
+        )
+        session.add(WoodchuckState(
+            profile_id=student.id,
+            state_json={"progress": {"credits": 7}},
+            revision=0,
+        ))
+        chart = add_chart(
+            session,
+            profile=student,
+            practice_date=date(2026, 7, 29),
+            minutes=42,
+            verification_status="approved",
+        )
+        chart.created_at = NOW
+        session.commit()
+
+        finalize_contest_week(session, week_start=week.week_start, now=FINAL_NOW)
+        session.commit()
+
+        progress = session.scalars(select(CrownProgress).where(
+            CrownProgress.profile_id == student.id,
+            CrownProgress.category_key == "weekly-points-leaders",
+        )).all()
+        assert len(progress) == 1
+        assert progress[0].qualifying_wins == 2
+
+        first_counts = {
+            "results": session.scalar(select(func.count()).select_from(ContestResult)),
+            "grants": session.scalar(select(func.count()).select_from(RewardGrant)),
+            "camp_awards": session.scalar(
+                select(func.count()).select_from(CampPointAward)
+            ),
+            "crown_progress": session.scalar(
+                select(func.count()).select_from(CrownProgress)
+            ),
+        }
+        first_balance = session.get(WoodchuckState, student.id).state_json[
+            "progress"
+        ]["credits"]
+        assert first_balance > 7
+
+        finalize_contest_week(
+            session, week_start=week.week_start, now=FINAL_NOW + timedelta(hours=1)
+        )
+        session.commit()
+
+        assert first_counts == {
+            "results": session.scalar(select(func.count()).select_from(ContestResult)),
+            "grants": session.scalar(select(func.count()).select_from(RewardGrant)),
+            "camp_awards": session.scalar(
+                select(func.count()).select_from(CampPointAward)
+            ),
+            "crown_progress": session.scalar(
+                select(func.count()).select_from(CrownProgress)
+            ),
+        }
+        assert (
+            session.get(WoodchuckState, student.id).state_json["progress"]["credits"]
+            == first_balance
+        )
+
+
+@pytest.mark.parametrize("existing_balance", [None, 7], ids=["pending", "persisted"])
+def test_multiple_finalization_rewards_reuse_one_woodchuck_state(
+    database: tuple[Session, sessionmaker[Session]],
+    existing_balance: int | None,
+) -> None:
+    fixture_session, factory = database
+    fixture_session.close()
+    with factory(autoflush=False) as session:
+        week = ready_week(session)
+        student = add_student(
+            session, woodchuck_id="WC-MULTI-REWARD", instrument="Flute"
+        )
+        unrelated = add_student(
+            session, woodchuck_id="WC-UNRELATED-STATE", instrument="Oboe"
+        )
+        session.add(WoodchuckState(
+            profile_id=unrelated.id,
+            state_json={"progress": {"credits": 91}},
+            revision=3,
+        ))
+        if existing_balance is not None:
+            session.add(WoodchuckState(
+                profile_id=student.id,
+                state_json={"progress": {"credits": existing_balance}},
+                revision=2,
+            ))
+        add_chart(
+            session,
+            profile=student,
+            practice_date=date(2026, 7, 29),
+            minutes=42,
+            verification_status="approved",
+            created_at=NOW,
+        )
+        session.commit()
+
+        finalize_contest_week(session, week_start=week.week_start, now=FINAL_NOW)
+        session.commit()
+
+        matching_states = session.scalars(select(WoodchuckState).where(
+            WoodchuckState.profile_id == student.id
+        )).all()
+        assert len(matching_states) == 1
+        reward_total = session.scalar(select(func.sum(RewardGrant.amount)).where(
+            RewardGrant.profile_id == student.id,
+            RewardGrant.reward_type.in_(("dandelion", "participation_dandelion")),
+        ))
+        assert reward_total == 205
+        assert matching_states[0].state_json["progress"]["credits"] == (
+            (existing_balance or 0) + reward_total
+        )
+        assert session.get(WoodchuckState, unrelated.id).state_json == {
+            "progress": {"credits": 91}
+        }
+
+        first_counts = {
+            "results": session.scalar(select(func.count()).select_from(ContestResult)),
+            "grants": session.scalar(select(func.count()).select_from(RewardGrant)),
+            "camp_awards": session.scalar(
+                select(func.count()).select_from(CampPointAward)
+            ),
+            "crown_progress": session.scalar(
+                select(func.count()).select_from(CrownProgress)
+            ),
+            "states": session.scalar(select(func.count()).select_from(WoodchuckState)),
+        }
+        assert first_counts == {
+            "results": 4,
+            "grants": 7,
+            "camp_awards": 4,
+            "crown_progress": 1,
+            "states": 2,
+        }
+        first_balances = {
+            row.profile_id: row.state_json["progress"]["credits"]
+            for row in session.scalars(select(WoodchuckState)).all()
+        }
+
+        finalize_contest_week(
+            session, week_start=week.week_start, now=FINAL_NOW + timedelta(hours=1)
+        )
+        session.commit()
+
+        assert first_counts == {
+            "results": session.scalar(select(func.count()).select_from(ContestResult)),
+            "grants": session.scalar(select(func.count()).select_from(RewardGrant)),
+            "camp_awards": session.scalar(
+                select(func.count()).select_from(CampPointAward)
+            ),
+            "crown_progress": session.scalar(
+                select(func.count()).select_from(CrownProgress)
+            ),
+            "states": session.scalar(select(func.count()).select_from(WoodchuckState)),
+        }
+        assert first_balances == {
+            row.profile_id: row.state_json["progress"]["credits"]
+            for row in session.scalars(select(WoodchuckState)).all()
+        }
 
 
 def test_existing_finalized_student_scores_are_not_rewritten(
@@ -802,10 +1109,11 @@ def test_camp_points_finalize_once_with_medals_reward_and_crown(
         (bronze, ("hours",)),
     ):
         for activity in activities:
-            create_camp_point_award(
+            award, _created = create_camp_point_award(
                 session, profile=profile, activity_type=activity,
                 activity_date=date(2026, 7, 28), now=NOW,
             )
+            award.created_at = NOW
     session.commit()
 
     finalize_contest_week(session, week_start=week.week_start, now=FINAL_NOW)
@@ -856,7 +1164,7 @@ def test_olympic_ties_and_open_verified_gold_pay_once(
     for profile, count in zip(students, (2, 2, 1)):
         for _ in range(count):
             add_chart(session, profile=profile, practice_date=date(2026, 7, 30),
-                      minutes=5, verification_status="approved")
+                      minutes=5, verification_status="approved", created_at=NOW)
     session.commit()
     finalize_contest_week(session, week_start=week.week_start, now=FINAL_NOW)
     session.commit()
@@ -888,7 +1196,10 @@ def test_tenth_win_sets_crown_once_and_progress_never_resets(
         profile_id=student.id, category_key=contest.crown_category or contest.key,
         qualifying_wins=9,
     ))
-    add_chart(session, profile=student, practice_date=date(2026, 7, 31), minutes=5)
+    add_chart(
+        session, profile=student, practice_date=date(2026, 7, 31),
+        minutes=5, created_at=NOW,
+    )
     session.commit()
     finalize_contest_week(session, week_start=week.week_start, now=FINAL_NOW)
     session.commit()
@@ -911,11 +1222,11 @@ def test_instrument_participation_threshold_and_division_deduplication(
     short = add_student(session, woodchuck_id="WC-PART-14", instrument="Flute")
     rival = add_student(session, woodchuck_id="WC-PART-R", instrument="Oboe")
     add_chart(session, profile=eligible, practice_date=date(2026, 8, 1), minutes=15,
-              verification_status="approved")
+              verification_status="approved", created_at=NOW)
     add_chart(session, profile=short, practice_date=date(2026, 8, 1), minutes=14,
-              verification_status="approved")
+              verification_status="approved", created_at=NOW)
     add_chart(session, profile=rival, practice_date=date(2026, 8, 1), minutes=10,
-              verification_status="approved")
+              verification_status="approved", created_at=NOW)
     session.commit()
     finalize_contest_week(session, week_start=week.week_start, now=FINAL_NOW)
     session.commit()
@@ -937,7 +1248,10 @@ def test_failure_rolls_back_every_finalization_change(
     week = ready_week(session)
     student = add_student(session, woodchuck_id="WC-ROLLBACK", instrument="Flute")
     session.add(WoodchuckState(profile_id=student.id, state_json={"progress": {"credits": 7}}, revision=4))
-    add_chart(session, profile=student, practice_date=date(2026, 8, 2), minutes=20)
+    add_chart(
+        session, profile=student, practice_date=date(2026, 8, 2),
+        minutes=20, created_at=NOW,
+    )
     session.commit()
     before_state = deepcopy(session.get(WoodchuckState, student.id).state_json)
     session.commit()
@@ -965,7 +1279,7 @@ def test_results_are_immutable_private_and_preserve_historical_data(
     student = add_student(session, woodchuck_id="WC-SECRET-HIST", instrument="Flute")
     student.display_name = "Original Public Name"
     chart = add_chart(session, profile=student, practice_date=date(2026, 8, 2), minutes=20,
-                      verification_status="approved")
+                      verification_status="approved", created_at=NOW)
     session.commit()
     finalize_contest_week(session, week_start=week.week_start, now=FINAL_NOW)
     session.commit()

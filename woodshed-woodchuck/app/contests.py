@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hmac
 import os
+import re
 from copy import deepcopy
 from datetime import date, datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
@@ -561,6 +562,39 @@ def _week_utc_bounds(contest_week: ContestWeek) -> tuple[datetime, datetime]:
     )
 
 
+CONTEST_CAMP_POINT_SOURCE = re.compile(r"^contest:([^:]+):")
+
+
+def _camp_point_source_week(
+    award: CampPointAward,
+    *,
+    weeks_by_id: dict[int, ContestWeek],
+    weeks_by_start: dict[date, ContestWeek],
+) -> tuple[bool, ContestWeek | None]:
+    source = CONTEST_CAMP_POINT_SOURCE.match(award.duplicate_key)
+    if source is None:
+        return False, None
+    source_value = source.group(1)
+    if source_value.isdigit():
+        return True, weeks_by_id.get(int(source_value))
+    try:
+        return True, weeks_by_start.get(date.fromisoformat(source_value))
+    except ValueError:
+        return True, None
+
+
+def _camp_point_week_maps(
+    session: Session, *, season_id: int
+) -> tuple[dict[int, ContestWeek], dict[date, ContestWeek]]:
+    weeks = session.scalars(select(ContestWeek).where(
+        ContestWeek.season_id == season_id
+    )).all()
+    return (
+        {row.id: row for row in weeks},
+        {row.week_start: row for row in weeks},
+    )
+
+
 def weekly_camp_points(
     session: Session,
     *,
@@ -568,14 +602,20 @@ def weekly_camp_points(
     current_profile_id: int,
 ) -> dict[str, object]:
     start_at, end_at = _week_utc_bounds(contest_week)
-    awards = session.scalars(
-        select(CampPointAward).where(
-            CampPointAward.occurred_at >= start_at,
-            CampPointAward.occurred_at < end_at,
-        )
-    ).all()
+    awards = session.scalars(select(CampPointAward)).all()
+    weeks_by_id, weeks_by_start = _camp_point_week_maps(
+        session, season_id=contest_week.season_id
+    )
     scores: dict[int, int] = {}
     for award in awards:
+        has_contest_source, source_week = _camp_point_source_week(
+            award, weeks_by_id=weeks_by_id, weeks_by_start=weeks_by_start
+        )
+        if has_contest_source:
+            if source_week is None or source_week.id != contest_week.id:
+                continue
+        elif not start_at <= aware_utc(award.occurred_at) < end_at:
+            continue
         scores[award.profile_id] = scores.get(award.profile_id, 0) + award.points_awarded
     profiles = {
         profile.id: profile
@@ -601,25 +641,60 @@ def student_camp_point_totals(
     *,
     profile_id: int,
     now: datetime,
+    season: Season | None = None,
+    contest_week: ContestWeek | None = None,
 ) -> dict[str, int]:
-    """Return persisted current-week and career Camp Point totals."""
+    """Return current-week and active-season totals from the award ledger."""
     if now.tzinfo is None or now.utcoffset() is None:
         raise ValueError("The current time must be timezone-aware.")
     central_now = now.astimezone(CENTRAL)
-    monday = central_now.date() - timedelta(days=central_now.weekday())
-    week_start = datetime.combine(
-        monday, time.min, CENTRAL
-    ).astimezone(timezone.utc)
+    if season is None:
+        season = session.scalar(select(Season).where(
+            Season.status == "active",
+            Season.starts_on <= central_now.date(),
+            (Season.ends_on.is_(None) | (Season.ends_on >= central_now.date())),
+        ).order_by(Season.starts_on.desc()))
+    if season is not None and contest_week is None:
+        contest_week = session.scalar(select(ContestWeek).where(
+            ContestWeek.season_id == season.id,
+            ContestWeek.week_start <= central_now.date(),
+            ContestWeek.week_end > central_now.date(),
+        ))
+    if season is None or contest_week is None:
+        return {"camp_points_this_week": 0, "camp_points_season": 0}
+
     awards = session.scalars(select(CampPointAward).where(
         CampPointAward.profile_id == profile_id,
         CampPointAward.occurred_at <= now.astimezone(timezone.utc),
     )).all()
+    weeks_by_id, weeks_by_start = _camp_point_week_maps(
+        session, season_id=season.id
+    )
+    this_week = 0
+    season_total = 0
+    for award in awards:
+        has_contest_source, source_week = _camp_point_source_week(
+            award, weeks_by_id=weeks_by_id, weeks_by_start=weeks_by_start
+        )
+        if has_contest_source:
+            if source_week is None:
+                continue
+            season_total += award.points_awarded
+            if source_week.id == contest_week.id:
+                this_week += award.points_awarded
+            continue
+
+        award_date = aware_utc(award.occurred_at).astimezone(CENTRAL).date()
+        if award_date < season.starts_on:
+            continue
+        if season.ends_on is not None and award_date > season.ends_on:
+            continue
+        season_total += award.points_awarded
+        if contest_week.week_start <= award_date < contest_week.week_end:
+            this_week += award.points_awarded
     return {
-        "weekly_points": sum(
-            award.points_awarded for award in awards
-            if aware_utc(award.occurred_at) >= week_start
-        ),
-        "career_points": sum(award.points_awarded for award in awards),
+        "camp_points_this_week": this_week,
+        "camp_points_season": season_total,
     }
 
 
@@ -939,6 +1014,12 @@ def _ranked_student_scores(
 def _add_dandelion(session: Session, profile_id: int, amount: int = 1) -> None:
     state = session.get(WoodchuckState, profile_id)
     if state is None:
+        state = next((
+            row for row in session.new
+            if isinstance(row, WoodchuckState)
+            and row.profile_id == profile_id
+        ), None)
+    if state is None:
         state = WoodchuckState(profile_id=profile_id, state_json={}, revision=0)
         session.add(state)
     payload = deepcopy(state.state_json or {})
@@ -1231,9 +1312,14 @@ PLACEMENT_CAMP_POINTS = 3
 PARTICIPATION_DANDELIONS = 5
 
 
+def _set_finalization_stage(session: Session, stage: str) -> None:
+    session.info["contest_finalization_stage"] = stage
+
+
 def _increment_crown_progress(
     session: Session, *, profile_id: int, category: str, now: datetime
 ) -> None:
+    _set_finalization_stage(session, "crown_progress")
     progress = next((
         row for row in session.new
         if isinstance(row, CrownProgress)
@@ -1288,11 +1374,13 @@ def _reward_contest_result(
             f"contest:{result.contest_week_id}:{contest.key}:{result.division}:"
             f"{result.subject_type}:{result.subject_key}:rank:{result.rank}:profile:{profile_id}"
         )
+        _set_finalization_stage(session, "rewards")
         if _grant_once(
             session, profile_id=profile_id, result_id=result.id, source_key=source,
             reward_type="dandelion", amount=amount,
         ):
             _add_dandelion(session, profile_id, amount)
+        _set_finalization_stage(session, "camp_points")
         camp_key = f"{source}:camp-points"
         existing_camp = session.scalar(select(CampPointAward.id).where(
             CampPointAward.profile_id == profile_id,
@@ -1305,6 +1393,7 @@ def _reward_contest_result(
                 duplicate_key=camp_key, team_id=snapshot_team_ids.get(profile_id),
             ))
         if result.rank == 1:
+            _set_finalization_stage(session, "crown_progress")
             category = "team-crown" if result.subject_type == "team" else contest.crown_category
             if category and _grant_once(
                 session, profile_id=profile_id, result_id=result.id, source_key=source,
@@ -1413,6 +1502,7 @@ def finalize_contest_week(
             if chart.minutes >= 15:
                 instrument_contributors.setdefault((division, instrument_key), set()).add(chart.profile_id)
 
+    _set_finalization_stage(session, "contest_results")
     results: list[tuple[ContestResult, Contest, set[int]]] = []
     for division in ("open", "verified"):
         for profile_id, display, score, rank in _ranked_student_scores(student_scores[division], profiles):
@@ -1441,6 +1531,7 @@ def finalize_contest_week(
             )
             results.append((result, contests["weekly-practice-by-instrument"], instrument_contributors.get((division, key), set())))
 
+    _set_finalization_stage(session, "camp_points")
     start_at, end_at = _week_utc_bounds(week)
     camp_awards = session.scalars(select(CampPointAward).where(
         CampPointAward.occurred_at >= start_at,
@@ -1465,6 +1556,7 @@ def finalize_contest_week(
         )
         results.append((result, contests["weekly-camp-points"], {profile_id}))
 
+    _set_finalization_stage(session, "membership_snapshots")
     snapshots = _snapshot_memberships(session, week)
     snapshot_team_ids = {row.profile_id: row.team_id for row in snapshots}
     has_chart = set(session.scalars(select(PracticeChart.profile_id).where(
@@ -1494,14 +1586,17 @@ def finalize_contest_week(
                     active_member_count=int(row["active_member_count"]),
                 )
                 results.append((result, contest, team_members.get(int(row["team_id"]), set())))
+    _set_finalization_stage(session, "contest_results")
     session.flush()
 
+    _set_finalization_stage(session, "rewards")
     for result, contest, recipients in results:
         _reward_contest_result(
             session, result=result, contest=contest, recipients=recipients,
             snapshot_team_ids=snapshot_team_ids,
             now=aware_utc(week.finalized_at) if was_finalized and week.finalized_at else now_utc,
         )
+    _set_finalization_stage(session, "rewards")
     for profile_id in {chart.profile_id for chart in charts}:
         source = f"contest:{week.id}:weekly-participation:profile:{profile_id}"
         if _grant_once(
@@ -1509,6 +1604,7 @@ def finalize_contest_week(
             reward_type="participation_dandelion", amount=PARTICIPATION_DANDELIONS,
         ):
             _add_dandelion(session, profile_id, PARTICIPATION_DANDELIONS)
+    _set_finalization_stage(session, "final_week_status_flush_commit")
     if not was_finalized:
         week.status = "finalized"; week.finalized_at = now_utc
     session.flush()
@@ -1833,6 +1929,10 @@ def current_contests_payload(
     team_standings = team_leaderboards(
         session, season=season, contest_week=contest_week,
     )
+    camp_point_totals = student_camp_point_totals(
+        session, profile_id=current_profile_id, now=now,
+        season=season, contest_week=contest_week,
+    )
     return {
         "season": {
             "key": season.key,
@@ -1867,6 +1967,7 @@ def current_contests_payload(
             "weekly-camp-points": camp_points_standings,
             **team_standings,
         },
+        **camp_point_totals,
     }
 
 

@@ -789,12 +789,12 @@
         stateApi.saveState(next, { sync: false });
 
         const weeklyPoints = document.getElementById("board-player-weekly-points");
-        const careerPoints = document.getElementById("board-player-points");
-        if (weeklyPoints && Number.isInteger(payload.weekly_points)) {
-          weeklyPoints.textContent = String(payload.weekly_points);
+        const seasonPoints = document.getElementById("board-player-season-points");
+        if (weeklyPoints && Number.isInteger(payload.camp_points_this_week)) {
+          weeklyPoints.textContent = String(payload.camp_points_this_week);
         }
-        if (careerPoints && Number.isInteger(payload.career_points)) {
-          careerPoints.textContent = String(payload.career_points);
+        if (seasonPoints && Number.isInteger(payload.camp_points_season)) {
+          seasonPoints.textContent = String(payload.camp_points_season);
         }
         window.dispatchEvent(new CustomEvent("ww:camp-points-saved"));
 
@@ -1334,7 +1334,7 @@
     const playerNameEl = document.getElementById("board-player-name");
     if (!playerNameEl) return;
 
-    const playerPointsEl = document.getElementById("board-player-points");
+    const playerPointsEl = document.getElementById("board-player-season-points");
     const playerWeeklyPointsEl = document.getElementById(
       "board-player-weekly-points"
     );
@@ -1476,11 +1476,11 @@
         if (payload.award && payload.award.activity_type) {
           serverConfirmedAwards.add(payload.award.activity_type);
         }
-        if (playerWeeklyPointsEl && Number.isInteger(payload.weekly_points)) {
-          playerWeeklyPointsEl.textContent = String(payload.weekly_points);
+        if (playerWeeklyPointsEl && Number.isInteger(payload.camp_points_this_week)) {
+          playerWeeklyPointsEl.textContent = String(payload.camp_points_this_week);
         }
-        if (playerPointsEl && Number.isInteger(payload.career_points)) {
-          playerPointsEl.textContent = String(payload.career_points);
+        if (playerPointsEl && Number.isInteger(payload.camp_points_season)) {
+          playerPointsEl.textContent = String(payload.camp_points_season);
         }
         window.dispatchEvent(new CustomEvent("ww:camp-points-saved"));
         return payload;
@@ -1526,11 +1526,11 @@
       const next = prepareCurrentDay(stateApi.getState());
       const triviaAttempt = payload.trivia_attempt;
 
-      if (playerWeeklyPointsEl && Number.isInteger(payload.weekly_points)) {
-        playerWeeklyPointsEl.textContent = String(payload.weekly_points);
+      if (playerWeeklyPointsEl && Number.isInteger(payload.camp_points_this_week)) {
+        playerWeeklyPointsEl.textContent = String(payload.camp_points_this_week);
       }
-      if (playerPointsEl && Number.isInteger(payload.career_points)) {
-        playerPointsEl.textContent = String(payload.career_points);
+      if (playerPointsEl && Number.isInteger(payload.camp_points_season)) {
+        playerPointsEl.textContent = String(payload.camp_points_season);
       }
 
       awards.forEach((award) => {
@@ -1603,7 +1603,6 @@
 
     function renderBoard(current) {
       const name = playerName(current);
-      const points = current.bandCamp.totals.points;
       const daily = current.bandCamp.daily;
 
       renderActivityDisclosure(hoursActivity, hoursSummaryEl, "hours");
@@ -1612,10 +1611,6 @@
       renderActivityDisclosure(marchingActivity, marchingSummaryEl, "marching");
 
       playerNameEl.textContent = name;
-
-      if (playerPointsEl) {
-        playerPointsEl.textContent = String(points);
-      }
 
       if (hoursCheckbox) {
         const hoursComplete = serverConfirmedAwards.has("hours");
@@ -1809,11 +1804,11 @@
 
         if (isCorrect) {
           serverConfirmedAwards.add("trivia");
-          if (playerWeeklyPointsEl && Number.isInteger(checkedAnswer.weekly_points)) {
-            playerWeeklyPointsEl.textContent = String(checkedAnswer.weekly_points);
+          if (playerWeeklyPointsEl && Number.isInteger(checkedAnswer.camp_points_this_week)) {
+            playerWeeklyPointsEl.textContent = String(checkedAnswer.camp_points_this_week);
           }
-          if (playerPointsEl && Number.isInteger(checkedAnswer.career_points)) {
-            playerPointsEl.textContent = String(checkedAnswer.career_points);
+          if (playerPointsEl && Number.isInteger(checkedAnswer.camp_points_season)) {
+            playerPointsEl.textContent = String(checkedAnswer.camp_points_season);
           }
           if (checkedAnswer.award_created === true) {
             celebrateSuccess(triviaForm);
@@ -2201,6 +2196,8 @@
         const payload = await response.json();
         const week = payload && payload.current_week;
         const standings = payload && payload.standings;
+        const campPointsThisWeek = payload && payload.camp_points_this_week;
+        const campPointsSeason = payload && payload.camp_points_season;
         const practiceStandings = standings &&
           standings["weekly-practice-by-instrument"];
         const pointsStandings = standings &&
@@ -2221,10 +2218,21 @@
           !campPointsStandings ||
           !Array.isArray(campPointsStandings.open) ||
           !campPointsStandings.current_user_position ||
-          !campPointsStandings.current_user_position.open
+          !campPointsStandings.current_user_position.open ||
+          !Number.isInteger(campPointsThisWeek) ||
+          !Number.isInteger(campPointsSeason) ||
+          campPointsThisWeek < 0 ||
+          campPointsSeason < campPointsThisWeek
         ) {
           showError("Band Camp standings could not be read.");
           return;
+        }
+
+        const weeklyBanner = document.getElementById("board-player-weekly-points");
+        const seasonBanner = document.getElementById("board-player-season-points");
+        if (weeklyBanner && seasonBanner) {
+          weeklyBanner.textContent = String(campPointsThisWeek);
+          seasonBanner.textContent = String(campPointsSeason);
         }
 
         const startText = formatContestDate(week.week_start);

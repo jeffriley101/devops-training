@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -155,6 +155,7 @@ def test_full_completion_route_persists_reward_once_and_returns_authority(
     with TestClient(app) as client:
         profile_id = create_student(client)
         with quest_database() as session:
+            contests.ensure_band_camp_data(session, now=datetime.now(timezone.utc))
             assert session.scalar(select(func.count()).select_from(QuestCompletion)) == 0
             assert session.scalar(select(func.count()).select_from(RewardGrant)) == 0
             assert session.scalar(select(func.count()).select_from(CampPointAward)) == 0
@@ -167,8 +168,8 @@ def test_full_completion_route_persists_reward_once_and_returns_authority(
         assert payload["camp_point_created"] is True
         assert payload["completion"]["reward_amount"] == 5
         assert payload["credits"] == 12
-        assert payload["weekly_points"] == 2
-        assert payload["career_points"] == 2
+        assert payload["camp_points_this_week"] == 2
+        assert payload["camp_points_season"] == 2
 
         with quest_database() as session:
             assert session.scalar(select(func.count()).select_from(QuestCompletion)) == 1

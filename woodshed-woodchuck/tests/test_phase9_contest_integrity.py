@@ -62,6 +62,7 @@ def add_chart(session: Session, profile: WoodchuckProfile, team: Team) -> Practi
         profile_id=profile.id, practice_date=date(2026, 7, 29), minutes=42,
         instrument="Flute", practice_details=[], source="p-book", credits_awarded=0,
         include_contests=True, include_team_contests=True, team_id=team.id,
+        created_at=NOW,
     )
     session.add(row); session.flush()
     return row

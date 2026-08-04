@@ -39,12 +39,16 @@ def add_profile(session: Session, number: int) -> WoodchuckProfile:
     return row
 
 
-def add_chart(session: Session, profile: WoodchuckProfile, team_id: int, minutes: int, *, approved: bool = True, practice_date: date = date(2026, 7, 29)) -> PracticeChart:
+def add_chart(
+    session: Session, profile: WoodchuckProfile, team_id: int, minutes: int,
+    *, approved: bool = True, practice_date: date = date(2026, 7, 29),
+    created_at: datetime | None = None,
+) -> PracticeChart:
     chart = PracticeChart(
         profile_id=profile.id, practice_date=practice_date, minutes=minutes,
         instrument=profile.instrument, practice_details=[], source="p-book",
         credits_awarded=0, include_contests=True, include_team_contests=True,
-        team_id=team_id,
+        team_id=team_id, created_at=created_at,
     )
     session.add(chart); session.flush()
     if approved:
@@ -83,9 +87,16 @@ def test_finalization_snapshots_membership_and_rewards_every_team_board_once() -
     captain = add_profile(session, 1); noncontributor = add_profile(session, 2); session.commit()
     team, _ = create_and_join_team(session, profile=captain, season=season, name="Final Team", emblem_key="shield:gold", now=NOW)
     select_team(session, profile=noncontributor, season=season, team=team, now=NOW)
-    add_chart(session, noncontributor, team.id, 5, practice_date=date(2026, 7, 20))
-    add_chart(session, captain, team.id, 45)
-    create_camp_point_award(session, profile=captain, activity_type="care", activity_date=NOW.date(), now=NOW)
+    add_chart(
+        session, noncontributor, team.id, 5,
+        practice_date=date(2026, 7, 20), created_at=NOW,
+    )
+    add_chart(session, captain, team.id, 45, created_at=NOW)
+    award, _created = create_camp_point_award(
+        session, profile=captain, activity_type="care",
+        activity_date=NOW.date(), now=NOW,
+    )
+    award.created_at = NOW
     session.commit()
 
     finalize_contest_week(session, week_start=week.week_start, now=FINAL_NOW); session.commit()
@@ -133,7 +144,10 @@ def test_revised_olympic_rewards_and_weekly_participation() -> None:
             session, profile=student, season=season, name=f"Solo {index}",
             emblem_key=f"letter:{chr(65 + index)}", now=NOW,
         )
-        add_chart(session, student, team.id, [60, 60, 40, 20][index], approved=False)
+        add_chart(
+            session, student, team.id, [60, 60, 40, 20][index],
+            approved=False, created_at=NOW,
+        )
     session.commit(); finalize_contest_week(session, week_start=week.week_start, now=FINAL_NOW); session.commit()
     open_results = session.scalars(select(ContestResult).join(Contest).where(
         Contest.key == "weekly-points-leaders", ContestResult.division == "open",
@@ -168,8 +182,8 @@ def test_repair_preserves_team_and_individual_history_without_duplicates() -> No
         emblem_key="letter:R", now=NOW,
     )
     select_team(session, profile=member, season=season, team=team, now=NOW)
-    add_chart(session, captain, team.id, 45)
-    add_chart(session, member, team.id, 20)
+    add_chart(session, captain, team.id, 45, created_at=NOW)
+    add_chart(session, member, team.id, 20, created_at=NOW)
     week.status = "finalized"
     week.finalized_at = FINAL_NOW
     session.commit()
