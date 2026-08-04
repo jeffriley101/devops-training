@@ -325,15 +325,22 @@ def test_board_weekly_points_and_hours_checkbox_contract() -> None:
     markup = (root / "templates" / "quest.html").read_text(encoding="utf-8")
     javascript = (root / "static" / "js" / "app.js").read_text(encoding="utf-8")
     css = (root / "static" / "css" / "styles.css").read_text(encoding="utf-8")
-    weekly = markup.index("This Week’s Camp Points:")
-    career = markup.index("Career Band Camp Points:")
+    weekly = markup.index("This Week’s Camp Points")
+    season = markup.index("Season Camp Points")
     hours_panel = markup[
         markup.index('id="camp-hours-activity"'):
         markup.index('id="instrument-care-activity"')
     ]
 
-    assert weekly < career
+    assert weekly < season
     assert 'id="board-player-weekly-points">0</strong>' in markup
+    assert 'id="board-player-season-points">0</strong>' in markup
+    assert "Career Band Camp Points" not in markup
+    assert 'document.getElementById("board-player-points")' not in javascript
+    assert "current.bandCamp.totals.points" not in javascript[
+        javascript.index("function renderBoard(current)"):
+        javascript.index("let current = prepareCurrentDay")
+    ]
     assert "Were you at band camp or mini-camp today?" in hours_panel
     assert 'id="camp-hours-checkbox" type="checkbox"' in hours_panel
     assert 'for="camp-hours-checkbox"' in hours_panel

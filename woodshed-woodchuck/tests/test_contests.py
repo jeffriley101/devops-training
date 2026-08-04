@@ -43,6 +43,7 @@ from app.models import (
     PracticeChartVerification,
     RewardGrant,
     Season,
+    Team,
     WoodchuckProfile,
     WoodchuckState,
 )
@@ -249,8 +250,9 @@ def test_student_camp_point_totals_use_persisted_central_week_and_exclude_future
     database: tuple[Session, sessionmaker[Session]],
 ) -> None:
     session, _ = database
+    season, _, week = ensure_band_camp_data(session, now=NOW)
     student = add_student(session, woodchuck_id="WC-CAMP-TOTALS", instrument="Flute")
-    # NOW is Tuesday in America/Chicago. Only Monday and Tuesday-to-now count weekly.
+    # NOW is Tuesday in America/Chicago. Preseason and future awards do not count.
     for key, occurred_at, points in (
         ("prior", datetime(2026, 7, 26, 20, tzinfo=timezone.utc), 5),
         ("monday", datetime(2026, 7, 27, 6, tzinfo=timezone.utc), 1),
@@ -264,8 +266,139 @@ def test_student_camp_point_totals_use_persisted_central_week_and_exclude_future
     session.commit()
 
     assert student_camp_point_totals(
-        session, profile_id=student.id, now=NOW
-    ) == {"weekly_points": 3, "career_points": 8}
+        session, profile_id=student.id, now=NOW,
+        season=season, contest_week=week,
+    ) == {"camp_points_this_week": 3, "camp_points_season": 3}
+
+
+def test_board_week_and_season_camp_points_share_authoritative_ledger(
+    database: tuple[Session, sessionmaker[Session]],
+) -> None:
+    session, _ = database
+    season, contests, prior_week = ensure_band_camp_data(session, now=NOW)
+    current_now = datetime(2026, 8, 5, 18, tzinfo=timezone.utc)
+    _, _, current_week = ensure_band_camp_data(session, now=current_now)
+    student = add_student(session, woodchuck_id="WC-17-PLUS-15", instrument="Flute")
+    unrelated = add_student(session, woodchuck_id="WC-NOT-IN-TOTAL", instrument="Oboe")
+    team = Team(
+        season_id=season.id,
+        display_name="Ledger Team",
+        normalized_name="ledger team",
+        emblem_key="letter:L",
+        creator_profile_id=student.id,
+    )
+    session.add(team)
+    session.flush()
+
+    award_specs = [
+        ("prior-activities", 12, datetime(2026, 7, 29, 18, tzinfo=timezone.utc), None),
+        (
+            f"contest:{prior_week.id}:weekly-points-leaders:open:camp-points",
+            3,
+            datetime(2026, 8, 3, 18, tzinfo=timezone.utc),
+            team.id,
+        ),
+        ("band-camp:2026-08-03:activities", 8, datetime(2026, 8, 3, 19, tzinfo=timezone.utc), team.id),
+        ("bonus-challenge:2026-08-03:first", 2, datetime(2026, 8, 3, 20, tzinfo=timezone.utc), None),
+        ("bonus-challenge:2026-08-04:second", 2, datetime(2026, 8, 4, 20, tzinfo=timezone.utc), team.id),
+        ("bonus-challenge:2026-08-05:third", 2, datetime(2026, 8, 5, 16, tzinfo=timezone.utc), None),
+        (
+            f"contest:{current_week.id}:weekly-points-leaders:open:camp-points",
+            3,
+            datetime(2026, 8, 5, 17, tzinfo=timezone.utc),
+            team.id,
+        ),
+    ]
+    for duplicate_key, points, occurred_at, team_id in award_specs:
+        session.add(CampPointAward(
+            profile_id=student.id,
+            activity_type=(
+                "contest-placement" if duplicate_key.startswith("contest:")
+                else "bonus-challenge" if duplicate_key.startswith("bonus-challenge:")
+                else "care"
+            ),
+            points_awarded=points,
+            occurred_at=occurred_at,
+            duplicate_key=duplicate_key,
+            team_id=team_id,
+        ))
+    session.add(CampPointAward(
+        profile_id=unrelated.id,
+        activity_type="care",
+        points_awarded=99,
+        occurred_at=datetime(2026, 8, 5, 17, tzinfo=timezone.utc),
+        duplicate_key="unrelated-current-week",
+        team_id=team.id,
+    ))
+    points_contest = next(
+        contest for contest in contests if contest.key == "weekly-points-leaders"
+    )
+    for division in ("open", "verified"):
+        session.add(ContestResult(
+            contest_week_id=current_week.id,
+            contest_id=points_contest.id,
+            division=division,
+            subject_type="student",
+            subject_key=str(student.id),
+            profile_id=student.id,
+            display_name_snapshot=student.display_name,
+            score=42,
+            rank=1,
+            medal="gold",
+        ))
+    prior_week.status = "finalized"
+    prior_week.finalized_at = datetime(2026, 8, 3, 18, tzinfo=timezone.utc)
+    session.commit()
+
+    before_rows = [tuple(row) for row in session.execute(select(
+        CampPointAward.id,
+        CampPointAward.points_awarded,
+        CampPointAward.occurred_at,
+        CampPointAward.duplicate_key,
+        CampPointAward.team_id,
+    ).order_by(CampPointAward.id)).all()]
+    totals = student_camp_point_totals(
+        session, profile_id=student.id, now=current_now,
+        season=season, contest_week=current_week,
+    )
+    assert totals == {"camp_points_this_week": 17, "camp_points_season": 32}
+    assert totals["camp_points_season"] >= totals["camp_points_this_week"]
+
+    payload = current_contests_payload(
+        session, now=current_now, current_profile_id=student.id
+    )
+    assert payload["camp_points_this_week"] == 17
+    assert payload["camp_points_season"] == 32
+    student_position = payload["standings"]["weekly-camp-points"][
+        "current_user_position"
+    ]["open"]
+    assert student_position["total_points"] == 17
+    assert session.scalar(select(func.count()).select_from(CampPointAward).where(
+        CampPointAward.profile_id == student.id,
+        CampPointAward.duplicate_key.like(
+            f"contest:{current_week.id}:%:camp-points"
+        ),
+    )) == 1
+    assert current_contests_payload(
+        session, now=current_now, current_profile_id=student.id
+    )["camp_points_season"] == 32
+
+    finalize_contest_week(
+        session, week_start=prior_week.week_start, now=current_now
+    )
+    session.commit()
+    assert student_camp_point_totals(
+        session, profile_id=student.id, now=current_now,
+        season=season, contest_week=current_week,
+    ) == totals
+    after_rows = [tuple(row) for row in session.execute(select(
+        CampPointAward.id,
+        CampPointAward.points_awarded,
+        CampPointAward.occurred_at,
+        CampPointAward.duplicate_key,
+        CampPointAward.team_id,
+    ).order_by(CampPointAward.id)).all()]
+    assert after_rows == before_rows
 
 
 def test_camp_point_award_endpoint_is_authenticated_idempotent_and_private(

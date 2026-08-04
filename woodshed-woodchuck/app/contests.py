@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hmac
 import os
+import re
 from copy import deepcopy
 from datetime import date, datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
@@ -540,6 +541,39 @@ def _week_utc_bounds(contest_week: ContestWeek) -> tuple[datetime, datetime]:
     )
 
 
+CONTEST_CAMP_POINT_SOURCE = re.compile(r"^contest:([^:]+):")
+
+
+def _camp_point_source_week(
+    award: CampPointAward,
+    *,
+    weeks_by_id: dict[int, ContestWeek],
+    weeks_by_start: dict[date, ContestWeek],
+) -> tuple[bool, ContestWeek | None]:
+    source = CONTEST_CAMP_POINT_SOURCE.match(award.duplicate_key)
+    if source is None:
+        return False, None
+    source_value = source.group(1)
+    if source_value.isdigit():
+        return True, weeks_by_id.get(int(source_value))
+    try:
+        return True, weeks_by_start.get(date.fromisoformat(source_value))
+    except ValueError:
+        return True, None
+
+
+def _camp_point_week_maps(
+    session: Session, *, season_id: int
+) -> tuple[dict[int, ContestWeek], dict[date, ContestWeek]]:
+    weeks = session.scalars(select(ContestWeek).where(
+        ContestWeek.season_id == season_id
+    )).all()
+    return (
+        {row.id: row for row in weeks},
+        {row.week_start: row for row in weeks},
+    )
+
+
 def weekly_camp_points(
     session: Session,
     *,
@@ -547,14 +581,20 @@ def weekly_camp_points(
     current_profile_id: int,
 ) -> dict[str, object]:
     start_at, end_at = _week_utc_bounds(contest_week)
-    awards = session.scalars(
-        select(CampPointAward).where(
-            CampPointAward.occurred_at >= start_at,
-            CampPointAward.occurred_at < end_at,
-        )
-    ).all()
+    awards = session.scalars(select(CampPointAward)).all()
+    weeks_by_id, weeks_by_start = _camp_point_week_maps(
+        session, season_id=contest_week.season_id
+    )
     scores: dict[int, int] = {}
     for award in awards:
+        has_contest_source, source_week = _camp_point_source_week(
+            award, weeks_by_id=weeks_by_id, weeks_by_start=weeks_by_start
+        )
+        if has_contest_source:
+            if source_week is None or source_week.id != contest_week.id:
+                continue
+        elif not start_at <= aware_utc(award.occurred_at) < end_at:
+            continue
         scores[award.profile_id] = scores.get(award.profile_id, 0) + award.points_awarded
     profiles = {
         profile.id: profile
@@ -576,25 +616,60 @@ def student_camp_point_totals(
     *,
     profile_id: int,
     now: datetime,
+    season: Season | None = None,
+    contest_week: ContestWeek | None = None,
 ) -> dict[str, int]:
-    """Return persisted current-week and career Camp Point totals."""
+    """Return current-week and active-season totals from the award ledger."""
     if now.tzinfo is None or now.utcoffset() is None:
         raise ValueError("The current time must be timezone-aware.")
     central_now = now.astimezone(CENTRAL)
-    monday = central_now.date() - timedelta(days=central_now.weekday())
-    week_start = datetime.combine(
-        monday, time.min, CENTRAL
-    ).astimezone(timezone.utc)
+    if season is None:
+        season = session.scalar(select(Season).where(
+            Season.status == "active",
+            Season.starts_on <= central_now.date(),
+            (Season.ends_on.is_(None) | (Season.ends_on >= central_now.date())),
+        ).order_by(Season.starts_on.desc()))
+    if season is not None and contest_week is None:
+        contest_week = session.scalar(select(ContestWeek).where(
+            ContestWeek.season_id == season.id,
+            ContestWeek.week_start <= central_now.date(),
+            ContestWeek.week_end > central_now.date(),
+        ))
+    if season is None or contest_week is None:
+        return {"camp_points_this_week": 0, "camp_points_season": 0}
+
     awards = session.scalars(select(CampPointAward).where(
         CampPointAward.profile_id == profile_id,
         CampPointAward.occurred_at <= now.astimezone(timezone.utc),
     )).all()
+    weeks_by_id, weeks_by_start = _camp_point_week_maps(
+        session, season_id=season.id
+    )
+    this_week = 0
+    season_total = 0
+    for award in awards:
+        has_contest_source, source_week = _camp_point_source_week(
+            award, weeks_by_id=weeks_by_id, weeks_by_start=weeks_by_start
+        )
+        if has_contest_source:
+            if source_week is None:
+                continue
+            season_total += award.points_awarded
+            if source_week.id == contest_week.id:
+                this_week += award.points_awarded
+            continue
+
+        award_date = aware_utc(award.occurred_at).astimezone(CENTRAL).date()
+        if award_date < season.starts_on:
+            continue
+        if season.ends_on is not None and award_date > season.ends_on:
+            continue
+        season_total += award.points_awarded
+        if contest_week.week_start <= award_date < contest_week.week_end:
+            this_week += award.points_awarded
     return {
-        "weekly_points": sum(
-            award.points_awarded for award in awards
-            if aware_utc(award.occurred_at) >= week_start
-        ),
-        "career_points": sum(award.points_awarded for award in awards),
+        "camp_points_this_week": this_week,
+        "camp_points_season": season_total,
     }
 
 
@@ -1806,6 +1881,10 @@ def current_contests_payload(
     team_standings = team_leaderboards(
         session, season=season, contest_week=contest_week,
     )
+    camp_point_totals = student_camp_point_totals(
+        session, profile_id=current_profile_id, now=now,
+        season=season, contest_week=contest_week,
+    )
     return {
         "season": {
             "key": season.key,
@@ -1840,6 +1919,7 @@ def current_contests_payload(
             "weekly-camp-points": camp_points_standings,
             **team_standings,
         },
+        **camp_point_totals,
     }
 
 
