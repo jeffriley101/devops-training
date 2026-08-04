@@ -752,6 +752,77 @@ def test_successful_finalization_medals_rewards_crown_and_idempotence(
     assert crown is not None and crown.qualifying_wins == 2
 
 
+def test_open_and_verified_wins_reuse_pending_crown_progress(
+    database: tuple[Session, sessionmaker[Session]],
+) -> None:
+    fixture_session, factory = database
+    fixture_session.close()
+    with factory(autoflush=False) as session:
+        week = ready_week(session)
+        student = add_student(
+            session, woodchuck_id="WC-DUAL-DIVISION", instrument="Flute"
+        )
+        session.add(WoodchuckState(
+            profile_id=student.id,
+            state_json={"progress": {"credits": 7}},
+            revision=0,
+        ))
+        chart = add_chart(
+            session,
+            profile=student,
+            practice_date=date(2026, 7, 29),
+            minutes=42,
+            verification_status="approved",
+        )
+        chart.created_at = NOW
+        session.commit()
+
+        finalize_contest_week(session, week_start=week.week_start, now=FINAL_NOW)
+        session.commit()
+
+        progress = session.scalars(select(CrownProgress).where(
+            CrownProgress.profile_id == student.id,
+            CrownProgress.category_key == "weekly-points-leaders",
+        )).all()
+        assert len(progress) == 1
+        assert progress[0].qualifying_wins == 2
+
+        first_counts = {
+            "results": session.scalar(select(func.count()).select_from(ContestResult)),
+            "grants": session.scalar(select(func.count()).select_from(RewardGrant)),
+            "camp_awards": session.scalar(
+                select(func.count()).select_from(CampPointAward)
+            ),
+            "crown_progress": session.scalar(
+                select(func.count()).select_from(CrownProgress)
+            ),
+        }
+        first_balance = session.get(WoodchuckState, student.id).state_json[
+            "progress"
+        ]["credits"]
+        assert first_balance > 7
+
+        finalize_contest_week(
+            session, week_start=week.week_start, now=FINAL_NOW + timedelta(hours=1)
+        )
+        session.commit()
+
+        assert first_counts == {
+            "results": session.scalar(select(func.count()).select_from(ContestResult)),
+            "grants": session.scalar(select(func.count()).select_from(RewardGrant)),
+            "camp_awards": session.scalar(
+                select(func.count()).select_from(CampPointAward)
+            ),
+            "crown_progress": session.scalar(
+                select(func.count()).select_from(CrownProgress)
+            ),
+        }
+        assert (
+            session.get(WoodchuckState, student.id).state_json["progress"]["credits"]
+            == first_balance
+        )
+
+
 def test_existing_finalized_student_scores_are_not_rewritten(
     database: tuple[Session, sessionmaker[Session]],
 ) -> None:
