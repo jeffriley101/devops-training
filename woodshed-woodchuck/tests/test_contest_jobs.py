@@ -118,6 +118,8 @@ def add_week_activity(
     session: Session,
     profile: WoodchuckProfile,
     week: ContestWeek,
+    *,
+    created_at: datetime | None = None,
 ) -> None:
     chart = PracticeChart(
         profile_id=profile.id,
@@ -127,6 +129,7 @@ def add_week_activity(
         practice_details=[],
         source="p-book",
         credits_awarded=0,
+        created_at=created_at,
     )
     session.add(chart)
     session.flush()
@@ -144,6 +147,7 @@ def add_week_activity(
             week.week_start, datetime.min.time(), timezone.utc
         ) + timedelta(hours=18),
         duplicate_key=f"job:{week.week_start}:care",
+        created_at=created_at,
     ))
     session.commit()
 
@@ -250,7 +254,10 @@ def test_all_three_contests_finalize_and_camp_points_are_open_only(
     week.verification_deadline_at = NOW - timedelta(hours=1)
     week.finalize_after = NOW - timedelta(minutes=30)
     student = add_student(session, "ALL")
-    add_week_activity(session, student, week)
+    add_week_activity(
+        session, student, week,
+        created_at=datetime(2026, 7, 28, 15, tzinfo=timezone.utc),
+    )
 
     code, summary = run_finalize_due_weeks(
         now=NOW, session_factory=factory, stream=io.StringIO()
@@ -379,7 +386,10 @@ def test_recently_closed_week_audit_respects_deadline_then_finalizes(
         session, now=datetime(2026, 7, 28, tzinfo=timezone.utc)
     )
     student = add_student(session, "RECENT")
-    add_week_activity(session, student, week)
+    add_week_activity(
+        session, student, week,
+        created_at=datetime(2026, 7, 28, 15, tzinfo=timezone.utc),
+    )
     source_ids = set(session.scalars(select(PracticeChart.id)).all())
 
     early = audit_or_repair_history(

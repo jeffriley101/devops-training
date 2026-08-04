@@ -94,6 +94,7 @@ def add_chart(
     instrument: str | None = None,
     verification_status: str | None = None,
     include_contests: bool = True,
+    created_at: datetime | None = None,
 ) -> PracticeChart:
     chart = PracticeChart(
         profile_id=profile.id,
@@ -104,6 +105,7 @@ def add_chart(
         source="p-book",
         credits_awarded=0,
         include_contests=include_contests,
+        created_at=created_at,
     )
     session.add(chart)
     session.flush()
@@ -715,6 +717,7 @@ def test_successful_finalization_medals_rewards_crown_and_idempotence(
             add_chart(
                 session, profile=profile, practice_date=date(2026, 7, 29),
                 minutes=5, verification_status="approved" if profile != beta else None,
+                created_at=NOW,
             )
     session.commit()
 
@@ -873,10 +876,11 @@ def test_camp_points_finalize_once_with_medals_reward_and_crown(
         (bronze, ("hours",)),
     ):
         for activity in activities:
-            create_camp_point_award(
+            award, _created = create_camp_point_award(
                 session, profile=profile, activity_type=activity,
                 activity_date=date(2026, 7, 28), now=NOW,
             )
+            award.created_at = NOW
     session.commit()
 
     finalize_contest_week(session, week_start=week.week_start, now=FINAL_NOW)
@@ -927,7 +931,7 @@ def test_olympic_ties_and_open_verified_gold_pay_once(
     for profile, count in zip(students, (2, 2, 1)):
         for _ in range(count):
             add_chart(session, profile=profile, practice_date=date(2026, 7, 30),
-                      minutes=5, verification_status="approved")
+                      minutes=5, verification_status="approved", created_at=NOW)
     session.commit()
     finalize_contest_week(session, week_start=week.week_start, now=FINAL_NOW)
     session.commit()
@@ -959,7 +963,10 @@ def test_tenth_win_sets_crown_once_and_progress_never_resets(
         profile_id=student.id, category_key=contest.crown_category or contest.key,
         qualifying_wins=9,
     ))
-    add_chart(session, profile=student, practice_date=date(2026, 7, 31), minutes=5)
+    add_chart(
+        session, profile=student, practice_date=date(2026, 7, 31),
+        minutes=5, created_at=NOW,
+    )
     session.commit()
     finalize_contest_week(session, week_start=week.week_start, now=FINAL_NOW)
     session.commit()
@@ -982,11 +989,11 @@ def test_instrument_participation_threshold_and_division_deduplication(
     short = add_student(session, woodchuck_id="WC-PART-14", instrument="Flute")
     rival = add_student(session, woodchuck_id="WC-PART-R", instrument="Oboe")
     add_chart(session, profile=eligible, practice_date=date(2026, 8, 1), minutes=15,
-              verification_status="approved")
+              verification_status="approved", created_at=NOW)
     add_chart(session, profile=short, practice_date=date(2026, 8, 1), minutes=14,
-              verification_status="approved")
+              verification_status="approved", created_at=NOW)
     add_chart(session, profile=rival, practice_date=date(2026, 8, 1), minutes=10,
-              verification_status="approved")
+              verification_status="approved", created_at=NOW)
     session.commit()
     finalize_contest_week(session, week_start=week.week_start, now=FINAL_NOW)
     session.commit()
@@ -1008,7 +1015,10 @@ def test_failure_rolls_back_every_finalization_change(
     week = ready_week(session)
     student = add_student(session, woodchuck_id="WC-ROLLBACK", instrument="Flute")
     session.add(WoodchuckState(profile_id=student.id, state_json={"progress": {"credits": 7}}, revision=4))
-    add_chart(session, profile=student, practice_date=date(2026, 8, 2), minutes=20)
+    add_chart(
+        session, profile=student, practice_date=date(2026, 8, 2),
+        minutes=20, created_at=NOW,
+    )
     session.commit()
     before_state = deepcopy(session.get(WoodchuckState, student.id).state_json)
     session.commit()
@@ -1036,7 +1046,7 @@ def test_results_are_immutable_private_and_preserve_historical_data(
     student = add_student(session, woodchuck_id="WC-SECRET-HIST", instrument="Flute")
     student.display_name = "Original Public Name"
     chart = add_chart(session, profile=student, practice_date=date(2026, 8, 2), minutes=20,
-                      verification_status="approved")
+                      verification_status="approved", created_at=NOW)
     session.commit()
     finalize_contest_week(session, week_start=week.week_start, now=FINAL_NOW)
     session.commit()
