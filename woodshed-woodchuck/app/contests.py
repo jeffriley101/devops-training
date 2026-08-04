@@ -1198,9 +1198,14 @@ PLACEMENT_CAMP_POINTS = 3
 PARTICIPATION_DANDELIONS = 5
 
 
+def _set_finalization_stage(session: Session, stage: str) -> None:
+    session.info["contest_finalization_stage"] = stage
+
+
 def _increment_crown_progress(
     session: Session, *, profile_id: int, category: str, now: datetime
 ) -> None:
+    _set_finalization_stage(session, "crown_progress")
     progress = next((
         row for row in session.new
         if isinstance(row, CrownProgress)
@@ -1255,11 +1260,13 @@ def _reward_contest_result(
             f"contest:{result.contest_week_id}:{contest.key}:{result.division}:"
             f"{result.subject_type}:{result.subject_key}:rank:{result.rank}:profile:{profile_id}"
         )
+        _set_finalization_stage(session, "rewards")
         if _grant_once(
             session, profile_id=profile_id, result_id=result.id, source_key=source,
             reward_type="dandelion", amount=amount,
         ):
             _add_dandelion(session, profile_id, amount)
+        _set_finalization_stage(session, "camp_points")
         camp_key = f"{source}:camp-points"
         existing_camp = session.scalar(select(CampPointAward.id).where(
             CampPointAward.profile_id == profile_id,
@@ -1272,6 +1279,7 @@ def _reward_contest_result(
                 duplicate_key=camp_key, team_id=snapshot_team_ids.get(profile_id),
             ))
         if result.rank == 1:
+            _set_finalization_stage(session, "crown_progress")
             category = "team-crown" if result.subject_type == "team" else contest.crown_category
             if category and _grant_once(
                 session, profile_id=profile_id, result_id=result.id, source_key=source,
@@ -1380,6 +1388,7 @@ def finalize_contest_week(
             if chart.minutes >= 15:
                 instrument_contributors.setdefault((division, instrument_key), set()).add(chart.profile_id)
 
+    _set_finalization_stage(session, "contest_results")
     results: list[tuple[ContestResult, Contest, set[int]]] = []
     for division in ("open", "verified"):
         for profile_id, display, score, rank in _ranked_student_scores(student_scores[division], profiles):
@@ -1408,6 +1417,7 @@ def finalize_contest_week(
             )
             results.append((result, contests["weekly-practice-by-instrument"], instrument_contributors.get((division, key), set())))
 
+    _set_finalization_stage(session, "camp_points")
     start_at, end_at = _week_utc_bounds(week)
     camp_awards = session.scalars(select(CampPointAward).where(
         CampPointAward.occurred_at >= start_at,
@@ -1432,6 +1442,7 @@ def finalize_contest_week(
         )
         results.append((result, contests["weekly-camp-points"], {profile_id}))
 
+    _set_finalization_stage(session, "membership_snapshots")
     snapshots = _snapshot_memberships(session, week)
     snapshot_team_ids = {row.profile_id: row.team_id for row in snapshots}
     has_chart = set(session.scalars(select(PracticeChart.profile_id).where(
@@ -1461,14 +1472,17 @@ def finalize_contest_week(
                     active_member_count=int(row["active_member_count"]),
                 )
                 results.append((result, contest, team_members.get(int(row["team_id"]), set())))
+    _set_finalization_stage(session, "contest_results")
     session.flush()
 
+    _set_finalization_stage(session, "rewards")
     for result, contest, recipients in results:
         _reward_contest_result(
             session, result=result, contest=contest, recipients=recipients,
             snapshot_team_ids=snapshot_team_ids,
             now=aware_utc(week.finalized_at) if was_finalized and week.finalized_at else now_utc,
         )
+    _set_finalization_stage(session, "rewards")
     for profile_id in {chart.profile_id for chart in charts}:
         source = f"contest:{week.id}:weekly-participation:profile:{profile_id}"
         if _grant_once(
@@ -1476,6 +1490,7 @@ def finalize_contest_week(
             reward_type="participation_dandelion", amount=PARTICIPATION_DANDELIONS,
         ):
             _add_dandelion(session, profile_id, PARTICIPATION_DANDELIONS)
+    _set_finalization_stage(session, "final_week_status_flush_commit")
     if not was_finalized:
         week.status = "finalized"; week.finalized_at = now_utc
     session.flush()

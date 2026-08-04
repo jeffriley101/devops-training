@@ -10,6 +10,7 @@ from typing import Callable, Sequence, TextIO
 
 from fastapi import HTTPException
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
 from .contests import (
@@ -182,6 +183,45 @@ def _safe_error_message(error: Exception) -> str:
     return message[:300]
 
 
+SAFE_DIAGNOSTIC_VALUE = re.compile(r"^[A-Za-z0-9_.-]{1,128}$")
+FINALIZATION_STAGES = {
+    "membership_snapshots",
+    "contest_results",
+    "rewards",
+    "camp_points",
+    "crown_progress",
+    "final_week_status_flush_commit",
+}
+
+
+def _safe_diagnostic_value(value: object) -> str | None:
+    if not isinstance(value, str) or not SAFE_DIAGNOSTIC_VALUE.fullmatch(value):
+        return None
+    return value
+
+
+def _integrity_error_fields(error: IntegrityError) -> dict[str, str]:
+    original = error.orig
+    diagnostic = getattr(original, "diag", None)
+    fields: dict[str, str] = {}
+    sqlstate = _safe_diagnostic_value(
+        getattr(original, "sqlstate", None)
+        or getattr(original, "pgcode", None)
+        or getattr(diagnostic, "sqlstate", None)
+    )
+    if sqlstate is not None:
+        fields["sqlstate"] = sqlstate
+    for field, attribute in (
+        ("constraint", "constraint_name"),
+        ("table", "table_name"),
+        ("column", "column_name"),
+    ):
+        value = _safe_diagnostic_value(getattr(diagnostic, attribute, None))
+        if value is not None:
+            fields[field] = value
+    return fields
+
+
 def candidate_reason(candidate: WeekCandidate, now: datetime) -> str | None:
     if candidate.status == "finalized":
         return "already_finalized"
@@ -255,11 +295,12 @@ def run_finalize_due_weeks(
     for candidate in due:
         week_text = candidate.week_start.isoformat()
         _log(stream, "week_finalizing", week_start=week_text)
+        transaction_session: Session | None = None
         try:
-            with session_factory() as session:
-                with session.begin():
+            with session_factory() as transaction_session:
+                with transaction_session.begin():
                     finalized_week = finalizer(
-                        session,
+                        transaction_session,
                         week_start=candidate.week_start,
                         now=run_now,
                     )
@@ -269,6 +310,21 @@ def run_finalize_due_weeks(
             _log(stream, "week_finalized", week_start=week_text)
         except Exception as error:  # continue safely to later independent weeks
             failed += 1
+            if isinstance(error, IntegrityError):
+                stage = "unknown"
+                if transaction_session is not None:
+                    reported_stage = transaction_session.info.get(
+                        "contest_finalization_stage"
+                    )
+                    if reported_stage in FINALIZATION_STAGES:
+                        stage = str(reported_stage)
+                _log(
+                    stream,
+                    "week_integrity_error",
+                    week_start=week_text,
+                    stage=stage,
+                    **_integrity_error_fields(error),
+                )
             _log(
                 stream,
                 "week_failed",

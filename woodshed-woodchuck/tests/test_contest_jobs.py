@@ -6,6 +6,7 @@ from datetime import date, datetime, timedelta, timezone
 
 import pytest
 from sqlalchemy import create_engine, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -336,6 +337,108 @@ def test_failed_week_rolls_back_continues_and_returns_nonzero_without_secrets(
     assert retry.finalized == 1 and retry.skipped == 1 and retry.failed == 0
     session.expire_all()
     assert session.get(ContestWeek, failed_week.id).status == "finalized"
+
+
+def test_integrity_error_logs_only_driver_diagnostics_and_rolls_back(
+    database: tuple[Session, sessionmaker[Session]],
+) -> None:
+    session, factory = database
+    _, _, week = ensure_band_camp_data(
+        session, now=datetime(2026, 7, 28, tzinfo=timezone.utc)
+    )
+    week.verification_deadline_at = NOW - timedelta(hours=1)
+    week.finalize_after = NOW - timedelta(minutes=30)
+    session.commit()
+
+    class Diagnostic:
+        sqlstate = "23505"
+        constraint_name = "uq_crown_progress_profile_category"
+        table_name = "crown_progress"
+        column_name = "category_key"
+
+    class DatabaseError(Exception):
+        sqlstate = "23505"
+        diag = Diagnostic()
+
+    integrity_error = IntegrityError(
+        "INSERT INTO secret_table VALUES (%(secret)s)",
+        {"secret": "bound-parameter-secret"},
+        DatabaseError("raw database message with student@example.com and row values"),
+    )
+
+    def fail_during_crown_progress(
+        transaction_session: Session, *, week_start: date, now: datetime
+    ) -> ContestWeek:
+        transaction_week = transaction_session.scalar(select(ContestWeek).where(
+            ContestWeek.week_start == week_start
+        ))
+        assert transaction_week is not None
+        transaction_week.status = "finalized"
+        transaction_session.flush()
+        transaction_session.info["contest_finalization_stage"] = "crown_progress"
+        raise integrity_error
+
+    output = io.StringIO()
+    code, summary = run_finalize_due_weeks(
+        now=NOW, session_factory=factory, stream=output,
+        finalizer=fail_during_crown_progress,
+    )
+
+    assert code == 1 and summary.failed == 1 and summary.finalized == 0
+    session.expire_all()
+    assert session.get(ContestWeek, week.id).status == "open"
+    records = logs(output)
+    diagnostic_record = next(
+        record for record in records
+        if record["event"] == "week_integrity_error"
+    )
+    assert diagnostic_record == {
+        "event": "week_integrity_error",
+        "week_start": "2026-07-27",
+        "stage": "crown_progress",
+        "sqlstate": "23505",
+        "constraint": "uq_crown_progress_profile_category",
+        "table": "crown_progress",
+        "column": "category_key",
+    }
+    serialized = output.getvalue().casefold()
+    for sensitive in (
+        "insert into", "secret_table", "bound-parameter-secret",
+        "raw database message", "student@example.com", "row values",
+    ):
+        assert sensitive not in serialized
+
+
+def test_successful_finalization_log_shape_is_unchanged(
+    database: tuple[Session, sessionmaker[Session]],
+) -> None:
+    session, factory = database
+    _, _, week = ensure_band_camp_data(
+        session, now=datetime(2026, 7, 28, tzinfo=timezone.utc)
+    )
+    week.verification_deadline_at = NOW - timedelta(hours=1)
+    week.finalize_after = NOW - timedelta(minutes=30)
+    session.commit()
+    output = io.StringIO()
+
+    code, summary = run_finalize_due_weeks(
+        now=NOW, session_factory=factory, stream=output
+    )
+
+    assert code == 0 and summary.finalized == 1 and summary.failed == 0
+    records = logs(output)
+    assert [record["event"] for record in records] == [
+        "run_started",
+        "due_weeks_found",
+        "week_finalizing",
+        "week_finalized",
+        "run_finished",
+    ]
+    assert records[3] == {
+        "event": "week_finalized", "week_start": "2026-07-27"
+    }
+    session.expire_all()
+    assert session.get(ContestWeek, week.id).status == "finalized"
 
 
 def test_finalized_historical_results_are_skipped_and_unchanged(
