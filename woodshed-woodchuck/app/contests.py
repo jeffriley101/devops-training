@@ -906,6 +906,12 @@ def _ranked_student_scores(
 def _add_dandelion(session: Session, profile_id: int, amount: int = 1) -> None:
     state = session.get(WoodchuckState, profile_id)
     if state is None:
+        state = next((
+            row for row in session.new
+            if isinstance(row, WoodchuckState)
+            and row.profile_id == profile_id
+        ), None)
+    if state is None:
         state = WoodchuckState(profile_id=profile_id, state_json={}, revision=0)
         session.add(state)
     payload = deepcopy(state.state_json or {})

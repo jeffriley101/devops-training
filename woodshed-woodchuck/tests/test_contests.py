@@ -826,6 +826,106 @@ def test_open_and_verified_wins_reuse_pending_crown_progress(
         )
 
 
+@pytest.mark.parametrize("existing_balance", [None, 7], ids=["pending", "persisted"])
+def test_multiple_finalization_rewards_reuse_one_woodchuck_state(
+    database: tuple[Session, sessionmaker[Session]],
+    existing_balance: int | None,
+) -> None:
+    fixture_session, factory = database
+    fixture_session.close()
+    with factory(autoflush=False) as session:
+        week = ready_week(session)
+        student = add_student(
+            session, woodchuck_id="WC-MULTI-REWARD", instrument="Flute"
+        )
+        unrelated = add_student(
+            session, woodchuck_id="WC-UNRELATED-STATE", instrument="Oboe"
+        )
+        session.add(WoodchuckState(
+            profile_id=unrelated.id,
+            state_json={"progress": {"credits": 91}},
+            revision=3,
+        ))
+        if existing_balance is not None:
+            session.add(WoodchuckState(
+                profile_id=student.id,
+                state_json={"progress": {"credits": existing_balance}},
+                revision=2,
+            ))
+        add_chart(
+            session,
+            profile=student,
+            practice_date=date(2026, 7, 29),
+            minutes=42,
+            verification_status="approved",
+            created_at=NOW,
+        )
+        session.commit()
+
+        finalize_contest_week(session, week_start=week.week_start, now=FINAL_NOW)
+        session.commit()
+
+        matching_states = session.scalars(select(WoodchuckState).where(
+            WoodchuckState.profile_id == student.id
+        )).all()
+        assert len(matching_states) == 1
+        reward_total = session.scalar(select(func.sum(RewardGrant.amount)).where(
+            RewardGrant.profile_id == student.id,
+            RewardGrant.reward_type.in_(("dandelion", "participation_dandelion")),
+        ))
+        assert reward_total == 205
+        assert matching_states[0].state_json["progress"]["credits"] == (
+            (existing_balance or 0) + reward_total
+        )
+        assert session.get(WoodchuckState, unrelated.id).state_json == {
+            "progress": {"credits": 91}
+        }
+
+        first_counts = {
+            "results": session.scalar(select(func.count()).select_from(ContestResult)),
+            "grants": session.scalar(select(func.count()).select_from(RewardGrant)),
+            "camp_awards": session.scalar(
+                select(func.count()).select_from(CampPointAward)
+            ),
+            "crown_progress": session.scalar(
+                select(func.count()).select_from(CrownProgress)
+            ),
+            "states": session.scalar(select(func.count()).select_from(WoodchuckState)),
+        }
+        assert first_counts == {
+            "results": 4,
+            "grants": 7,
+            "camp_awards": 4,
+            "crown_progress": 1,
+            "states": 2,
+        }
+        first_balances = {
+            row.profile_id: row.state_json["progress"]["credits"]
+            for row in session.scalars(select(WoodchuckState)).all()
+        }
+
+        finalize_contest_week(
+            session, week_start=week.week_start, now=FINAL_NOW + timedelta(hours=1)
+        )
+        session.commit()
+
+        assert first_counts == {
+            "results": session.scalar(select(func.count()).select_from(ContestResult)),
+            "grants": session.scalar(select(func.count()).select_from(RewardGrant)),
+            "camp_awards": session.scalar(
+                select(func.count()).select_from(CampPointAward)
+            ),
+            "crown_progress": session.scalar(
+                select(func.count()).select_from(CrownProgress)
+            ),
+            "states": session.scalar(select(func.count()).select_from(WoodchuckState)),
+        }
+        assert first_balances == {
+            row.profile_id: row.state_json["progress"]["credits"]
+            for row in session.scalars(select(WoodchuckState)).all()
+        }
+
+
 def test_existing_finalized_student_scores_are_not_rewritten(
     database: tuple[Session, sessionmaker[Session]],
 ) -> None:
