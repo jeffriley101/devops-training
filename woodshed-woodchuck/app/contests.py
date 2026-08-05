@@ -133,7 +133,7 @@ class QuestCompletionSubmission(BaseModel):
 class BonusChallengeProgressSubmission(BaseModel):
     activity_date: date
     challenge_instance: str = Field(min_length=1, max_length=200)
-    minutes: int = Field(ge=1, le=1440)
+    minutes: int | None = Field(default=None, ge=1, le=1440)
     note: str = Field(default="", max_length=500)
 
 
@@ -2217,11 +2217,8 @@ def record_bonus_challenge_progress(
             daily.get("dateKey") == today.isoformat()
             and daily.get("questId") == challenge_id
         )
-        current_minutes = daily.get("loggedMinutes", 0) if same_instance else 0
-        if not isinstance(current_minutes, int) or isinstance(current_minutes, bool):
-            current_minutes = 0
-        logged_minutes = min(1440, current_minutes + submitted.minutes)
-        completed = logged_minutes >= target_minutes
+        logged_minutes = target_minutes
+        completed = True
         completed_at = now.isoformat() if completed else None
         daily.update({
             "dateKey": today.isoformat(),

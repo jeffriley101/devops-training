@@ -71,7 +71,6 @@ def test_board_template_contains_no_private_account_fields() -> None:
     markup = board_template().casefold()
 
     for private_field in (
-        "woodchuck_id",
         "pin_hash",
         "legal_name",
         "email_address",
@@ -80,6 +79,8 @@ def test_board_template_contains_no_private_account_fields() -> None:
         "verifier_email",
     ):
         assert private_field not in markup
+    assert "authenticated_profile.woodchuck_id" in markup
+    assert "woodchuck id:" in markup
 
 
 def test_fake_local_point_leader_is_not_presented() -> None:

@@ -107,17 +107,35 @@ def test_membership_switch_is_weekly_idempotent_and_historical(session: Session)
     first, changed = select_team(session, profile=member, season=active, team=team1, now=NOW)
     session.commit()
     assert changed
-    same, changed = select_team(session, profile=member, season=active, team=team1, now=NOW)
+    same, changed = select_team(
+        session, profile=member, season=active, team=team1, now=NOW + timedelta(minutes=15)
+    )
     assert same.id == first.id and not changed
-    with pytest.raises(ValueError, match="locked"):
-        select_team(session, profile=member, season=active, team=team2, now=NOW)
-    later = NOW + timedelta(days=7)
-    second, changed = select_team(session, profile=member, season=active, team=team2, now=later)
+    second, changed = select_team(
+        session, profile=member, season=active, team=team2, now=NOW + timedelta(hours=1)
+    )
     session.commit()
     assert changed and second.team_id == team2.id
-    assert membership_at(session, profile_id=member.id, season_id=active.id, at=NOW + timedelta(hours=1)).team_id == team1.id
-    assert membership_at(session, profile_id=member.id, season_id=active.id, at=later + timedelta(hours=1)).team_id == team2.id
-    assert session.scalars(select(TeamMembership).where(TeamMembership.profile_id == member.id)).all().__len__() == 2
+    assert membership_at(
+        session, profile_id=member.id, season_id=active.id, at=NOW + timedelta(minutes=30)
+    ).team_id == team1.id
+    assert membership_at(
+        session, profile_id=member.id, season_id=active.id, at=NOW + timedelta(hours=2)
+    ).team_id == team2.id
+    with pytest.raises(ValueError, match="locked"):
+        select_team(
+            session, profile=member, season=active, team=team1, now=NOW + timedelta(hours=3)
+        )
+    later = NOW + timedelta(days=7)
+    third, changed = select_team(session, profile=member, season=active, team=team1, now=later)
+    session.commit()
+    assert changed and third.team_id == team1.id
+    assert membership_at(
+        session, profile_id=member.id, season_id=active.id, at=later + timedelta(hours=1)
+    ).team_id == team1.id
+    assert len(session.scalars(
+        select(TeamMembership).where(TeamMembership.profile_id == member.id)
+    ).all()) == 3
 
 
 def test_chart_and_camp_point_snapshot_team_without_rewriting_history(session: Session) -> None:

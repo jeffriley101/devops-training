@@ -312,6 +312,43 @@
     });
   }
 
+  function wireAuthenticatedLogout() {
+    const button = document.getElementById("authenticated-logout");
+    if (!button || button.dataset.logoutWired === "true") return;
+    button.dataset.logoutWired = "true";
+    button.addEventListener("click", async function () {
+      button.disabled = true;
+      try {
+        await fetch("/account/logout", {method: "POST", credentials: "same-origin"});
+      } finally {
+        try {
+          window.localStorage.removeItem("woodshedWoodchuckState.v1");
+          Object.keys(window.localStorage).filter((key) => key.startsWith("woodshedWoodchuckConflictBackup.")).forEach((key) => window.localStorage.removeItem(key));
+          window.sessionStorage.removeItem("woodshed:p-book:verifier-draft:v1");
+          window.sessionStorage.removeItem("woodshed:practice-timer-started-at");
+        } catch (_storageError) {}
+        window.location.assign("/");
+      }
+    });
+  }
+
+  function wireWoodchuckIdCopy() {
+    const button = document.getElementById("copy-woodchuck-id");
+    const status = document.getElementById("copy-woodchuck-id-status");
+    if (!button || button.dataset.copyWired === "true") return;
+    button.dataset.copyWired = "true";
+    button.addEventListener("click", async function () {
+      const woodchuckId = button.dataset.woodchuckId || "";
+      if (!woodchuckId) return;
+      try {
+        await navigator.clipboard.writeText(woodchuckId);
+        if (status) status.textContent = "Copied";
+      } catch (_error) {
+        if (status) status.textContent = "Copy unavailable";
+      }
+    });
+  }
+
   function hydrateHome(state) {
     const creditsEl = document.getElementById("credits-value");
     const streakEl = document.getElementById("streak-value");
@@ -611,17 +648,13 @@
 
   function wireQuestForm(state) {
     const questTextEl = document.getElementById("quest-text");
-    const questTargetEl = document.getElementById("quest-target");
     const questStatusEl = document.getElementById("quest-status");
-    const questProgressEl = document.getElementById("quest-progress");
     const form = document.getElementById("practice-form");
-    const minutesEl = document.getElementById("practice-minutes");
-    const noteEl = document.getElementById("practice-note");
     const errorEl = document.getElementById("practice-error");
     const feedbackEl = document.getElementById("quest-feedback");
     const completeBtn = document.getElementById("complete-quest-btn");
 
-    if (!form || !questTextEl || !questTargetEl || !questStatusEl) return;
+    if (!form || !questTextEl || !questStatusEl) return;
     if (form.dataset.bonusChallengeWired === "true") return;
     form.dataset.bonusChallengeWired = "true";
 
@@ -635,12 +668,7 @@
 
     function renderQuestStatus(s) {
       questTextEl.textContent = s.daily.questText;
-      questTargetEl.textContent = String(s.daily.targetMinutes);
       questStatusEl.textContent = s.daily.completed ? "Complete ✅" : "Not completed";
-
-      if (questProgressEl) {
-        questProgressEl.textContent = `${s.daily.loggedMinutes || 0} of ${s.daily.targetMinutes}`;
-      }
 
       if (completeBtn && s.daily.completed) {
         completeBtn.textContent = "Quest Complete";
@@ -669,9 +697,7 @@
         if (payload.available !== true || !payload.challenge) {
           currentChallengeInstance = null;
           questTextEl.textContent = payload.message || "No Bonus Challenge is available.";
-          questTargetEl.textContent = "—";
           questStatusEl.textContent = "Unavailable";
-          if (questProgressEl) questProgressEl.textContent = "0";
           if (completeBtn) completeBtn.textContent = "Unavailable";
           return;
         }
@@ -703,7 +729,6 @@
       } catch (error) {
         currentChallengeInstance = null;
         questTextEl.textContent = "Bonus Challenge unavailable";
-        questTargetEl.textContent = "—";
         questStatusEl.textContent = "Unavailable";
         if (completeBtn) {
           completeBtn.disabled = true;
@@ -738,13 +763,6 @@
         return;
       }
       const dateKey = next.daily.dateKey;
-      const minutes = Number(minutesEl?.value);
-      const note = noteEl?.value.trim() || "";
-
-      if (!Number.isFinite(minutes) || minutes <= 0) {
-        if (errorEl) errorEl.textContent = "Enter a positive number of minutes.";
-        return;
-      }
       if (next.daily.completed && next.daily.dateKey === dateKey) {
         setQuestFeedback(pickMessage("already_done", dateKey));
         renderQuestStatus(next);
@@ -764,8 +782,6 @@
           body: JSON.stringify({
             activity_date: dateKey,
             challenge_instance: currentChallengeInstance,
-            minutes,
-            note,
           }),
         });
         const payload = await response.json();
@@ -801,8 +817,6 @@
         setQuestFeedback(rewardMessage);
         renderQuestStatus(next);
         hydrateHome(next);
-        minutesEl.value = "";
-        noteEl.value = "";
         if (payload.created === true && payload.reward_created === true) {
           playSound("questCompleted");
         }
@@ -4004,6 +4018,8 @@
   wireBandCampStandings();
   wirePastWinners();
   wireHallOfChampions();
+  wireWoodchuckIdCopy();
+  wireAuthenticatedLogout();
   wirePersonalCrownProgress();
   wireStore(state);
   wireShopPolish();

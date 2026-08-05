@@ -135,13 +135,14 @@ def test_fallback_instances_are_canonical_and_instrument_specific(
         assert accordion_current["task"] == "Practice a difficult passage slowly and evenly."
         assert accordion_current["target_minutes"] == 10
         assert ":accordion:general-difficult-passage-slow-evenly" in accordion_current["instance_key"]
-        partial = accordion.post("/contests/bonus-challenge/progress", json={
+        completed = accordion.post("/contests/bonus-challenge/progress", json={
             "activity_date": accordion_current["activity_date"],
             "challenge_instance": accordion_current["instance_key"],
-            "minutes": 4,
         })
-        assert partial.status_code == 200 and partial.json()["logged_minutes"] == 4
-        assert partial.json()["dandelions_awarded"] == 0
+        assert completed.status_code == 200
+        assert completed.json()["completed"] is True
+        assert completed.json()["dandelions_awarded"] == 5
+        assert completed.json()["camp_points_awarded"] == 2
     with TestClient(app) as banjo:
         create_student(banjo, instrument="Banjo")
         banjo_current = banjo.get("/contests/bonus-challenge/current").json()["challenge"]
@@ -231,43 +232,28 @@ def test_bonus_progress_endpoint_persists_increment_then_rewards_threshold(
         first = client.post("/contests/bonus-challenge/progress", json={
             "activity_date": today,
             "challenge_instance": current["instance_key"],
-            "minutes": 4,
-            "note": "First increment",
         })
         assert first.status_code == 200
-        assert first.json()["logged_minutes"] == 4
-        assert first.json()["completed"] is False
-        assert first.json()["dandelions_awarded"] == 0
-        assert first.json()["camp_points_awarded"] == 0
+        assert first.json()["logged_minutes"] == target_minutes
+        assert first.json()["completed"] is True
+        assert first.json()["dandelions_awarded"] == 5
+        assert first.json()["camp_points_awarded"] == 2
         with quest_database() as session:
-            assert session.scalar(select(func.count()).select_from(QuestCompletion)) == 0
-            assert session.scalar(select(func.count()).select_from(RewardGrant)) == 0
-            assert session.scalar(select(func.count()).select_from(CampPointAward)) == 0
+            assert session.scalar(select(func.count()).select_from(QuestCompletion)) == 1
+            assert session.scalar(select(func.count()).select_from(RewardGrant)) == 1
+            assert session.scalar(select(func.count()).select_from(CampPointAward)) == 1
             assert session.scalar(select(func.count()).select_from(PracticeChart)) == 0
         refreshed = client.get("/account/state").json()["state"]
-        assert refreshed["daily"]["loggedMinutes"] == 4
-
-        completed = client.post("/contests/bonus-challenge/progress", json={
-            "activity_date": today,
-            "challenge_instance": current["instance_key"],
-            "minutes": target_minutes - 4,
-            "note": "Threshold increment",
-        })
-        assert completed.status_code == 200
-        payload = completed.json()
-        assert payload["created"] is True and payload["completed"] is True
-        assert payload["logged_minutes"] == target_minutes
-        assert payload["dandelions_awarded"] == 5
-        assert payload["camp_points_awarded"] == 2
-        assert payload["credits"] == 12
+        assert refreshed["daily"]["loggedMinutes"] == target_minutes
 
         duplicate = client.post("/contests/bonus-challenge/progress", json={
             "activity_date": today,
             "challenge_instance": current["instance_key"],
-            "minutes": target_minutes - 4,
         })
         assert duplicate.status_code == 200
         assert duplicate.json()["created"] is False
+        assert duplicate.json()["dandelions_awarded"] == 0
+        assert duplicate.json()["camp_points_awarded"] == 0
         with quest_database() as session:
             assert session.scalar(select(func.count()).select_from(QuestCompletion)) == 1
             assert session.scalar(select(func.count()).select_from(RewardGrant)) == 1
@@ -297,18 +283,17 @@ def test_piano_keyboard_get_and_post_share_canonical_challenge(
         assert current["target_minutes"] == 10
         assert ":piano-keyboard:" in current["instance_key"]
 
-        partial = client.post("/contests/bonus-challenge/progress", json={
+        completed = client.post("/contests/bonus-challenge/progress", json={
             "activity_date": current["activity_date"],
             "challenge_instance": current["instance_key"],
-            "minutes": 4,
         })
-        assert partial.status_code == 200
-        assert partial.json()["logged_minutes"] == 4
-        assert partial.json()["dandelions_awarded"] == 0
-        assert partial.json()["camp_points_awarded"] == 0
+        assert completed.status_code == 200
+        assert completed.json()["completed"] is True
+        assert completed.json()["dandelions_awarded"] == 5
+        assert completed.json()["camp_points_awarded"] == 2
         refreshed = client.get("/contests/bonus-challenge/current").json()["challenge"]
         assert refreshed["instance_key"] == current["instance_key"]
-        assert refreshed["logged_minutes"] == 4
+        assert refreshed["completed"] is True
         assert client.get("/account/state").json()["state"]["practiceLog"] == []
 
         stale = client.post("/contests/bonus-challenge/progress", json={
@@ -316,21 +301,19 @@ def test_piano_keyboard_get_and_post_share_canonical_challenge(
             "challenge_instance": current["instance_key"].replace(
                 ":piano-keyboard:", ":flute:"
             ),
-            "minutes": 6,
         })
         assert stale.status_code == 409
-        completed = client.post("/contests/bonus-challenge/progress", json={
+        retry = client.post("/contests/bonus-challenge/progress", json={
             "activity_date": current["activity_date"],
             "challenge_instance": current["instance_key"],
-            "minutes": 6,
         })
-        assert completed.status_code == 200
-        assert completed.json()["dandelions_awarded"] == 5
-        assert completed.json()["camp_points_awarded"] == 2
+        assert retry.status_code == 200
+        assert retry.json()["created"] is False
+        assert retry.json()["dandelions_awarded"] == 0
+        assert retry.json()["camp_points_awarded"] == 0
         duplicate = client.post("/contests/bonus-challenge/progress", json={
             "activity_date": current["activity_date"],
             "challenge_instance": current["instance_key"],
-            "minutes": 6,
         })
         assert duplicate.status_code == 200
         assert duplicate.json()["dandelions_awarded"] == 0
@@ -382,10 +365,10 @@ def test_shared_resolver_replaces_stale_cross_instrument_client_state(
         valid = client.post("/contests/bonus-challenge/progress", json={
             "activity_date": today,
             "challenge_instance": challenge["instance_key"],
-            "minutes": 1,
         })
         assert valid.status_code == 200
-        assert valid.json()["logged_minutes"] == 1
+        assert valid.json()["logged_minutes"] == challenge["target_minutes"]
+        assert valid.json()["completed"] is True
 
 
 def test_genuinely_missing_bonus_configuration_is_controlled(

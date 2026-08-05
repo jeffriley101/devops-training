@@ -79,9 +79,14 @@ NAV_ITEMS = [
 
 def _render(request: Request, template_name: str, **context: object):
     account_state_bootstrap = None
+    authenticated_profile = None
     with SessionLocal() as session:
         profile = current_profile(request, session)
         if profile is not None:
+            authenticated_profile = {
+                "display_name": profile.display_name,
+                "woodchuck_id": profile.woodchuck_id,
+            }
             saved_state = session.get(WoodchuckState, profile.id)
             account_state_bootstrap = {
                 "state": saved_state.state_json if saved_state else None,
@@ -99,6 +104,7 @@ def _render(request: Request, template_name: str, **context: object):
             "sax_viking_messages": SAX_VIKING_MESSAGES,
             "instrument_definitions": instrument_definition_payloads(),
             "account_state_bootstrap": account_state_bootstrap,
+            "authenticated_profile": authenticated_profile,
             **context,
         },
     )

@@ -15,6 +15,13 @@
     <div>
       <p class="board-kicker">Get your name on the Board</p>
       <h3 id="board-player-name">Your Woodchuck</h3>
+      {% if authenticated_profile %}
+      <div class="board-account-identity">
+        <span>Woodchuck ID: <strong id="board-woodchuck-id">{{ authenticated_profile.woodchuck_id }}</strong></span>
+        <button id="copy-woodchuck-id" class="board-copy-id" type="button" data-woodchuck-id="{{ authenticated_profile.woodchuck_id }}">Copy</button>
+        <span id="copy-woodchuck-id-status" class="board-copy-status" role="status" aria-live="polite"></span>
+      </div>
+      {% endif %}
       <p class="board-member-since">
         <strong>Member Since</strong>
         {% if member_since %}
@@ -442,32 +449,10 @@
     <div class="section-head">
       <p id="bonus-challenge-title" class="chip bonus-challenge-title"><span aria-hidden="true">🏆</span> Bonus Challenge</p>
       <h2 id="quest-text">Loading quest...</h2>
-      <p>
-        Target: <strong><span id="quest-target">0</span> minutes</strong>
-        · Status: <strong id="quest-status">Not started</strong>
-      </p>
-      <p>Your minutes: <strong id="quest-progress">0 of 0</strong></p>
+      <p id="quest-status" class="bonus-challenge-status">Not started</p>
     </div>
 
     <form id="practice-form" class="stack-form mt-md" novalidate>
-      <label for="practice-minutes">Practice minutes</label>
-      <input
-        id="practice-minutes"
-        name="practice-minutes"
-        type="number"
-        min="1"
-        step="1"
-        required
-      />
-
-      <label for="practice-note">Practice note (optional)</label>
-      <textarea
-        id="practice-note"
-        name="practice-note"
-        rows="3"
-        placeholder="What improved today?"
-      ></textarea>
-
       <p id="practice-error" class="error-text" aria-live="polite"></p>
       <p id="quest-feedback" class="body-copy" aria-live="polite"></p>
 
