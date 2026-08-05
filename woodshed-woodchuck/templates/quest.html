@@ -15,6 +15,13 @@
     <div>
       <p class="board-kicker">Get your name on the Board</p>
       <h3 id="board-player-name">Your Woodchuck</h3>
+      {% if authenticated_profile %}
+      <div class="board-account-identity">
+        <span>Woodchuck ID: <strong id="board-woodchuck-id">{{ authenticated_profile.woodchuck_id }}</strong></span>
+        <button id="copy-woodchuck-id" class="board-copy-id" type="button" data-woodchuck-id="{{ authenticated_profile.woodchuck_id }}">Copy</button>
+        <span id="copy-woodchuck-id-status" class="board-copy-status" role="status" aria-live="polite"></span>
+      </div>
+      {% endif %}
       <p class="board-member-since">
         <strong>Member Since</strong>
         {% if member_since %}

@@ -4692,14 +4692,69 @@ select {
 
 .account-danger-zone h2 { color: #751616; }
 .account-danger-zone input { max-width: 28rem; }
-.shed-account-privacy-link {
-  position: absolute;
-  top: 0.75rem;
-  left: 0.75rem;
+.account-access-control {
+  position: fixed;
+  left: max(0.75rem, env(safe-area-inset-left));
+  bottom: calc(8.25rem + env(safe-area-inset-bottom));
   z-index: 6;
+  max-width: min(10.5rem, calc(100vw - 5.5rem));
   color: #24180e;
   background: rgba(255, 244, 205, 0.92);
-  padding: 0.45rem 0.7rem;
+  padding: 0.4rem 0.65rem;
+  border: 2px solid #6b3f1f;
   border-radius: 0.6rem;
+  box-shadow: 0 3px 8px rgba(35, 12, 29, 0.25);
+  font-size: 0.82rem;
   font-weight: 700;
+  line-height: 1.15;
+  text-align: center;
+  text-decoration: none;
+}
+.account-access-control:focus-visible {
+  outline: 3px solid #1677c8;
+  outline-offset: 3px;
+}
+.board-account-identity {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.55rem;
+  max-width: 100%;
+  margin: 0.2rem 0 0.65rem;
+  overflow-wrap: anywhere;
+}
+.board-account-identity strong { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.board-copy-id {
+  min-height: 2rem;
+  padding: 0.25rem 0.55rem;
+  border: 1px solid #6b3f1f;
+  border-radius: 0.45rem;
+  background: #fff5cf;
+  color: #24180e;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+.board-copy-id:focus-visible { outline: 3px solid #1677c8; outline-offset: 2px; }
+.board-copy-status { min-width: 4.5rem; font-size: 0.78rem; font-weight: 700; }
+.account-id-reference {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.7rem;
+  border-radius: 0.6rem;
+  background: #fff9df;
+  overflow-wrap: anywhere;
+}
+.account-id-reference span { font-size: 0.88rem; }
+
+@media (max-width: 420px) {
+  .account-access-control {
+    left: max(0.5rem, env(safe-area-inset-left));
+    bottom: calc(8.15rem + env(safe-area-inset-bottom));
+    max-width: 8.5rem;
+    padding: 0.35rem 0.5rem;
+    font-size: 0.76rem;
+  }
+  .board-account-identity { align-items: flex-start; }
 }

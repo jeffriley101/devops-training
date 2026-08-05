@@ -312,6 +312,23 @@
     });
   }
 
+  function wireWoodchuckIdCopy() {
+    const button = document.getElementById("copy-woodchuck-id");
+    const status = document.getElementById("copy-woodchuck-id-status");
+    if (!button || button.dataset.copyWired === "true") return;
+    button.dataset.copyWired = "true";
+    button.addEventListener("click", async function () {
+      const woodchuckId = button.dataset.woodchuckId || "";
+      if (!woodchuckId) return;
+      try {
+        await navigator.clipboard.writeText(woodchuckId);
+        if (status) status.textContent = "Copied";
+      } catch (_error) {
+        if (status) status.textContent = "Copy unavailable";
+      }
+    });
+  }
+
   function hydrateHome(state) {
     const creditsEl = document.getElementById("credits-value");
     const streakEl = document.getElementById("streak-value");
@@ -4004,6 +4021,7 @@
   wireBandCampStandings();
   wirePastWinners();
   wireHallOfChampions();
+  wireWoodchuckIdCopy();
   wirePersonalCrownProgress();
   wireStore(state);
   wireShopPolish();
