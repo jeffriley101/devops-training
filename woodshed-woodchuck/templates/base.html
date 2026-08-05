@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{{ title }} · Woodshed Woodchuck</title>
-  <link rel="stylesheet" href="/static/css/styles.css?v=70" />
+  <link rel="stylesheet" href="/static/css/styles.css?v=72" />
 
   <!-- Woodshed app icons -->
   <link
@@ -45,8 +45,12 @@
     </main>
 
     {% if nav_items and active_nav %}
-    {% if authenticated_profile %}
-    <a class="account-access-control" href="/account/privacy">Account &amp; Privacy</a>
+    {% if authenticated_profile and active_nav == "store" %}
+    <div class="authenticated-access-controls">
+      <span class="authenticated-student-name">{{ authenticated_profile.display_name }}</span>
+      <a class="account-access-control" href="/account/privacy">Account &amp; Privacy</a>
+      <button id="authenticated-logout" class="logout-access-control" type="button">Log Out</button>
+    </div>
     {% endif %}
     <div class="sound-effects-controls">
       <button id="sound-effects-button" class="sound-effects-button" type="button" aria-label="Sound Effects On. Open settings." aria-controls="sound-effects-panel" aria-expanded="false">🔊</button>
@@ -75,7 +79,7 @@
   <script src="/static/js/instruments.js?v=3"></script>
   <script src="/static/vendor/tone/Tone.js?v=15.1.22"></script>
   <script src="/static/js/audio.js?v=4"></script>
-  <script src="/static/js/app.js?v=36"></script>
+  <script src="/static/js/app.js?v=37"></script>
   <script src="/static/js/account.js?v=12"></script>
   {% block page_scripts %}{% endblock %}
 </body>

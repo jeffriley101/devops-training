@@ -4,7 +4,7 @@ from datetime import datetime, time, timezone
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -115,8 +115,13 @@ def select_team(session: Session, *, profile: WoodchuckProfile, season: Season,
     if current and current.team_id == team.id:
         return current, False
     current_team = session.get(Team, current.team_id) if current else None
+    week_membership_count = session.scalar(select(func.count(TeamMembership.id)).where(
+        TeamMembership.profile_id == profile.id,
+        TeamMembership.season_id == season.id,
+        TeamMembership.selected_week_start == week_start,
+    )) or 0
     if (
-        current and current.selected_week_start == week_start
+        current and week_membership_count >= 2
         and (current_team is None or current_team.moderation_status != "hidden")
     ):
         raise ValueError("Your team choice is locked until next contest week.")
@@ -177,8 +182,13 @@ def selection_payload(session: Session, *, profile: WoodchuckProfile, now: datet
         WoodchuckProfile.id.in_(captain_ids), WoodchuckProfile.status == "active"
     )).all()} if captain_ids else {}
     current_captain = captains.get(current_team.creator_profile_id) if current_team else None
+    week_membership_count = session.scalar(select(func.count(TeamMembership.id)).where(
+        TeamMembership.profile_id == profile.id,
+        TeamMembership.season_id == season.id,
+        TeamMembership.selected_week_start == week.week_start,
+    )) or 0
     locked = bool(
-        membership and membership.selected_week_start == week.week_start
+        membership and week_membership_count >= 2
         and (current_team is None or current_team.moderation_status != "hidden")
     )
     next_at = datetime.combine(week.week_end, time.min, CENTRAL).astimezone(timezone.utc)
@@ -188,7 +198,13 @@ def selection_payload(session: Session, *, profile: WoodchuckProfile, now: datet
         "membership": {
             "team": team_payload(current_team, current_captain) if current_team else None,
             "selected_week_start": membership.selected_week_start.isoformat() if membership else None,
-            "locked": locked, "next_change_at": next_at.isoformat() if locked else None,
+            "locked": locked,
+            "correction_available": bool(membership and not locked),
+            "correction_message": (
+                "Your team correction has been used for this week. You can choose again next Monday."
+                if locked else "You have one team correction available this week."
+            ) if membership else "Choose a team to get started.",
+            "next_change_at": next_at.isoformat() if locked else None,
         },
         "approved_emblems": [emblem_payload(key) for key in APPROVED_EMBLEMS],
     }

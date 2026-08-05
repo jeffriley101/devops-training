@@ -4747,6 +4747,28 @@ select {
   overflow-wrap: anywhere;
 }
 .account-id-reference span { font-size: 0.88rem; }
+.authenticated-access-controls {
+  position: fixed;
+  left: max(0.5rem, env(safe-area-inset-left));
+  bottom: calc(8.15rem + env(safe-area-inset-bottom));
+  z-index: 7;
+  display: grid;
+  gap: 0.3rem;
+  justify-items: start;
+}
+
+.authenticated-access-controls .account-access-control {
+  position: static;
+  left: auto;
+  bottom: auto;
+}
+
+.authenticated-student-name { max-width: 11rem; color: #fff5cf; font-size: 0.78rem; font-weight: 800; overflow-wrap: anywhere; text-shadow: 0 1px 2px #24180e; }
+.logout-access-control { border: 2px solid #6b3f1f; border-radius: 0.6rem; padding: 0.35rem 0.65rem; color: #fffaf0; background: #6f2f28; font: inherit; font-size: 0.8rem; font-weight: 800; cursor: pointer; }
+.logout-access-control:focus-visible { outline: 3px solid #1677c8; outline-offset: 3px; }
+.team-emblem-letter { border: 0; border-radius: 0; color: #b42323; background: transparent; font-weight: 1000; }
+.bonus-challenge-section .section-head { padding-bottom: 0.5rem; }
+
 
 @media (max-width: 420px) {
   .account-access-control {
@@ -4757,4 +4779,5 @@ select {
     font-size: 0.76rem;
   }
   .board-account-identity { align-items: flex-start; }
+  .authenticated-access-controls { bottom: calc(8.05rem + env(safe-area-inset-bottom)); }
 }
