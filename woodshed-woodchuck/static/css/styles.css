@@ -2329,7 +2329,7 @@ select {
 
 /* Use the Woodshed artwork as the full room background */
 .woodshed-scene {
-  background-image: url("/static/img/woodchuck-home.png");
+  background-image: url("/static/img/woodshed-painting.png");
   background-repeat: no-repeat;
   background-position: center;
   background-size: cover;
@@ -2397,7 +2397,7 @@ select {
     position: relative;
     min-height: 620px;
 
-    background-image: url("/static/img/woodchuck-home.png");
+    background-image: url("/static/img/woodshed-painting.png");
     background-repeat: no-repeat;
     background-position: center center;
     background-size: contain;
