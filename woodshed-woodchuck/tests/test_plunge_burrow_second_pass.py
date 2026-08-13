@@ -179,7 +179,7 @@ def test_second_pass_ui_accessibility_audio_and_persistence_boundaries() -> None
     assert instrument_event.count('playEffect("instrumentCollected")') == 1
     assert instrument_event.count('playEffect("bandSetCompleted")') == 1
     assert "Tone.Transport" not in GAME
-    assert "fetch(" not in GAME + PAGE
+    assert GAME.count('root.fetch("/xp/plunge-points"') == 1
     assert "/account/state" not in GAME + PAGE
     assert "RewardGrant" not in GAME + PAGE
     assert "CampPoint" not in GAME + PAGE

@@ -629,6 +629,54 @@ class CampPointAward(Base):
     )
 
 
+class PlungePointAward(Base):
+    __tablename__ = "plunge_point_awards"
+    __table_args__ = (
+        UniqueConstraint(
+            "profile_id",
+            "event_key",
+            name="uq_plunge_point_award_profile_event",
+        ),
+        CheckConstraint(
+            "event_type IN ('dandelion', 'carrot', 'instrument', 'band_complete')",
+            name="ck_plunge_point_award_event_type",
+        ),
+        CheckConstraint(
+            "points_scored > 0",
+            name="ck_plunge_point_award_points_positive",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    profile_id: Mapped[int] = mapped_column(
+        ForeignKey("woodchuck_profiles.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    event_key: Mapped[str] = mapped_column(
+        String(100),
+        nullable=False,
+    )
+    event_type: Mapped[str] = mapped_column(
+        String(30),
+        nullable=False,
+    )
+    points_scored: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+    )
+    occurred_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        index=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        nullable=False,
+    )
+
+
 class DailyTriviaAttempt(Base):
     __tablename__ = "daily_trivia_attempts"
     __table_args__ = (

@@ -39,6 +39,18 @@
         </button>
 
         <button
+          id="xp-level-control"
+          class="xp-level-control"
+          type="button"
+          aria-controls="xp-panel"
+          aria-expanded="false"
+          aria-label="XP Level. Loading."
+          title="XP Level"
+        >
+          <span id="xp-level-number">1</span>
+        </button>
+
+        <button
           id="level-value"
           class="shed-readout shed-readout-level shed-profile-field"
           type="button"
@@ -116,6 +128,26 @@
         <input id="sound-effects-volume" type="range" min="0" max="100" step="1" value="35" aria-label="Sound Effects volume" aria-valuetext="35 percent" />
       </div>
     </div>
+
+  <section id="xp-panel" class="mentor-card xp-panel hidden" hidden aria-labelledby="xp-panel-title">
+    <div class="xp-panel-head">
+      <div>
+        <p class="chip">Lifetime XP</p>
+        <h2 id="xp-panel-title">Level <span id="xp-panel-level">1</span></h2>
+      </div>
+      <button id="xp-panel-close" class="xp-panel-close" type="button" aria-label="Close XP panel">×</button>
+    </div>
+    <progress id="xp-progress" max="100" value="0" aria-label="XP progress">0%</progress>
+    <p id="xp-progress-text" class="xp-progress-text">Loading XP…</p>
+    <p id="xp-max-level-label" class="xp-max-level-label" hidden>Max Level</p>
+    <dl class="xp-source-list" aria-label="XP Sources">
+      <div><dt>Practice Minutes</dt><dd id="xp-source-practice-minutes">—</dd></div>
+      <div><dt>Board Points</dt><dd id="xp-source-board-points">—</dd></div>
+      <div><dt>P-Charts</dt><dd id="xp-source-p-charts">—</dd></div>
+      <div><dt>Plunge Points</dt><dd id="xp-source-plunge-points">—</dd></div>
+    </dl>
+    <p id="xp-panel-status" class="xp-panel-status" role="status" aria-live="polite"></p>
+  </section>
 
   <section id="shed-team-panel" class="mentor-card hidden" hidden aria-labelledby="shed-team-title">
     <h2 id="shed-team-title">Choose Your Team</h2>

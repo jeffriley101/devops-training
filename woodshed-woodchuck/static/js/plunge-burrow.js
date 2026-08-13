@@ -475,21 +475,50 @@
   function pauseMusic() { if (soundtrack) soundtrack.pause(); }
   function stopMusic() { if (soundtrack) { soundtrack.pause(); soundtrack.currentTime = 0; } }
 
+  const plungeSessionKey = root.crypto && typeof root.crypto.randomUUID === "function"
+    ? root.crypto.randomUUID()
+    : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  let plungeEventSequence = 0;
+
+  function reportScoringEvent(eventType, pointsScored) {
+    if (typeof root.fetch !== "function") return;
+    plungeEventSequence += 1;
+    const eventKey = `${plungeSessionKey}:${plungeEventSequence}:${eventType}`;
+    try {
+      const request = root.fetch("/xp/plunge-points", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          event_key: eventKey,
+          event_type: eventType,
+          points_scored: pointsScored,
+        }),
+      });
+      if (request && typeof request.catch === "function") request.catch(function () {});
+    } catch (_error) {
+      // XP reporting is supplemental and must never interrupt the game.
+    }
+  }
+
   const game = new PlungeBurrowGame({
     storage: root.localStorage,
     onChange: renderState,
     onEvent: function (event, detail) {
-      if (event === "dandelion") { playEffect("dandelionEarned"); announce(`Dandelion found. Score ${detail.score}.`); }
+      if (event === "dandelion") { reportScoringEvent("dandelion", 1); playEffect("dandelionEarned"); announce(`Dandelion found. Score ${detail.score}.`); }
       if (event === "portal") {
         playEffect("burrowPortal");
         announce(`Entered portal ${detail.pairId} and emerged from its matching tunnel. Direction preserved.`);
       }
       if (event === "carrot") {
+        reportScoringEvent("carrot", 3);
         playEffect("carrotCollected");
         announce(`Carrot collected. Plus 3 score and two trail segments.${detail.heartRestored ? ` One heart restored; ${detail.hearts} hearts now.` : " Hearts already full."} Score ${detail.score}.`);
       }
       if (event === "instrument") {
+        reportScoringEvent("instrument", 5);
         if (detail.completed) {
+          reportScoringEvent("band_complete", 20);
           playEffect("bandSetCompleted");
           announce(`${detail.name} collected for 5 points. Band Set Complete for 20 bonus points. A fresh set has begun. Score ${detail.score}.`);
         } else {

@@ -416,6 +416,88 @@
     }
   }
 
+  function wireXpPanel() {
+    const control = document.getElementById("xp-level-control");
+    const numberEl = document.getElementById("xp-level-number");
+    const panel = document.getElementById("xp-panel");
+    const closeButton = document.getElementById("xp-panel-close");
+    const levelEl = document.getElementById("xp-panel-level");
+    const progressEl = document.getElementById("xp-progress");
+    const progressTextEl = document.getElementById("xp-progress-text");
+    const maxLevelEl = document.getElementById("xp-max-level-label");
+    const statusEl = document.getElementById("xp-panel-status");
+    const sourceEls = {
+      practice_minutes: document.getElementById("xp-source-practice-minutes"),
+      board_points: document.getElementById("xp-source-board-points"),
+      p_charts: document.getElementById("xp-source-p-charts"),
+      plunge_points: document.getElementById("xp-source-plunge-points"),
+    };
+    if (!control || !numberEl || !panel || !closeButton || !levelEl || !progressEl || !progressTextEl || !maxLevelEl || !statusEl) return;
+    if (control.dataset.xpWired === "true") return;
+    control.dataset.xpWired = "true";
+    let loading = false;
+
+    function close() {
+      panel.hidden = true;
+      panel.classList.add("hidden");
+      control.setAttribute("aria-expanded", "false");
+      control.focus();
+    }
+
+    function render(payload) {
+      if (!Number.isInteger(payload.level) || !Number.isInteger(payload.xp_total)) throw new Error("Invalid XP response");
+      const isMaxLevel = payload.level === 10 || payload.next_level_xp === null;
+      const progressPercent = isMaxLevel
+        ? 100
+        : Math.max(0, Math.min(100, Number(payload.progress_percent) || 0));
+      numberEl.textContent = String(payload.level);
+      levelEl.textContent = String(payload.level);
+      progressEl.value = progressPercent;
+      progressEl.textContent = `${Math.round(progressPercent)}%`;
+      maxLevelEl.hidden = !isMaxLevel;
+      progressTextEl.textContent = isMaxLevel
+        ? `${payload.xp_total} lifetime XP`
+        : `${payload.xp_total} XP / ${payload.next_level_xp} XP`;
+      Object.entries(sourceEls).forEach(([key, element]) => {
+        if (element) element.textContent = String(payload.sources?.[key] ?? 0);
+      });
+      statusEl.textContent = "";
+      control.setAttribute("aria-label", `XP Level ${payload.level}. Open XP details.`);
+      control.title = `XP Level ${payload.level}`;
+    }
+
+    async function refresh() {
+      if (loading) return;
+      loading = true;
+      control.setAttribute("aria-busy", "true");
+      statusEl.textContent = "Loading XP…";
+      try {
+        const response = await fetch("/xp", {credentials: "same-origin", cache: "no-store"});
+        if (!response.ok) throw new Error("XP is unavailable");
+        render(await response.json());
+      } catch (_error) {
+        statusEl.textContent = "XP is unavailable right now.";
+        control.setAttribute("aria-label", "XP Level unavailable. Open XP details.");
+      } finally {
+        loading = false;
+        control.removeAttribute("aria-busy");
+      }
+    }
+
+    control.addEventListener("click", function () {
+      const opening = panel.hidden;
+      panel.hidden = !opening;
+      panel.classList.toggle("hidden", !opening);
+      control.setAttribute("aria-expanded", String(opening));
+      if (opening) refresh();
+    });
+    closeButton.addEventListener("click", close);
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && !panel.hidden) close();
+    });
+    refresh();
+  }
+
   function wireShedSecret() {
     const trigger = document.getElementById("shed-secret-button");
     const panel = document.getElementById("shed-secret-panel");
@@ -3984,6 +4066,7 @@
 
   wireSetupForm(state);
   hydrateHome(state);
+  wireXpPanel();
   wireShedSecret();
   wireShedTeamBadge();
   if (document.getElementById("woodchuck-name-value")) refreshPracticeStreak();

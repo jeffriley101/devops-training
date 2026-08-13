@@ -34,7 +34,7 @@ def test_game_route_navigation_and_page_only_script() -> None:
     assert "<title>Plunge Burrow · Woodshed Woodchuck</title>" in response.text
     assert 'href="/quest">Back to BOARD</a>' in response.text
     assert 'href="/plunge-burrow"' in BOARD
-    assert "/static/js/plunge-burrow.js?v=2" in TEMPLATE
+    assert "/static/js/plunge-burrow.js?v=3" in TEMPLATE
     assert "/static/js/plunge-burrow.js" not in BASE
     assert '"/plunge-burrow"].includes(path)' in (ROOT / "static/js/app.js").read_text(encoding="utf-8")
 
@@ -179,12 +179,39 @@ def test_lifecycle_inputs_and_single_animation_loop_are_present() -> None:
     assert "event.preventDefault()" in GAME_JS
 
 
-def test_prototype_never_persists_rewards_or_account_state() -> None:
+def test_plunge_persists_only_score_events_without_account_reward_side_effects() -> None:
     combined = TEMPLATE + GAME_JS
-    assert "fetch(" not in combined
+    assert 'root.fetch("/xp/plunge-points"' in GAME_JS
+    assert 'event_key: eventKey' in GAME_JS
+    assert 'event_type: eventType' in GAME_JS
+    assert 'points_scored: pointsScored' in GAME_JS
+    assert "occurred_at" not in GAME_JS
+    assert "activity_date" not in GAME_JS
     assert "XMLHttpRequest" not in combined
     assert "/account/state" not in combined
     assert "RewardGrant" not in combined
     assert "CampPoint" not in combined
     assert "crown" not in combined.casefold()
     assert "alembic" not in combined.casefold()
+
+
+def test_visible_game_score_continues_past_daily_xp_cap() -> None:
+    result = run_game_core(
+        r"""
+const {PlungeBurrowGame} = require('./static/js/plunge-burrow.js');
+const game = new PlungeBurrowGame({random: () => 0.31});
+game.obstacles = []; game.portals = []; game.start();
+for (let index = 0; index < 12; index += 1) {
+  game.trail = game.initialTrail();
+  game.direction = 'right'; game.queuedDirection = null;
+  game.dandelion = {x: game.trail[0].x + 1, y: game.trail[0].y};
+  game.tick();
+}
+console.log(JSON.stringify({score: game.score, dandelions: game.dandelionsCollected}));
+"""
+    )
+    assert result == {"score": 12, "dandelions": 12}
+    assert 'reportScoringEvent("dandelion", 1)' in GAME_JS
+    assert 'reportScoringEvent("carrot", 3)' in GAME_JS
+    assert 'reportScoringEvent("instrument", 5)' in GAME_JS
+    assert 'reportScoringEvent("band_complete", 20)' in GAME_JS
