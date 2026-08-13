@@ -8,6 +8,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    Float,
     Index,
     Integer,
     JSON,
@@ -119,6 +120,61 @@ class WoodchuckState(Base):
         onupdate=utc_now,
         nullable=False,
     )
+
+class OwnedItemCopy(Base):
+    __tablename__ = "owned_item_copies"
+    __table_args__ = (
+        UniqueConstraint(
+            "profile_id",
+            "acquisition_key",
+            name="uq_owned_item_copy_profile_acquisition",
+        ),
+        CheckConstraint(
+            "acquisition_source IN ('store', 'mum')",
+            name="ck_owned_item_copy_source",
+        ),
+        CheckConstraint(
+            "(acquisition_source = 'store' AND purchase_price > 0) OR "
+            "(acquisition_source = 'mum' AND purchase_price IS NULL)",
+            name="ck_owned_item_copy_price_source",
+        ),
+        CheckConstraint(
+            "(placement_x IS NULL AND placement_y IS NULL) OR "
+            "(placement_x IS NOT NULL AND placement_y IS NOT NULL)",
+            name="ck_owned_item_copy_placement_pair",
+        ),
+        CheckConstraint(
+            "placement_x IS NULL OR (placement_x >= 0 AND placement_x <= 1)",
+            name="ck_owned_item_copy_placement_x",
+        ),
+        CheckConstraint(
+            "placement_y IS NULL OR (placement_y >= 0 AND placement_y <= 1)",
+            name="ck_owned_item_copy_placement_y",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    profile_id: Mapped[int] = mapped_column(
+        ForeignKey("woodchuck_profiles.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    item_key: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    acquisition_source: Mapped[str] = mapped_column(String(20), nullable=False)
+    acquisition_key: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    purchase_price: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    placement_x: Mapped[float | None] = mapped_column(Float, nullable=True)
+    placement_y: Mapped[float | None] = mapped_column(Float, nullable=True)
+    acquired_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+    )
+
 
 class TrustedVerifier(Base):
     __tablename__ = "trusted_verifiers"

@@ -26,6 +26,7 @@ from .contests import router as contest_router
 from .contest_admin import router as contest_admin_router
 from .teams import router as team_router
 from .xp_routes import router as xp_router
+from .store_routes import router as store_router
 from .db import SessionLocal
 from .content import (
     ART_SUBMISSION_EMAIL,
@@ -67,6 +68,7 @@ app.include_router(contest_router)
 app.include_router(contest_admin_router)
 app.include_router(team_router)
 app.include_router(xp_router)
+app.include_router(store_router)
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
