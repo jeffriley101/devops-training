@@ -351,23 +351,17 @@
 
   function hydrateHome(state) {
     const creditsEl = document.getElementById("credits-value");
-    const streakEl = document.getElementById("streak-value");
     const woodchuckNameEl = document.getElementById("woodchuck-name-value");
     const instrumentObjectEl = document.getElementById("instrument-object");
     const levelEl = document.getElementById("level-value");
-    const totalPChartsEl = document.getElementById("total-p-charts-value");
     const dandelionObjectEl = document.getElementById("dandelion-object");
 
     const practiceLog = Array.isArray(state.practiceLog)
       ? state.practiceLog
       : [];
 
-    const totalPCharts = practiceLog.filter(
-      (entry) => entry && entry.source === "p-book"
-    ).length;
 
     const dandelions = state.progress.credits ?? 0;
-    const streak = state.progress.streak ?? 0;
     const instrument = state.profile.instrument || "Instrument not set";
 
     if (woodchuckNameEl) {
@@ -406,21 +400,7 @@
       levelEl.title = `Level: ${profileLevel}. Change level.`;
     }
 
-    if (streakEl) {
-      streakEl.textContent = `Streak ${streak}`;
-      streakEl.setAttribute(
-        "aria-label",
-        `${streak} day practice streak`
-      );
-    }
 
-    if (totalPChartsEl) {
-      totalPChartsEl.textContent = `P-Charts ${totalPCharts}`;
-      totalPChartsEl.setAttribute(
-        "aria-label",
-        `${totalPCharts} total P-Charts`
-      );
-    }
 
     if (creditsEl) {
       creditsEl.textContent = String(dandelions);
@@ -593,8 +573,6 @@
   }
 
   async function refreshPracticeStreak() {
-    const streakEl = document.getElementById("streak-value");
-    if (!streakEl) return;
     try {
       const response = await fetch("/practice-charts/streak", {
         credentials: "same-origin", cache: "no-store",
@@ -4008,7 +3986,7 @@
   hydrateHome(state);
   wireShedSecret();
   wireShedTeamBadge();
-  refreshPracticeStreak();
+  if (document.getElementById("woodchuck-name-value")) refreshPracticeStreak();
   wireMetronome();
   wireTuner();
   wireMum(state);

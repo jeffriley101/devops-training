@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{{ title }} · Woodshed Woodchuck</title>
-  <link rel="stylesheet" href="/static/css/styles.css?v=73" />
+  <link rel="stylesheet" href="/static/css/styles.css?v=74" />
 
   <!-- Woodshed app icons -->
   <link
@@ -52,6 +52,7 @@
       <button id="authenticated-logout" class="logout-access-control" type="button">Log Out</button>
     </div>
     {% endif %}
+    {% if active_nav != "home" %}
     <div class="sound-effects-controls">
       <button id="sound-effects-button" class="sound-effects-button" type="button" aria-label="Sound Effects On. Open settings." aria-controls="sound-effects-panel" aria-expanded="false">🔊</button>
       <div id="sound-effects-panel" class="sound-effects-panel" hidden>
@@ -63,6 +64,7 @@
         <input id="sound-effects-volume" type="range" min="0" max="100" step="1" value="35" aria-label="Sound Effects volume" aria-valuetext="35 percent" />
       </div>
     </div>
+    {% endif %}
     <nav class="main-nav" aria-label="Primary navigation">
       {% for item in nav_items %}
       <a class="nav-pill {% if item.key == active_nav %}active{% endif %}" href="{{ item.href }}">{{ item.label }}</a>
@@ -79,7 +81,7 @@
   <script src="/static/js/instruments.js?v=3"></script>
   <script src="/static/vendor/tone/Tone.js?v=15.1.22"></script>
   <script src="/static/js/audio.js?v=4"></script>
-  <script src="/static/js/app.js?v=37"></script>
+  <script src="/static/js/app.js?v=38"></script>
   <script src="/static/js/account.js?v=12"></script>
   {% block page_scripts %}{% endblock %}
 </body>

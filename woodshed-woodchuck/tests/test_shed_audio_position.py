@@ -17,7 +17,7 @@ def shared_sound_block() -> str:
 
 def test_four_main_pages_receive_one_shared_positioning_hook() -> None:
     client = TestClient(app)
-    for path in ("/home", "/p-book", "/quest", "/store"):
+    for path in ("/p-book", "/quest", "/store"):
         response = client.get(path)
         assert response.status_code == 200
         assert '<body class="main-app-page' in response.text
@@ -25,7 +25,7 @@ def test_four_main_pages_receive_one_shared_positioning_hook() -> None:
 
     assert '<body{% if page_class %} class="{{ page_class }}"{% endif %}>' in BASE
     assert CSS.count(".main-app-page .sound-effects-controls") == 1
-    assert ".shed-screen .sound-effects-controls" not in CSS
+    assert ".woodshed-scene > .shed-sound-effects-controls" in CSS
     assert ".shop-page .sound-effects-controls" not in CSS
     assert ".board-page .sound-effects-controls" not in CSS
 
@@ -54,7 +54,11 @@ def test_shared_placement_keeps_page_content_and_accessibility_intact() -> None:
         "BOARD": (ROOT / "templates/quest.html").read_text(encoding="utf-8"),
         "SHOP": (ROOT / "templates/store.html").read_text(encoding="utf-8"),
     }
-    assert 'id="streak-value"' in templates["SHED"]
+    assert 'id="streak-value"' not in templates["SHED"]
+    assert 'id="total-p-charts-value"' not in templates["SHED"]
+    assert 'id="p-book"' not in templates["SHED"]
+    assert 'aria-label="Open Bulletin Board"' in templates["SHED"]
+    assert 'class="sound-effects-controls shed-sound-effects-controls"' in templates["SHED"]
     assert "practice-timer" in templates["BOOK"] and "Submit" in templates["BOOK"]
     assert "Bonus Challenge" in templates["BOARD"] and "plunge-burrow-button" in templates["BOARD"]
     assert 'data-shop-panel-content="clothing"' in templates["SHOP"]

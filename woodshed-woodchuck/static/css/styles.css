@@ -375,9 +375,7 @@ select {
   overflow: hidden;
   border: 1px solid rgba(79, 58, 34, 0.35);
   border-radius: var(--radius-xl);
-  background:
-    linear-gradient(180deg, rgba(35, 80, 60, 0.22), rgba(67, 43, 25, 0.38)),
-    linear-gradient(180deg, #d8c28f, #8c633a 56%, #4a3423);
+  background: transparent;
   box-shadow: inset 0 0 0 1px rgba(255, 244, 210, 0.25);
 }
 
@@ -583,15 +581,15 @@ select {
 .woodshed-scene > .shed-secret-button {
   position: absolute;
   top: auto;
-  bottom: 0.45rem;
-  left: 0.45rem;
-  z-index: 5;
-  width: 3rem;
-  height: 3rem;
+  bottom: max(0.45rem, env(safe-area-inset-bottom));
+  left: max(0.45rem, env(safe-area-inset-left));
+  z-index: 4;
+  width: 2.25rem;
+  height: 2.25rem;
   padding: 0;
   color: #d7263d;
   font-weight: 900;
-  font-size: 1.3rem;
+  font-size: 1.4rem;
   background: transparent;
   border: 0;
   border-radius: 0;
@@ -612,12 +610,6 @@ select {
 @media (max-width: 640px) {
   .shed-readout-level { width: 2.4rem; min-height: 2.4rem; }
 
-  .woodshed-scene > .shed-secret-button {
-    top: auto;
-    bottom: 0.45rem;
-    left: 0.45rem;
-    color: #d7263d;
-  }
 }
 
 .shed-icon-object,
@@ -2333,7 +2325,7 @@ select {
   background-repeat: no-repeat;
   background-position: center;
   background-size: cover;
-  background-color: #8c633a;
+  background-color: transparent;
 }
 
 /* The artwork now belongs to the scene itself, not a separate image layer */
@@ -2574,10 +2566,6 @@ select {
     left: 0;
   }
 
-  .p-book-object {
-    top: 75%;
-    left: 0;
-  }
 
   .quest-object {
     bottom: 1rem;
@@ -2585,15 +2573,7 @@ select {
   }
 
   /* Right column */
-  #streak-value {
-    top: 1rem;
-    right: 0;
-  }
 
-  #total-p-charts-value {
-    top: 18%;
-    right: 0;
-  }
 
   .dandelion-object {
     top: 43%;
@@ -2668,38 +2648,29 @@ select {
     top: 47%;
   }
 
-  .p-book-object {
-    top: 66% !important;
-  }
 
   .quest-object {
-    top: 84%;
+    top: 75%;
     bottom: auto;
   }
 
   /* Right side */
-  #streak-value {
-    top: 1rem;
-  }
 
-  #total-p-charts-value {
-    top: 9%;
-  }
 
   .dandelion-object {
-    top: 27%;
+    top: 12%;
   }
 
   .metronome-object {
-    top: 47%;
+    top: 34%;
   }
 
   .tuner-object {
-    top: 66%;
+    top: 55%;
   }
 
   .chair-object {
-    top: 84%;
+    top: 76%;
     bottom: auto;
   }
 
@@ -4380,6 +4351,22 @@ select {
   overflow-y: auto;
 }
 
+.woodshed-scene > .shed-sound-effects-controls {
+  position: absolute;
+  top: auto;
+  right: max(0.5rem, env(safe-area-inset-right));
+  bottom: max(0.5rem, env(safe-area-inset-bottom));
+  z-index: 4;
+}
+
+.woodshed-scene > .shed-sound-effects-controls .sound-effects-panel {
+  top: auto;
+  right: 0;
+  bottom: 3.15rem;
+  max-height: min(18rem, calc(100vh - 9rem));
+  overflow-y: auto;
+}
+
 /* Phase 8 main-page polish */
 .welcome-enter-button {
   color: #fff;
@@ -4410,15 +4397,6 @@ select {
   background: transparent !important;
   box-shadow: none !important;
   font-weight: 1000;
-}
-.woodshed-scene > .shed-secret-button {
-  position: fixed;
-  left: max(0.75rem, env(safe-area-inset-left));
-  bottom: calc(4.75rem + env(safe-area-inset-bottom));
-  width: 44px;
-  height: 44px;
-  font-size: 1.9rem;
-  z-index: 6;
 }
 
 .board-page { position: relative; }
@@ -4508,7 +4486,6 @@ select {
 
 @media (max-width: 640px) {
   .shed-readout-name { min-width: 7.5rem; }
-  .woodshed-scene > .shed-secret-button { bottom: calc(4.75rem + env(safe-area-inset-bottom)); left: max(0.75rem, env(safe-area-inset-left)); }
   .team-leaderboard-grid { grid-template-columns: 1fr; }
 }
 

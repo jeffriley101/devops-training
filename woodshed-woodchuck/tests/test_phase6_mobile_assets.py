@@ -7,7 +7,7 @@ from app.main import app
 
 
 ROOT = Path(__file__).resolve().parents[1]
-STYLESHEET_URL = "/static/css/styles.css?v=73"
+STYLESHEET_URL = "/static/css/styles.css?v=74"
 
 
 def source(path: str) -> str:
@@ -35,22 +35,19 @@ def test_served_stylesheet_contains_final_mobile_scene_rules() -> None:
     assert response.status_code == 200
     css = response.text
 
-    secret_mobile = css.index(
-        ".woodshed-scene > .shed-secret-button {",
-        css.index(".woodshed-scene > .shed-secret-button:focus-visible"),
-    )
-    secret_rule = css[secret_mobile:css.index("}", secret_mobile)]
+    secret_start = css.index(".woodshed-scene > .shed-secret-button {")
+    secret_rule = css[secret_start:css.index("}", secret_start)]
     for declaration in (
-        "top: auto",
-        "bottom: 0.45rem",
-        "left: 0.45rem",
+        "position: absolute",
+        "bottom: max(0.45rem, env(safe-area-inset-bottom))",
+        "left: max(0.45rem, env(safe-area-inset-left))",
         "color: #d7263d",
     ):
         assert declaration in secret_rule
-    final_secret = css.rfind(".woodshed-scene > .shed-secret-button {")
-    final_rule = css[final_secret:css.index("}", final_secret)]
-    assert "env(safe-area-inset-bottom)" in final_rule
-    assert "width: 44px" in css and "height: 44px" in css
+    assert css.count(".woodshed-scene > .shed-secret-button {") == 1
+    assert "width: 2.25rem" in secret_rule and "height: 2.25rem" in secret_rule
+
+
 
     shop_mobile = css.index("@media (max-width: 430px)", css.index("/* SHOP */"))
     shop_scene = css.index(".shop-scene {", shop_mobile)

@@ -3,7 +3,7 @@
 {% block content %}
 <section class="card woodshed-page">
   <div class="woodshed-scene" aria-label="Interactive Woodshed room">
-    <button id="shed-secret-button" class="shed-secret-button" type="button" aria-controls="shed-secret-panel" aria-expanded="false" aria-label="Open secret passcode">U</button>
+    <button id="shed-secret-button" class="shed-secret-button" type="button" aria-controls="shed-secret-panel" aria-expanded="false" aria-label="Open secret passcode">.</button>
     <div class="woodshed-character-layer" aria-label="Woodchuck holding selected instrument">
       <img
         class="character-art woodshed-character-art"
@@ -50,21 +50,12 @@
           B
         </button>
 
-        <a
-          id="p-book"
-          class="room-object p-book-object"
-          href="/p-book"
-          aria-label="Open P-Chart Book"
-          title="P-Chart Book"
-        >
-          <span class="room-object-icon" aria-hidden="true">📓</span>
-        </a>
 
         <a
           class="room-object quest-object"
           href="/quest"
-          aria-label="Open Quest Book"
-          title="Quest Book"
+          aria-label="Open Bulletin Board"
+          title="Bulletin Board"
         >
           <span class="room-object-icon" aria-hidden="true">📋</span>
         </a>
@@ -76,21 +67,7 @@
       ></div>
 
       <div class="woodshed-object-column woodshed-object-column-right">
-        <div
-          id="streak-value"
-          class="shed-readout"
-          title="Practice streak"
-        >
-          0
-        </div>
 
-        <div
-          id="total-p-charts-value"
-          class="shed-readout"
-          title="Total P-Charts"
-        >
-          0
-        </div>
 
         <button id="shed-team-button" class="room-object dandelion-object" type="button" aria-controls="shed-team-panel" aria-expanded="false" aria-label="Choose a team" title="Choose a team">
           <span id="shed-team-emblem" class="room-object-icon" aria-hidden="true">⬡</span>
@@ -134,6 +111,18 @@
       </div>
     </div>
   </div>
+
+    <div class="sound-effects-controls shed-sound-effects-controls">
+      <button id="sound-effects-button" class="sound-effects-button" type="button" aria-label="Sound Effects On. Open settings." aria-controls="sound-effects-panel" aria-expanded="false">🔊</button>
+      <div id="sound-effects-panel" class="sound-effects-panel" hidden>
+        <label class="sound-effects-toggle" for="sound-effects-enabled">
+          <span>Sound Effects</span>
+          <input id="sound-effects-enabled" type="checkbox" checked />
+        </label>
+        <label for="sound-effects-volume">Volume <output id="sound-effects-volume-value" for="sound-effects-volume">35%</output></label>
+        <input id="sound-effects-volume" type="range" min="0" max="100" step="1" value="35" aria-label="Sound Effects volume" aria-valuetext="35 percent" />
+      </div>
+    </div>
 
   <section id="shed-team-panel" class="mentor-card hidden" hidden aria-labelledby="shed-team-title">
     <h2 id="shed-team-title">Choose Your Team</h2>
