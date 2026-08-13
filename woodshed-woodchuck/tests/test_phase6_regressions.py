@@ -246,9 +246,9 @@ def test_shop_photo_only_scene_and_unboxed_accessible_emoji_controls() -> None:
     assert "object-fit: cover" in scene_css
     assert "background: none" in scene_css
     assert ".shop-scene::before" not in css
-    assert "border: 0" in scene_css
+    assert "border: 3px solid #f4d35e" in scene_css
     assert "background: transparent" in scene_css
-    assert "box-shadow: none" in scene_css
+    assert "box-shadow: inset 0 0 0 1px rgba(255, 244, 210, 0.25)" in scene_css
     assert "shop-control-label" not in markup
     assert "shop-coming-soon" not in markup
     assert markup.count('class="sr-only"') >= 10

@@ -91,6 +91,13 @@
         <img class="shop-qr-image" src="{{ public_site_qr }}" alt="QR code for the public Woodshed Woodchuck website at {{ public_site_url }}" />
         <p><a href="{{ public_site_url }}">{{ public_site_url }}</a></p>
         <p id="shop-qr-status" role="status" aria-live="polite"></p>
+        {% if authenticated_profile %}
+        <div class="authenticated-access-controls shop-share-account-controls">
+          <span class="authenticated-student-name">{{ authenticated_profile.display_name }}</span>
+          <a class="account-access-control" href="/account/privacy">Account &amp; Privacy</a>
+          <button id="authenticated-logout" class="logout-access-control" type="button">Log Out</button>
+        </div>
+        {% endif %}
       </section>
       <section data-shop-panel-content="clothing" hidden>
         <p class="shop-panel-sign">Coming Soon</p><p>Hats and hoodies are coming soon. This shelf has room for future avatar clothing.</p>

@@ -45,13 +45,6 @@
     </main>
 
     {% if nav_items and active_nav %}
-    {% if authenticated_profile and active_nav == "store" %}
-    <div class="authenticated-access-controls">
-      <span class="authenticated-student-name">{{ authenticated_profile.display_name }}</span>
-      <a class="account-access-control" href="/account/privacy">Account &amp; Privacy</a>
-      <button id="authenticated-logout" class="logout-access-control" type="button">Log Out</button>
-    </div>
-    {% endif %}
     {% if active_nav != "home" %}
     <div class="sound-effects-controls">
       <button id="sound-effects-button" class="sound-effects-button" type="button" aria-label="Sound Effects On. Open settings." aria-controls="sound-effects-panel" aria-expanded="false">🔊</button>

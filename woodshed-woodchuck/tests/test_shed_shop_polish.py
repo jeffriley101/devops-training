@@ -92,7 +92,7 @@ def test_shed_uses_server_member_date_board_clipboard_and_compact_level() -> Non
     board = (ROOT / "templates/quest.html").read_text(encoding="utf-8")
     assert "Member Since" in board
     assert 'datetime="{{ member_since.timestamp }}"' in board
-    assert ">📋<" in home
+    assert ">📋<" not in home
     assert ">📔<" not in home
     assert "profileLevel.charAt(0).toUpperCase()" in app_js
     assert 'Level: ${profileLevel}. Change level.' in app_js

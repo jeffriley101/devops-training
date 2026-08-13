@@ -371,7 +371,7 @@ select {
 
 .woodshed-scene {
   position: relative;
-  min-height: 620px;
+  min-height: calc(100dvh - 6.5rem);
   overflow: hidden;
   border: 1px solid rgba(79, 58, 34, 0.35);
   border-radius: var(--radius-xl);
@@ -404,7 +404,7 @@ select {
     minmax(280px, 1.4fr)
     minmax(115px, 0.42fr);
   gap: 0.7rem;
-  min-height: 620px;
+  min-height: calc(100dvh - 6.5rem);
   padding: 1rem;
 }
 
@@ -2567,15 +2567,7 @@ select {
   }
 
 
-  .p-book-object {
-    top: 75%;
-    left: 0;
-  }
 
-  .quest-object {
-    bottom: 1rem;
-    left: 0;
-  }
 
   /* Right column */
 
@@ -2624,16 +2616,16 @@ select {
 @media (max-width: 640px) {
   /* End the SHED scene with the artwork—no brown extension below it. */
   .woodshed-scene {
-    min-height: 515px;
-    height: 515px;
-    background-size: auto 515px;
-    background-position: center top;
+    min-height: calc(100dvh - 6.5rem);
+    height: calc(100dvh - 6.5rem);
+    background-size: cover;
+    background-position: center;
     background-repeat: no-repeat;
   }
 
   .woodshed-foreground {
-    height: 515px;
-    min-height: 515px;
+    height: calc(100dvh - 6.5rem);
+    min-height: calc(100dvh - 6.5rem);
   }
 
   /* Left side */
@@ -2654,14 +2646,7 @@ select {
   }
 
 
-  .p-book-object {
-    top: 66% !important;
-  }
 
-  .quest-object {
-    top: 84%;
-    bottom: auto;
-  }
 
   /* Right side */
 
@@ -3506,13 +3491,16 @@ select {
 .shop-scene {
   position: relative;
   width: min(100%, 760px);
-  min-height: clamp(590px, 85vw, 700px);
+  min-height: calc(100dvh - 6.5rem);
   margin: 0 auto;
   overflow: hidden;
-  border: 0;
-  border-radius: 0;
+  border: 3px solid #f4d35e;
+  border-radius: var(--radius-xl);
   background: none;
-  box-shadow: none;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+  box-shadow: inset 0 0 0 1px rgba(255, 244, 210, 0.25);
 }
 
 .shop-viking-art {
@@ -3590,6 +3578,19 @@ select {
 .shop-dialog-scroll section > :first-child { margin-top: 0; }
 .shop-dialog-scroll section > :last-child { margin-bottom: 0; }
 .shop-qr-image { display: block; width: min(100%, 360px); height: auto; margin: 1rem auto; padding: .5rem; border: 2px solid #352616; background: #fff; }
+.shop-dialog-scroll .shop-share-account-controls {
+  position: static;
+  left: auto;
+  bottom: auto;
+  z-index: auto;
+  margin-top: 1rem;
+}
+
+.shop-dialog-scroll .shop-share-account-controls .authenticated-student-name {
+  color: #352616;
+  text-shadow: none;
+}
+
 .shop-practice-definition { font-size: 1.1rem; line-height: 1.55; }
 .shop-panel-sign { display: inline-block; padding: .35rem .75rem; border: 3px dashed #7f5429; transform: rotate(-2deg); font-weight: 950; background: #f4d35e; }
 .shop-crown-history-note { font-size: .9rem; }
@@ -3598,8 +3599,8 @@ select {
 @media (max-width: 430px) {
   .shop-scene {
     display: block;
-    min-height: 590px;
-    border-radius: 0;
+    min-height: calc(100dvh - 6.5rem);
+    border-radius: var(--radius-xl);
   }
   .shop-viking-art { object-position: 50% 30%; }
   .shop-object-column {

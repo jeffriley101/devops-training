@@ -55,19 +55,21 @@ def sign_in(client: TestClient) -> None:
     assert response.status_code == 200
 
 
-def test_account_control_has_distinct_safe_lower_left_tier() -> None:
+def test_account_control_is_rendered_once_in_shop_share_dialog() -> None:
     base = (ROOT / "templates/base.html").read_text(encoding="utf-8")
     home = (ROOT / "templates/home.html").read_text(encoding="utf-8")
+    store = (ROOT / "templates/store.html").read_text(encoding="utf-8")
     css = (ROOT / "static/css/styles.css").read_text(encoding="utf-8")
 
-    assert 'class="account-access-control" href="/account/privacy"' in base
+    assert 'class="account-access-control" href="/account/privacy"' not in base
     assert "shed-account-privacy-link" not in home
-    account_rule = css[css.index(".account-access-control {"):css.index(".account-access-control:focus-visible")]
-    assert "position: fixed" in account_rule
-    assert "left: max(0.75rem, env(safe-area-inset-left))" in account_rule
-    assert "bottom: calc(8.25rem + env(safe-area-inset-bottom))" in account_rule
-    assert "bottom: calc(4.75rem + env(safe-area-inset-bottom))" in css
-    assert "max-width: 8.5rem" in css
+    share = store[store.index('data-shop-panel-content="share"'):store.index('data-shop-panel-content="clothing"')]
+    assert 'class="authenticated-access-controls shop-share-account-controls"' in share
+    assert 'class="account-access-control" href="/account/privacy"' in share
+    assert 'id="authenticated-logout"' in share
+    dialog_rule = css[css.index(".shop-dialog-scroll .shop-share-account-controls {"):css.index(".shop-dialog-scroll .shop-share-account-controls .authenticated-student-name {")]
+    assert "position: static" in dialog_rule
+    assert "bottom: auto" in dialog_rule
 
 
 def test_authenticated_board_and_privacy_show_only_own_read_only_id(access_db) -> None:

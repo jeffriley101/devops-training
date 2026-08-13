@@ -57,7 +57,7 @@ def test_shared_placement_keeps_page_content_and_accessibility_intact() -> None:
     assert 'id="streak-value"' not in templates["SHED"]
     assert 'id="total-p-charts-value"' not in templates["SHED"]
     assert 'id="p-book"' not in templates["SHED"]
-    assert 'aria-label="Open Bulletin Board"' in templates["SHED"]
+    assert 'aria-label="Open Bulletin Board"' not in templates["SHED"]
     assert 'class="sound-effects-controls shed-sound-effects-controls"' in templates["SHED"]
     assert "practice-timer" in templates["BOOK"] and "Submit" in templates["BOOK"]
     assert "Bonus Challenge" in templates["BOARD"] and "plunge-burrow-button" in templates["BOARD"]
