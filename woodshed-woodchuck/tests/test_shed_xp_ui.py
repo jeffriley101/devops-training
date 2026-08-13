@@ -16,13 +16,16 @@ def xp_javascript() -> str:
     return APP[start:end]
 
 
-def test_xp_control_is_distinct_and_directly_under_instrument() -> None:
-    instrument = HOME.index("id=\"instrument-object\"")
-    xp_control = HOME.index("id=\"xp-level-control\"")
-    profile_level = HOME.index("id=\"level-value\"")
+def test_xp_control_and_team_are_ordered_in_the_left_column() -> None:
+    left_column = HOME.index("woodshed-object-column-left")
+    center_column = HOME.index("woodshed-object-column-center", left_column)
+    instrument = HOME.index("id=\"instrument-object\"", left_column)
+    xp_control = HOME.index("id=\"xp-level-control\"", instrument)
+    team = HOME.index("id=\"shed-team-button\"", xp_control)
+    profile_level = HOME.index("id=\"level-value\"", team)
 
-    assert instrument < xp_control < profile_level
-    assert "aria-controls=\"xp-panel\"" in HOME[xp_control:profile_level]
+    assert left_column < instrument < xp_control < team < profile_level < center_column
+    assert "aria-controls=\"xp-panel\"" in HOME[xp_control:team]
     assert HOME.count("id=\"xp-level-control\"") == 1
     assert HOME.count("id=\"level-value\"") == 1
 
@@ -84,16 +87,18 @@ def test_profile_skill_level_editor_remains_separate() -> None:
     assert "const control = document.getElementById(\"xp-level-control\");" in xp_javascript()
 
 
-def test_mobile_left_controls_are_compact_and_keep_markup_order() -> None:
-    start = CSS.index("/* Compact mobile SHED left controls")
+def test_mobile_left_and_right_controls_share_intentional_rows() -> None:
+    start = CSS.index("/* Keep the four mobile SHED controls")
     end = CSS.index("/* SHED lifetime XP badge", start)
     mobile = CSS[start:end]
 
-    assert "@media (max-width: 640px)" in mobile
-    assert ".woodshed-object-column-left {" in mobile
-    assert "justify-content: flex-start" in mobile
-    assert "gap: 0.6rem" in mobile
-    assert "height: auto !important" in mobile
-    assert ".woodshed-object-column-left > *" in mobile
-    assert "position: static !important" in mobile
-    assert HOME.index('id="instrument-object"') < HOME.index('id="xp-level-control"') < HOME.index('id="level-value"')
+    assert "#instrument-object,\n  .metronome-object" in mobile
+    assert "top: 12% !important" in mobile
+    assert "#xp-level-control,\n  .tuner-object" in mobile
+    assert "top: 34% !important" in mobile
+    assert ".woodshed-object-column-left .dandelion-object,\n  .chair-object" in mobile
+    assert "top: 55% !important" in mobile
+    assert "#level-value" in mobile
+    assert "top: 76% !important" in mobile
+    assert ".woodshed-object-column-left .dandelion-object" in mobile
+    assert "left: 0" in mobile

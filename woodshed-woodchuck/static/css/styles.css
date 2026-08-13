@@ -4499,23 +4499,31 @@ select {
   .team-leaderboard-grid { grid-template-columns: 1fr; }
 }
 
-/* Compact mobile SHED left controls without percentage-sized gaps. */
+/* Keep the four mobile SHED controls in equivalent left/right rows. */
 @media (max-width: 640px) {
-  .woodshed-object-column-left {
-    top: max(0.75rem, env(safe-area-inset-top)) !important;
-    bottom: auto !important;
-    height: auto !important;
-    display: flex !important;
-    flex-direction: column;
-    justify-content: flex-start;
-    align-items: flex-start;
-    gap: 0.6rem;
-    max-width: calc(100% - 1.2rem);
+  #instrument-object,
+  .metronome-object {
+    top: 12% !important;
   }
 
-  .woodshed-object-column-left > * {
-    position: static !important;
-    flex: 0 0 auto;
+  #xp-level-control,
+  .tuner-object {
+    top: 34% !important;
+  }
+
+  .woodshed-object-column-left .dandelion-object,
+  .chair-object {
+    top: 55% !important;
+  }
+
+  .woodshed-object-column-left .dandelion-object {
+    right: auto;
+    left: 0;
+    transform: none !important;
+  }
+
+  #level-value {
+    top: 76% !important;
   }
 }
 

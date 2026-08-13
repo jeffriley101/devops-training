@@ -186,13 +186,52 @@
     }
   }
 
-  function audioContextIsRunning() {
-    if (!window.Tone || typeof window.Tone.getContext !== "function") return false;
+  function toneAudioContext() {
+    if (!window.Tone || typeof window.Tone.getContext !== "function") return null;
     try {
       const context = window.Tone.getContext();
-      return !context || typeof context.state !== "string" || context.state === "running";
+      return context && context.rawContext ? context.rawContext : context;
     } catch (_error) {
-      return false;
+      return null;
+    }
+  }
+
+  function audioContextIsRunning() {
+    const context = toneAudioContext();
+    return Boolean(
+      context &&
+      (typeof context.state !== "string" || context.state === "running")
+    );
+  }
+
+  function primeAudioContextFromGesture() {
+    const context = toneAudioContext();
+    if (!context) return;
+
+    try {
+      if (context.state !== "running" && typeof context.resume === "function") {
+        Promise.resolve(context.resume()).then(function () {
+          if (!audioContextIsRunning()) return;
+          unlocked = true;
+          buildGraph();
+        }).catch(function () {});
+      }
+
+      if (
+        typeof context.createBuffer === "function" &&
+        typeof context.createBufferSource === "function" &&
+        context.destination
+      ) {
+        const source = context.createBufferSource();
+        source.buffer = context.createBuffer(1, 1, context.sampleRate || 22050);
+        source.connect(context.destination);
+        source.onended = function () {
+          try { source.disconnect(); } catch (_error) {}
+        };
+        source.start(0);
+      }
+    } catch (_error) {
+      // A later user gesture can try the mobile audio primer again.
     }
   }
 
@@ -209,7 +248,12 @@
         buildGraph();
         return true;
       })
-      .catch(function () { return false; })
+      .catch(function () {
+        if (!audioContextIsRunning()) return false;
+        unlocked = true;
+        buildGraph();
+        return true;
+      })
       .finally(function () { unlockPending = null; });
     return unlockPending;
   }
@@ -389,9 +433,11 @@
 
   function gestureUnlock(event) {
     if (event.type === "keydown" && event.isComposing) return;
+    primeAudioContextFromGesture();
     unlock().catch(function () {});
   }
   document.addEventListener("pointerdown", gestureUnlock, true);
+  document.addEventListener("touchend", gestureUnlock, true);
   document.addEventListener("click", gestureUnlock, true);
   document.addEventListener("keydown", gestureUnlock, true);
   document.addEventListener("DOMContentLoaded", wireControls, { once: true });

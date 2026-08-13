@@ -1,4 +1,5 @@
 from pathlib import Path
+import subprocess
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -17,25 +18,86 @@ def test_tone_is_exactly_pinned_local_licensed_and_loaded_in_order():
     assert "MIT License" in license_file.read_text()
     assert "cdn" not in BASE.casefold()
     tone_pos = BASE.index('/static/vendor/tone/Tone.js?v=15.1.22')
-    audio_pos = BASE.index('/static/js/audio.js?v=5')
+    audio_pos = BASE.index('/static/js/audio.js?v=6')
     app_pos = BASE.index('/static/js/app.js?v=39')
     assert tone_pos < audio_pos < app_pos
 
 
 def test_audio_unlock_is_gesture_only_lazy_and_reuses_graph():
     assert 'document.addEventListener("pointerdown", gestureUnlock, true)' in AUDIO
+    assert 'document.addEventListener("touchend", gestureUnlock, true)' in AUDIO
     assert 'document.addEventListener("click", gestureUnlock, true)' in AUDIO
     assert 'document.addEventListener("keydown", gestureUnlock, true)' in AUDIO
     assert 'document.removeEventListener("pointerdown", gestureUnlock, true)' not in AUDIO
     assert 'document.addEventListener("DOMContentLoaded", wireControls' in AUDIO
     assert "Tone.start()" in AUDIO
     assert "if (graph || !window.Tone) return graph" in AUDIO
+    assert "function toneAudioContext()" in AUDIO
+    assert "context.rawContext ? context.rawContext : context" in AUDIO
     assert "function audioContextIsRunning()" in AUDIO
     assert 'context.state === "running"' in AUDIO
+    assert "function primeAudioContextFromGesture()" in AUDIO
+    assert 'context.state !== "running"' in AUDIO
+    assert "Promise.resolve(context.resume())" in AUDIO
+    assert "source.buffer = context.createBuffer(1, 1" in AUDIO
+    assert "source.start(0)" in AUDIO
+    assert "primeAudioContextFromGesture();" in AUDIO
     assert "if (unlocked && audioContextIsRunning()) return Promise.resolve(true)" in AUDIO
     assert "unlocked = false;" in AUDIO
-    assert ".catch(function () { return false; })" in AUDIO
+    assert "if (!audioContextIsRunning()) return false;" in AUDIO
     assert "Transport" not in AUDIO
+
+
+def test_mobile_gestures_resume_a_context_that_suspends_again():
+    script = r"""
+const fs = require("fs");
+const vm = require("vm");
+const listeners = {};
+let resumeCalls = 0;
+let sourceStarts = 0;
+const pending = new Promise(function () {});
+const rawContext = {
+  state: "suspended",
+  sampleRate: 44100,
+  destination: {},
+  resume: function () { resumeCalls += 1; return pending; },
+  createBuffer: function () { return {}; },
+  createBufferSource: function () {
+    return {
+      connect: function () {},
+      disconnect: function () {},
+      start: function () { sourceStarts += 1; },
+      onended: null,
+      buffer: null,
+    };
+  },
+};
+global.document = {
+  addEventListener: function (name, handler) { listeners[name] = handler; },
+  getElementById: function () { return null; },
+};
+global.window = {
+  localStorage: { getItem: function () { return null; }, setItem: function () {} },
+  Tone: {
+    getContext: function () { return { rawContext: rawContext }; },
+    start: function () { return pending; },
+  },
+};
+vm.runInThisContext(fs.readFileSync(process.argv[1], "utf8"));
+listeners.pointerdown({ type: "pointerdown", isComposing: false });
+rawContext.state = "suspended";
+listeners.touchend({ type: "touchend", isComposing: false });
+if (resumeCalls !== 2 || sourceStarts !== 2) {
+  process.exitCode = 1;
+}
+"""
+    result = subprocess.run(
+        ["node", "-e", script, str(ROOT / "static/js/audio.js")],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
 
 
 def test_effect_preferences_are_local_accessible_and_independent():

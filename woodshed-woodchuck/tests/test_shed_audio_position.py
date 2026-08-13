@@ -46,6 +46,13 @@ def test_shared_launcher_uses_lower_safe_edge_and_panel_opens_upward() -> None:
     assert "width: min(14rem, calc(100vw - 1.4rem))" in CSS
     assert "overflow-x" not in shared
 
+    shed_start = shared.index(".woodshed-scene > .shed-sound-effects-controls {")
+    shed_end = shared.index(".woodshed-scene > .shed-sound-effects-controls .sound-effects-panel", shed_start)
+    shed_controls = shared[shed_start:shed_end]
+    assert "position: absolute" in shed_controls
+    assert "right: max(0.5rem, env(safe-area-inset-right))" in shed_controls
+    assert "bottom: max(1.25rem, env(safe-area-inset-bottom))" in shed_controls
+
 
 def test_shared_placement_keeps_page_content_and_accessibility_intact() -> None:
     templates = {
