@@ -186,12 +186,23 @@
     }
   }
 
+  function audioContextIsRunning() {
+    if (!window.Tone || typeof window.Tone.getContext !== "function") return false;
+    try {
+      const context = window.Tone.getContext();
+      return !context || typeof context.state !== "string" || context.state === "running";
+    } catch (_error) {
+      return false;
+    }
+  }
+
   function unlock() {
-    if (unlocked) return Promise.resolve(true);
+    if (unlocked && audioContextIsRunning()) return Promise.resolve(true);
     if (unlockPending) return unlockPending;
     if (!window.Tone || typeof window.Tone.start !== "function") {
       return Promise.resolve(false);
     }
+    unlocked = false;
     unlockPending = Promise.resolve(window.Tone.start())
       .then(function () {
         unlocked = true;
@@ -378,12 +389,7 @@
 
   function gestureUnlock(event) {
     if (event.type === "keydown" && event.isComposing) return;
-    unlock().then(function (ready) {
-      if (!ready) return;
-      document.removeEventListener("pointerdown", gestureUnlock, true);
-      document.removeEventListener("click", gestureUnlock, true);
-      document.removeEventListener("keydown", gestureUnlock, true);
-    }).catch(function () {});
+    unlock().catch(function () {});
   }
   document.addEventListener("pointerdown", gestureUnlock, true);
   document.addEventListener("click", gestureUnlock, true);

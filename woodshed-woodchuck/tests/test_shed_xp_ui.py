@@ -6,6 +6,7 @@ from app.content import LEVEL_OPTIONS
 ROOT = Path(__file__).resolve().parents[1]
 HOME = (ROOT / "templates" / "home.html").read_text()
 APP = (ROOT / "static" / "js" / "app.js").read_text()
+CSS = (ROOT / "static" / "css" / "styles.css").read_text()
 MAIN = (ROOT / "app" / "main.py").read_text()
 
 
@@ -81,3 +82,18 @@ def test_profile_skill_level_editor_remains_separate() -> None:
     assert "const profileLevel = state.profile.level || \"Level not set\";" in hydrate
     assert "levelEl.textContent = profileLevel === \"Level not set\"" in hydrate
     assert "const control = document.getElementById(\"xp-level-control\");" in xp_javascript()
+
+
+def test_mobile_left_controls_are_compact_and_keep_markup_order() -> None:
+    start = CSS.index("/* Compact mobile SHED left controls")
+    end = CSS.index("/* SHED lifetime XP badge", start)
+    mobile = CSS[start:end]
+
+    assert "@media (max-width: 640px)" in mobile
+    assert ".woodshed-object-column-left {" in mobile
+    assert "justify-content: flex-start" in mobile
+    assert "gap: 0.6rem" in mobile
+    assert "height: auto !important" in mobile
+    assert ".woodshed-object-column-left > *" in mobile
+    assert "position: static !important" in mobile
+    assert HOME.index('id="instrument-object"') < HOME.index('id="xp-level-control"') < HOME.index('id="level-value"')

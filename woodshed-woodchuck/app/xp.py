@@ -124,7 +124,9 @@ def xp_sources(session: Session, *, profile_id: int) -> dict[str, int]:
     ) or 0
     p_charts = session.scalar(
         select(func.count()).select_from(PracticeChart).where(
-            PracticeChart.profile_id == profile_id
+            PracticeChart.profile_id == profile_id,
+            PracticeChart.source == "p-book",
+            PracticeChart.minutes > 0,
         )
     ) or 0
     return {

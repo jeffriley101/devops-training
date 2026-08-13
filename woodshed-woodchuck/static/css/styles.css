@@ -4499,6 +4499,26 @@ select {
   .team-leaderboard-grid { grid-template-columns: 1fr; }
 }
 
+/* Compact mobile SHED left controls without percentage-sized gaps. */
+@media (max-width: 640px) {
+  .woodshed-object-column-left {
+    top: max(0.75rem, env(safe-area-inset-top)) !important;
+    bottom: auto !important;
+    height: auto !important;
+    display: flex !important;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: flex-start;
+    gap: 0.6rem;
+    max-width: calc(100% - 1.2rem);
+  }
+
+  .woodshed-object-column-left > * {
+    position: static !important;
+    flex: 0 0 auto;
+  }
+}
+
 /* SHED lifetime XP badge and compact panel */
 .xp-level-control {
   display: grid;

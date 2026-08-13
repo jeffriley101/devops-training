@@ -17,7 +17,7 @@ def test_tone_is_exactly_pinned_local_licensed_and_loaded_in_order():
     assert "MIT License" in license_file.read_text()
     assert "cdn" not in BASE.casefold()
     tone_pos = BASE.index('/static/vendor/tone/Tone.js?v=15.1.22')
-    audio_pos = BASE.index('/static/js/audio.js?v=4')
+    audio_pos = BASE.index('/static/js/audio.js?v=5')
     app_pos = BASE.index('/static/js/app.js?v=39')
     assert tone_pos < audio_pos < app_pos
 
@@ -26,11 +26,14 @@ def test_audio_unlock_is_gesture_only_lazy_and_reuses_graph():
     assert 'document.addEventListener("pointerdown", gestureUnlock, true)' in AUDIO
     assert 'document.addEventListener("click", gestureUnlock, true)' in AUDIO
     assert 'document.addEventListener("keydown", gestureUnlock, true)' in AUDIO
-    assert 'document.removeEventListener("pointerdown", gestureUnlock, true)' in AUDIO
+    assert 'document.removeEventListener("pointerdown", gestureUnlock, true)' not in AUDIO
     assert 'document.addEventListener("DOMContentLoaded", wireControls' in AUDIO
     assert "Tone.start()" in AUDIO
     assert "if (graph || !window.Tone) return graph" in AUDIO
-    assert "if (unlocked) return Promise.resolve(true)" in AUDIO
+    assert "function audioContextIsRunning()" in AUDIO
+    assert 'context.state === "running"' in AUDIO
+    assert "if (unlocked && audioContextIsRunning()) return Promise.resolve(true)" in AUDIO
+    assert "unlocked = false;" in AUDIO
     assert ".catch(function () { return false; })" in AUDIO
     assert "Transport" not in AUDIO
 

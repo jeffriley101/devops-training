@@ -53,14 +53,21 @@ def add_profile(session, *, woodchuck_id: str = "WC-XP-TEST") -> WoodchuckProfil
     return profile
 
 
-def add_chart(session, profile_id: int, *, minutes: int, key: str) -> PracticeChart:
+def add_chart(
+    session,
+    profile_id: int,
+    *,
+    minutes: int,
+    key: str,
+    source: str = "p-book",
+) -> PracticeChart:
     chart = PracticeChart(
         profile_id=profile_id,
         practice_date=date(2025, 1, 6),
         minutes=minutes,
         instrument="Flute",
         practice_details=[],
-        source="p-book",
+        source=source,
         submission_key=key,
         include_contests=True,
         include_team_contests=True,
@@ -89,19 +96,28 @@ def add_plunge_event(
     ))
 
 
-def test_historical_positive_practice_minutes_and_all_chart_rows_count(xp_database) -> None:
+def test_historical_minutes_and_valid_submitted_p_charts_use_canonical_rows(
+    xp_database,
+) -> None:
     with xp_database() as session:
         profile = add_profile(session)
         add_chart(session, profile.id, minutes=90, key="old-positive")
         add_chart(session, profile.id, minutes=35, key="older-positive")
         add_chart(session, profile.id, minutes=0, key="zero-minute")
         add_chart(session, profile.id, minutes=-5, key="negative-minute")
+        add_chart(
+            session,
+            profile.id,
+            minutes=25,
+            key="imported-non-p-book",
+            source="quest",
+        )
         session.commit()
 
         sources = xp_sources(session, profile_id=profile.id)
 
-    assert sources["practice_minutes"] == 125
-    assert sources["p_charts"] == 4
+    assert sources["practice_minutes"] == 150
+    assert sources["p_charts"] == 2
 
 
 def test_rejected_verification_does_not_remove_p_chart_xp(xp_database) -> None:
