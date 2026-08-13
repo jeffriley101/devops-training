@@ -37,11 +37,11 @@
     </div>
 
     <div class="shop-object-column shop-object-column-right" aria-label="Shop shelves and rooms">
-      <button class="shop-scene-control shop-shelf-control" type="button" data-shop-panel="clothing" aria-label="Open Clothing Shelf, coming soon">
-        <span class="shop-control-emoji" aria-hidden="true">🧢</span><span class="sr-only">Clothing Shelf, coming soon</span>
+      <button class="shop-scene-control shop-shelf-control" type="button" data-shop-panel="gear" aria-label="Open Gear Shelf">
+        <span class="shop-control-emoji" aria-hidden="true">🧢</span><span class="sr-only">Gear Shelf</span>
       </button>
-      <button class="shop-scene-control shop-shelf-control" type="button" data-shop-panel="gear" aria-label="Open Gear Shelf, coming soon">
-        <span class="shop-control-emoji" aria-hidden="true">🧃</span><span class="sr-only">Gear Shelf, coming soon</span>
+      <button class="shop-scene-control shop-shelf-control" type="button" data-shop-panel="little-buddy" aria-label="Open Little Buddy Shelf">
+        <span class="shop-control-emoji" aria-hidden="true">🧃</span><span class="sr-only">Little Buddy Shelf</span>
       </button>
       <button class="shop-scene-control" type="button" data-shop-panel="practice-room" aria-label="Open Practice Rooms">
         <span class="shop-control-emoji" aria-hidden="true">🚪</span><span class="sr-only">Practice Rooms</span>
@@ -99,11 +99,15 @@
         </div>
         {% endif %}
       </section>
-      <section data-shop-panel-content="clothing" hidden>
-        <p class="shop-panel-sign">Coming Soon</p><p>Hats and hoodies are coming soon. This shelf has room for future avatar clothing.</p>
+      <section class="shop-catalog-panel" data-shop-panel-content="gear" hidden>
+        <p class="shop-shelf-status" data-shop-shelf-status="gear" role="status">Loading Gear Shelf…</p>
+        <div class="shop-catalog-grid" data-shop-items="gear" aria-label="Gear Shelf items"></div>
+        <p class="shop-purchase-feedback" data-shop-feedback="gear" role="status" aria-live="polite"></p>
       </section>
-      <section data-shop-panel-content="gear" hidden>
-        <p class="shop-panel-sign">Coming Soon</p><p>Future gear may include water bottles, stickers, instrument cases, and camp gear.</p>
+      <section class="shop-catalog-panel" data-shop-panel-content="little-buddy" hidden>
+        <p class="shop-shelf-status" data-shop-shelf-status="little-buddy" role="status">Loading Little Buddy Shelf…</p>
+        <div class="shop-catalog-grid" data-shop-items="little-buddy" aria-label="Little Buddy Shelf items"></div>
+        <p class="shop-purchase-feedback" data-shop-feedback="little-buddy" role="status" aria-live="polite"></p>
       </section>
       <section data-shop-panel-content="practice-room" hidden>
         <p>Take a private lesson using special tools to help develop your Woodchuck's musical skills.</p>

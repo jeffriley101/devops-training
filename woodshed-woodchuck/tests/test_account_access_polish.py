@@ -63,7 +63,7 @@ def test_account_control_is_rendered_once_in_shop_share_dialog() -> None:
 
     assert 'class="account-access-control" href="/account/privacy"' not in base
     assert "shed-account-privacy-link" not in home
-    share = store[store.index('data-shop-panel-content="share"'):store.index('data-shop-panel-content="clothing"')]
+    share = store[store.index('data-shop-panel-content="share"'):store.index('data-shop-panel-content="gear"')]
     assert 'class="authenticated-access-controls shop-share-account-controls"' in share
     assert 'class="account-access-control" href="/account/privacy"' in share
     assert 'id="authenticated-logout"' in share

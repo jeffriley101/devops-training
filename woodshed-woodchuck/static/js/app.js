@@ -3032,14 +3032,159 @@
     const qrStatus = document.getElementById("shop-qr-status");
     const controls = Array.from(document.querySelectorAll("[data-shop-panel]"));
     if (!dialog || !closeButton || !title || !controls.length) return;
+    if (dialog.dataset.woodshedShopWired === "true") return;
+    dialog.dataset.woodshedShopWired = "true";
+
     const panels = Array.from(dialog.querySelectorAll("[data-shop-panel-content]"));
     const titles = {
       crown: "Crown Progress", goat: "The GOAT Tracker",
       "practice-definition": "Practice Definition", share: "Share Woodshed",
-      clothing: "Clothing Shelf", gear: "Gear Shelf",
+      gear: "Gear Shelf", "little-buddy": "Little Buddy Shelf",
       "practice-room": "Practice Rooms", artist: "Artist",
     };
+    const catalogShelfKeys = new Set(["gear", "little-buddy"]);
+    const shelfItems = { gear: [], "little-buddy": [] };
+    const ownedCounts = new Map();
+    const purchaseInFlight = new Set();
+    let shopDataPromise = null;
+    let inventoryAvailable = false;
     let activator = null;
+
+    function setShelfFeedback(shelfKey, message, isError = false) {
+      const feedback = dialog.querySelector(`[data-shop-feedback="${shelfKey}"]`);
+      if (!feedback) return;
+      feedback.textContent = message;
+      feedback.classList.toggle("shop-purchase-error", isError);
+    }
+
+    function renderShelf(shelfKey) {
+      const container = dialog.querySelector(`[data-shop-items="${shelfKey}"]`);
+      const status = dialog.querySelector(`[data-shop-shelf-status="${shelfKey}"]`);
+      if (!container || !status) return;
+      container.replaceChildren();
+
+      shelfItems[shelfKey].forEach((item) => {
+        const card = document.createElement("article");
+        card.className = "shop-catalog-item";
+
+        const emoji = document.createElement("span");
+        emoji.className = "shop-catalog-item-emoji";
+        emoji.setAttribute("aria-hidden", "true");
+        emoji.textContent = item.emoji;
+
+        const name = document.createElement("strong");
+        name.className = "shop-catalog-item-name";
+        name.textContent = item.name;
+
+        const price = document.createElement("span");
+        price.className = "shop-catalog-item-price";
+        price.textContent = `${item.price} dandelions`;
+
+        const quantity = document.createElement("span");
+        quantity.className = "shop-catalog-owned";
+        quantity.textContent = `Owned ×${ownedCounts.get(item.item_key) || 0}`;
+
+        const buyButton = document.createElement("button");
+        buyButton.className = "btn btn-primary shop-buy-button";
+        buyButton.type = "button";
+        buyButton.dataset.shopBuy = item.item_key;
+        buyButton.dataset.shopShelf = shelfKey;
+        buyButton.textContent = purchaseInFlight.has(item.item_key) ? "Buying…" : "Buy";
+        buyButton.disabled = purchaseInFlight.has(item.item_key) || !inventoryAvailable;
+
+        card.append(emoji, name, price, quantity, buyButton);
+        container.append(card);
+      });
+
+      status.hidden = inventoryAvailable;
+      status.textContent = inventoryAvailable
+        ? ""
+        : "Sign in as a Woodchuck to buy shelf items.";
+    }
+
+    async function loadShopData() {
+      if (shopDataPromise) return shopDataPromise;
+      shopDataPromise = (async () => {
+        const [catalogResponse, inventoryResponse] = await Promise.all([
+          fetch("/store/catalog", { credentials: "same-origin", cache: "no-store" }),
+          fetch("/store/inventory", { credentials: "same-origin", cache: "no-store" }),
+        ]);
+        if (!catalogResponse.ok) throw new Error("The SHOP catalog is unavailable right now.");
+        if (!inventoryResponse.ok && inventoryResponse.status !== 401) {
+          throw new Error("Your owned items are unavailable right now.");
+        }
+
+        const catalog = await catalogResponse.json();
+        const inventory = inventoryResponse.ok ? await inventoryResponse.json() : { items: [] };
+        const gear = catalog?.shelves?.gear;
+        const littleBuddy = catalog?.shelves?.little_buddy;
+        if (!Array.isArray(gear) || gear.length !== 4 || !Array.isArray(littleBuddy) || littleBuddy.length !== 4) {
+          throw new Error("The SHOP catalog is unavailable right now.");
+        }
+        shelfItems.gear = gear;
+        shelfItems["little-buddy"] = littleBuddy;
+        ownedCounts.clear();
+        (Array.isArray(inventory.items) ? inventory.items : []).forEach((item) => {
+          ownedCounts.set(item.item_key, (ownedCounts.get(item.item_key) || 0) + 1);
+        });
+        inventoryAvailable = inventoryResponse.ok;
+      })();
+      try {
+        await shopDataPromise;
+      } catch (error) {
+        shopDataPromise = null;
+        throw error;
+      }
+    }
+
+    async function openShelf(shelfKey) {
+      const status = dialog.querySelector(`[data-shop-shelf-status="${shelfKey}"]`);
+      if (status) {
+        status.hidden = false;
+        status.textContent = "Loading shelf…";
+      }
+      setShelfFeedback(shelfKey, "");
+      try {
+        await loadShopData();
+        renderShelf(shelfKey);
+      } catch (error) {
+        if (status) status.textContent = error.message || "The SHOP shelf is unavailable right now.";
+      }
+    }
+
+    async function purchaseItem(shelfKey, itemKey) {
+      const item = shelfItems[shelfKey].find((candidate) => candidate.item_key === itemKey);
+      if (!item || purchaseInFlight.has(itemKey)) return;
+      purchaseInFlight.add(itemKey);
+      setShelfFeedback(shelfKey, "");
+      renderShelf(shelfKey);
+      try {
+        const response = await fetch("/store/purchases", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ item_key: itemKey }),
+        });
+        let payload = {};
+        try { payload = await response.json(); } catch (_error) { payload = {}; }
+        if (!response.ok) {
+          throw new Error(payload.detail || (response.status === 409
+            ? "Not enough dandelions for that item."
+            : "That purchase could not be completed."));
+        }
+        ownedCounts.set(itemKey, (ownedCounts.get(itemKey) || 0) + 1);
+        const credits = document.getElementById("credits-value");
+        const dandelionControl = document.getElementById("dandelion-object");
+        if (credits) credits.textContent = String(payload.dandelion_balance);
+        if (dandelionControl) dandelionControl.setAttribute("aria-label", `${payload.dandelion_balance} dandelions`);
+        setShelfFeedback(shelfKey, `${item.name} purchased. Owned ×${ownedCounts.get(itemKey)}.`);
+      } catch (error) {
+        setShelfFeedback(shelfKey, error.message || "That purchase could not be completed.", true);
+      } finally {
+        purchaseInFlight.delete(itemKey);
+        renderShelf(shelfKey);
+      }
+    }
 
     async function copyPublicAddress(control) {
       const address = control.dataset.publicSiteUrl;
@@ -3065,14 +3210,20 @@
           qrStatus.textContent = "";
           copyPublicAddress(control);
         }
+        if (catalogShelfKeys.has(key)) void openShelf(key);
         dialog.showModal();
         title.focus({ preventScroll: true });
       });
     });
-    closeButton.addEventListener("click", () => dialog.close());
     dialog.addEventListener("click", function (event) {
+      const buyButton = event.target.closest("[data-shop-buy]");
+      if (buyButton && dialog.contains(buyButton)) {
+        void purchaseItem(buyButton.dataset.shopShelf, buyButton.dataset.shopBuy);
+        return;
+      }
       if (event.target === dialog) dialog.close();
     });
+    closeButton.addEventListener("click", () => dialog.close());
     dialog.addEventListener("close", function () {
       if (activator) activator.focus({ preventScroll: true });
     });

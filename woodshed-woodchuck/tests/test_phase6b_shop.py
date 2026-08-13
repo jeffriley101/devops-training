@@ -52,7 +52,8 @@ def test_right_controls_and_donation_are_unique() -> None:
     assert [markup.index(item) for item in controls] == sorted(markup.index(item) for item in controls)
     assert "Open Spectrogram" in markup
     assert "Pristine P-Chart — Coming Soon" in markup
-    assert "water bottles" in markup and "instrument cases" in markup
+    assert "Clothing Shelf, coming soon" not in markup
+    assert "Gear Shelf, coming soon" not in markup
     assert "direct file upload" not in markup
     assert markup.count("venmo.com/u/jeffriley101") == 1
     assert markup.count('aria-label="Donate"') == 1
@@ -65,7 +66,7 @@ def test_single_dialog_and_keyboard_focus_behavior_are_wired() -> None:
     assert 'aria-labelledby="shop-dialog-title"' in markup
     for label in (
         "Open Crown Progress", "Open The GOAT Tracker", "Open Practice Definition",
-        "Share Woodshed", "Open Clothing Shelf", "Open Gear Shelf",
+        "Share Woodshed", "Open Gear Shelf", "Open Little Buddy Shelf",
         "Open Practice Room", "Open Artist instructions", "Donate",
     ):
         assert f'aria-label="{label}' in markup
@@ -77,7 +78,9 @@ def test_single_dialog_and_keyboard_focus_behavior_are_wired() -> None:
     assert 'aria-live="polite"' in markup
     shop_wiring = javascript[javascript.index("function wireShopPolish"):javascript.index("function wirePBook")]
     assert "saveState" not in shop_wiring
-    assert 'fetch(' not in shop_wiring
+    assert 'fetch("/store/catalog"' in shop_wiring
+    assert 'fetch("/store/inventory"' in shop_wiring
+    assert 'fetch("/store/purchases"' in shop_wiring
 
 
 def test_share_uses_one_canonical_url_and_accessible_qr(monkeypatch) -> None:
