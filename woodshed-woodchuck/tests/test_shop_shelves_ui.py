@@ -12,14 +12,14 @@ CSS = (ROOT / "static" / "css" / "styles.css").read_text(encoding="utf-8")
 SHOP_WIRING = APP[APP.index("function wireShopPolish"):APP.index("function wirePBook")]
 
 
-def test_hat_and_juice_open_the_two_catalog_shelves() -> None:
+def test_hat_and_buddy_open_the_two_catalog_shelves() -> None:
     hat = STORE[STORE.index("🧢") - 220:STORE.index("🧢") + 180]
-    juice = STORE[STORE.index("🧃") - 220:STORE.index("🧃") + 190]
+    buddy = STORE[STORE.index("🐛") - 220:STORE.index("🐛") + 190]
     assert "data-shop-panel=\"gear\"" in hat
     assert "Open Gear Shelf" in hat
-    assert "data-shop-panel=\"little-buddy\"" in juice
-    assert "Open Little Buddy Shelf" in juice
-    assert "coming soon" not in (hat + juice).casefold()
+    assert "data-shop-panel=\"little-buddy\"" in buddy
+    assert "Open Little Buddy Shelf" in buddy
+    assert "coming soon" not in (hat + buddy).casefold()
 
 
 def test_each_shelf_renders_exactly_four_server_catalog_items() -> None:

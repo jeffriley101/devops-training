@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from copy import deepcopy
 from datetime import datetime, timezone
+import math
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from .models import OwnedItemCopy, WoodchuckState
+from .models import OwnedItemCopy, WoodchuckProfile, WoodchuckState
 from .store_catalog import active_catalog_item, item_definition
 
 
@@ -17,6 +18,17 @@ class InsufficientDandelionsError(ValueError):
 
 class StoreItemUnavailableError(ValueError):
     pass
+
+
+class OwnedItemAccessError(ValueError):
+    pass
+
+
+class DecorationCollisionError(ValueError):
+    pass
+
+
+DECORATION_HITBOX_NORMALIZED = 0.10
 
 
 def _credits(state: WoodchuckState | None) -> int:
@@ -50,6 +62,93 @@ def list_owned_items(session: Session, *, profile_id: int) -> list[OwnedItemCopy
         .where(OwnedItemCopy.profile_id == profile_id)
         .order_by(OwnedItemCopy.acquired_at.asc(), OwnedItemCopy.id.asc())
     ).all())
+
+
+def _normalized_coordinate(value: float) -> float:
+    coordinate = float(value)
+    if not math.isfinite(coordinate) or coordinate < 0 or coordinate > 1:
+        raise ValueError("Decoration coordinates must be between 0 and 1.")
+    return coordinate
+
+
+def _lock_placement_profile(session: Session, *, profile_id: int) -> None:
+    locked_profile_id = session.scalar(
+        select(WoodchuckProfile.id)
+        .where(WoodchuckProfile.id == profile_id)
+        .with_for_update()
+    )
+    if locked_profile_id is None:
+        raise OwnedItemAccessError("That owned item is unavailable.")
+
+
+def place_owned_item_copy(
+    session: Session,
+    *,
+    profile_id: int,
+    owned_item_id: int,
+    placement_x: float,
+    placement_y: float,
+) -> OwnedItemCopy:
+    x = _normalized_coordinate(placement_x)
+    y = _normalized_coordinate(placement_y)
+    _lock_placement_profile(session, profile_id=profile_id)
+    owned = session.scalar(
+        select(OwnedItemCopy)
+        .where(
+            OwnedItemCopy.id == owned_item_id,
+            OwnedItemCopy.profile_id == profile_id,
+        )
+        .with_for_update()
+    )
+    if owned is None:
+        raise OwnedItemAccessError("That owned item is unavailable.")
+
+    placed_items = session.scalars(
+        select(OwnedItemCopy)
+        .where(
+            OwnedItemCopy.profile_id == profile_id,
+            OwnedItemCopy.id != owned_item_id,
+            OwnedItemCopy.placement_x.is_not(None),
+            OwnedItemCopy.placement_y.is_not(None),
+        )
+        .with_for_update()
+    ).all()
+    for other in placed_items:
+        if (
+            abs(float(other.placement_x) - x) < DECORATION_HITBOX_NORMALIZED
+            and abs(float(other.placement_y) - y) < DECORATION_HITBOX_NORMALIZED
+        ):
+            raise DecorationCollisionError(
+                "That spot overlaps another decoration. Choose another spot."
+            )
+
+    owned.placement_x = x
+    owned.placement_y = y
+    session.flush()
+    return owned
+
+
+def remove_owned_item_copy_placement(
+    session: Session,
+    *,
+    profile_id: int,
+    owned_item_id: int,
+) -> OwnedItemCopy:
+    _lock_placement_profile(session, profile_id=profile_id)
+    owned = session.scalar(
+        select(OwnedItemCopy)
+        .where(
+            OwnedItemCopy.id == owned_item_id,
+            OwnedItemCopy.profile_id == profile_id,
+        )
+        .with_for_update()
+    )
+    if owned is None:
+        raise OwnedItemAccessError("That owned item is unavailable.")
+    owned.placement_x = None
+    owned.placement_y = None
+    session.flush()
+    return owned
 
 
 def purchase_catalog_item(

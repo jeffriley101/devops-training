@@ -68,8 +68,8 @@ def test_shared_placement_keeps_page_content_and_accessibility_intact() -> None:
     assert 'class="sound-effects-controls shed-sound-effects-controls"' in templates["SHED"]
     assert "practice-timer" in templates["BOOK"] and "Submit" in templates["BOOK"]
     assert "Bonus Challenge" in templates["BOARD"] and "plunge-burrow-button" in templates["BOARD"]
-    assert 'data-shop-panel-content="clothing"' in templates["SHOP"]
-    assert "Hats and hoodies" in templates["SHOP"]
+    assert 'data-shop-panel-content="gear"' in templates["SHOP"]
+    assert 'data-shop-panel-content="little-buddy"' in templates["SHOP"]
     assert 'aria-label="Sound Effects On. Open settings."' in BASE
     assert 'aria-controls="sound-effects-panel"' in BASE
     assert ".sound-effects-button:focus-visible" in CSS

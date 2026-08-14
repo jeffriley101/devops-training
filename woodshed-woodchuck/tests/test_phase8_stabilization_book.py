@@ -131,8 +131,8 @@ def test_book_history_uses_accessible_verified_and_pristine_badges() -> None:
 
 def test_book_asset_versions_are_advanced() -> None:
     base = (ROOT / "templates/base.html").read_text(encoding="utf-8")
-    assert "/static/css/styles.css?v=78" in base
-    assert "/static/js/app.js?v=40" in base
+    assert "/static/css/styles.css?v=79" in base
+    assert "/static/js/app.js?v=41" in base
     assert "styles.css?v=68" not in base
     assert "app.js?v=34" not in base
 

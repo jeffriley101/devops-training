@@ -12,7 +12,7 @@ MAIN = (ROOT / "app" / "main.py").read_text()
 
 def xp_javascript() -> str:
     start = APP.index("  function wireXpPanel() {")
-    end = APP.index("  function wireShedSecret() {", start)
+    end = APP.index("  function wireShedDecorations() {", start)
     return APP[start:end]
 
 

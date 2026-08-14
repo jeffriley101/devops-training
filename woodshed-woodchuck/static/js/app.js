@@ -498,6 +498,317 @@
     refresh();
   }
 
+  function wireShedDecorations() {
+    const scene = document.querySelector(".woodshed-scene");
+    const layer = document.getElementById("shed-decoration-layer");
+    const control = document.getElementById("shed-decorate-button");
+    const panel = document.getElementById("shed-decorate-panel");
+    const closeButton = document.getElementById("shed-decorate-close");
+    const inventoryEl = document.getElementById("shed-decoration-inventory");
+    const placedListEl = document.getElementById("shed-decoration-placed-list");
+    const feedbackEl = document.getElementById("shed-decoration-feedback");
+    if (!scene || !layer || !control || !panel || !closeButton || !inventoryEl || !placedListEl || !feedbackEl) return;
+    if (control.dataset.decorateWired === "true") return;
+    control.dataset.decorateWired = "true";
+
+    const COLLISION_SIZE = 0.10;
+    const placementRequests = new Set();
+    let ownedItems = [];
+    let decorateMode = false;
+    let dragState = null;
+
+    function isPlaced(item) {
+      return Number.isFinite(item.placement_x) && Number.isFinite(item.placement_y);
+    }
+
+    function itemLabel(item) {
+      const matching = ownedItems.filter((candidate) => candidate.item_key === item.item_key);
+      if (matching.length < 2) return item.name;
+      return `${item.name} copy ${matching.findIndex((candidate) => candidate.id === item.id) + 1}`;
+    }
+
+    function setFeedback(message, isError = false) {
+      feedbackEl.textContent = message;
+      feedbackEl.classList.toggle("shed-decoration-error", isError);
+    }
+
+    function positionDecoration(element, item) {
+      const maxLeft = Math.max(0, layer.clientWidth - element.offsetWidth);
+      const maxTop = Math.max(0, layer.clientHeight - element.offsetHeight);
+      element.style.left = `${Math.max(0, Math.min(1, item.placement_x)) * maxLeft}px`;
+      element.style.top = `${Math.max(0, Math.min(1, item.placement_y)) * maxTop}px`;
+    }
+
+    function renderPlacedDecorations() {
+      layer.replaceChildren();
+      ownedItems.filter(isPlaced).forEach((item) => {
+        const decoration = document.createElement(decorateMode ? "button" : "span");
+        decoration.className = "shed-decoration";
+        if (decorateMode) decoration.type = "button";
+        else decoration.setAttribute("role", "img");
+        decoration.dataset.ownedCopyId = String(item.id);
+        decoration.textContent = item.emoji;
+        decoration.title = itemLabel(item);
+        decoration.setAttribute(
+          "aria-label",
+          decorateMode ? `Move ${itemLabel(item)}` : itemLabel(item)
+        );
+        if (decorateMode) {
+          decoration.tabIndex = 0;
+          decoration.disabled = placementRequests.has(item.id);
+        }
+        layer.append(decoration);
+        positionDecoration(decoration, item);
+      });
+    }
+
+    function makeInventoryRow(item, action, actionLabel) {
+      const row = document.createElement("div");
+      row.className = "shed-decoration-inventory-item";
+      const identity = document.createElement("span");
+      identity.className = "shed-decoration-inventory-identity";
+      const emoji = document.createElement("span");
+      emoji.className = "shed-decoration-inventory-emoji";
+      emoji.setAttribute("aria-hidden", "true");
+      emoji.textContent = item.emoji;
+      const name = document.createElement("strong");
+      name.textContent = itemLabel(item);
+      identity.append(emoji, name);
+      const button = document.createElement("button");
+      button.className = "btn btn-secondary shed-decoration-action";
+      button.type = "button";
+      button.dataset.decorationAction = action;
+      button.dataset.ownedCopyId = String(item.id);
+      button.textContent = placementRequests.has(item.id) ? "Saving…" : actionLabel;
+      button.disabled = placementRequests.has(item.id);
+      row.append(identity, button);
+      return row;
+    }
+
+    function renderInventory() {
+      inventoryEl.replaceChildren();
+      placedListEl.replaceChildren();
+      const unplaced = ownedItems.filter((item) => !isPlaced(item));
+      const placed = ownedItems.filter(isPlaced);
+      if (!unplaced.length) {
+        const empty = document.createElement("p");
+        empty.textContent = "No unplaced owned items. Visit SHOP to add more.";
+        inventoryEl.append(empty);
+      } else {
+        unplaced.forEach((item) => inventoryEl.append(makeInventoryRow(item, "place", "Place")));
+      }
+      if (!placed.length) {
+        const empty = document.createElement("p");
+        empty.textContent = "No decorations are in the SHED yet.";
+        placedListEl.append(empty);
+      } else {
+        placed.forEach((item) => placedListEl.append(makeInventoryRow(item, "remove", "Return to Inventory")));
+      }
+    }
+
+    function renderAll() {
+      scene.classList.toggle("is-decorating", decorateMode);
+      renderPlacedDecorations();
+      renderInventory();
+    }
+
+    function updateOwnedItem(updated) {
+      const index = ownedItems.findIndex((item) => item.id === updated.id);
+      if (index >= 0) ownedItems[index] = updated;
+    }
+
+    async function responsePayload(response, fallback) {
+      let payload = {};
+      try { payload = await response.json(); } catch (_error) { payload = {}; }
+      if (!response.ok) throw new Error(payload.detail || fallback);
+      return payload;
+    }
+
+    async function savePlacement(item, x, y) {
+      if (placementRequests.has(item.id)) return false;
+      placementRequests.add(item.id);
+      setFeedback("Saving decoration…");
+      renderInventory();
+      try {
+        const response = await fetch(`/store/inventory/${item.id}/placement`, {
+          method: "PUT",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ x, y }),
+        });
+        const payload = await responsePayload(response, "That decoration could not be placed.");
+        updateOwnedItem(payload.item);
+        setFeedback(`${item.name} placed in the SHED.`);
+        return true;
+      } catch (error) {
+        setFeedback(error.message || "That decoration could not be placed.", true);
+        return false;
+      } finally {
+        placementRequests.delete(item.id);
+        renderAll();
+      }
+    }
+
+    async function removePlacement(item) {
+      if (placementRequests.has(item.id)) return;
+      placementRequests.add(item.id);
+      setFeedback("Returning decoration to inventory…");
+      renderInventory();
+      try {
+        const response = await fetch(`/store/inventory/${item.id}/placement`, {
+          method: "DELETE",
+          credentials: "same-origin",
+        });
+        const payload = await responsePayload(response, "That decoration could not be returned.");
+        updateOwnedItem(payload.item);
+        setFeedback(`${item.name} returned to inventory.`);
+      } catch (error) {
+        setFeedback(error.message || "That decoration could not be returned.", true);
+      } finally {
+        placementRequests.delete(item.id);
+        renderAll();
+      }
+    }
+
+    function overlapsPlaced(x, y, ignoredId = null) {
+      return ownedItems.some((item) => (
+        item.id !== ignoredId
+        && isPlaced(item)
+        && Math.abs(item.placement_x - x) < COLLISION_SIZE
+        && Math.abs(item.placement_y - y) < COLLISION_SIZE
+      ));
+    }
+
+    function nextOpenPlacement() {
+      const positions = [0.28, 0.42, 0.56, 0.70];
+      for (const y of positions) {
+        for (const x of positions) {
+          if (!overlapsPlaced(x, y)) return { x, y };
+        }
+      }
+      return null;
+    }
+
+    async function placeFromInventory(item) {
+      const position = nextOpenPlacement();
+      if (!position) {
+        setFeedback("The middle of the SHED is full. Move or return a decoration first.", true);
+        return;
+      }
+      await savePlacement(item, position.x, position.y);
+    }
+
+    async function refreshInventory() {
+      control.setAttribute("aria-busy", "true");
+      try {
+        const response = await fetch("/store/inventory", {
+          credentials: "same-origin",
+          cache: "no-store",
+        });
+        const payload = await responsePayload(response, "Owned items are unavailable right now.");
+        ownedItems = Array.isArray(payload.items) ? payload.items : [];
+        renderAll();
+      } catch (error) {
+        setFeedback(error.message || "Owned items are unavailable right now.", true);
+      } finally {
+        control.removeAttribute("aria-busy");
+      }
+    }
+
+    function openDecorateMode() {
+      decorateMode = true;
+      panel.hidden = false;
+      panel.classList.remove("hidden");
+      control.setAttribute("aria-expanded", "true");
+      setFeedback("");
+      renderAll();
+      void refreshInventory();
+    }
+
+    function closeDecorateMode() {
+      decorateMode = false;
+      dragState = null;
+      panel.hidden = true;
+      panel.classList.add("hidden");
+      control.setAttribute("aria-expanded", "false");
+      renderAll();
+      control.focus();
+    }
+
+    control.addEventListener("click", function () {
+      if (decorateMode) closeDecorateMode();
+      else openDecorateMode();
+    });
+    closeButton.addEventListener("click", closeDecorateMode);
+    panel.addEventListener("click", function (event) {
+      const button = event.target.closest("[data-decoration-action]");
+      if (!button) return;
+      const itemId = Number(button.dataset.ownedCopyId);
+      const item = ownedItems.find((candidate) => candidate.id === itemId);
+      if (!item) return;
+      if (button.dataset.decorationAction === "place") void placeFromInventory(item);
+      if (button.dataset.decorationAction === "remove") void removePlacement(item);
+    });
+
+    layer.addEventListener("pointerdown", function (event) {
+      if (!decorateMode) return;
+      const decoration = event.target.closest(".shed-decoration");
+      if (!decoration) return;
+      const item = ownedItems.find((candidate) => candidate.id === Number(decoration.dataset.ownedCopyId));
+      if (!item || placementRequests.has(item.id)) return;
+      const rect = decoration.getBoundingClientRect();
+      dragState = {
+        decoration,
+        item,
+        pointerId: event.pointerId,
+        offsetX: event.clientX - rect.left,
+        offsetY: event.clientY - rect.top,
+        x: item.placement_x,
+        y: item.placement_y,
+      };
+      decoration.setPointerCapture(event.pointerId);
+      decoration.classList.add("is-dragging");
+      event.preventDefault();
+    });
+    layer.addEventListener("pointermove", function (event) {
+      if (!dragState || event.pointerId !== dragState.pointerId) return;
+      const sceneRect = layer.getBoundingClientRect();
+      const maxLeft = Math.max(1, layer.clientWidth - dragState.decoration.offsetWidth);
+      const maxTop = Math.max(1, layer.clientHeight - dragState.decoration.offsetHeight);
+      const left = Math.max(0, Math.min(maxLeft, event.clientX - sceneRect.left - dragState.offsetX));
+      const top = Math.max(0, Math.min(maxTop, event.clientY - sceneRect.top - dragState.offsetY));
+      dragState.x = left / maxLeft;
+      dragState.y = top / maxTop;
+      dragState.decoration.style.left = `${left}px`;
+      dragState.decoration.style.top = `${top}px`;
+      event.preventDefault();
+    });
+    layer.addEventListener("pointerup", function (event) {
+      if (!dragState || event.pointerId !== dragState.pointerId) return;
+      const completedDrag = dragState;
+      dragState = null;
+      completedDrag.decoration.classList.remove("is-dragging");
+      completedDrag.decoration.releasePointerCapture(event.pointerId);
+      if (
+        Math.abs(completedDrag.x - completedDrag.item.placement_x) < 0.001
+        && Math.abs(completedDrag.y - completedDrag.item.placement_y) < 0.001
+      ) return;
+      void savePlacement(completedDrag.item, completedDrag.x, completedDrag.y);
+    });
+    layer.addEventListener("pointercancel", function (event) {
+      if (!dragState || event.pointerId !== dragState.pointerId) return;
+      dragState = null;
+      renderPlacedDecorations();
+    });
+    window.addEventListener("resize", renderPlacedDecorations);
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && decorateMode) closeDecorateMode();
+    });
+
+    renderAll();
+    void refreshInventory();
+  }
+
   function wireShedSecret() {
     const trigger = document.getElementById("shed-secret-button");
     const panel = document.getElementById("shed-secret-panel");
@@ -4218,6 +4529,7 @@
   wireSetupForm(state);
   hydrateHome(state);
   wireXpPanel();
+  wireShedDecorations();
   wireShedSecret();
   wireShedTeamBadge();
   if (document.getElementById("woodchuck-name-value")) refreshPracticeStreak();

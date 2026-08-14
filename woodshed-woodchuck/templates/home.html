@@ -12,6 +12,19 @@
       />
     </div>
 
+    <div id="shed-decoration-layer" class="shed-decoration-layer" aria-label="Placed SHED decorations"></div>
+
+    <button
+      id="shed-decorate-button"
+      class="shed-decorate-button"
+      type="button"
+      aria-controls="shed-decorate-panel"
+      aria-expanded="false"
+    >
+      <span aria-hidden="true">🎨</span>
+      <span>Decorate</span>
+    </button>
+
     <div class="woodshed-foreground" aria-label="Clickable Woodshed objects">
       <div class="woodshed-object-column woodshed-object-column-left">
         <button
@@ -128,6 +141,22 @@
       </div>
     </div>
   </div>
+
+  <section id="shed-decorate-panel" class="mentor-card shed-decorate-panel hidden" hidden aria-labelledby="shed-decorate-title">
+    <div class="shed-decorate-panel-head">
+      <div>
+        <p class="chip">Owned Items</p>
+        <h2 id="shed-decorate-title">Decorate the SHED</h2>
+      </div>
+      <button id="shed-decorate-close" class="shed-decorate-close" type="button" aria-label="Close Decorate mode">×</button>
+    </div>
+    <p>Tap an inventory item to place it. Drag placed items to move them.</p>
+    <h3>Inventory</h3>
+    <div id="shed-decoration-inventory" class="shed-decoration-inventory" aria-live="polite"></div>
+    <h3>In the SHED</h3>
+    <div id="shed-decoration-placed-list" class="shed-decoration-placed-list" aria-live="polite"></div>
+    <p id="shed-decoration-feedback" class="shed-decoration-feedback" role="status" aria-live="polite"></p>
+  </section>
 
   <section id="xp-panel" class="mentor-card xp-panel hidden" hidden aria-labelledby="xp-panel-title">
     <div class="xp-panel-head">
