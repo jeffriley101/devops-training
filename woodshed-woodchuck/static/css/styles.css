@@ -471,45 +471,30 @@ select {
 }
 
 .shed-decorate-button {
-  position: absolute;
-  top: max(.55rem, env(safe-area-inset-top));
-  left: 50%;
-  z-index: 4;
-  display: inline-flex;
-  min-height: 2.5rem;
-  padding: .35rem .7rem;
-  align-items: center;
-  gap: .3rem;
-  border: 2px solid #6b3f1f;
-  border-radius: 999px;
-  color: #352616;
-  background: rgba(255, 245, 207, .94);
-  box-shadow: 0 3px 8px rgba(35, 12, 29, .3);
-  font: inherit;
-  font-size: .85rem;
-  font-weight: 900;
-  transform: translateX(-50%);
   cursor: pointer;
+  font: inherit;
 }
 
 .shed-decorate-panel {
-  max-width: 38rem;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+  max-width: 36rem;
   margin: 1rem auto 0;
+  text-align: left;
 }
 
 .shed-decorate-panel-head {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
+  justify-content: flex-end;
 }
-
-.shed-decorate-panel-head h2 { margin: .2rem 0 0; }
 .shed-decorate-close {
+  position: fixed;
+  top: max(0.75rem, env(safe-area-inset-top));
+  right: max(0.75rem, env(safe-area-inset-right));
+  z-index: 1200;
   width: 2.5rem;
   height: 2.5rem;
   padding: 0;
-  flex: 0 0 2.5rem;
   border: 1px solid rgba(108, 76, 42, .35);
   border-radius: 50%;
   color: #352616;
@@ -523,7 +508,7 @@ select {
 .shed-decoration-placed-list {
   display: grid;
   min-width: 0;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: .65rem;
 }
 
@@ -539,6 +524,24 @@ select {
   background: rgba(255, 248, 232, .72);
 }
 
+.shed-decoration-placed-list .shed-decoration-inventory-item {
+  display: grid;
+  grid-template-columns: 3rem minmax(10.5rem, 1fr);
+  align-items: center;
+}
+
+.shed-decoration-placed-list .shed-decoration-inventory-identity {
+  min-width: 3rem;
+  justify-content: center;
+}
+
+.shed-decoration-placed-list .shed-decoration-action {
+  min-width: 10.5rem;
+  max-width: 100%;
+  justify-self: end;
+  white-space: nowrap;
+}
+
 .shed-decoration-inventory-identity {
   display: flex;
   min-width: 0;
@@ -549,17 +552,9 @@ select {
 
 .shed-decoration-inventory-emoji { font-size: 1.5rem; }
 .shed-decoration-action { min-height: 44px; }
-.shed-decoration-feedback { min-height: 1.4em; }
 .shed-decoration-error { color: #9f1d1d; font-weight: 800; }
 
 @media (max-width: 480px) {
-  .shed-decorate-button {
-    top: max(.35rem, env(safe-area-inset-top));
-    min-height: 2.25rem;
-    padding: .25rem .55rem;
-    font-size: .75rem;
-  }
-
   .shed-decoration {
     width: 1.7rem;
     height: 1.7rem;
@@ -571,8 +566,18 @@ select {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .shed-decoration-inventory-item { flex-wrap: wrap; }
-  .shed-decoration-action { width: 100%; }
+  .shed-decoration-placed-list .shed-decoration-inventory-item {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+  }
+
+  .shed-decoration-placed-list .shed-decoration-action {
+    width: 100%;
+    min-width: 0;
+    justify-self: stretch;
+    white-space: normal;
+  }
+
 }
 
 .shed-readout {
@@ -4599,15 +4604,25 @@ select {
   overflow-y: auto;
 }
 
-.woodshed-scene > .shed-sound-effects-controls {
-  position: absolute;
-  top: auto;
-  right: max(0.5rem, env(safe-area-inset-right));
-  bottom: max(1.25rem, env(safe-area-inset-bottom));
+.woodshed-object-column-right > .shed-sound-effects-controls {
+  position: relative;
+  inset: auto;
   z-index: 4;
 }
 
-.woodshed-scene > .shed-sound-effects-controls .sound-effects-panel {
+.woodshed-object-column-right > .shed-sound-effects-controls .sound-effects-button {
+  width: 3.5rem;
+  height: 3.5rem;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  filter: drop-shadow(0 4px 4px rgba(35, 24, 16, 0.8));
+  font-size: clamp(2.2rem, 5vw, 3.1rem);
+}
+
+.woodshed-object-column-right > .shed-sound-effects-controls .sound-effects-panel {
   top: auto;
   right: 0;
   bottom: 3.15rem;
@@ -4638,12 +4653,16 @@ select {
 .shed-readout-name::before { left: 0.35rem; }
 .shed-readout-name::after { right: 0.35rem; }
 .shed-readout-level {
-  width: auto;
-  min-width: 44px;
-  min-height: 44px;
-  border: 0 !important;
-  background: transparent !important;
-  box-shadow: none !important;
+  width: 3.5rem;
+  min-width: 3.5rem;
+  height: 3.5rem;
+  min-height: 3.5rem;
+  padding: 0;
+  color: #2d210f;
+  background: radial-gradient(circle at 35% 28%, #fff4ad, #f2bd3f 58%, #b66b18) !important;
+  border: 3px ridge #8b5c1d !important;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 2px rgba(255, 248, 185, 0.65), 0 5px 8px rgba(35, 24, 16, 0.55) !important;
   font-weight: 1000;
 }
 
@@ -4737,22 +4756,12 @@ select {
   .team-leaderboard-grid { grid-template-columns: 1fr; }
 }
 
-/* Keep the four mobile SHED controls in equivalent left/right rows. */
+/* Keep mobile SHED controls in intentional left/right column rows. */
 @media (max-width: 640px) {
-  #instrument-object,
-  .metronome-object {
-    top: 12% !important;
-  }
-
-  #xp-level-control,
-  .tuner-object {
-    top: 34% !important;
-  }
-
-  .woodshed-object-column-left .dandelion-object,
-  .chair-object {
-    top: 55% !important;
-  }
+  #instrument-object { top: 12% !important; }
+  #xp-level-control { top: 34% !important; }
+  .woodshed-object-column-left .dandelion-object { top: 55% !important; }
+  #level-value { top: 76% !important; }
 
   .woodshed-object-column-left .dandelion-object {
     right: auto;
@@ -4760,8 +4769,20 @@ select {
     transform: none !important;
   }
 
-  #level-value {
-    top: 76% !important;
+  .metronome-object { top: 10% !important; }
+  .tuner-object { top: 29% !important; }
+  .chair-object { top: 48% !important; }
+  .shed-decorate-button { top: 67% !important; right: 0; }
+  .woodshed-object-column-right > .shed-sound-effects-controls {
+    top: 86% !important;
+    right: 0;
+    bottom: auto !important;
+  }
+
+  .woodshed-object-column-right > .shed-sound-effects-controls .sound-effects-button {
+    width: 2.4rem;
+    height: 2.4rem;
+    font-size: 1.9rem;
   }
 }
 
@@ -4774,14 +4795,31 @@ select {
   height: 3.5rem;
   padding: 0;
   color: #2d210f;
-  font-size: 1.4rem;
-  font-weight: 1000;
   line-height: 1;
-  background: radial-gradient(circle at 35% 28%, #fff4ad, #f2bd3f 58%, #b66b18);
-  border: 3px ridge #8b5c1d;
-  border-radius: 50%;
-  box-shadow: inset 0 0 0 2px rgba(255, 248, 185, 0.65), 0 5px 8px rgba(35, 24, 16, 0.55);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  filter: drop-shadow(0 4px 4px rgba(35, 24, 16, 0.72));
   cursor: pointer;
+}
+
+.xp-level-symbol,
+.xp-level-number {
+  grid-area: 1 / 1;
+}
+
+.xp-level-symbol {
+  font-size: clamp(2.6rem, 5vw, 3.2rem);
+  line-height: 1;
+}
+
+.xp-level-number {
+  z-index: 1;
+  color: #3c2607;
+  font-size: 0.9rem;
+  font-weight: 1000;
+  text-shadow: 0 1px rgba(255, 250, 204, 0.9);
 }
 
 .xp-level-control:hover,
@@ -4888,6 +4926,14 @@ select {
     min-width: 2.8rem;
     height: 2.8rem;
     font-size: 1.2rem;
+  }
+
+  #level-value {
+    width: 2.8rem;
+    min-width: 2.8rem;
+    height: 2.8rem;
+    min-height: 2.8rem;
+    font-size: 1.1rem;
   }
 }
 

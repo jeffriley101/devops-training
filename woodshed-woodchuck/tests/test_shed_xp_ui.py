@@ -28,6 +28,9 @@ def test_xp_control_and_team_are_ordered_in_the_left_column() -> None:
     assert "aria-controls=\"xp-panel\"" in HOME[xp_control:team]
     assert HOME.count("id=\"xp-level-control\"") == 1
     assert HOME.count("id=\"level-value\"") == 1
+    xp_markup = HOME[xp_control:team]
+    assert '<span class="xp-level-symbol" aria-hidden="true">⭐</span>' in xp_markup
+    assert 'id="xp-level-number" class="xp-level-number"' in xp_markup
 
 
 def test_xp_panel_lists_every_lifetime_source() -> None:
@@ -87,18 +90,43 @@ def test_profile_skill_level_editor_remains_separate() -> None:
     assert "const control = document.getElementById(\"xp-level-control\");" in xp_javascript()
 
 
-def test_mobile_left_and_right_controls_share_intentional_rows() -> None:
-    start = CSS.index("/* Keep the four mobile SHED controls")
+def test_mobile_left_and_right_controls_use_intentional_rows() -> None:
+    start = CSS.index("/* Keep mobile SHED controls")
     end = CSS.index("/* SHED lifetime XP badge", start)
     mobile = CSS[start:end]
 
-    assert "#instrument-object,\n  .metronome-object" in mobile
-    assert "top: 12% !important" in mobile
-    assert "#xp-level-control,\n  .tuner-object" in mobile
-    assert "top: 34% !important" in mobile
-    assert ".woodshed-object-column-left .dandelion-object,\n  .chair-object" in mobile
-    assert "top: 55% !important" in mobile
-    assert "#level-value" in mobile
-    assert "top: 76% !important" in mobile
-    assert ".woodshed-object-column-left .dandelion-object" in mobile
+    for selector, position in (
+        ("#instrument-object", "12%"),
+        ("#xp-level-control", "34%"),
+        (".woodshed-object-column-left .dandelion-object", "55%"),
+        ("#level-value", "76%"),
+        (".metronome-object", "10%"),
+        (".tuner-object", "29%"),
+        (".chair-object", "48%"),
+        (".shed-decorate-button", "67%"),
+        (".woodshed-object-column-right > .shed-sound-effects-controls", "86%"),
+    ):
+        rule_start = mobile.index(selector)
+        assert f"top: {position} !important" in mobile[rule_start:rule_start + 220]
     assert "left: 0" in mobile
+    assert "right: 0" in mobile
+
+def test_xp_level_uses_an_emoji_token_without_the_old_coin_treatment() -> None:
+    badge = CSS[CSS.index(".xp-level-control {"):CSS.index(".xp-panel {")]
+    assert "background: transparent" in badge
+    assert "border: 0" in badge
+    assert "drop-shadow" in badge
+    assert ".xp-level-symbol" in badge
+    assert ".xp-level-number" in badge
+    assert "radial-gradient" not in badge
+
+
+def test_profile_level_uses_the_gold_medallion_separately_from_xp() -> None:
+    start = CSS.rindex(".shed-readout-level {")
+    profile_badge = CSS[start:CSS.index(".board-page", start)]
+    assert "radial-gradient(circle at 35% 28%" in profile_badge
+    assert "border: 3px ridge #8b5c1d" in profile_badge
+    assert "border-radius: 50%" in profile_badge
+    control_start = HOME.index('id="level-value"')
+    control = HOME[control_start:HOME.index("</button>", control_start)]
+    assert 'aria-controls="change-level-panel"' in control

@@ -17,7 +17,37 @@ def test_decorate_mode_has_a_dedicated_scene_layer_and_inventory_panel() -> None
     assert "aria-controls=\"shed-decorate-panel\"" in scene
     assert "id=\"shed-decoration-inventory\"" in HOME
     assert "id=\"shed-decoration-placed-list\"" in HOME
+    right_column = scene[scene.index("woodshed-object-column-right"):]
+    chair = right_column.index('id="mum-open-button"')
+    decorate = right_column.index('id="shed-decorate-button"')
+    decorate_end = right_column.index("</button>", decorate)
+    decorate_button = right_column[decorate:decorate_end]
+    assert chair < decorate
+    assert 'class="room-object shed-decorate-button"' in decorate_button
+    assert 'aria-label="Decorate the SHED"' in decorate_button
+    assert '<span class="room-object-icon" aria-hidden="true">🎨</span>' in decorate_button
+    assert "<span>Decorate</span>" not in decorate_button
     assert "Return to Inventory" in DECORATIONS
+    panel = HOME[HOME.index('id="shed-decorate-panel"'):HOME.index('id="xp-panel"')]
+    assert "Owned Items" not in panel
+    assert ">Decorate the SHED<" not in panel
+    assert "Tap an inventory item" not in panel
+    assert panel.count("<h3>") == 2
+    assert ">Inventory<" in panel and ">In the SHED<" in panel
+    assert 'id="shed-decorate-close"' in panel
+    assert 'id="shed-decoration-feedback" class="sr-only"' in panel
+
+
+def test_inventory_rows_show_only_emoji_and_required_action() -> None:
+    rows = DECORATIONS[DECORATIONS.index("function makeInventoryRow"):DECORATIONS.index("function renderInventory")]
+    assert 'document.createElement("strong")' not in rows
+    assert "identity.append(emoji)" in rows
+    assert 'emoji.setAttribute("role", "img")' in rows
+    assert 'button.setAttribute("aria-label", `${actionLabel} ${itemLabel(item)}`)' in rows
+    assert '"Place"' in DECORATIONS
+    assert '"Return to Inventory"' in DECORATIONS
+    assert "placed in the SHED" not in DECORATIONS
+    assert "returned to inventory" not in DECORATIONS
 
 
 def test_owned_inventory_and_placed_items_render_from_server_copies() -> None:
@@ -85,8 +115,62 @@ def test_decoration_size_and_phone_layout_are_safe() -> None:
     mobile_start = CSS.index("@media (max-width: 480px)", CSS.index(".shed-decoration-error"))
     mobile = CSS[mobile_start:CSS.index(".shed-readout {", mobile_start)]
     assert "grid-template-columns: minmax(0, 1fr)" in mobile
+    assert ".shed-decoration-placed-list .shed-decoration-inventory-item" in mobile
+    assert "justify-items: center" in mobile
+    assert ".shed-decoration-placed-list .shed-decoration-action" in mobile
     assert "width: 100%" in mobile
     assert "overflow-x" not in mobile[:mobile.index("@media", 1) if "@media" in mobile[1:] else len(mobile)]
+    decorate_rule = CSS[CSS.index(".shed-decorate-button {"):CSS.index(".shed-decorate-panel {")]
+    assert "cursor: pointer" in decorate_rule
+    assert "position: absolute" not in decorate_rule
+    final_rows = CSS[CSS.index("/* Keep mobile SHED controls"):CSS.index("/* SHED lifetime XP badge")]
+    assert ".shed-decorate-button" in final_rows
+    assert "top: 67% !important" in final_rows
+
+
+def test_placed_rows_reserve_separate_emoji_and_action_space() -> None:
+    list_start = CSS.index(".shed-decoration-inventory,")
+    list_rule = CSS[list_start:CSS.index(".shed-decoration-inventory-item {", list_start)]
+    assert "grid-template-columns: minmax(0, 1fr)" in list_rule
+    assert "repeat(auto-fit" not in list_rule
+
+    start = CSS.index(".shed-decoration-placed-list .shed-decoration-inventory-item {")
+    end = CSS.index(".shed-decoration-inventory-emoji", start)
+    placed_rows = CSS[start:end]
+    assert "display: grid" in placed_rows
+    assert "grid-template-columns: 3rem minmax(10.5rem, 1fr)" in placed_rows
+    assert "min-width: 3rem" in placed_rows
+    assert "min-width: 10.5rem" in placed_rows
+    assert "max-width: 100%" in placed_rows
+    assert "justify-self: end" in placed_rows
+    assert "white-space: nowrap" in placed_rows
+
+    mobile_start = CSS.index("@media (max-width: 480px)", start)
+    mobile = CSS[mobile_start:CSS.index(".shed-readout {", mobile_start)]
+    assert "grid-template-columns: minmax(0, 1fr)" in mobile
+    assert "min-width: 0" in mobile
+    assert "white-space: normal" in mobile
+
+def test_decorate_panel_overrides_the_wide_mentor_card_layout() -> None:
+    wide = CSS[CSS.index("@media (min-width: 860px)"):CSS.index(".woodshed-page", CSS.index("@media (min-width: 860px)"))]
+    assert ".mentor-card" in wide
+    assert "grid-template-columns: 220px 1fr" in wide
+
+    start = CSS.index(".shed-decorate-panel {")
+    panel = CSS[start:CSS.index(".shed-decorate-panel-head", start)]
+    assert "grid-template-columns: minmax(0, 1fr)" in panel
+    assert "align-items: stretch" in panel
+    assert "text-align: left" in panel
+
+
+def test_decorate_close_is_viewport_fixed_above_the_panel() -> None:
+    start = CSS.index(".shed-decorate-close {")
+    close_rule = CSS[start:CSS.index(".shed-decoration-inventory,", start)]
+    assert "position: fixed" in close_rule
+    assert "top: max(0.75rem, env(safe-area-inset-top))" in close_rule
+    assert "right: max(0.75rem, env(safe-area-inset-right))" in close_rule
+    assert "z-index: 1200" in close_rule
+    assert "flex:" not in close_rule
 
 
 def test_decoration_initialization_is_single_and_profile_controls_remain() -> None:

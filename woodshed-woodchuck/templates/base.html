@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{{ title }} · Woodshed Woodchuck</title>
-  <link rel="stylesheet" href="/static/css/styles.css?v=80" />
+  <link rel="stylesheet" href="/static/css/styles.css?v=81" />
 
   <!-- Woodshed app icons -->
   <link
@@ -45,7 +45,7 @@
     </main>
 
     {% if nav_items and active_nav %}
-    {% if active_nav != "home" %}
+    {% if active_nav not in ("home", "store") %}
     <div class="sound-effects-controls">
       <button id="sound-effects-button" class="sound-effects-button" type="button" aria-label="Sound Effects On. Open settings." aria-controls="sound-effects-panel" aria-expanded="false">🔊</button>
       <div id="sound-effects-panel" class="sound-effects-panel" hidden>
@@ -74,7 +74,7 @@
   <script src="/static/js/instruments.js?v=3"></script>
   <script src="/static/vendor/tone/Tone.js?v=15.1.22"></script>
   <script src="/static/js/audio.js?v=6"></script>
-  <script src="/static/js/app.js?v=42"></script>
+  <script src="/static/js/app.js?v=43"></script>
   <script src="/static/js/account.js?v=12"></script>
   {% block page_scripts %}{% endblock %}
 </body>

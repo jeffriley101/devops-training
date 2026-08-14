@@ -15,17 +15,23 @@ def shared_sound_block() -> str:
     return CSS[start:CSS.index("/* Plunge Burrow prototype", start)]
 
 
-def test_four_main_pages_receive_one_shared_positioning_hook() -> None:
+def test_shared_sound_controls_render_on_main_pages_except_shop() -> None:
     client = TestClient(app)
-    for path in ("/p-book", "/quest", "/store"):
+    for path in ("/p-book", "/quest"):
         response = client.get(path)
         assert response.status_code == 200
         assert '<body class="main-app-page' in response.text
         assert 'class="sound-effects-controls"' in response.text
 
+    shop = client.get("/store")
+    assert shop.status_code == 200
+    assert '<body class="main-app-page' in shop.text
+    assert 'class="sound-effects-controls"' not in shop.text
+
     assert '<body{% if page_class %} class="{{ page_class }}"{% endif %}>' in BASE
+    assert '{% if active_nav not in ("home", "store") %}' in BASE
     assert CSS.count(".main-app-page .sound-effects-controls") == 1
-    assert ".woodshed-scene > .shed-sound-effects-controls" in CSS
+    assert ".woodshed-object-column-right > .shed-sound-effects-controls" in CSS
     assert ".shop-page .sound-effects-controls" not in CSS
     assert ".board-page .sound-effects-controls" not in CSS
 
@@ -46,12 +52,17 @@ def test_shared_launcher_uses_lower_safe_edge_and_panel_opens_upward() -> None:
     assert "width: min(14rem, calc(100vw - 1.4rem))" in CSS
     assert "overflow-x" not in shared
 
-    shed_start = shared.index(".woodshed-scene > .shed-sound-effects-controls {")
-    shed_end = shared.index(".woodshed-scene > .shed-sound-effects-controls .sound-effects-panel", shed_start)
+    shed_start = shared.index(".woodshed-object-column-right > .shed-sound-effects-controls {")
+    shed_end = shared.index(".woodshed-object-column-right > .shed-sound-effects-controls .sound-effects-button", shed_start)
     shed_controls = shared[shed_start:shed_end]
-    assert "position: absolute" in shed_controls
-    assert "right: max(0.5rem, env(safe-area-inset-right))" in shed_controls
-    assert "bottom: max(1.25rem, env(safe-area-inset-bottom))" in shed_controls
+    assert "position: relative" in shed_controls
+    assert "inset: auto" in shed_controls
+    shed_button_start = shed_end
+    shed_button_end = shared.index(".woodshed-object-column-right > .shed-sound-effects-controls .sound-effects-panel", shed_button_start)
+    shed_button = shared[shed_button_start:shed_button_end]
+    assert "width: 3.5rem" in shed_button and "height: 3.5rem" in shed_button
+    assert "background: transparent" in shed_button
+    assert "filter: drop-shadow" in shed_button
 
 
 def test_shared_placement_keeps_page_content_and_accessibility_intact() -> None:
@@ -66,6 +77,8 @@ def test_shared_placement_keeps_page_content_and_accessibility_intact() -> None:
     assert 'id="p-book"' not in templates["SHED"]
     assert 'aria-label="Open Bulletin Board"' not in templates["SHED"]
     assert 'class="sound-effects-controls shed-sound-effects-controls"' in templates["SHED"]
+    right = templates["SHED"][templates["SHED"].index("woodshed-object-column-right"):templates["SHED"].index("id=\"shed-decorate-panel\"")]
+    assert right.index('id="shed-decorate-button"') < right.index('id="sound-effects-button"')
     assert "practice-timer" in templates["BOOK"] and "Submit" in templates["BOOK"]
     assert "Bonus Challenge" in templates["BOARD"] and "plunge-burrow-button" in templates["BOARD"]
     assert 'data-shop-panel-content="gear"' in templates["SHOP"]

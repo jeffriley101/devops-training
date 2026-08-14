@@ -569,17 +569,17 @@
       identity.className = "shed-decoration-inventory-identity";
       const emoji = document.createElement("span");
       emoji.className = "shed-decoration-inventory-emoji";
-      emoji.setAttribute("aria-hidden", "true");
+      emoji.setAttribute("role", "img");
+      emoji.setAttribute("aria-label", itemLabel(item));
       emoji.textContent = item.emoji;
-      const name = document.createElement("strong");
-      name.textContent = itemLabel(item);
-      identity.append(emoji, name);
+      identity.append(emoji);
       const button = document.createElement("button");
       button.className = "btn btn-secondary shed-decoration-action";
       button.type = "button";
       button.dataset.decorationAction = action;
       button.dataset.ownedCopyId = String(item.id);
       button.textContent = placementRequests.has(item.id) ? "Saving…" : actionLabel;
+      button.setAttribute("aria-label", `${actionLabel} ${itemLabel(item)}`);
       button.disabled = placementRequests.has(item.id);
       row.append(identity, button);
       return row;
@@ -590,20 +590,8 @@
       placedListEl.replaceChildren();
       const unplaced = ownedItems.filter((item) => !isPlaced(item));
       const placed = ownedItems.filter(isPlaced);
-      if (!unplaced.length) {
-        const empty = document.createElement("p");
-        empty.textContent = "No unplaced owned items. Visit SHOP to add more.";
-        inventoryEl.append(empty);
-      } else {
-        unplaced.forEach((item) => inventoryEl.append(makeInventoryRow(item, "place", "Place")));
-      }
-      if (!placed.length) {
-        const empty = document.createElement("p");
-        empty.textContent = "No decorations are in the SHED yet.";
-        placedListEl.append(empty);
-      } else {
-        placed.forEach((item) => placedListEl.append(makeInventoryRow(item, "remove", "Return to Inventory")));
-      }
+      unplaced.forEach((item) => inventoryEl.append(makeInventoryRow(item, "place", "Place")));
+      placed.forEach((item) => placedListEl.append(makeInventoryRow(item, "remove", "Return to Inventory")));
     }
 
     function renderAll() {
@@ -627,7 +615,6 @@
     async function savePlacement(item, x, y) {
       if (placementRequests.has(item.id)) return false;
       placementRequests.add(item.id);
-      setFeedback("Saving decoration…");
       renderInventory();
       try {
         const response = await fetch(`/store/inventory/${item.id}/placement`, {
@@ -638,7 +625,6 @@
         });
         const payload = await responsePayload(response, "That decoration could not be placed.");
         updateOwnedItem(payload.item);
-        setFeedback(`${item.name} placed in the SHED.`);
         return true;
       } catch (error) {
         setFeedback(error.message || "That decoration could not be placed.", true);
@@ -652,7 +638,6 @@
     async function removePlacement(item) {
       if (placementRequests.has(item.id)) return;
       placementRequests.add(item.id);
-      setFeedback("Returning decoration to inventory…");
       renderInventory();
       try {
         const response = await fetch(`/store/inventory/${item.id}/placement`, {
@@ -661,7 +646,6 @@
         });
         const payload = await responsePayload(response, "That decoration could not be returned.");
         updateOwnedItem(payload.item);
-        setFeedback(`${item.name} returned to inventory.`);
       } catch (error) {
         setFeedback(error.message || "That decoration could not be returned.", true);
       } finally {

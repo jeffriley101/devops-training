@@ -14,17 +14,6 @@
 
     <div id="shed-decoration-layer" class="shed-decoration-layer" aria-label="Placed SHED decorations"></div>
 
-    <button
-      id="shed-decorate-button"
-      class="shed-decorate-button"
-      type="button"
-      aria-controls="shed-decorate-panel"
-      aria-expanded="false"
-    >
-      <span aria-hidden="true">🎨</span>
-      <span>Decorate</span>
-    </button>
-
     <div class="woodshed-foreground" aria-label="Clickable Woodshed objects">
       <div class="woodshed-object-column woodshed-object-column-left">
         <button
@@ -60,7 +49,8 @@
           aria-label="XP Level. Loading."
           title="XP Level"
         >
-          <span id="xp-level-number">1</span>
+          <span class="xp-level-symbol" aria-hidden="true">⭐</span>
+          <span id="xp-level-number" class="xp-level-number">1</span>
         </button>
 
         <button id="shed-team-button" class="room-object dandelion-object" type="button" aria-controls="shed-team-panel" aria-expanded="false" aria-label="Choose a team" title="Choose a team">
@@ -126,36 +116,45 @@
         >
           <span class="room-object-icon" aria-hidden="true">🪑</span>
         </button>
+
+
+        <button
+          id="shed-decorate-button"
+          class="room-object shed-decorate-button"
+          type="button"
+          aria-controls="shed-decorate-panel"
+          aria-expanded="false"
+          aria-label="Decorate the SHED"
+          title="Decorate the SHED"
+        >
+          <span class="room-object-icon" aria-hidden="true">🎨</span>
+        </button>
+
+        <div class="sound-effects-controls shed-sound-effects-controls">
+          <button id="sound-effects-button" class="sound-effects-button" type="button" aria-label="Sound Effects On. Open settings." aria-controls="sound-effects-panel" aria-expanded="false">🔊</button>
+          <div id="sound-effects-panel" class="sound-effects-panel" hidden>
+            <label class="sound-effects-toggle" for="sound-effects-enabled">
+              <span>Sound Effects</span>
+              <input id="sound-effects-enabled" type="checkbox" checked />
+            </label>
+            <label for="sound-effects-volume">Volume <output id="sound-effects-volume-value" for="sound-effects-volume">35%</output></label>
+            <input id="sound-effects-volume" type="range" min="0" max="100" step="1" value="35" aria-label="Sound Effects volume" aria-valuetext="35 percent" />
+          </div>
+        </div>
       </div>
     </div>
 
-    <div class="sound-effects-controls shed-sound-effects-controls">
-      <button id="sound-effects-button" class="sound-effects-button" type="button" aria-label="Sound Effects On. Open settings." aria-controls="sound-effects-panel" aria-expanded="false">🔊</button>
-      <div id="sound-effects-panel" class="sound-effects-panel" hidden>
-        <label class="sound-effects-toggle" for="sound-effects-enabled">
-          <span>Sound Effects</span>
-          <input id="sound-effects-enabled" type="checkbox" checked />
-        </label>
-        <label for="sound-effects-volume">Volume <output id="sound-effects-volume-value" for="sound-effects-volume">35%</output></label>
-        <input id="sound-effects-volume" type="range" min="0" max="100" step="1" value="35" aria-label="Sound Effects volume" aria-valuetext="35 percent" />
-      </div>
-    </div>
   </div>
 
-  <section id="shed-decorate-panel" class="mentor-card shed-decorate-panel hidden" hidden aria-labelledby="shed-decorate-title">
+  <section id="shed-decorate-panel" class="mentor-card shed-decorate-panel hidden" hidden aria-label="Decorate the SHED">
     <div class="shed-decorate-panel-head">
-      <div>
-        <p class="chip">Owned Items</p>
-        <h2 id="shed-decorate-title">Decorate the SHED</h2>
-      </div>
       <button id="shed-decorate-close" class="shed-decorate-close" type="button" aria-label="Close Decorate mode">×</button>
     </div>
-    <p>Tap an inventory item to place it. Drag placed items to move them.</p>
     <h3>Inventory</h3>
     <div id="shed-decoration-inventory" class="shed-decoration-inventory" aria-live="polite"></div>
     <h3>In the SHED</h3>
     <div id="shed-decoration-placed-list" class="shed-decoration-placed-list" aria-live="polite"></div>
-    <p id="shed-decoration-feedback" class="shed-decoration-feedback" role="status" aria-live="polite"></p>
+    <p id="shed-decoration-feedback" class="sr-only" role="status" aria-live="polite"></p>
   </section>
 
   <section id="xp-panel" class="mentor-card xp-panel hidden" hidden aria-labelledby="xp-panel-title">

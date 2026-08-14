@@ -48,7 +48,7 @@ def test_left_controls_preserve_rewards_crowns_definition_and_share() -> None:
 
 def test_right_controls_and_donation_are_unique() -> None:
     markup = shop_markup()
-    controls = ["🧢", "🐛", "🚪", "🎨", "💝"]
+    controls = ["🧢", "🐛", "🚪", "📬", "💝"]
     assert [markup.index(item) for item in controls] == sorted(markup.index(item) for item in controls)
     assert "Open Spectrogram" in markup
     assert "Pristine P-Chart — Coming Soon" in markup
@@ -103,6 +103,7 @@ def test_artist_email_is_fixed_public_project_address(monkeypatch) -> None:
     assert "mailto:woodshedwoodchuck@gmail.com?subject=Woodshed%20Woodchuck%20Artwork" in configured
     assert "Artwork email coming soon." not in configured
     assert "private@example.org" not in configured and "bcc=" not in configured
+    assert "The Viking Sax would love to see your artwork of a woodchuck, the Viking Sax, or anything fun (please ask an adult before emailing your artwork). And feel free to email questions, concerns, and comments about this app, too." in configured
 
 
 def test_mobile_css_avoids_fixed_width_overflow() -> None:
@@ -140,7 +141,7 @@ def test_mobile_shop_keeps_both_vertical_columns_over_the_scene() -> None:
     ]
     for control in ("🌼", "👑", "🐐", "🗿", "↗"):
         assert control in left
-    for control in ("🧢", "🐛", "🚪", "🎨", "💝"):
+    for control in ("🧢", "🐛", "🚪", "📬", "💝"):
         assert control in right
     assert 'class="shop-dandelion-count"' in left
     assert 'aria-label="Shop rewards and sharing"' in markup
