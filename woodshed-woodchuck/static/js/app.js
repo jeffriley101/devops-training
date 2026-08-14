@@ -3420,8 +3420,13 @@
     const closeButton = document.getElementById("shop-dialog-close");
     const title = document.getElementById("shop-dialog-title");
     const qrStatus = document.getElementById("shop-qr-status");
+    const purchaseDialog = document.getElementById("shop-purchase-confirmation");
+    const purchaseName = document.getElementById("shop-purchase-confirmation-name");
+    const purchasePrice = document.getElementById("shop-purchase-confirmation-price");
+    const purchaseCancel = document.getElementById("shop-purchase-cancel");
+    const purchaseConfirm = document.getElementById("shop-purchase-confirm");
     const controls = Array.from(document.querySelectorAll("[data-shop-panel]"));
-    if (!dialog || !closeButton || !title || !controls.length) return;
+    if (!dialog || !closeButton || !title || !purchaseDialog || !purchaseName || !purchasePrice || !purchaseCancel || !purchaseConfirm || !controls.length) return;
     if (dialog.dataset.woodshedShopWired === "true") return;
     dialog.dataset.woodshedShopWired = "true";
 
@@ -3439,6 +3444,9 @@
     let shopDataPromise = null;
     let inventoryAvailable = false;
     let activator = null;
+    let purchaseActivator = null;
+    let pendingPurchase = null;
+    let confirmationInFlight = false;
 
     function setShelfFeedback(shelfKey, message, isError = false) {
       const feedback = dialog.querySelector(`[data-shop-feedback="${shelfKey}"]`);
@@ -3542,6 +3550,19 @@
       }
     }
 
+    function requestPurchaseConfirmation(shelfKey, itemKey, buyButton) {
+      const item = shelfItems[shelfKey].find((candidate) => candidate.item_key === itemKey);
+      if (!item || purchaseInFlight.has(itemKey) || confirmationInFlight || pendingPurchase || purchaseDialog.open) return;
+      pendingPurchase = { shelfKey, itemKey };
+      purchaseActivator = buyButton;
+      purchaseName.textContent = item.name;
+      purchasePrice.textContent = `${item.price} dandelions`;
+      purchaseConfirm.disabled = false;
+      purchaseConfirm.textContent = "Buy";
+      purchaseDialog.showModal();
+      purchaseConfirm.focus({ preventScroll: true });
+    }
+
     async function purchaseItem(shelfKey, itemKey) {
       const item = shelfItems[shelfKey].find((candidate) => candidate.item_key === itemKey);
       if (!item || purchaseInFlight.has(itemKey)) return;
@@ -3608,10 +3629,42 @@
     dialog.addEventListener("click", function (event) {
       const buyButton = event.target.closest("[data-shop-buy]");
       if (buyButton && dialog.contains(buyButton)) {
-        void purchaseItem(buyButton.dataset.shopShelf, buyButton.dataset.shopBuy);
+        requestPurchaseConfirmation(
+          buyButton.dataset.shopShelf,
+          buyButton.dataset.shopBuy,
+          buyButton
+        );
         return;
       }
       if (event.target === dialog) dialog.close();
+    });
+    purchaseCancel.addEventListener("click", function () {
+      if (!confirmationInFlight) purchaseDialog.close();
+    });
+    purchaseDialog.addEventListener("cancel", function (event) {
+      if (confirmationInFlight) event.preventDefault();
+    });
+    purchaseDialog.addEventListener("close", function () {
+      if (confirmationInFlight) return;
+      pendingPurchase = null;
+      if (purchaseActivator?.isConnected) purchaseActivator.focus({ preventScroll: true });
+      purchaseActivator = null;
+    });
+    purchaseConfirm.addEventListener("click", async function () {
+      if (!pendingPurchase || confirmationInFlight) return;
+      confirmationInFlight = true;
+      purchaseConfirm.disabled = true;
+      purchaseConfirm.textContent = "Buying…";
+      const purchase = pendingPurchase;
+      try {
+        await purchaseItem(purchase.shelfKey, purchase.itemKey);
+      } finally {
+        confirmationInFlight = false;
+        purchaseConfirm.disabled = false;
+        purchaseConfirm.textContent = "Buy";
+        pendingPurchase = null;
+        purchaseDialog.close();
+      }
     });
     closeButton.addEventListener("click", () => dialog.close());
     dialog.addEventListener("close", function () {

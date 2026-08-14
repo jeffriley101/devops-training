@@ -59,10 +59,11 @@ def test_right_controls_and_donation_are_unique() -> None:
     assert markup.count('aria-label="Donate"') == 1
 
 
-def test_single_dialog_and_keyboard_focus_behavior_are_wired() -> None:
+def test_shop_dialogs_and_keyboard_focus_behavior_are_wired() -> None:
     markup = shop_markup()
     javascript = JS.read_text(encoding="utf-8")
-    assert markup.count("<dialog") == 1
+    assert markup.count("<dialog") == 2
+    assert markup.count('class="shop-feature-dialog') == 2
     assert 'aria-labelledby="shop-dialog-title"' in markup
     for label in (
         "Open Crown Progress", "Open The GOAT Tracker", "Open Practice Definition",

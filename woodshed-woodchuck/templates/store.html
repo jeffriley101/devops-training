@@ -122,5 +122,19 @@
       </section>
     </div>
   </dialog>
+
+  <dialog id="shop-purchase-confirmation" class="shop-feature-dialog shop-purchase-confirmation" aria-labelledby="shop-purchase-confirmation-title">
+    <div class="shop-dialog-head">
+      <h2 id="shop-purchase-confirmation-title" tabindex="-1">Confirm Purchase</h2>
+    </div>
+    <div class="shop-dialog-scroll">
+      <p>Are you sure you want to buy this item?</p>
+      <p><strong id="shop-purchase-confirmation-name"></strong> — <span id="shop-purchase-confirmation-price"></span></p>
+      <div class="button-row">
+        <button id="shop-purchase-cancel" class="btn btn-secondary" type="button">Cancel</button>
+        <button id="shop-purchase-confirm" class="btn btn-primary" type="button">Buy</button>
+      </div>
+    </div>
+  </dialog>
 </section>
 {% endblock %}

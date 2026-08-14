@@ -71,6 +71,47 @@ def test_purchase_uses_one_guarded_server_authoritative_request() -> None:
     assert "dialog.dataset.woodshedShopWired" in SHOP_WIRING
 
 
+def test_purchase_click_opens_confirmation_without_buying() -> None:
+    assert "Are you sure you want to buy this item?" in STORE
+    assert 'id="shop-purchase-confirmation-name"' in STORE
+    assert 'id="shop-purchase-confirmation-price"' in STORE
+    request = SHOP_WIRING[SHOP_WIRING.index("function requestPurchaseConfirmation"):SHOP_WIRING.index("async function purchaseItem")]
+    assert "purchaseName.textContent = item.name" in request
+    assert "purchasePrice.textContent = `${item.price} dandelions`" in request
+    assert "purchaseDialog.showModal()" in request
+    assert 'fetch("/store/purchases"' not in request
+    click = SHOP_WIRING[SHOP_WIRING.index('dialog.addEventListener("click"'):SHOP_WIRING.index('purchaseCancel.addEventListener')]
+    assert "requestPurchaseConfirmation(" in click
+    assert "purchaseItem(" not in click
+
+
+def test_cancel_closes_confirmation_without_purchase() -> None:
+    cancel = SHOP_WIRING[SHOP_WIRING.index('purchaseCancel.addEventListener'):SHOP_WIRING.index('purchaseDialog.addEventListener("cancel"')]
+    assert "purchaseDialog.close()" in cancel
+    assert "purchaseItem(" not in cancel
+    assert "fetch(" not in cancel
+    assert 'purchaseDialog.addEventListener("cancel"' in SHOP_WIRING
+
+
+def test_confirmed_buy_calls_existing_purchase_once_and_closes() -> None:
+    confirm = SHOP_WIRING[SHOP_WIRING.index('purchaseConfirm.addEventListener'):SHOP_WIRING.index('closeButton.addEventListener')]
+    assert confirm.count("await purchaseItem(") == 1
+    assert "purchaseDialog.close()" in confirm
+    assert "confirmationInFlight = true" in confirm
+    assert "purchaseConfirm.disabled = true" in confirm
+    assert 'purchaseConfirm.textContent = "Buying…"' in confirm
+
+
+def test_rapid_confirmation_is_guarded_from_duplicate_purchase() -> None:
+    request = SHOP_WIRING[SHOP_WIRING.index("function requestPurchaseConfirmation"):SHOP_WIRING.index("async function purchaseItem")]
+    confirm = SHOP_WIRING[SHOP_WIRING.index('purchaseConfirm.addEventListener'):SHOP_WIRING.index('closeButton.addEventListener')]
+    assert "confirmationInFlight" in request
+    assert "pendingPurchase || purchaseDialog.open" in request
+    assert "if (!pendingPurchase || confirmationInFlight) return" in confirm
+    assert confirm.index("confirmationInFlight = true") < confirm.index("await purchaseItem(")
+    assert "purchaseInFlight.has(itemKey)" in SHOP_WIRING
+
+
 def test_share_account_panel_remains_single_and_unchanged() -> None:
     share = STORE[STORE.index("data-shop-panel-content=\"share\""):STORE.index("data-shop-panel-content=\"gear\"")]
     assert "shop-qr-image" in share
