@@ -1276,6 +1276,98 @@
   }
 
 
+  function launchDigitalRain(triggerButton) {
+    if (document.querySelector(".digital-rain-overlay")) return;
+
+    const overlay = document.createElement("div");
+    overlay.className = "digital-rain-overlay";
+    overlay.setAttribute("role", "dialog");
+    overlay.setAttribute("aria-label", "Digital rain animation");
+
+    const canvas = document.createElement("canvas");
+    canvas.className = "digital-rain-canvas";
+    canvas.setAttribute("aria-hidden", "true");
+
+    const stopButton = document.createElement("button");
+    stopButton.className = "digital-rain-stop";
+    stopButton.type = "button";
+    stopButton.textContent = "STOP";
+    stopButton.setAttribute("aria-label", "Stop digital rain");
+    overlay.append(canvas, stopButton);
+    document.body.append(overlay);
+
+    const context = canvas.getContext("2d");
+    if (!context) {
+      overlay.remove();
+      return;
+    }
+
+    const characters = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz@#$%&*+=<>";
+    const fontSize = 17;
+    let drops = [];
+    let animationFrame = null;
+    let lastFrameAt = 0;
+
+    function resizeCanvas() {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.floor(width * pixelRatio);
+      canvas.height = Math.floor(height * pixelRatio);
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
+      context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+      const columnCount = Math.ceil(width / fontSize);
+      drops = Array.from({ length: columnCount }, () =>
+        -Math.floor(Math.random() * Math.max(1, height / fontSize))
+      );
+      context.fillStyle = "#020603";
+      context.fillRect(0, 0, width, height);
+    }
+
+    function draw(timestamp) {
+      animationFrame = window.requestAnimationFrame(draw);
+      if (timestamp - lastFrameAt < 45) return;
+      lastFrameAt = timestamp;
+
+      context.fillStyle = "rgba(2, 6, 3, 0.12)";
+      context.fillRect(0, 0, window.innerWidth, window.innerHeight);
+      context.fillStyle = "#48ef78";
+      context.font = `${fontSize}px ui-monospace, SFMono-Regular, Menlo, monospace`;
+
+      drops.forEach((drop, column) => {
+        const character = characters[Math.floor(Math.random() * characters.length)];
+        context.fillText(character, column * fontSize, drop * fontSize);
+        if (drop * fontSize > window.innerHeight && Math.random() > 0.975) {
+          drops[column] = 0;
+        } else {
+          drops[column] += 1;
+        }
+      });
+    }
+
+    function stopDigitalRain() {
+      if (animationFrame !== null) {
+        window.cancelAnimationFrame(animationFrame);
+      }
+      window.removeEventListener("resize", resizeCanvas);
+      document.removeEventListener("keydown", handleKeydown);
+      overlay.remove();
+      triggerButton?.focus({ preventScroll: true });
+    }
+
+    function handleKeydown(event) {
+      if (event.key === "Escape") stopDigitalRain();
+    }
+
+    stopButton.addEventListener("click", stopDigitalRain, { once: true });
+    document.addEventListener("keydown", handleKeydown);
+    window.addEventListener("resize", resizeCanvas);
+    resizeCanvas();
+    animationFrame = window.requestAnimationFrame(draw);
+    stopButton.focus({ preventScroll: true });
+  }
+
   function wireMum(state) {
     const openButton = document.getElementById("mum-open-button");
     const closeButton = document.getElementById("mum-close-button");
@@ -1333,6 +1425,9 @@
 
         if (response) {
           messageEl.textContent = response;
+          if (button.dataset.mumChoice === "water") {
+            launchDigitalRain(button);
+          }
         }
       });
     });
@@ -4040,7 +4135,31 @@
     let practiceTimerStartedAt = null;
     let practiceTimerInterval = null;
     const PRACTICE_TIMER_LIMIT_SECONDS = 120 * 60;
-    const PRACTICE_TIMER_STORAGE_KEY = "woodshedPracticeTimerStartedAt";
+    const PRACTICE_TIMER_STORAGE_KEY = "woodshed:practice-timer-started-at";
+
+    function persistPracticeTimerStart(startedAt) {
+      try {
+        window.sessionStorage.setItem(PRACTICE_TIMER_STORAGE_KEY, String(startedAt));
+      } catch (_storageError) {
+        // The timer still works in-page when browser storage is unavailable.
+      }
+    }
+
+    function readPracticeTimerStart() {
+      try {
+        return Number(window.sessionStorage.getItem(PRACTICE_TIMER_STORAGE_KEY));
+      } catch (_storageError) {
+        return 0;
+      }
+    }
+
+    function clearPracticeTimerStart() {
+      try {
+        window.sessionStorage.removeItem(PRACTICE_TIMER_STORAGE_KEY);
+      } catch (_storageError) {
+        // Nothing else is required when browser storage is unavailable.
+      }
+    }
 
     function formatTimerSeconds(totalSeconds) {
       const minutes = Math.floor(totalSeconds / 60);
@@ -4059,7 +4178,7 @@
       if (elapsedSeconds >= PRACTICE_TIMER_LIMIT_SECONDS) {
         stopPracticeTimerInterval();
         practiceTimerStartedAt = null;
-        window.sessionStorage.removeItem(PRACTICE_TIMER_STORAGE_KEY);
+        clearPracticeTimerStart();
         minutesEl.value = "120";
         if (timerFeedbackEl) timerFeedbackEl.textContent =
           "Timer stopped at 2 hours. You can adjust your minutes before submitting.";
@@ -4090,7 +4209,7 @@
 
       timerStartBtn.addEventListener("click", function () {
         practiceTimerStartedAt = Date.now();
-        window.sessionStorage.setItem(PRACTICE_TIMER_STORAGE_KEY, String(practiceTimerStartedAt));
+        persistPracticeTimerStart(practiceTimerStartedAt);
         stopPracticeTimerInterval();
         timerDisplayEl.textContent = "00:00";
         practiceTimerInterval = window.setInterval(updatePracticeTimerDisplay, 1000);
@@ -4115,7 +4234,7 @@
         stopPracticeTimerInterval();
         timerDisplayEl.textContent = formatTimerSeconds(elapsedSeconds);
         practiceTimerStartedAt = null;
-        window.sessionStorage.removeItem(PRACTICE_TIMER_STORAGE_KEY);
+        clearPracticeTimerStart();
         renderTimerRunning(false);
 
         const shouldFillMinutes = window.confirm(`Do you want to enter ${elapsedMinutes} practice minute${elapsedMinutes === 1 ? "" : "s"}?`);
@@ -4134,16 +4253,22 @@
         else timerStartBtn.click();
       });
 
-      const restoredStart = Number(window.sessionStorage.getItem(PRACTICE_TIMER_STORAGE_KEY));
-      if (Number.isFinite(restoredStart) && restoredStart > 0) {
+      function restorePracticeTimer() {
+        const restoredStart = readPracticeTimerStart();
+        if (!Number.isFinite(restoredStart) || restoredStart <= 0) return;
+
         practiceTimerStartedAt = restoredStart;
         updatePracticeTimerDisplay();
         if (practiceTimerStartedAt) {
+          stopPracticeTimerInterval();
           practiceTimerInterval = window.setInterval(updatePracticeTimerDisplay, 1000);
           renderTimerRunning(true);
         }
       }
-      window.addEventListener("pagehide", stopPracticeTimerInterval, { once: true });
+
+      restorePracticeTimer();
+      window.addEventListener("pageshow", restorePracticeTimer);
+      window.addEventListener("pagehide", stopPracticeTimerInterval);
     }
 
     function formatEntry(entry) {

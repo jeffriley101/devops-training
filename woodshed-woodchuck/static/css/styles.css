@@ -1023,6 +1023,45 @@ select {
   font: inherit;
 }
 
+.digital-rain-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  overflow: hidden;
+  background: #020603;
+  touch-action: none;
+}
+
+.digital-rain-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.digital-rain-stop {
+  position: absolute;
+  top: max(1rem, env(safe-area-inset-top));
+  right: max(1rem, env(safe-area-inset-right));
+  min-width: 5.5rem;
+  min-height: 3rem;
+  border: 2px solid #75ff98;
+  border-radius: 999px;
+  background: rgba(2, 18, 7, 0.92);
+  color: #b8ffc9;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.digital-rain-stop:focus-visible {
+  outline: 3px solid #fff3a6;
+  outline-offset: 3px;
+}
+
 .mum-panel {
   display: grid;
   gap: 1rem;
