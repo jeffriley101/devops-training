@@ -39,7 +39,7 @@ from .content import (
     SAX_VIKING_WELCOME,
     SHOP_SHARE_URL,
 )
-from .instruments import instrument_definition_payloads
+from .instruments import instrument_definition_payloads, shed_artwork_url
 from .models import WoodchuckState
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -247,9 +247,11 @@ def setup_submit(
 @app.get("/home")
 def home(request: Request):
     member_since = None
+    artwork_url = shed_artwork_url(None)
     with SessionLocal() as session:
         profile = current_profile(request, session)
         if profile is not None:
+            artwork_url = shed_artwork_url(profile.instrument)
             created_at = profile.created_at
             member_since = {
                 "timestamp": created_at.isoformat(),
@@ -266,6 +268,7 @@ def home(request: Request):
         instruments=INSTRUMENT_OPTIONS,
         levels=LEVEL_OPTIONS,
         member_since=member_since,
+        shed_artwork_url=artwork_url,
     )
 
 

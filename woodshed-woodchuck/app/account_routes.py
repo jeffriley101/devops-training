@@ -22,7 +22,7 @@ from .accounts import (
     update_profile_display_name,
     update_profile_level,
 )
-from .instruments import INSTRUMENTS_BY_LABEL
+from .instruments import INSTRUMENTS_BY_LABEL, shed_artwork_url
 from .content import LEVEL_OPTIONS
 from .db import SessionLocal
 from .models import RewardGrant, WoodchuckProfile, WoodchuckState
@@ -370,6 +370,7 @@ def change_profile_instrument(
             "updated": True,
             "instrument": updated.instrument,
             "instrument_definition": dict(definition),
+            "shed_artwork_url": shed_artwork_url(updated.instrument),
         }
 
 

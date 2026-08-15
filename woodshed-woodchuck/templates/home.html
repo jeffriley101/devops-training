@@ -2,12 +2,12 @@
 
 {% block content %}
 <section class="card woodshed-page">
-  <div class="woodshed-scene" aria-label="Interactive Woodshed room">
+  <div class="woodshed-scene" aria-label="Interactive Woodshed room" style="background-image: url('{{ shed_artwork_url }}');">
     <button id="shed-secret-button" class="shed-secret-button" type="button" aria-controls="shed-secret-panel" aria-expanded="false" aria-label="Open secret passcode">.</button>
     <div class="woodshed-character-layer" aria-label="Woodchuck holding selected instrument">
       <img
         class="character-art woodshed-character-art"
-        src="/static/img/woodchuck-home.png"
+        src="{{ shed_artwork_url }}"
         alt="Woodchuck holding an instrument in the Woodshed"
       />
     </div>

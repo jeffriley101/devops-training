@@ -54,6 +54,35 @@ INSTRUMENT_DEFINITIONS = (
     instrument("auxiliary-percussion", "Auxiliary Percussion", "🪇", team_label="The Auxiliary Percussion"),
 )
 
+_DEFAULT_SHED_ARTWORK_URL = "/static/img/woodchuck-home.png"
+_SHED_ARTWORK_BY_INSTRUMENT_KEY = {
+    "trumpet": "/static/img/woodchuck-trumpet.png",
+    "trombone": "/static/img/woodchuck-trumpet.png",
+    "tuba": "/static/img/woodchuck-trumpet.png",
+    "percussion": "/static/img/woodchuck-drum.png",
+    "hand-percussion": "/static/img/woodchuck-drum.png",
+    "auxiliary-percussion": "/static/img/woodchuck-drum.png",
+    "color-guard": "/static/img/woodchuck-drum.png",
+    "drum-major": "/static/img/woodchuck-drum.png",
+    "harp": "/static/img/woodchuck-guitar.png",
+    "piano-keyboard": "/static/img/woodchuck-guitar.png",
+    "banjo": "/static/img/woodchuck-guitar.png",
+    "guitar": "/static/img/woodchuck-guitar.png",
+    "violin": "/static/img/woodchuck-guitar.png",
+}
+
+
+def shed_artwork_url(instrument_value: str | None) -> str:
+    """Return SHED artwork for a supported instrument, with a safe fallback."""
+    try:
+        instrument_key = canonical_instrument_key(instrument_value)
+    except ValueError:
+        return _DEFAULT_SHED_ARTWORK_URL
+    return _SHED_ARTWORK_BY_INSTRUMENT_KEY.get(
+        instrument_key, _DEFAULT_SHED_ARTWORK_URL
+    )
+
+
 INSTRUMENT_OPTIONS = [item["label"] for item in INSTRUMENT_DEFINITIONS]
 INSTRUMENTS_BY_LABEL = {
     item["label"].casefold(): item for item in INSTRUMENT_DEFINITIONS

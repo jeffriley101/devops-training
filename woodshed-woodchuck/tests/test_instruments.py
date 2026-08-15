@@ -245,8 +245,11 @@ def test_authenticated_instrument_api_returns_only_public_instrument_data(
         InstrumentUpdate(instrument="Tuba"),
     )
 
-    assert set(payload) == {"updated", "instrument", "instrument_definition"}
+    assert set(payload) == {
+        "updated", "instrument", "instrument_definition", "shed_artwork_url"
+    }
     assert payload["instrument"] == "Tuba"
+    assert payload["shed_artwork_url"] == "/static/img/woodchuck-trumpet.png"
     with factory() as session:
         persisted = session.get(WoodchuckProfile, profile_id)
         assert persisted is not None
