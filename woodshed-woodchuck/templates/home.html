@@ -387,24 +387,25 @@
 
   <section
     id="tuner-panel"
-    class="tuner-panel hidden"
-    aria-labelledby="tuner-title"
+    class="tuner-panel tuner-state-neutral hidden"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="tuner-note"
+    hidden
   >
-    <div>
-      <p class="chip">Tuner</p>
-      <h2 id="tuner-title">Not quite ready</h2>
-      <p class="tuner-message">
-        “Oh sorry, need to get batteries.”
-      </p>
-    </div>
-
     <button
       id="tuner-close-button"
-      class="btn btn-secondary"
+      class="tuner-close-button"
       type="button"
+      aria-label="Stop tuner and return to SHED"
     >
-      Put it back
+      STOP
     </button>
+
+    <div class="tuner-reading" aria-live="polite" aria-atomic="true">
+      <h2 id="tuner-note" class="tuner-note">—</h2>
+      <p id="tuner-diagnosis" class="tuner-diagnosis">LISTENING</p>
+    </div>
   </section>
 
   <section

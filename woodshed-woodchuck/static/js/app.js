@@ -1233,30 +1233,198 @@
     const openButton = document.getElementById("tuner-open-button");
     const closeButton = document.getElementById("tuner-close-button");
     const panel = document.getElementById("tuner-panel");
+    const noteElement = document.getElementById("tuner-note");
+    const diagnosisElement = document.getElementById("tuner-diagnosis");
+    const tuner = window.WWTuner;
 
-    if (!openButton || !panel) return;
+    if (!openButton || !closeButton || !panel || !noteElement || !diagnosisElement || !tuner) return;
 
-    openButton.addEventListener("click", function () {
+    const stateClasses = [
+      "tuner-state-neutral",
+      "tuner-state-pristine",
+      "tuner-state-good",
+      "tuner-state-flat",
+      "tuner-state-sharp",
+      "tuner-state-very-flat",
+      "tuner-state-very-sharp",
+    ];
+    let mediaStream = null;
+    let audioContext = null;
+    let mediaSource = null;
+    let analyser = null;
+    let sampleBuffer = null;
+    let animationFrame = null;
+    let lastAnalysisAt = 0;
+    let sessionNumber = 0;
+    let starting = false;
+    let silenceFrames = 0;
+    let frequencyHistory = [];
+    let stableState = "NEUTRAL";
+    let candidateState = null;
+    let candidateFrames = 0;
+
+    function stateClass(state) {
+      return `tuner-state-${state.toLowerCase().replace(/ /g, "-")}`;
+    }
+
+    function render(state, noteName, diagnosis) {
+      panel.classList.remove(...stateClasses);
+      panel.classList.add(stateClass(state));
+      noteElement.textContent = noteName;
+      diagnosisElement.textContent = diagnosis;
+    }
+
+    function renderNeutral(message) {
+      stableState = "NEUTRAL";
+      candidateState = null;
+      candidateFrames = 0;
+      frequencyHistory = [];
+      render("NEUTRAL", "—", message || "LISTENING");
+    }
+
+    function stopTuner(restoreFocus) {
+      sessionNumber += 1;
+      starting = false;
+      if (animationFrame !== null) {
+        window.cancelAnimationFrame(animationFrame);
+        animationFrame = null;
+      }
+      if (mediaSource) {
+        try { mediaSource.disconnect(); } catch (error) { /* already disconnected */ }
+      }
+      if (analyser) {
+        try { analyser.disconnect(); } catch (error) { /* already disconnected */ }
+      }
+      if (mediaStream) {
+        mediaStream.getTracks().forEach(function (track) { track.stop(); });
+      }
+      if (audioContext && audioContext.state !== "closed") {
+        audioContext.close().catch(function () {});
+      }
+      mediaStream = null;
+      mediaSource = null;
+      analyser = null;
+      audioContext = null;
+      sampleBuffer = null;
+      renderNeutral();
+      panel.hidden = true;
+      panel.classList.add("hidden");
+      openButton.setAttribute("aria-expanded", "false");
+      if (restoreFocus) openButton.focus({ preventScroll: true });
+    }
+
+    function analyze(timestamp) {
+      if (!analyser || !audioContext || panel.hidden) return;
+      animationFrame = window.requestAnimationFrame(analyze);
+      if (timestamp - lastAnalysisAt < 70) return;
+      lastAnalysisAt = timestamp;
+      analyser.getFloatTimeDomainData(sampleBuffer);
+      const frequency = tuner.detectPitch(sampleBuffer, audioContext.sampleRate);
+      if (!frequency) {
+        silenceFrames += 1;
+        if (silenceFrames >= 4) renderNeutral();
+        return;
+      }
+
+      silenceFrames = 0;
+      frequencyHistory.push(frequency);
+      if (frequencyHistory.length > 5) frequencyHistory.shift();
+      const smoothedFrequency = tuner.median(frequencyHistory);
+      const note = tuner.frequencyToNote(smoothedFrequency);
+      if (!note) {
+        renderNeutral();
+        return;
+      }
+
+      const nextState = tuner.classifyCents(note.cents);
+      if (nextState !== stableState) {
+        if (nextState === candidateState) {
+          candidateFrames += 1;
+        } else {
+          candidateState = nextState;
+          candidateFrames = 1;
+        }
+        if (candidateFrames < 2) return;
+        stableState = nextState;
+        candidateState = null;
+        candidateFrames = 0;
+      } else {
+        candidateState = null;
+        candidateFrames = 0;
+      }
+      render(stableState, note.name, stableState);
+    }
+
+    async function startTuner() {
+      if (starting || !panel.hidden) return;
+      const currentSession = sessionNumber + 1;
+      sessionNumber = currentSession;
+      starting = true;
+      renderNeutral();
+      panel.hidden = false;
       panel.classList.remove("hidden");
       openButton.setAttribute("aria-expanded", "true");
+      closeButton.focus({ preventScroll: true });
 
-      panel.scrollIntoView({
-        behavior: "smooth",
-        block: "nearest",
-      });
-
-      if (closeButton) {
-        closeButton.focus();
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !AudioContextClass) {
+        starting = false;
+        renderNeutral("MICROPHONE UNAVAILABLE");
+        return;
       }
-    });
 
-    if (closeButton) {
-      closeButton.addEventListener("click", function () {
-        panel.classList.add("hidden");
-        openButton.setAttribute("aria-expanded", "false");
-        openButton.focus();
-      });
+      try {
+        const requestedStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            autoGainControl: false,
+            echoCancellation: false,
+            noiseSuppression: false,
+          },
+          video: false,
+        });
+        if (currentSession !== sessionNumber || panel.hidden) {
+          requestedStream.getTracks().forEach(function (track) { track.stop(); });
+          return;
+        }
+        mediaStream = requestedStream;
+        audioContext = new AudioContextClass();
+        if (audioContext.state === "suspended") await audioContext.resume();
+        if (currentSession !== sessionNumber || panel.hidden) {
+          stopTuner(false);
+          return;
+        }
+        mediaSource = audioContext.createMediaStreamSource(mediaStream);
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 4096;
+        analyser.smoothingTimeConstant = 0;
+        mediaSource.connect(analyser);
+        sampleBuffer = new Float32Array(analyser.fftSize);
+        lastAnalysisAt = 0;
+        starting = false;
+        animationFrame = window.requestAnimationFrame(analyze);
+      } catch (error) {
+        if (currentSession !== sessionNumber) return;
+        starting = false;
+        if (mediaStream) {
+          mediaStream.getTracks().forEach(function (track) { track.stop(); });
+          mediaStream = null;
+        }
+        if (audioContext && audioContext.state !== "closed") {
+          audioContext.close().catch(function () {});
+          audioContext = null;
+        }
+        renderNeutral("MICROPHONE UNAVAILABLE");
+      }
     }
+
+    openButton.addEventListener("click", startTuner);
+    closeButton.addEventListener("click", function () { stopTuner(true); });
+    document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && !panel.hidden) stopTuner(true);
+    });
+    window.addEventListener("pagehide", function () {
+      if (!panel.hidden || mediaStream || audioContext) stopTuner(false);
+    });
   }
 
 
