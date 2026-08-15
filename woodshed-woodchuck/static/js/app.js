@@ -2925,6 +2925,23 @@
     loadStandings();
   }
 
+  function groupTeamContestResults(rows) {
+    const groups = new Map();
+    rows.forEach((result) => {
+      const contest = result && result.contest;
+      if (!contest || typeof contest.key !== "string" || !contest.key) return;
+      if (!groups.has(contest.key)) {
+        groups.set(contest.key, {
+          contestKey: contest.key,
+          contestName: contest.name || contest.key,
+          results: [],
+        });
+      }
+      groups.get(contest.key).results.push(result);
+    });
+    return Array.from(groups.values());
+  }
+
   function wirePastWinners() {
     const root = document.getElementById("past-winners");
     if (!root) return;
@@ -3043,34 +3060,61 @@
           typeof subject === "string" && subject.trim() &&
           Number.isInteger(result.score) && result.score >= 0;
       });
+      const groups = type === "teams"
+        ? groupTeamContestResults(rows)
+        : [{ results: rows }];
 
-      rows.forEach((result) => {
-        const medal = medals[result.rank];
-        const isStudent = type !== "instruments" && type !== "teams";
-        const subject = type === "teams" ? result.team_name : isStudent ? result.display_name : result.instrument;
-        const row = document.createElement("article");
-        row.className = "medal-row";
-        const icon = document.createElement("span");
-        icon.className = "medal-row-icon";
-        icon.setAttribute("aria-hidden", "true");
-        icon.textContent = medal.emoji;
-        const subjectBlock = document.createElement("div");
-        subjectBlock.className = "medal-row-subject";
-        const name = document.createElement("strong");
-        const teamName = !isStudent && window.WWInstruments
-          ? window.WWInstruments.teamLabel(subject)
-          : null;
-        name.textContent = type === "teams" ? `🛡 ${subject}` : isStudent ? subject : `🎵 ${teamName || subject}`;
-        const rank = document.createElement("small");
-        rank.textContent = `${medal.label} · Rank ${result.rank}`;
-        subjectBlock.append(name, rank);
-        const score = document.createElement("span");
-        score.className = "medal-row-score";
-        score.textContent = type === "camp-points"
-          ? `${result.score} Camp ${result.score === 1 ? "point" : "points"}`
-          : `${result.score} min`;
-        row.append(icon, subjectBlock, score);
-        rowsEl.appendChild(row);
+      groups.forEach((group) => {
+        let groupRows = rowsEl;
+        if (type === "teams") {
+          const groupSection = document.createElement("section");
+          groupSection.className = "medal-contest team-medal-contest-group";
+          const heading = document.createElement("h5");
+          heading.id = `past-winners-${division}-${group.contestKey}-title`;
+          heading.textContent = group.contestName;
+          groupSection.setAttribute("aria-labelledby", heading.id);
+          groupRows = document.createElement("div");
+          groupRows.className = "medal-rows";
+          groupRows.setAttribute("role", "list");
+          groupSection.append(heading, groupRows);
+          rowsEl.appendChild(groupSection);
+        }
+
+        group.results.forEach((result) => {
+          const medal = medals[result.rank];
+          const isStudent = type !== "instruments" && type !== "teams";
+          const subject = type === "teams" ? result.team_name : isStudent ? result.display_name : result.instrument;
+          const row = document.createElement("article");
+          row.className = "medal-row";
+          row.setAttribute("role", "listitem");
+          const icon = document.createElement("span");
+          icon.className = "medal-row-icon";
+          icon.setAttribute("aria-hidden", "true");
+          icon.textContent = medal.emoji;
+          const subjectBlock = document.createElement("div");
+          subjectBlock.className = "medal-row-subject";
+          const name = document.createElement("strong");
+          const teamName = !isStudent && window.WWInstruments
+            ? window.WWInstruments.teamLabel(subject)
+            : null;
+          name.textContent = type === "teams" ? `🛡 ${subject}` : isStudent ? subject : `🎵 ${teamName || subject}`;
+          const rank = document.createElement("small");
+          rank.textContent = `${medal.label} · Rank ${result.rank}`;
+          subjectBlock.append(name, rank);
+          const score = document.createElement("span");
+          score.className = "medal-row-score";
+          if (type === "camp-points") {
+            score.textContent = `${result.score} Camp ${result.score === 1 ? "point" : "points"}`;
+          } else if (type === "teams" && result.contest.key === "team-seasonal-points") {
+            score.textContent = `${result.score} ${result.score === 1 ? "point" : "points"}`;
+          } else if (type === "teams" && result.contest.key === "team-average-practice") {
+            score.textContent = `${(result.score / 100).toFixed(2)} min`;
+          } else {
+            score.textContent = `${result.score} min`;
+          }
+          row.append(icon, subjectBlock, score);
+          groupRows.appendChild(row);
+        });
       });
       noResultsEl.classList.toggle("hidden", rows.length !== 0);
     }
