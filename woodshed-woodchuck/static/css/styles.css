@@ -642,10 +642,19 @@ select {
   font-weight: 700;
 }
 
+.board-activity {
+  align-self: start;
+  min-height: 0;
+}
+
 .board-activity-body {
   display: flex;
   gap: 1rem;
   padding-top: 0.65rem;
+}
+
+.board-activity:not([open]) > .board-activity-body {
+  display: none;
 }
 
 .camp-hours-checkbox-label {
@@ -3069,6 +3078,37 @@ select {
   background: #fff1b8;
 }
 .p-book-option-card + .p-book-option-detail { margin-top: -0.72rem; }
+
+.p-book-option-group {
+  display: grid;
+  gap: 0.7rem;
+  min-width: 0;
+  margin-top: 0.2rem;
+  padding: 0.72rem;
+  border: 2px solid #527a58;
+  border-radius: 12px;
+  background: #eef7e8;
+}
+
+.p-book-option-group .p-book-option-card {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.p-book-option-group .p-book-option-detail {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.p-book-option-group .p-book-option-card + .p-book-option-detail {
+  margin-top: 0;
+}
 .p-book-warm-field,
 .p-book-work-field { border-radius: 12px; background: #fff1b8; }
 #p-book-form input:not([type="checkbox"]):not([type="radio"]),
@@ -4787,13 +4827,41 @@ select {
 .champions-row { border: 1px solid #7e673f; background: #f7e4ae; }
 
 .bonus-challenge-section {
+  position: relative;
   overflow: hidden;
   border: 5px ridge #a8751f;
   border-radius: 14px;
   background: linear-gradient(145deg, #f5d76e, #bb8526);
 }
+
+.bonus-challenge-screw {
+  position: absolute;
+  z-index: 3;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #46515a;
+  border-radius: 50%;
+  background:
+    linear-gradient(45deg, transparent 43%, #4b555c 44% 56%, transparent 57%),
+    linear-gradient(-45deg, transparent 43%, #4b555c 44% 56%, transparent 57%),
+    radial-gradient(circle at 34% 28%, #fff 0 13%, #d9dfe1 26%, #858f95 52%, #c8ced0 70%, #59636a 100%);
+  box-shadow: inset 1px 1px 1px rgba(255, 255, 255, 0.8), 0 1px 2px rgba(53, 37, 16, 0.65);
+  pointer-events: none;
+}
+
+.bonus-challenge-screw-top-left { top: 0.7rem; left: 0.7rem; }
+.bonus-challenge-screw-top-right { top: 0.7rem; right: 0.7rem; }
+.bonus-challenge-screw-bottom-left { bottom: 0.7rem; left: 0.7rem; }
+.bonus-challenge-screw-bottom-right { right: 0.7rem; bottom: 0.7rem; }
 .bonus-challenge-section > * { margin-block: 0; padding: 1rem; }
 .bonus-challenge-section > * + * { border-top: 2px solid rgba(113,73,16,.45); }
+
+.bonus-challenge-section > .bonus-challenge-screw {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  border-top: 2px solid #46515a;
+}
 
 .practice-room-emoji-control {
   display: grid;

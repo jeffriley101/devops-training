@@ -81,10 +81,11 @@
       </div>
     </details>
 
-    <label class="contest-opt-in-control p-book-option-card" for="p-book-include-contests">
-      <input id="p-book-include-contests" name="include-contests" type="checkbox" checked />
-      <span><strong>Include this chart in Band Camp contests</strong><small>Uncheck to keep it in your Log Book without adding it to Open or Verified standings.</small></span>
-    </label>
+    <section class="p-book-option-group p-book-team-option-group">
+      <label class="contest-opt-in-control p-book-option-card" for="p-book-include-contests">
+        <input id="p-book-include-contests" name="include-contests" type="checkbox" checked />
+        <span><strong>Include this chart in Band Camp contests</strong><small>Uncheck to keep it in your Log Book without adding it to Open or Verified standings.</small></span>
+      </label>
 
     <label class="contest-opt-in-control p-book-option-card" for="p-book-include-team">
       <input id="p-book-include-team" name="include-team" type="checkbox" checked />
@@ -95,13 +96,15 @@
       <a id="p-book-team-shed-link" class="btn btn-secondary" href="/home#shed-team-panel">Choose a Team in SHED</a>
     </section>
 
+    </section>
+
+    <section class="p-book-option-group p-book-email-option-group">
     <label class="contest-opt-in-control p-book-option-card" for="p-book-email-copy">
       <input id="p-book-email-copy" name="email-copy" type="checkbox" checked />
       <span><strong>Email your Practice Book to someone that agrees to receive your emails</strong><small>Uncheck to prevent emailing anyone.</small></span>
     </label>
     <div class="p-book-option-detail">
-      <label for="p-book-email-preset">Preset email addresses</label>
-      <select id="p-book-email-preset"><option value="">Choose a saved recipient</option></select>
+      <select id="p-book-email-preset" aria-label="Saved email recipients"><option value="">Choose a saved recipient</option></select>
       <details class="mentor-card">
         <summary>Manage preset email addresses</summary>
         <p class="body-copy">Do not submit your band director or teacher's email address without talking with them first, please!</p>
@@ -114,18 +117,22 @@
       </details>
     </div>
 
+    </section>
+
+    <section class="p-book-option-group p-book-verification-option-group">
     <label class="contest-opt-in-control p-book-option-card" for="p-book-request-validation">
       <input id="p-book-request-validation" name="request-validation" type="checkbox" checked />
       <span><strong>Request your parent or mentor to validate your P-Chart</strong><small>Uncheck to prevent sending a notification.</small></span>
     </label>
     <div class="p-book-option-detail">
-      <label for="p-book-verifier">Connected parent or mentor</label>
-      <select id="p-book-verifier" name="p-book-verifier" disabled>
+      <select id="p-book-verifier" name="p-book-verifier" aria-label="Connected parent or mentor" disabled>
         <option value="">Loading trusted verifiers...</option>
       </select>
       <a id="p-book-verifier-manage" class="btn btn-secondary p-book-verifier-manage" href="/trusted-verifiers?return_to=p-book">Manage Trusted Verifiers</a>
       <p id="p-book-verifier-help" class="body-copy"></p>
     </div>
+
+    </section>
 
     <p id="p-book-error" class="error-text" aria-live="polite"></p>
     <p id="p-book-feedback" class="body-copy" aria-live="polite"></p>

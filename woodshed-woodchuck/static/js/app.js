@@ -1727,7 +1727,7 @@
     const AudioContextClass =
       window.AudioContext || window.webkitAudioContext;
 
-    let bpm = 100;
+    let bpm = 120;
     let audioContext = null;
     let schedulerTimer = null;
     let nextBeatTime = 0;
@@ -1757,11 +1757,11 @@
       try {
         const saved = window.localStorage.getItem(BPM_STORAGE_KEY);
 
-        if (saved !== null) {
+        if (saved !== null && saved.trim() !== "" && Number.isFinite(Number(saved))) {
           bpm = clampBpm(saved);
         }
       } catch (_error) {
-        bpm = 100;
+        bpm = 120;
       }
     }
 
@@ -2033,13 +2033,13 @@
 
     if (slowerButton) {
       slowerButton.addEventListener("click", function () {
-        setBpm(bpm - 5);
+        setBpm(bpm - 4);
       });
     }
 
     if (fasterButton) {
       fasterButton.addEventListener("click", function () {
-        setBpm(bpm + 5);
+        setBpm(bpm + 4);
       });
     }
 
