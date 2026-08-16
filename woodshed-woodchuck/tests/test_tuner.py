@@ -81,7 +81,7 @@ def test_tuner_is_full_screen_minimal_and_uses_locked_state_colors():
     assert ".tuner-state-flat,\n.tuner-state-sharp" in CSS
     assert ".tuner-state-very-flat,\n.tuner-state-very-sharp" in CSS
     assert "/static/js/tuner.js?v=1" in BASE
-    assert BASE.index("/static/js/tuner.js?v=1") < BASE.index("/static/js/app.js?v=46")
+    assert BASE.index("/static/js/tuner.js?v=1") < BASE.index("/static/js/app.js?v=47")
 
 
 def test_tuner_requests_microphone_smooths_results_and_releases_resources():
@@ -108,5 +108,30 @@ def test_tuner_open_close_state_and_permission_failure_are_graceful():
     assert "panel.hidden = true" in tuner_code
     assert 'openButton.setAttribute("aria-expanded", "true")' in tuner_code
     assert 'openButton.setAttribute("aria-expanded", "false")' in tuner_code
-    assert tuner_code.count('renderNeutral("MICROPHONE UNAVAILABLE")') == 2
+    assert ">READY<" in HOME
+    assert ">LISTENING<" not in HOME
+    assert 'renderNeutral("REQUESTING MICROPHONE")' in tuner_code
+    assert 'renderNeutral("LISTENING")' in tuner_code
+    assert 'return "MICROPHONE DENIED"' in tuner_code
+    assert 'renderNeutral("SECURE CONNECTION REQUIRED")' in tuner_code
+    assert 'renderNeutral("MICROPHONE UNSUPPORTED")' in tuner_code
+    assert 'return track.readyState === "live"' in tuner_code
+    assert 'microphoneTrack.readyState !== "live"' in tuner_code
+    get_user_media_call = (
+        "requestedStreamPromise = navigator.mediaDevices.getUserMedia"
+    )
+    assert tuner_code.index("new AudioContextClass()") < tuner_code.index(
+        get_user_media_call
+    )
+    assert tuner_code.index(get_user_media_call) < tuner_code.index(
+        "await requestedStreamPromise"
+    )
+    assert tuner_code.index("await requestedStreamPromise") < tuner_code.index(
+        "microphoneTrack = liveTrack"
+    )
+    assert tuner_code.index("microphoneTrack = liveTrack") < tuner_code.index(
+        "createMediaStreamSource"
+    )
+    media_source_at = tuner_code.index("createMediaStreamSource")
+    assert 'renderNeutral("LISTENING")' in tuner_code[media_source_at:]
     assert "if (currentSession !== sessionNumber || panel.hidden)" in tuner_code

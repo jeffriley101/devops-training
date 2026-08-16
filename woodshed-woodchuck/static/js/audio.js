@@ -235,31 +235,53 @@
     }
   }
 
+  function markAudioReady() {
+    if (!audioContextIsRunning()) {
+      unlocked = false;
+      return false;
+    }
+    unlocked = true;
+    buildGraph();
+    return true;
+  }
+
   function unlock() {
     if (unlocked && audioContextIsRunning()) return Promise.resolve(true);
-    if (unlockPending) return unlockPending;
     if (!window.Tone || typeof window.Tone.start !== "function") {
+      unlocked = false;
       return Promise.resolve(false);
     }
+
+    primeAudioContextFromGesture();
+    if (unlockPending) return unlockPending;
     unlocked = false;
-    unlockPending = Promise.resolve(window.Tone.start())
-      .then(function () {
-        unlocked = true;
-        buildGraph();
-        return true;
-      })
-      .catch(function () {
-        if (!audioContextIsRunning()) return false;
-        unlocked = true;
-        buildGraph();
-        return true;
+    let startResult;
+    try {
+      startResult = window.Tone.start();
+    } catch (_error) {
+      startResult = Promise.reject(_error);
+    }
+    unlockPending = Promise.resolve(startResult)
+      .catch(function () { return false; })
+      .then(async function () {
+        const context = toneAudioContext();
+        if (
+          context && context.state !== "running" &&
+          typeof context.resume === "function"
+        ) {
+          try { await context.resume(); } catch (_error) { return false; }
+        }
+        return markAudioReady();
       })
       .finally(function () { unlockPending = null; });
     return unlockPending;
   }
 
   function canPlay(name) {
-    if (!enabled || !unlocked || !graph || !EFFECT_NAMES.includes(name)) return false;
+    if (
+      !enabled || !unlocked || !audioContextIsRunning() ||
+      !graph || !EFFECT_NAMES.includes(name)
+    ) return false;
     const nowMs = Date.now();
     if (name !== "crownEarned" && nowMs < crownUntil) return false;
     const quietPeriods = {
@@ -276,8 +298,11 @@
   }
 
   function play(name) {
-    if (!unlocked && unlockPending && enabled) {
-      unlockPending.then(function (ready) { if (ready) play(name); }).catch(function () {});
+    if (!enabled || !EFFECT_NAMES.includes(name)) return false;
+    if (!unlocked || !audioContextIsRunning() || !graph) {
+      unlock().then(function (ready) {
+        if (ready) play(name);
+      }).catch(function () {});
       return false;
     }
     if (!canPlay(name)) return false;
@@ -431,21 +456,42 @@
     });
   }
 
+  function isDedicatedMediaGesture(event) {
+    const target = event && event.target;
+    return Boolean(
+      target && typeof target.closest === "function" &&
+      target.closest(
+        "#tuner-open-button, #tuner-panel, #metronome-open-button, #metronome-panel"
+      )
+    );
+  }
+
   function gestureUnlock(event) {
     if (event.type === "keydown" && event.isComposing) return;
-    primeAudioContextFromGesture();
+    if (isDedicatedMediaGesture(event)) return;
     unlock().catch(function () {});
   }
+
+  function refreshAudioState() {
+    if (!audioContextIsRunning()) unlocked = false;
+  }
+
   document.addEventListener("pointerdown", gestureUnlock, true);
   document.addEventListener("touchend", gestureUnlock, true);
   document.addEventListener("click", gestureUnlock, true);
   document.addEventListener("keydown", gestureUnlock, true);
+  document.addEventListener("visibilitychange", refreshAudioState);
+  window.addEventListener("pageshow", refreshAudioState);
   document.addEventListener("DOMContentLoaded", wireControls, { once: true });
 
   window.WoodshedAudio = {
     unlock, play, playCampReward, setEnabled, setVolume,
     isEnabled: function () { return enabled; },
     getVolume: function () { return volume; },
+    getContextState: function () {
+      const context = toneAudioContext();
+      return context && typeof context.state === "string" ? context.state : "unavailable";
+    },
     effectNames: EFFECT_NAMES.slice(),
     goatClipUrls: GOAT_CLIP_URLS.slice(),
     expectedGoatClipUrls: EXPECTED_GOAT_CLIP_URLS.slice(),

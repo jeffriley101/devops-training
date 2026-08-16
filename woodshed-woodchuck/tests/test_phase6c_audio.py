@@ -18,8 +18,8 @@ def test_tone_is_exactly_pinned_local_licensed_and_loaded_in_order():
     assert "MIT License" in license_file.read_text()
     assert "cdn" not in BASE.casefold()
     tone_pos = BASE.index('/static/vendor/tone/Tone.js?v=15.1.22')
-    audio_pos = BASE.index('/static/js/audio.js?v=6')
-    app_pos = BASE.index('/static/js/app.js?v=46')
+    audio_pos = BASE.index('/static/js/audio.js?v=7')
+    app_pos = BASE.index('/static/js/app.js?v=47')
     assert tone_pos < audio_pos < app_pos
 
 
@@ -44,7 +44,10 @@ def test_audio_unlock_is_gesture_only_lazy_and_reuses_graph():
     assert "primeAudioContextFromGesture();" in AUDIO
     assert "if (unlocked && audioContextIsRunning()) return Promise.resolve(true)" in AUDIO
     assert "unlocked = false;" in AUDIO
-    assert "if (!audioContextIsRunning()) return false;" in AUDIO
+    assert "function markAudioReady()" in AUDIO
+    assert "if (!audioContextIsRunning()) {" in AUDIO
+    assert "return markAudioReady();" in AUDIO
+    assert "!unlocked || !audioContextIsRunning() || !graph" in AUDIO
     assert "Transport" not in AUDIO
 
 
@@ -78,6 +81,7 @@ global.document = {
 };
 global.window = {
   localStorage: { getItem: function () { return null; }, setItem: function () {} },
+  addEventListener: function (name, handler) { listeners["window:" + name] = handler; },
   Tone: {
     getContext: function () { return { rawContext: rawContext }; },
     start: function () { return pending; },
@@ -105,7 +109,10 @@ def test_effect_preferences_are_local_accessible_and_independent():
     assert 'readBoolean(STORAGE_ENABLED, true)' in AUDIO
     assert "window.localStorage" in AUDIO
     assert "/account/state" not in AUDIO
-    assert "metronome" not in AUDIO.casefold()
+    assert '"#tuner-open-button, #tuner-panel, #metronome-open-button, #metronome-panel"' in AUDIO
+    assert "function isDedicatedMediaGesture(event)" in AUDIO
+    assert "woodshedWoodchuckMetronomeBpm" not in AUDIO
+    assert "createOscillator" not in AUDIO
     assert "Sound Effects" in BASE
     assert 'type="range" min="0" max="100"' in BASE
     assert 'aria-valuetext="35 percent"' in BASE
@@ -156,3 +163,9 @@ def test_visual_confirmation_and_metronome_implementation_remain_present():
     assert "AudioContext" in metronome
     assert "WoodshedAudio" not in metronome
     assert "Tone" not in metronome
+    assert 'startButton.addEventListener("click", toggleMetronome)' in metronome
+    assert 'audioContext.state !== "running"' in metronome
+    assert "await audioContext.resume()" in metronome
+    assert "if (isRunning && contextIsRunning)" in metronome
+    assert "gain.connect(audioContext.destination)" in metronome
+    assert 'document.addEventListener("visibilitychange"' in metronome

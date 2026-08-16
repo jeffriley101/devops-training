@@ -1249,6 +1249,7 @@
       "tuner-state-very-sharp",
     ];
     let mediaStream = null;
+    let microphoneTrack = null;
     let audioContext = null;
     let mediaSource = null;
     let analyser = null;
@@ -1279,7 +1280,19 @@
       candidateState = null;
       candidateFrames = 0;
       frequencyHistory = [];
-      render("NEUTRAL", "—", message || "LISTENING");
+      render("NEUTRAL", "—", message || "READY");
+    }
+
+    function microphoneErrorMessage(error) {
+      const errorName = error && error.name;
+      if (errorName === "NotAllowedError") return "MICROPHONE DENIED";
+      if (errorName === "SecurityError") return "MICROPHONE BLOCKED";
+      if (errorName === "NotFoundError") return "NO MICROPHONE";
+      if (errorName === "NotReadableError") return "MICROPHONE BUSY";
+      if (errorName === "TrackNotLive") return "MICROPHONE NOT LIVE";
+      if (errorName === "AudioContextNotRunning") return "AUDIO INPUT BLOCKED";
+      if (errorName === "AbortError") return "MICROPHONE INTERRUPTED";
+      return "MICROPHONE FAILED";
     }
 
     function stopTuner(restoreFocus) {
@@ -1302,6 +1315,7 @@
         audioContext.close().catch(function () {});
       }
       mediaStream = null;
+      microphoneTrack = null;
       mediaSource = null;
       analyser = null;
       audioContext = null;
@@ -1315,6 +1329,11 @@
 
     function analyze(timestamp) {
       if (!analyser || !audioContext || panel.hidden) return;
+      if (!microphoneTrack || microphoneTrack.readyState !== "live") {
+        renderNeutral("MICROPHONE DISCONNECTED");
+        animationFrame = null;
+        return;
+      }
       animationFrame = window.requestAnimationFrame(analyze);
       if (timestamp - lastAnalysisAt < 70) return;
       lastAnalysisAt = timestamp;
@@ -1322,7 +1341,7 @@
       const frequency = tuner.detectPitch(sampleBuffer, audioContext.sampleRate);
       if (!frequency) {
         silenceFrames += 1;
-        if (silenceFrames >= 4) renderNeutral();
+        if (silenceFrames >= 4) renderNeutral("LISTENING");
         return;
       }
 
@@ -1332,7 +1351,7 @@
       const smoothedFrequency = tuner.median(frequencyHistory);
       const note = tuner.frequencyToNote(smoothedFrequency);
       if (!note) {
-        renderNeutral();
+        renderNeutral("LISTENING");
         return;
       }
 
@@ -1360,21 +1379,36 @@
       const currentSession = sessionNumber + 1;
       sessionNumber = currentSession;
       starting = true;
-      renderNeutral();
+      renderNeutral("REQUESTING MICROPHONE");
       panel.hidden = false;
       panel.classList.remove("hidden");
       openButton.setAttribute("aria-expanded", "true");
       closeButton.focus({ preventScroll: true });
 
       const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (window.isSecureContext === false) {
+        starting = false;
+        renderNeutral("SECURE CONNECTION REQUIRED");
+        return;
+      }
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !AudioContextClass) {
         starting = false;
-        renderNeutral("MICROPHONE UNAVAILABLE");
+        renderNeutral("MICROPHONE UNSUPPORTED");
         return;
       }
 
+      let requestedStreamPromise;
+      let resumePromise = Promise.resolve();
       try {
-        const requestedStream = await navigator.mediaDevices.getUserMedia({
+        audioContext = new AudioContextClass();
+        if (
+          typeof audioContext.state === "string" &&
+          audioContext.state !== "running" &&
+          typeof audioContext.resume === "function"
+        ) {
+          resumePromise = Promise.resolve(audioContext.resume()).catch(function () {});
+        }
+        requestedStreamPromise = navigator.mediaDevices.getUserMedia({
           audio: {
             autoGainControl: false,
             echoCancellation: false,
@@ -1382,13 +1416,54 @@
           },
           video: false,
         });
+      } catch (error) {
+        starting = false;
+        if (audioContext && audioContext.state !== "closed") {
+          audioContext.close().catch(function () {});
+          audioContext = null;
+        }
+        renderNeutral(microphoneErrorMessage(error));
+        return;
+      }
+
+      try {
+        const requestedStream = await requestedStreamPromise;
         if (currentSession !== sessionNumber || panel.hidden) {
           requestedStream.getTracks().forEach(function (track) { track.stop(); });
           return;
         }
+        const audioTracks = typeof requestedStream.getAudioTracks === "function"
+          ? requestedStream.getAudioTracks()
+          : requestedStream.getTracks().filter(function (track) {
+              return track.kind === "audio";
+            });
+        const liveTrack = audioTracks.find(function (track) {
+          return track.readyState === "live";
+        });
+        if (!liveTrack) {
+          requestedStream.getTracks().forEach(function (track) { track.stop(); });
+          const trackError = new Error("Microphone track is not live.");
+          trackError.name = "TrackNotLive";
+          throw trackError;
+        }
         mediaStream = requestedStream;
-        audioContext = new AudioContextClass();
-        if (audioContext.state === "suspended") await audioContext.resume();
+        microphoneTrack = liveTrack;
+        await resumePromise;
+        if (
+          typeof audioContext.state === "string" &&
+          audioContext.state !== "running" &&
+          typeof audioContext.resume === "function"
+        ) {
+          try { await audioContext.resume(); } catch (_error) { /* handled below */ }
+        }
+        if (
+          typeof audioContext.state === "string" &&
+          audioContext.state !== "running"
+        ) {
+          const contextError = new Error("Tuner audio context did not start.");
+          contextError.name = "AudioContextNotRunning";
+          throw contextError;
+        }
         if (currentSession !== sessionNumber || panel.hidden) {
           stopTuner(false);
           return;
@@ -1401,6 +1476,7 @@
         sampleBuffer = new Float32Array(analyser.fftSize);
         lastAnalysisAt = 0;
         starting = false;
+        renderNeutral("LISTENING");
         animationFrame = window.requestAnimationFrame(analyze);
       } catch (error) {
         if (currentSession !== sessionNumber) return;
@@ -1408,12 +1484,13 @@
         if (mediaStream) {
           mediaStream.getTracks().forEach(function (track) { track.stop(); });
           mediaStream = null;
+          microphoneTrack = null;
         }
         if (audioContext && audioContext.state !== "closed") {
           audioContext.close().catch(function () {});
           audioContext = null;
         }
-        renderNeutral("MICROPHONE UNAVAILABLE");
+        renderNeutral(microphoneErrorMessage(error));
       }
     }
 
@@ -1774,7 +1851,10 @@
     }
 
     function scheduler() {
-      if (!audioContext || !isRunning) return;
+      if (
+        !audioContext || !isRunning ||
+        (typeof audioContext.state === "string" && audioContext.state !== "running")
+      ) return;
 
       while (
         nextBeatTime <
@@ -1795,14 +1875,26 @@
         return;
       }
 
-      if (!audioContext) {
+      if (!audioContext || audioContext.state === "closed") {
         audioContext = new AudioContextClass();
       }
-
-      if (audioContext.state === "suspended") {
+      if (
+        typeof audioContext.state === "string" &&
+        audioContext.state !== "running" &&
+        typeof audioContext.resume === "function"
+      ) {
         await audioContext.resume();
       }
+      if (
+        typeof audioContext.state === "string" &&
+        audioContext.state !== "running"
+      ) {
+        throw new Error(`Metronome audio context is ${audioContext.state}.`);
+      }
 
+      if (schedulerTimer !== null) {
+        window.clearInterval(schedulerTimer);
+      }
       isRunning = true;
       nextBeatTime = audioContext.currentTime + 0.05;
 
@@ -1842,13 +1934,23 @@
     }
 
     function toggleMetronome() {
-      if (isRunning) {
+      const contextIsRunning = audioContext && (
+        typeof audioContext.state !== "string" || audioContext.state === "running"
+      );
+      if (isRunning && contextIsRunning) {
         stopMetronome();
       } else {
         startMetronome().catch(function () {
+          isRunning = false;
+          if (schedulerTimer !== null) {
+            window.clearInterval(schedulerTimer);
+            schedulerTimer = null;
+          }
+          startButton.textContent = "Start";
+          startButton.classList.remove("metronome-stop-button");
           if (status) {
             status.textContent =
-              "The browser could not start metronome audio.";
+              "The browser could not start metronome audio. Tap Start to try again.";
           }
         });
       }
@@ -1949,6 +2051,9 @@
       setBpm(numberInput.value);
     });
 
+    document.addEventListener("visibilitychange", function () {
+      if (document.hidden && isRunning) stopMetronome();
+    });
     window.addEventListener("pagehide", stopMetronome);
   }
 
