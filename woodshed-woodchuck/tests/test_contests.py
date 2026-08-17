@@ -1265,6 +1265,65 @@ def test_same_category_can_earn_two_independent_crowns(
     assert awards[0].source_key != awards[1].source_key
 
 
+def test_same_crown_source_is_pending_idempotent_before_flush(
+    database: tuple[Session, sessionmaker[Session]],
+) -> None:
+    session, factory = database
+    profile = add_student(session, woodchuck_id="WC-CROWN-SOURCE", instrument="Tuba")
+    session.add(CrownProgress(
+        profile_id=profile.id,
+        category_key="trivia",
+        qualifying_wins=9,
+    ))
+    session.commit()
+
+    source_key = "same-crown-source"
+    with factory(autoflush=False) as transaction:
+        first = contest_module._grant_once(
+            transaction,
+            profile_id=profile.id,
+            result_id=None,
+            source_key=source_key,
+            reward_type="crown_win",
+            category_key="trivia",
+        )
+        if first:
+            contest_module._increment_crown_progress(
+                transaction,
+                profile_id=profile.id,
+                category="trivia",
+                source_key=source_key,
+                now=FINAL_NOW,
+            )
+        retry = contest_module._grant_once(
+            transaction,
+            profile_id=profile.id,
+            result_id=None,
+            source_key=source_key,
+            reward_type="crown_win",
+            category_key="trivia",
+        )
+        if retry:
+            contest_module._increment_crown_progress(
+                transaction,
+                profile_id=profile.id,
+                category="trivia",
+                source_key=source_key,
+                now=FINAL_NOW,
+            )
+        transaction.commit()
+
+    assert first is True
+    assert retry is False
+    assert session.scalar(select(func.count()).select_from(RewardGrant)) == 1
+    assert session.scalar(select(func.count()).select_from(CrownAward)) == 1
+    progress = session.scalar(select(CrownProgress).where(
+        CrownProgress.profile_id == profile.id,
+        CrownProgress.category_key == "trivia",
+    ))
+    assert progress is not None and progress.qualifying_wins == 0
+
+
 def test_instrument_participation_threshold_and_division_deduplication(
     database: tuple[Session, sessionmaker[Session]],
 ) -> None:
@@ -1601,10 +1660,14 @@ def test_hall_aggregates_students_instruments_divisions_and_prior_seasons(
 
     payload = hall_of_champions_payload(session)
 
+    # One card per durable profile: multiple weeks/divisions aggregate into
+    # medal counts, while two different profiles may share a public name.
+    assert len(payload["students"]) == len(students)
     assert [student["display_name"] for student in payload["students"]] == [
         "Alpha", "Shared Name", "Shared Name"
     ]
     renamed = payload["students"][1]
+    assert renamed["medals"]["total"] == 2
     assert renamed["medals"] == {"gold": 1, "silver": 1, "bronze": 0, "total": 2}
     assert renamed["by_division"] == {
         "open": {"gold": 1, "silver": 0, "bronze": 0, "total": 1},

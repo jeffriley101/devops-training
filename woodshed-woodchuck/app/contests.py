@@ -1047,6 +1047,15 @@ def _grant_once(
     category_key: str | None = None,
     amount: int = 1,
 ) -> bool:
+    pending = next((
+        row for row in session.new
+        if isinstance(row, RewardGrant)
+        and row.profile_id == profile_id
+        and row.source_key == source_key
+        and row.reward_type == reward_type
+    ), None)
+    if pending is not None:
+        return False
     existing = session.scalar(select(RewardGrant.id).where(
         RewardGrant.profile_id == profile_id,
         RewardGrant.source_key == source_key,
