@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -23,6 +23,7 @@ from .models import (
     Contest,
     ContestResult,
     ContestWeek,
+    CrownAward,
     CrownProgress,
     PracticeChart,
     PracticeChartVerification,
@@ -1230,20 +1231,13 @@ def _legacy_finalize_contest_week(
             reward_type="crown_win",
             category_key=category,
         ):
-            progress = session.scalar(select(CrownProgress).where(
-                CrownProgress.profile_id == profile_id,
-                CrownProgress.category_key == category,
-            ).with_for_update())
-            if progress is None:
-                progress = CrownProgress(
-                    profile_id=profile_id,
-                    category_key=category,
-                    qualifying_wins=0,
-                )
-                session.add(progress)
-            progress.qualifying_wins += 1
-            if progress.qualifying_wins >= 10 and progress.crown_earned_at is None:
-                progress.crown_earned_at = now_utc
+            _increment_crown_progress(
+                session,
+                profile_id=profile_id,
+                category=category,
+                source_key=source,
+                now=now_utc,
+            )
 
     for profile_id, result in camp_gold_results:
         source = (
@@ -1266,20 +1260,13 @@ def _legacy_finalize_contest_week(
             reward_type="crown_win",
             category_key="weekly-camp-points",
         ):
-            progress = session.scalar(select(CrownProgress).where(
-                CrownProgress.profile_id == profile_id,
-                CrownProgress.category_key == "weekly-camp-points",
-            ).with_for_update())
-            if progress is None:
-                progress = CrownProgress(
-                    profile_id=profile_id,
-                    category_key="weekly-camp-points",
-                    qualifying_wins=0,
-                )
-                session.add(progress)
-            progress.qualifying_wins += 1
-            if progress.qualifying_wins >= 10 and progress.crown_earned_at is None:
-                progress.crown_earned_at = now_utc
+            _increment_crown_progress(
+                session,
+                profile_id=profile_id,
+                category="weekly-camp-points",
+                source_key=source,
+                now=now_utc,
+            )
 
     participation_winners: set[tuple[str, int]] = set()
     for winning_division, instrument_key in winning_instruments:
@@ -1316,9 +1303,46 @@ def _set_finalization_stage(session: Session, stage: str) -> None:
     session.info["contest_finalization_stage"] = stage
 
 
+def _crown_award_once(
+    session: Session,
+    *,
+    profile_id: int,
+    category: str,
+    source_key: str,
+    earned_at: datetime,
+) -> CrownAward:
+    pending = next((
+        row for row in session.new
+        if isinstance(row, CrownAward)
+        and row.profile_id == profile_id
+        and row.source_key == source_key
+    ), None)
+    if pending is not None:
+        return pending
+    existing = session.scalar(select(CrownAward).where(
+        CrownAward.profile_id == profile_id,
+        CrownAward.source_key == source_key,
+    ))
+    if existing is not None:
+        return existing
+    award = CrownAward(
+        profile_id=profile_id,
+        category_key=category,
+        source_key=source_key,
+        earned_at=earned_at,
+    )
+    session.add(award)
+    return award
+
+
 def _increment_crown_progress(
-    session: Session, *, profile_id: int, category: str, now: datetime
-) -> None:
+    session: Session,
+    *,
+    profile_id: int,
+    category: str,
+    source_key: str,
+    now: datetime,
+) -> CrownAward | None:
     _set_finalization_stage(session, "crown_progress")
     progress = next((
         row for row in session.new
@@ -1332,11 +1356,25 @@ def _increment_crown_progress(
             CrownProgress.category_key == category,
         ).with_for_update())
     if progress is None:
-        progress = CrownProgress(profile_id=profile_id, category_key=category, qualifying_wins=0)
+        progress = CrownProgress(
+            profile_id=profile_id,
+            category_key=category,
+            qualifying_wins=0,
+            crown_earned_at=None,
+        )
         session.add(progress)
     progress.qualifying_wins += 1
-    if progress.qualifying_wins >= 10 and progress.crown_earned_at is None:
-        progress.crown_earned_at = now
+    progress.crown_earned_at = None
+    if progress.qualifying_wins < 10:
+        return None
+    progress.qualifying_wins -= 10
+    return _crown_award_once(
+        session,
+        profile_id=profile_id,
+        category=category,
+        source_key=source_key,
+        earned_at=now,
+    )
 
 
 def _snapshot_memberships(session: Session, contest_week: ContestWeek) -> list[TeamWeekMembershipSnapshot]:
@@ -1399,7 +1437,10 @@ def _reward_contest_result(
                 session, profile_id=profile_id, result_id=result.id, source_key=source,
                 reward_type="crown_win", category_key=category,
             ):
-                _increment_crown_progress(session, profile_id=profile_id, category=category, now=now)
+                _increment_crown_progress(
+                    session, profile_id=profile_id, category=category,
+                    source_key=source, now=now,
+                )
 
 
 def _contest_result_once(
@@ -1800,6 +1841,17 @@ def hall_of_champions_payload(session: Session) -> dict[str, object]:
             )
         ).all()
     } if profile_ids else {}
+    crown_counts = {
+        profile_id: count
+        for profile_id, count in session.execute(
+            select(CrownAward.profile_id, func.count(CrownAward.id))
+            .where(
+                CrownAward.profile_id.in_(profile_ids),
+                CrownAward.category_key == crown_category,
+            )
+            .group_by(CrownAward.profile_id)
+        ).all()
+    } if profile_ids else {}
 
     students: list[dict[str, object]] = []
     for profile_id, champion in students_by_profile.items():
@@ -1808,7 +1860,8 @@ def hall_of_champions_payload(session: Session) -> dict[str, object]:
         champion["crown"] = {
             "qualifying_wins": progress.qualifying_wins if progress else 0,
             "target_wins": 10,
-            "earned": bool(progress and progress.crown_earned_at is not None),
+            "earned": crown_counts.get(profile_id, 0) > 0,
+            "earned_count": crown_counts.get(profile_id, 0),
         }
         students.append(champion)
 
@@ -1824,39 +1877,62 @@ def crown_progress_payload(
     session: Session, *, profile_id: int
 ) -> dict[str, object]:
     _reconcile_crown_categories(session, profile_id=profile_id)
+    category_keys = [key for key, _ in CROWN_CATEGORIES]
     progress_rows = {
         row.category_key: row for row in session.scalars(select(CrownProgress).where(
             CrownProgress.profile_id == profile_id,
-            CrownProgress.category_key.in_([key for key, _ in CROWN_CATEGORIES]),
+            CrownProgress.category_key.in_(category_keys),
         )).all()
     }
+    awards_by_category: dict[str, list[CrownAward]] = {
+        key: [] for key in category_keys
+    }
+    for award in session.scalars(
+        select(CrownAward)
+        .where(
+            CrownAward.profile_id == profile_id,
+            CrownAward.category_key.in_(category_keys),
+        )
+        .order_by(CrownAward.earned_at, CrownAward.id)
+    ).all():
+        awards_by_category[award.category_key].append(award)
+
     progress = progress_rows.get("weekly-points-leaders")
     qualifying_wins = progress.qualifying_wins if progress else 0
-    earned_at = progress.crown_earned_at if progress else None
+    point_awards = awards_by_category["weekly-points-leaders"]
+    earned_at = point_awards[0].earned_at if point_awards else None
     return {
         "qualifying_wins": qualifying_wins,
         "target_wins": 10,
-        "remaining_wins": max(10 - qualifying_wins, 0),
-        "earned": earned_at is not None,
+        "remaining_wins": 10 - qualifying_wins,
+        "earned": bool(point_awards),
+        "earned_count": len(point_awards),
         "earned_at": utc_iso(earned_at),
         "categories": [
             {
-                "key": key, "name": name,
-                "progress": progress_rows[key].qualifying_wins if key in progress_rows else 0,
+                "key": key,
+                "name": name,
+                "progress": progress_rows[key].qualifying_wins
+                if key in progress_rows else 0,
                 "target": 10,
-                "earned": bool(key in progress_rows and progress_rows[key].crown_earned_at),
-                "earned_at": utc_iso(progress_rows[key].crown_earned_at) if key in progress_rows else None,
+                "earned": bool(awards_by_category[key]),
+                "earned_count": len(awards_by_category[key]),
+                "earned_at": utc_iso(awards_by_category[key][0].earned_at)
+                if awards_by_category[key] else None,
             }
             for key, name in CROWN_CATEGORIES
         ],
     }
 
 
-def _set_crown_progress_at_least(
-    session: Session, *, profile_id: int, category_key: str,
-    count: int, earned_at: datetime | None,
+def _sync_crown_progress_from_total(
+    session: Session,
+    *,
+    profile_id: int,
+    category_key: str,
+    win_dates: list[datetime],
 ) -> CrownProgress | None:
-    if count <= 0:
+    if not win_dates:
         return None
     progress = session.scalar(select(CrownProgress).where(
         CrownProgress.profile_id == profile_id,
@@ -1864,12 +1940,36 @@ def _set_crown_progress_at_least(
     ).with_for_update())
     if progress is None:
         progress = CrownProgress(
-            profile_id=profile_id, category_key=category_key, qualifying_wins=0,
+            profile_id=profile_id,
+            category_key=category_key,
+            qualifying_wins=0,
+            crown_earned_at=None,
         )
         session.add(progress)
-    progress.qualifying_wins = max(progress.qualifying_wins, count)
-    if progress.qualifying_wins >= 10 and progress.crown_earned_at is None:
-        progress.crown_earned_at = earned_at or datetime.now(timezone.utc)
+
+    persisted_awards = list(session.scalars(select(CrownAward).where(
+        CrownAward.profile_id == profile_id,
+        CrownAward.category_key == category_key,
+    )).all())
+    pending_awards = [
+        row for row in session.new
+        if isinstance(row, CrownAward)
+        and row.profile_id == profile_id
+        and row.category_key == category_key
+    ]
+    existing_count = len(persisted_awards) + len(pending_awards)
+    earned_count = len(win_dates) // 10
+    for ordinal in range(existing_count + 1, earned_count + 1):
+        _crown_award_once(
+            session,
+            profile_id=profile_id,
+            category=category_key,
+            source_key=f"reconciled:{category_key}:{ordinal}",
+            earned_at=win_dates[(ordinal * 10) - 1],
+        )
+
+    progress.qualifying_wins = len(win_dates) % 10
+    progress.crown_earned_at = None
     return progress
 
 
@@ -1879,9 +1979,11 @@ def _reconcile_crown_categories(session: Session, *, profile_id: int) -> None:
             CampPointAward.profile_id == profile_id,
             CampPointAward.activity_type == activity,
         ).order_by(CampPointAward.occurred_at)).all())
-        _set_crown_progress_at_least(
-            session, profile_id=profile_id, category_key=category_key,
-            count=len(awards), earned_at=awards[9] if len(awards) >= 10 else None,
+        _sync_crown_progress_from_total(
+            session,
+            profile_id=profile_id,
+            category_key=category_key,
+            win_dates=awards,
         )
 
     camp_gold_dates = list(session.scalars(
@@ -1897,10 +1999,11 @@ def _reconcile_crown_categories(session: Session, *, profile_id: int) -> None:
         )
         .order_by(ContestResult.created_at)
     ).all())
-    _set_crown_progress_at_least(
-        session, profile_id=profile_id, category_key="weekly-camp-points",
-        count=len(camp_gold_dates),
-        earned_at=camp_gold_dates[9] if len(camp_gold_dates) >= 10 else None,
+    _sync_crown_progress_from_total(
+        session,
+        profile_id=profile_id,
+        category_key="weekly-camp-points",
+        win_dates=camp_gold_dates,
     )
     session.flush()
 

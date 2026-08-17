@@ -38,6 +38,7 @@ from app.models import (
     Contest,
     ContestResult,
     ContestWeek,
+    CrownAward,
     CrownProgress,
     PracticeChart,
     PracticeChartVerification,
@@ -1184,7 +1185,7 @@ def test_olympic_ties_and_open_verified_gold_pay_once(
         assert crown is not None and crown.qualifying_wins == 2
 
 
-def test_tenth_win_sets_crown_once_and_progress_never_resets(
+def test_tenth_win_creates_permanent_crown_and_resets_next_progress(
     database: tuple[Session, sessionmaker[Session]],
 ) -> None:
     session, _ = database
@@ -1193,24 +1194,75 @@ def test_tenth_win_sets_crown_once_and_progress_never_resets(
     contest = session.scalar(select(Contest).where(Contest.key == "weekly-points-leaders"))
     assert contest is not None
     session.add(CrownProgress(
-        profile_id=student.id, category_key=contest.crown_category or contest.key,
+        profile_id=student.id,
+        category_key=contest.crown_category or contest.key,
         qualifying_wins=9,
     ))
     add_chart(
-        session, profile=student, practice_date=date(2026, 7, 31),
-        minutes=5, created_at=NOW,
+        session,
+        profile=student,
+        practice_date=date(2026, 7, 31),
+        minutes=5,
+        created_at=NOW,
     )
     session.commit()
+
     finalize_contest_week(session, week_start=week.week_start, now=FINAL_NOW)
     session.commit()
-    progress = session.scalar(select(CrownProgress).where(CrownProgress.profile_id == student.id))
-    assert progress is not None
-    earned_at = progress.crown_earned_at
-    assert progress.qualifying_wins == 10
-    assert contest_module.aware_utc(earned_at) == FINAL_NOW
-    finalize_contest_week(session, week_start=week.week_start, now=FINAL_NOW + timedelta(days=1))
+    progress = session.scalar(select(CrownProgress).where(
+        CrownProgress.profile_id == student.id
+    ))
+    award = session.scalar(select(CrownAward).where(
+        CrownAward.profile_id == student.id
+    ))
+    assert progress is not None and progress.qualifying_wins == 0
+    assert progress.crown_earned_at is None
+    assert award is not None
+    assert award.category_key == contest.crown_category
+    assert contest_module.aware_utc(award.earned_at) == FINAL_NOW
+
+    award_id = award.id
+    finalize_contest_week(
+        session,
+        week_start=week.week_start,
+        now=FINAL_NOW + timedelta(days=1),
+    )
     session.commit()
-    assert progress.qualifying_wins == 10 and progress.crown_earned_at == earned_at
+    assert progress.qualifying_wins == 0
+    assert session.scalar(select(func.count()).select_from(CrownAward)) == 1
+    assert session.get(CrownAward, award_id) is not None
+
+
+def test_same_category_can_earn_two_independent_crowns(
+    database: tuple[Session, sessionmaker[Session]],
+) -> None:
+    session, _ = database
+    profile = add_student(session, woodchuck_id="WC-CROWN-TWICE", instrument="Tuba")
+    session.commit()
+
+    for win in range(20):
+        contest_module._increment_crown_progress(
+            session,
+            profile_id=profile.id,
+            category="trivia",
+            source_key=f"repeatable-crown-win:{win}",
+            now=FINAL_NOW + timedelta(days=win),
+        )
+    session.commit()
+
+    progress = session.scalar(select(CrownProgress).where(
+        CrownProgress.profile_id == profile.id,
+        CrownProgress.category_key == "trivia",
+    ))
+    awards = session.scalars(select(CrownAward).where(
+        CrownAward.profile_id == profile.id,
+        CrownAward.category_key == "trivia",
+    ).order_by(CrownAward.id)).all()
+    assert progress is not None and progress.qualifying_wins == 0
+    assert progress.crown_earned_at is None
+    assert len(awards) == 2
+    assert awards[0].id != awards[1].id
+    assert awards[0].source_key != awards[1].source_key
 
 
 def test_instrument_participation_threshold_and_division_deduplication(
@@ -1535,8 +1587,14 @@ def test_hall_aggregates_students_instruments_divisions_and_prior_seasons(
         CrownProgress(
             profile_id=students[2].id,
             category_key=points.crown_category or points.key,
-            qualifying_wins=10,
-            crown_earned_at=FINAL_NOW,
+            qualifying_wins=0,
+            crown_earned_at=None,
+        ),
+        CrownAward(
+            profile_id=students[2].id,
+            category_key=points.crown_category or points.key,
+            source_key="hall-fixture-crown",
+            earned_at=FINAL_NOW,
         ),
     ])
     session.commit()
@@ -1554,10 +1612,12 @@ def test_hall_aggregates_students_instruments_divisions_and_prior_seasons(
     }
     assert renamed["divisions"] == ["open", "verified"]
     assert renamed["crown"] == {
-        "qualifying_wins": 7, "target_wins": 10, "earned": False
+        "qualifying_wins": 7, "target_wins": 10,
+        "earned": False, "earned_count": 0,
     }
     assert payload["students"][0]["crown"] == {
-        "qualifying_wins": 10, "target_wins": 10, "earned": True
+        "qualifying_wins": 0, "target_wins": 10,
+        "earned": True, "earned_count": 1,
     }
     assert payload["instruments"][0] == {
         "instrument_key": "flute",
@@ -1657,9 +1717,10 @@ def test_crown_progress_defaults_to_zero_without_creating_a_row(
         "target_wins": 10,
         "remaining_wins": 10,
         "earned": False,
+        "earned_count": 0,
         "earned_at": None,
         "categories": [
-            {"key": key, "name": name, "progress": 0, "target": 10, "earned": False, "earned_at": None}
+            {"key": key, "name": name, "progress": 0, "target": 10, "earned": False, "earned_count": 0, "earned_at": None}
             for key, name in contest_module.CROWN_CATEGORIES
         ],
     }
@@ -1667,20 +1728,13 @@ def test_crown_progress_defaults_to_zero_without_creating_a_row(
 
 
 @pytest.mark.parametrize(
-    ("wins", "earned_at", "remaining", "earned"),
-    [
-        (7, None, 3, False),
-        (9, None, 1, False),
-        (10, FINAL_NOW, 0, True),
-        (12, FINAL_NOW, 0, True),
-    ],
+    ("wins", "remaining"),
+    [(0, 10), (7, 3), (9, 1)],
 )
-def test_crown_progress_partial_earned_and_above_target(
+def test_crown_progress_tracks_only_remainder_toward_next_crown(
     database: tuple[Session, sessionmaker[Session]],
     wins: int,
-    earned_at: datetime | None,
     remaining: int,
-    earned: bool,
 ) -> None:
     session, _ = database
     _, contests, _ = ensure_band_camp_data(session, now=NOW)
@@ -1692,29 +1746,50 @@ def test_crown_progress_partial_earned_and_above_target(
         profile_id=profile.id,
         category_key=points.crown_category or points.key,
         qualifying_wins=wins,
-        crown_earned_at=earned_at,
+        crown_earned_at=None,
     )
     session.add(progress)
     session.commit()
-    original_earned_at = progress.crown_earned_at
 
     payload = crown_progress_payload(session, profile_id=profile.id)
 
     assert payload["qualifying_wins"] == wins
     assert payload["remaining_wins"] == remaining
-    assert payload["earned"] is earned
-    assert payload["earned_at"] == (
-        "2026-08-03T18:00:00+00:00" if earned_at else None
+    assert payload["earned"] is False
+    assert payload["earned_count"] == 0
+    assert payload["earned_at"] is None
+
+
+def test_crown_payload_keeps_awards_separate_from_next_progress(
+    database: tuple[Session, sessionmaker[Session]],
+) -> None:
+    session, _ = database
+    profile = add_student(
+        session, woodchuck_id="WC-CROWN-PAYLOAD", instrument="Flute"
     )
-    session.refresh(progress)
-    assert progress.qualifying_wins == wins
-    assert (
-        contest_module.aware_utc(progress.crown_earned_at)
-        if progress.crown_earned_at else None
-    ) == (
-        contest_module.aware_utc(original_earned_at)
-        if original_earned_at else None
-    )
+    session.add(CrownProgress(
+        profile_id=profile.id,
+        category_key="weekly-points-leaders",
+        qualifying_wins=2,
+        crown_earned_at=None,
+    ))
+    session.add_all([
+        CrownAward(
+            profile_id=profile.id,
+            category_key="weekly-points-leaders",
+            source_key=f"payload-crown:{ordinal}",
+            earned_at=FINAL_NOW + timedelta(days=ordinal),
+        )
+        for ordinal in (1, 2)
+    ])
+    session.commit()
+
+    payload = crown_progress_payload(session, profile_id=profile.id)
+    assert payload["qualifying_wins"] == 2
+    assert payload["remaining_wins"] == 8
+    assert payload["earned"] is True
+    assert payload["earned_count"] == 2
+    assert payload["earned_at"] == "2026-08-04T18:00:00+00:00"
 
 
 def test_nonqualifying_medals_and_participation_do_not_change_crown_progress(
@@ -1766,7 +1841,8 @@ def test_crown_progress_endpoint_authentication_and_privacy(
     assert unauthorized.value.status_code == 401
     payload = contest_module.current_crown_progress(request_with_session(profile.id))
     assert set(payload) == {
-        "qualifying_wins", "target_wins", "remaining_wins", "earned", "earned_at", "categories"
+        "qualifying_wins", "target_wins", "remaining_wins", "earned",
+        "earned_count", "earned_at", "categories",
     }
     serialized = repr(payload).casefold()
     for private_field in (
@@ -1868,7 +1944,7 @@ def test_contest_opt_out_stays_in_history_but_not_either_division(
     assert session.get(PracticeChart, opted_in.id).include_contests is True
 
 
-def test_activity_crowns_reconcile_upward_and_tenth_event_is_permanent(
+def test_activity_crowns_reconcile_awards_and_preserve_ownership(
     database: tuple[Session, sessionmaker[Session]],
 ) -> None:
     session, _ = database
@@ -1876,23 +1952,38 @@ def test_activity_crowns_reconcile_upward_and_tenth_event_is_permanent(
     for index in range(12):
         occurred = NOW + timedelta(days=index)
         session.add(CampPointAward(
-            profile_id=profile.id, activity_type="trivia", points_awarded=1,
-            occurred_at=occurred, duplicate_key=f"trivia-{index}",
+            profile_id=profile.id,
+            activity_type="trivia",
+            points_awarded=1,
+            occurred_at=occurred,
+            duplicate_key=f"trivia-{index}",
         ))
     session.commit()
+
     payload = crown_progress_payload(session, profile_id=profile.id)
     trivia = next(item for item in payload["categories"] if item["key"] == "trivia")
-    assert trivia["progress"] == 12 and trivia["earned"] is True
+    assert trivia["progress"] == 2
+    assert trivia["earned"] is True
+    assert trivia["earned_count"] == 1
     progress = session.scalar(select(CrownProgress).where(
         CrownProgress.profile_id == profile.id,
         CrownProgress.category_key == "trivia",
     ))
-    assert progress is not None and progress.qualifying_wins == 12
-    earned_at = progress.crown_earned_at
-    session.query(CampPointAward).filter(CampPointAward.profile_id == profile.id).delete()
+    award = session.scalar(select(CrownAward).where(
+        CrownAward.profile_id == profile.id,
+        CrownAward.category_key == "trivia",
+    ))
+    assert progress is not None and progress.qualifying_wins == 2
+    assert progress.crown_earned_at is None
+    assert award is not None
+    award_id = award.id
+
+    session.query(CampPointAward).filter(
+        CampPointAward.profile_id == profile.id
+    ).delete()
     session.commit()
     crown_progress_payload(session, profile_id=profile.id)
-    assert progress.qualifying_wins == 12 and progress.crown_earned_at == earned_at
+    assert session.get(CrownAward, award_id) is not None
 
 
 def test_historical_hours_awards_still_feed_band_camp_hours_crown(
@@ -1914,5 +2005,6 @@ def test_historical_hours_awards_still_feed_band_camp_hours_crown(
         if item["key"] == "band-camp-hours"
     )
     assert hours["name"] == "Band Camp Hours Crown"
-    assert hours["progress"] == 10
+    assert hours["progress"] == 0
     assert hours["earned"] is True
+    assert hours["earned_count"] == 1

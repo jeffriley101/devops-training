@@ -513,6 +513,7 @@
 
     const COLLISION_SIZE = 0.10;
     const placementRequests = new Set();
+    const itemId = (item) => String(item.id);
     let ownedItems = [];
     let decorateMode = false;
     let dragState = null;
@@ -524,7 +525,7 @@
     function itemLabel(item) {
       const matching = ownedItems.filter((candidate) => candidate.item_key === item.item_key);
       if (matching.length < 2) return item.name;
-      return `${item.name} copy ${matching.findIndex((candidate) => candidate.id === item.id) + 1}`;
+      return `${item.name} copy ${matching.findIndex((candidate) => itemId(candidate) === itemId(item)) + 1}`;
     }
 
     function setFeedback(message, isError = false) {
@@ -555,7 +556,7 @@
         );
         if (decorateMode) {
           decoration.tabIndex = 0;
-          decoration.disabled = placementRequests.has(item.id);
+          decoration.disabled = placementRequests.has(itemId(item));
         }
         layer.append(decoration);
         positionDecoration(decoration, item);
@@ -578,9 +579,9 @@
       button.type = "button";
       button.dataset.decorationAction = action;
       button.dataset.ownedCopyId = String(item.id);
-      button.textContent = placementRequests.has(item.id) ? "Saving…" : actionLabel;
+      button.textContent = placementRequests.has(itemId(item)) ? "Saving…" : actionLabel;
       button.setAttribute("aria-label", `${actionLabel} ${itemLabel(item)}`);
-      button.disabled = placementRequests.has(item.id);
+      button.disabled = placementRequests.has(itemId(item));
       row.append(identity, button);
       return row;
     }
@@ -613,8 +614,8 @@
     }
 
     async function savePlacement(item, x, y) {
-      if (placementRequests.has(item.id)) return false;
-      placementRequests.add(item.id);
+      if (placementRequests.has(itemId(item))) return false;
+      placementRequests.add(itemId(item));
       renderInventory();
       try {
         const response = await fetch(`/store/inventory/${item.id}/placement`, {
@@ -630,14 +631,14 @@
         setFeedback(error.message || "That decoration could not be placed.", true);
         return false;
       } finally {
-        placementRequests.delete(item.id);
+        placementRequests.delete(itemId(item));
         renderAll();
       }
     }
 
     async function removePlacement(item) {
-      if (placementRequests.has(item.id)) return;
-      placementRequests.add(item.id);
+      if (placementRequests.has(itemId(item))) return;
+      placementRequests.add(itemId(item));
       renderInventory();
       try {
         const response = await fetch(`/store/inventory/${item.id}/placement`, {
@@ -649,14 +650,14 @@
       } catch (error) {
         setFeedback(error.message || "That decoration could not be returned.", true);
       } finally {
-        placementRequests.delete(item.id);
+        placementRequests.delete(itemId(item));
         renderAll();
       }
     }
 
     function overlapsPlaced(x, y, ignoredId = null) {
       return ownedItems.some((item) => (
-        item.id !== ignoredId
+        itemId(item) !== String(ignoredId)
         && isPlaced(item)
         && Math.abs(item.placement_x - x) < COLLISION_SIZE
         && Math.abs(item.placement_y - y) < COLLISION_SIZE
@@ -727,8 +728,8 @@
     panel.addEventListener("click", function (event) {
       const button = event.target.closest("[data-decoration-action]");
       if (!button) return;
-      const itemId = Number(button.dataset.ownedCopyId);
-      const item = ownedItems.find((candidate) => candidate.id === itemId);
+      const ownedCopyId = button.dataset.ownedCopyId;
+      const item = ownedItems.find((candidate) => itemId(candidate) === ownedCopyId);
       if (!item) return;
       if (button.dataset.decorationAction === "place") void placeFromInventory(item);
       if (button.dataset.decorationAction === "remove") void removePlacement(item);
@@ -738,8 +739,8 @@
       if (!decorateMode) return;
       const decoration = event.target.closest(".shed-decoration");
       if (!decoration) return;
-      const item = ownedItems.find((candidate) => candidate.id === Number(decoration.dataset.ownedCopyId));
-      if (!item || placementRequests.has(item.id)) return;
+      const item = ownedItems.find((candidate) => itemId(candidate) === decoration.dataset.ownedCopyId);
+      if (!item || placementRequests.has(itemId(item))) return;
       const rect = decoration.getBoundingClientRect();
       dragState = {
         decoration,
@@ -789,6 +790,9 @@
       if (event.key === "Escape" && decorateMode) closeDecorateMode();
     });
 
+    window.addEventListener("woodshed:inventory-changed", function () {
+      void refreshInventory();
+    });
     renderAll();
     void refreshInventory();
   }
@@ -1603,12 +1607,13 @@
     const readyButton = document.getElementById("mum-ready-button");
     const panel = document.getElementById("mum-panel");
     const messageEl = document.getElementById("mum-message");
+    const snackChooser = document.getElementById("mum-snack-chooser");
     const choiceButtons = document.querySelectorAll("[data-mum-choice]");
+    const snackButtons = document.querySelectorAll("[data-mum-snack-item]");
 
     if (!openButton || !panel || !messageEl) return;
 
     const name = state.profile.woodchuckName || "musician";
-
     const dailyGreetings = [
       `Sit for a moment, ${name}. Have you eaten and had some water?`,
       `Welcome back, ${name}. Check your shoulders and take one slow breath.`,
@@ -1616,68 +1621,86 @@
       "Before the next challenge: water, food, music, pencil, and instrument.",
       "You do not have to practice tired and uncomfortable. Sit down a minute.",
     ];
-
     const responses = {
-      water:
-        "Take a few steady sips. You do not need to finish the whole bottle at once.",
-      snack:
-        "Choose something that will last through rehearsal—not just a quick burst of sugar.",
-      rest:
-        "Set the instrument down safely. Relax your jaw, shoulders, hands, and back for a few minutes.",
-      camp:
-        "Camp check: instrument, music, pencil, water, sunscreen, hat, comfortable shoes, and anything your director requested.",
+      water: "Take a few steady sips. You do not need to finish the whole bottle at once.",
+      rest: "Set the instrument down safely. Relax your jaw, shoulders, hands, and back for a few minutes.",
+      camp: "Camp check: instrument, music, pencil, water, sunscreen, hat, comfortable shoes, and anything your director requested.",
     };
 
+    function hideSnackChooser() {
+      if (!snackChooser) return;
+      snackChooser.hidden = true;
+      snackChooser.classList.add("hidden");
+    }
+
     function closeMumPanel() {
+      hideSnackChooser();
       panel.classList.add("hidden");
       openButton.setAttribute("aria-expanded", "false");
       openButton.focus();
     }
 
     openButton.addEventListener("click", function () {
-      const greeting =
-        dailyGreetings[getDayIndex(new Date()) % dailyGreetings.length];
-
-      messageEl.textContent = greeting;
+      messageEl.textContent = dailyGreetings[getDayIndex(new Date()) % dailyGreetings.length];
+      hideSnackChooser();
       panel.classList.remove("hidden");
       openButton.setAttribute("aria-expanded", "true");
-
-      panel.scrollIntoView({
-        behavior: "smooth",
-        block: "nearest",
-      });
+      panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
     });
 
     choiceButtons.forEach((button) => {
       button.addEventListener("click", function () {
-        const response = responses[button.dataset.mumChoice];
+        const choice = button.dataset.mumChoice;
+        if (choice === "snack" && snackChooser) {
+          snackChooser.hidden = false;
+          snackChooser.classList.remove("hidden");
+          messageEl.textContent = "Choose one snack for this week.";
+          snackButtons[0]?.focus();
+          return;
+        }
+        const response = responses[choice];
+        if (!response) return;
+        messageEl.textContent = response;
+        if (choice === "water") launchDigitalRain(button);
+      });
+    });
 
-        if (response) {
-          messageEl.textContent = response;
-          if (button.dataset.mumChoice === "water") {
-            launchDigitalRain(button);
-          }
+    snackButtons.forEach((button) => {
+      button.addEventListener("click", async function () {
+        if (button.disabled) return;
+        snackButtons.forEach((candidate) => { candidate.disabled = true; });
+        try {
+          const response = await fetch("/store/mum/snacks", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ item_key: button.dataset.mumSnackItem }),
+          });
+          let payload = {};
+          try { payload = await response.json(); } catch (_error) { payload = {}; }
+          if (!response.ok) throw new Error(payload.detail || "That snack could not be saved.");
+          hideSnackChooser();
+          messageEl.textContent = payload.created
+            ? `${payload.item.name} is in your SHED inventory.`
+            : `You already chose ${payload.item.name} for this week.`;
+          window.dispatchEvent(new CustomEvent("woodshed:inventory-changed"));
+        } catch (error) {
+          messageEl.textContent = error.message || "That snack could not be saved.";
+        } finally {
+          snackButtons.forEach((candidate) => { candidate.disabled = false; });
         }
       });
     });
 
-    if (closeButton) {
-      closeButton.addEventListener("click", closeMumPanel);
-    }
-
+    if (closeButton) closeButton.addEventListener("click", closeMumPanel);
     if (readyButton) {
       readyButton.addEventListener("click", function () {
-        messageEl.textContent =
-          "Good. Take what you need with you, and do not rush the first note.";
-
+        messageEl.textContent = "Good. Take what you need with you, and do not rush the first note.";
         window.setTimeout(closeMumPanel, 900);
       });
     }
-
     panel.addEventListener("keydown", function (event) {
-      if (event.key === "Escape") {
-        closeMumPanel();
-      }
+      if (event.key === "Escape") closeMumPanel();
     });
   }
 

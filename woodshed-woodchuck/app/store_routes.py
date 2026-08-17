@@ -11,11 +11,12 @@ from .store_inventory import (
     InsufficientDandelionsError,
     OwnedItemAccessError,
     StoreItemUnavailableError,
-    list_owned_items,
+    claim_weekly_mum_snack,
+    list_inventory_payloads,
     owned_item_payload,
-    place_owned_item_copy,
+    place_inventory_item,
     purchase_catalog_item,
-    remove_owned_item_copy_placement,
+    remove_inventory_item_placement,
 )
 
 
@@ -35,6 +36,12 @@ class StorePlacementSubmission(BaseModel):
     y: float = Field(ge=0, le=1)
 
 
+class MumSnackSubmission(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    item_key: str = Field(min_length=1, max_length=50)
+
+
 @router.get("/catalog")
 def get_store_catalog():
     return catalog_payload()
@@ -46,17 +53,12 @@ def get_store_inventory(request: Request):
         profile = current_profile(request, session)
         if profile is None:
             raise HTTPException(status_code=401, detail="Student sign-in is required.")
-        return {
-            "items": [
-                owned_item_payload(item)
-                for item in list_owned_items(session, profile_id=profile.id)
-            ]
-        }
+        return {"items": list_inventory_payloads(session, profile_id=profile.id)}
 
 
-@router.put("/inventory/{owned_item_id}/placement")
+@router.put("/inventory/{inventory_id}/placement")
 def update_store_item_placement(
-    owned_item_id: int,
+    inventory_id: str,
     submitted: StorePlacementSubmission,
     request: Request,
 ):
@@ -65,10 +67,10 @@ def update_store_item_placement(
         if profile is None:
             raise HTTPException(status_code=401, detail="Student sign-in is required.")
         try:
-            owned = place_owned_item_copy(
+            item = place_inventory_item(
                 session,
                 profile_id=profile.id,
-                owned_item_id=owned_item_id,
+                inventory_id=inventory_id,
                 placement_x=submitted.x,
                 placement_y=submitted.y,
             )
@@ -82,20 +84,20 @@ def update_store_item_placement(
         except Exception:
             session.rollback()
             raise
-        return {"item": owned_item_payload(owned)}
+        return {"item": item}
 
 
-@router.delete("/inventory/{owned_item_id}/placement")
-def delete_store_item_placement(owned_item_id: int, request: Request):
+@router.delete("/inventory/{inventory_id}/placement")
+def delete_store_item_placement(inventory_id: str, request: Request):
     with SessionLocal() as session:
         profile = current_profile(request, session)
         if profile is None:
             raise HTTPException(status_code=401, detail="Student sign-in is required.")
         try:
-            owned = remove_owned_item_copy_placement(
+            item = remove_inventory_item_placement(
                 session,
                 profile_id=profile.id,
-                owned_item_id=owned_item_id,
+                inventory_id=inventory_id,
             )
             session.commit()
         except OwnedItemAccessError as error:
@@ -104,7 +106,33 @@ def delete_store_item_placement(owned_item_id: int, request: Request):
         except Exception:
             session.rollback()
             raise
-        return {"item": owned_item_payload(owned)}
+        return {"item": item}
+
+
+@router.post("/mum/snacks")
+def claim_mum_snack(request: Request, submitted: MumSnackSubmission):
+    with SessionLocal() as session:
+        profile = current_profile(request, session)
+        if profile is None:
+            raise HTTPException(status_code=401, detail="Student sign-in is required.")
+        try:
+            item, created, week_start = claim_weekly_mum_snack(
+                session,
+                profile_id=profile.id,
+                item_key=submitted.item_key,
+            )
+            session.commit()
+        except ValueError as error:
+            session.rollback()
+            raise HTTPException(status_code=400, detail=str(error)) from error
+        except Exception:
+            session.rollback()
+            raise
+        return {
+            "item": owned_item_payload(item),
+            "created": created,
+            "week_start": week_start.isoformat(),
+        }
 
 
 @router.post("/purchases", status_code=201)

@@ -44,6 +44,18 @@ LITTLE_BUDDY_ROTATION = (
     CatalogItem("beetle", "Beetle", "🪲", 100, "little-buddy", True),
 )
 
+MUM_SNACK_ITEMS = (
+    CatalogItem("mum-apple", "Apple", "🍎", 0, "mum"),
+    CatalogItem("mum-banana", "Banana", "🍌", 0, "mum"),
+    CatalogItem("mum-cookie", "Cookie", "🍪", 0, "mum"),
+    CatalogItem("mum-pretzel", "Pretzel", "🥨", 0, "mum"),
+    CatalogItem("mum-strawberry", "Strawberry", "🍓", 0, "mum"),
+    CatalogItem("mum-cheese", "Cheese", "🧀", 0, "mum"),
+    CatalogItem("mum-watermelon", "Watermelon", "🍉", 0, "mum"),
+    CatalogItem("mum-popcorn", "Popcorn", "🍿", 0, "mum"),
+)
+MUM_SNACK_ITEM_KEYS = frozenset(item.item_key for item in MUM_SNACK_ITEMS)
+
 ALL_ITEMS = {
     item.item_key: item
     for item in (
@@ -51,6 +63,7 @@ ALL_ITEMS = {
         *GEAR_ROTATION,
         *LITTLE_BUDDY_FIXED,
         *LITTLE_BUDDY_ROTATION,
+        *MUM_SNACK_ITEMS,
     )
 }
 

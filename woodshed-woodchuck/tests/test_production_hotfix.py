@@ -22,10 +22,10 @@ def test_instrument_assets_are_cache_busted_and_failures_are_visible() -> None:
     home = (ROOT / "templates/home.html").read_text(encoding="utf-8")
     account_js = (ROOT / "static/js/account.js").read_text(encoding="utf-8")
 
-    assert "/static/css/styles.css?v=83" in base
+    assert "/static/css/styles.css?v=84" in base
     assert "/static/manifest.webmanifest?v=4" in base
     assert "/static/js/instruments.js?v=3" in base
-    assert "/static/js/app.js?v=48" in base
+    assert "/static/js/app.js?v=49" in base
     assert "/static/js/account.js?v=13" in base
     assert 'id="change-instrument-feedback"' in home
     assert 'role="status"' in home

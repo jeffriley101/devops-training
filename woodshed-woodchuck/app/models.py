@@ -176,6 +176,69 @@ class OwnedItemCopy(Base):
     )
 
 
+class CrownAward(Base):
+    __tablename__ = "crown_awards"
+    __table_args__ = (
+        UniqueConstraint(
+            "profile_id",
+            "source_key",
+            name="uq_crown_award_profile_source",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    profile_id: Mapped[int] = mapped_column(
+        ForeignKey("woodchuck_profiles.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    category_key: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    source_key: Mapped[str] = mapped_column(String(150), nullable=False)
+    earned_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
+
+
+class RewardInventoryPlacement(Base):
+    __tablename__ = "reward_inventory_placements"
+    __table_args__ = (
+        UniqueConstraint(
+            "crown_award_id",
+            name="uq_reward_inventory_placement_crown_award",
+        ),
+        CheckConstraint(
+            "placement_x >= 0 AND placement_x <= 1",
+            name="ck_reward_inventory_placement_x",
+        ),
+        CheckConstraint(
+            "placement_y >= 0 AND placement_y <= 1",
+            name="ck_reward_inventory_placement_y",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    profile_id: Mapped[int] = mapped_column(
+        ForeignKey("woodchuck_profiles.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    crown_award_id: Mapped[int] = mapped_column(
+        ForeignKey("crown_awards.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    placement_x: Mapped[float] = mapped_column(Float, nullable=False)
+    placement_y: Mapped[float] = mapped_column(Float, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+    )
+
+
 class TrustedVerifier(Base):
     __tablename__ = "trusted_verifiers"
 
