@@ -27,37 +27,15 @@ let backstagePickActive = false;
 let userWantsPlayback = false;
 let playbackRecoveryTimeout = null;
 
-let wakeLock = null;
-
-async function requestWakeLock() {
-  if (!("wakeLock" in navigator)) {
-    return;
-  }
-
-  if (wakeLock) {
+function setMediaSessionPlaybackState(state) {
+  if (!("mediaSession" in navigator)) {
     return;
   }
 
   try {
-    wakeLock = await navigator.wakeLock.request("screen");
-    wakeLock.addEventListener("release", () => {
-      wakeLock = null;
-    });
+    navigator.mediaSession.playbackState = state;
   } catch (error) {
-    console.warn("Wake Lock not available:", error);
-  }
-}
-
-async function releaseWakeLock() {
-  if (!wakeLock) {
-    return;
-  }
-
-  try {
-    await wakeLock.release();
-    wakeLock = null;
-  } catch (error) {
-    console.warn("Could not release Wake Lock:", error);
+    console.warn("Could not update Media Session playback state:", error);
   }
 }
 
@@ -71,29 +49,30 @@ function updateMediaSession(track) {
     artist: track.artist,
     album: "Hoojshwah Radio"
   });
+  setMediaSessionPlaybackState(userWantsPlayback ? "playing" : "paused");
 
   navigator.mediaSession.setActionHandler("play", async () => {
     try {
       userWantsPlayback = true;
       await audio.play();
-      await requestWakeLock();
+      setMediaSessionPlaybackState("playing");
       startActivePlaybackTimer();
       playButton.textContent = "Signal Playing";
     } catch (error) {
+      setMediaSessionPlaybackState("paused");
       console.error("Could not play from media session:", error);
     }
   });
 
-  navigator.mediaSession.setActionHandler("pause", async () => {
+  navigator.mediaSession.setActionHandler("pause", () => {
     userWantsPlayback = false;
     audio.pause();
     stopActivePlaybackTimer();
-    await releaseWakeLock();
+    setMediaSessionPlaybackState("paused");
     playButton.textContent = "Play Signal";
   });
 }
 
-const MAX_ACTIVE_PLAYBACK_SECONDS = 90 * 60;
 let activePlaybackSeconds = 0;
 let activePlaybackInterval = null;
 
@@ -102,7 +81,7 @@ function renderSignalTimer() {
     return;
   }
 
-  signalTimer.textContent = `Signal Time: ${formatDuration(activePlaybackSeconds)} / ${formatDuration(MAX_ACTIVE_PLAYBACK_SECONDS)}`;
+  signalTimer.textContent = `Signal Time: ${formatDuration(activePlaybackSeconds)}`;
 }
 
 function logSignalEvent(eventName, detail = "") {
@@ -134,23 +113,12 @@ function stopActivePlaybackTimer() {
   }
 }
 
-function handleActivePlaybackLimit() {
-  userWantsPlayback = false;
-  stopActivePlaybackTimer();
-  audio.pause();
-  playButton.textContent = "Still tuned in? Press Play Signal to continue.";
-}
-
 function startActivePlaybackTimer() {
   stopActivePlaybackTimer();
 
   activePlaybackInterval = window.setInterval(() => {
     activePlaybackSeconds += 1;
     renderSignalTimer();
-
-    if (activePlaybackSeconds >= MAX_ACTIVE_PLAYBACK_SECONDS) {
-      handleActivePlaybackLimit();
-    }
   }, 1000);
 }
 
@@ -178,27 +146,15 @@ function schedulePlaybackRecovery(reason) {
     }
 
     try {
-      await requestWakeLock();
       await audio.play();
+      setMediaSessionPlaybackState("playing");
       startActivePlaybackTimer();
       playButton.textContent = backstagePickActive ? "Backstage Signal" : "Signal Playing";
       console.warn("Playback recovery succeeded.");
     } catch (error) {
-      console.error("Playback recovery failed, resyncing station:", error);
-
-      if (!backstagePickActive) {
-        tuneStation();
-      }
-
-      try {
-        await audio.play();
-        await requestWakeLock();
-        startActivePlaybackTimer();
-        playButton.textContent = "Signal Playing";
-      } catch (secondError) {
-        console.error("Playback recovery after resync failed:", secondError);
-        playButton.textContent = "Signal Blocked";
-      }
+      console.error("Playback recovery failed:", error);
+      setMediaSessionPlaybackState("paused");
+      playButton.textContent = "Tap Play to Resume";
     }
   }, 1200);
 }
@@ -481,10 +437,11 @@ async function playBackstageTrack(index) {
     userWantsPlayback = true;
     resetActivePlaybackTimer();
     await audio.play();
-    await requestWakeLock();
+    setMediaSessionPlaybackState("playing");
     startActivePlaybackTimer();
     playButton.textContent = "Backstage Signal";
   } catch (error) {
+    setMediaSessionPlaybackState("paused");
     console.error("Could not play Backstage Pick:", error);
     playButton.textContent = "Signal Blocked";
   }
@@ -600,19 +557,28 @@ playButton.addEventListener("click", async () => {
     userWantsPlayback = true;
     resetActivePlaybackTimer();
     await audio.play();
-    await requestWakeLock();
+    setMediaSessionPlaybackState("playing");
     startActivePlaybackTimer();
     playButton.textContent = "Signal Playing";
   } catch (error) {
     userWantsPlayback = false;
+    setMediaSessionPlaybackState("paused");
     console.error("Could not play audio:", error);
     playButton.textContent = "Signal Blocked";
   }
 });
 
-audio.addEventListener("pause", async () => {
+audio.addEventListener("play", () => {
+  setMediaSessionPlaybackState("playing");
+});
+
+audio.addEventListener("playing", () => {
+  setMediaSessionPlaybackState("playing");
+});
+
+audio.addEventListener("pause", () => {
   stopActivePlaybackTimer();
-  await releaseWakeLock();
+  setMediaSessionPlaybackState("paused");
 
   if (userWantsPlayback) {
     schedulePlaybackRecovery("pause");
@@ -639,11 +605,12 @@ audio.addEventListener("ended", async () => {
   try {
     userWantsPlayback = true;
     await audio.play();
-    await requestWakeLock();
+    setMediaSessionPlaybackState("playing");
     startActivePlaybackTimer();
   } catch (error) {
     console.error("Could not continue audio:", error);
-    playButton.textContent = "Signal Blocked";
+    setMediaSessionPlaybackState("paused");
+    playButton.textContent = "Tap Play to Resume";
   }
 });
 
@@ -659,21 +626,21 @@ audio.addEventListener("ended", async () => {
   });
 });
 
-["waiting", "stalled", "suspend", "error", "abort"].forEach((eventName) => {
+["waiting", "stalled", "error", "abort"].forEach((eventName) => {
   audio.addEventListener(eventName, () => {
     schedulePlaybackRecovery(eventName);
   });
 });
 
-document.addEventListener("visibilitychange", async () => {
-  logSignalEvent(`visibilitychange:${document.visibilityState}`);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState !== "visible") {
+    return;
+  }
 
-  if (document.visibilityState === "visible" && userWantsPlayback) {
-    await requestWakeLock();
+  logSignalEvent("visibilitychange:visible");
 
-    if (audio.paused) {
-      schedulePlaybackRecovery("visibilitychange");
-    }
+  if (userWantsPlayback && audio.paused) {
+    schedulePlaybackRecovery("visibilitychange");
   }
 });
 
