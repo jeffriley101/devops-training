@@ -19,7 +19,7 @@ def test_tone_is_exactly_pinned_local_licensed_and_loaded_in_order():
     assert "cdn" not in BASE.casefold()
     tone_pos = BASE.index('/static/vendor/tone/Tone.js?v=15.1.22')
     audio_pos = BASE.index('/static/js/audio.js?v=8')
-    app_pos = BASE.index('/static/js/app.js?v=50')
+    app_pos = BASE.index('/static/js/app.js?v=51')
     assert tone_pos < audio_pos < app_pos
 
 
@@ -176,7 +176,6 @@ def test_visual_confirmation_and_metronome_implementation_remain_present():
     assert "WoodshedAudio" not in metronome
     assert "Tone" not in metronome
     assert 'startButton.addEventListener("click", toggleMetronome)' in metronome
-    assert 'audioContext.state !== "running"' in metronome
     assert "resumePromise = Promise.resolve(audioContext.resume())" in metronome
     assert "await resumePromise" in metronome
     assert "function primeMetronomeOutput()" in metronome
@@ -184,6 +183,13 @@ def test_visual_confirmation_and_metronome_implementation_remain_present():
     assert metronome.index("primeMetronomeOutput();") < metronome.index(
         "await resumePromise;"
     )
+    assert "if (!audioContext || !isRunning) return;" in metronome
+    scheduler = metronome[metronome.index("function scheduler()"):
+                           metronome.index("async function startMetronome()")]
+    assert 'audioContext.state !== "running"' not in scheduler
+    after_resume = metronome[metronome.index("await resumePromise;"):
+                             metronome.index("if (schedulerTimer !== null)")]
+    assert 'audioContext.state !== "running"' not in after_resume
     assert "if (isRunning && contextIsRunning)" in metronome
     assert "gain.connect(audioContext.destination)" in metronome
     assert 'document.addEventListener("visibilitychange"' in metronome

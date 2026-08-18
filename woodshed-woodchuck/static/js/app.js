@@ -1890,10 +1890,7 @@
     }
 
     function scheduler() {
-      if (
-        !audioContext || !isRunning ||
-        (typeof audioContext.state === "string" && audioContext.state !== "running")
-      ) return;
+      if (!audioContext || !isRunning) return;
 
       while (
         nextBeatTime <
@@ -1927,12 +1924,6 @@
       }
       primeMetronomeOutput();
       await resumePromise;
-      if (
-        typeof audioContext.state === "string" &&
-        audioContext.state !== "running"
-      ) {
-        throw new Error(`Metronome audio context is ${audioContext.state}.`);
-      }
 
       if (schedulerTimer !== null) {
         window.clearInterval(schedulerTimer);
