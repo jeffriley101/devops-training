@@ -18,8 +18,8 @@ def test_tone_is_exactly_pinned_local_licensed_and_loaded_in_order():
     assert "MIT License" in license_file.read_text()
     assert "cdn" not in BASE.casefold()
     tone_pos = BASE.index('/static/vendor/tone/Tone.js?v=15.1.22')
-    audio_pos = BASE.index('/static/js/audio.js?v=7')
-    app_pos = BASE.index('/static/js/app.js?v=49')
+    audio_pos = BASE.index('/static/js/audio.js?v=8')
+    app_pos = BASE.index('/static/js/app.js?v=50')
     assert tone_pos < audio_pos < app_pos
 
 
@@ -39,9 +39,15 @@ def test_audio_unlock_is_gesture_only_lazy_and_reuses_graph():
     assert "function primeAudioContextFromGesture()" in AUDIO
     assert 'context.state !== "running"' in AUDIO
     assert "Promise.resolve(context.resume())" in AUDIO
-    assert "source.buffer = context.createBuffer(1, 1" in AUDIO
-    assert "source.start(0)" in AUDIO
+    assert 'typeof context.createOscillator === "function"' in AUDIO
+    assert 'typeof context.createGain === "function"' in AUDIO
+    assert "primerGain.gain.setValueAtTime(0.0001, now)" in AUDIO
+    assert "source.start(now)" in AUDIO
+    assert "source.stop(now + 0.02)" in AUDIO
     assert "primeAudioContextFromGesture();" in AUDIO
+    assert AUDIO.index("primeAudioContextFromGesture();") < AUDIO.index(
+        "if (unlocked && audioContextIsRunning()) return Promise.resolve(true)"
+    )
     assert "if (unlocked && audioContextIsRunning()) return Promise.resolve(true)" in AUDIO
     assert "unlocked = false;" in AUDIO
     assert "function markAudioReady()" in AUDIO
@@ -62,16 +68,23 @@ const pending = new Promise(function () {});
 const rawContext = {
   state: "suspended",
   sampleRate: 44100,
+  currentTime: 0,
   destination: {},
   resume: function () { resumeCalls += 1; return pending; },
-  createBuffer: function () { return {}; },
-  createBufferSource: function () {
+  createOscillator: function () {
     return {
       connect: function () {},
       disconnect: function () {},
       start: function () { sourceStarts += 1; },
+      stop: function () {},
       onended: null,
-      buffer: null,
+    };
+  },
+  createGain: function () {
+    return {
+      gain: { setValueAtTime: function () {} },
+      connect: function () {},
+      disconnect: function () {},
     };
   },
 };
@@ -112,7 +125,6 @@ def test_effect_preferences_are_local_accessible_and_independent():
     assert '"#tuner-open-button, #tuner-panel, #metronome-open-button, #metronome-panel"' in AUDIO
     assert "function isDedicatedMediaGesture(event)" in AUDIO
     assert "woodshedWoodchuckMetronomeBpm" not in AUDIO
-    assert "createOscillator" not in AUDIO
     assert "Sound Effects" in BASE
     assert 'type="range" min="0" max="100"' in BASE
     assert 'aria-valuetext="35 percent"' in BASE
@@ -165,7 +177,13 @@ def test_visual_confirmation_and_metronome_implementation_remain_present():
     assert "Tone" not in metronome
     assert 'startButton.addEventListener("click", toggleMetronome)' in metronome
     assert 'audioContext.state !== "running"' in metronome
-    assert "await audioContext.resume()" in metronome
+    assert "resumePromise = Promise.resolve(audioContext.resume())" in metronome
+    assert "await resumePromise" in metronome
+    assert "function primeMetronomeOutput()" in metronome
+    assert "gain.gain.setValueAtTime(0.0001, now)" in metronome
+    assert metronome.index("primeMetronomeOutput();") < metronome.index(
+        "await resumePromise;"
+    )
     assert "if (isRunning && contextIsRunning)" in metronome
     assert "gain.connect(audioContext.destination)" in metronome
     assert 'document.addEventListener("visibilitychange"' in metronome
