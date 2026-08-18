@@ -1873,22 +1873,6 @@
       showBeat(scheduledTime);
     }
 
-    function primeMetronomeOutput() {
-      if (!audioContext) return;
-      const oscillator = audioContext.createOscillator();
-      const gain = audioContext.createGain();
-      const now = audioContext.currentTime;
-      gain.gain.setValueAtTime(0.0001, now);
-      oscillator.connect(gain);
-      gain.connect(audioContext.destination);
-      oscillator.onended = function () {
-        try { oscillator.disconnect(); } catch (_error) {}
-        try { gain.disconnect(); } catch (_error) {}
-      };
-      oscillator.start(now);
-      oscillator.stop(now + 0.02);
-    }
-
     function scheduler() {
       if (!audioContext || !isRunning) return;
 
@@ -1922,7 +1906,6 @@
       ) {
         resumePromise = Promise.resolve(audioContext.resume());
       }
-      primeMetronomeOutput();
       await resumePromise;
 
       if (schedulerTimer !== null) {

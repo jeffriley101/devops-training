@@ -218,22 +218,17 @@
       }
 
       if (
-        typeof context.createOscillator === "function" &&
-        typeof context.createGain === "function" &&
+        typeof context.createBuffer === "function" &&
+        typeof context.createBufferSource === "function" &&
         context.destination
       ) {
-        const source = context.createOscillator();
-        const primerGain = context.createGain();
-        const now = Number.isFinite(context.currentTime) ? context.currentTime : 0;
-        primerGain.gain.setValueAtTime(0.0001, now);
-        source.connect(primerGain);
-        primerGain.connect(context.destination);
+        const source = context.createBufferSource();
+        source.buffer = context.createBuffer(1, 1, context.sampleRate || 22050);
+        source.connect(context.destination);
         source.onended = function () {
           try { source.disconnect(); } catch (_error) {}
-          try { primerGain.disconnect(); } catch (_error) {}
         };
-        source.start(now);
-        source.stop(now + 0.02);
+        source.start(0);
       }
     } catch (_error) {
       // A later user gesture can try the mobile audio primer again.
@@ -251,13 +246,13 @@
   }
 
   function unlock() {
+    if (unlocked && audioContextIsRunning()) return Promise.resolve(true);
     if (!window.Tone || typeof window.Tone.start !== "function") {
       unlocked = false;
       return Promise.resolve(false);
     }
 
     primeAudioContextFromGesture();
-    if (unlocked && audioContextIsRunning()) return Promise.resolve(true);
     if (unlockPending) return unlockPending;
     unlocked = false;
     let startResult;

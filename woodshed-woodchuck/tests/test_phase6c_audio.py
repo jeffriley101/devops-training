@@ -18,8 +18,8 @@ def test_tone_is_exactly_pinned_local_licensed_and_loaded_in_order():
     assert "MIT License" in license_file.read_text()
     assert "cdn" not in BASE.casefold()
     tone_pos = BASE.index('/static/vendor/tone/Tone.js?v=15.1.22')
-    audio_pos = BASE.index('/static/js/audio.js?v=8')
-    app_pos = BASE.index('/static/js/app.js?v=51')
+    audio_pos = BASE.index('/static/js/audio.js?v=9')
+    app_pos = BASE.index('/static/js/app.js?v=52')
     assert tone_pos < audio_pos < app_pos
 
 
@@ -39,14 +39,15 @@ def test_audio_unlock_is_gesture_only_lazy_and_reuses_graph():
     assert "function primeAudioContextFromGesture()" in AUDIO
     assert 'context.state !== "running"' in AUDIO
     assert "Promise.resolve(context.resume())" in AUDIO
-    assert 'typeof context.createOscillator === "function"' in AUDIO
-    assert 'typeof context.createGain === "function"' in AUDIO
-    assert "primerGain.gain.setValueAtTime(0.0001, now)" in AUDIO
-    assert "source.start(now)" in AUDIO
-    assert "source.stop(now + 0.02)" in AUDIO
+    assert 'typeof context.createBuffer === "function"' in AUDIO
+    assert 'typeof context.createBufferSource === "function"' in AUDIO
+    assert "source.buffer = context.createBuffer(1, 1" in AUDIO
+    assert "source.start(0)" in AUDIO
     assert "primeAudioContextFromGesture();" in AUDIO
-    assert AUDIO.index("primeAudioContextFromGesture();") < AUDIO.index(
+    assert AUDIO.index(
         "if (unlocked && audioContextIsRunning()) return Promise.resolve(true)"
+    ) < AUDIO.index(
+        "primeAudioContextFromGesture();"
     )
     assert "if (unlocked && audioContextIsRunning()) return Promise.resolve(true)" in AUDIO
     assert "unlocked = false;" in AUDIO
@@ -68,23 +69,16 @@ const pending = new Promise(function () {});
 const rawContext = {
   state: "suspended",
   sampleRate: 44100,
-  currentTime: 0,
   destination: {},
   resume: function () { resumeCalls += 1; return pending; },
-  createOscillator: function () {
+  createBuffer: function () { return {}; },
+  createBufferSource: function () {
     return {
       connect: function () {},
       disconnect: function () {},
       start: function () { sourceStarts += 1; },
-      stop: function () {},
       onended: null,
-    };
-  },
-  createGain: function () {
-    return {
-      gain: { setValueAtTime: function () {} },
-      connect: function () {},
-      disconnect: function () {},
+      buffer: null,
     };
   },
 };
@@ -178,11 +172,8 @@ def test_visual_confirmation_and_metronome_implementation_remain_present():
     assert 'startButton.addEventListener("click", toggleMetronome)' in metronome
     assert "resumePromise = Promise.resolve(audioContext.resume())" in metronome
     assert "await resumePromise" in metronome
-    assert "function primeMetronomeOutput()" in metronome
-    assert "gain.gain.setValueAtTime(0.0001, now)" in metronome
-    assert metronome.index("primeMetronomeOutput();") < metronome.index(
-        "await resumePromise;"
-    )
+    assert "function primeMetronomeOutput()" not in metronome
+    assert "primeMetronomeOutput();" not in metronome
     assert "if (!audioContext || !isRunning) return;" in metronome
     scheduler = metronome[metronome.index("function scheduler()"):
                            metronome.index("async function startMetronome()")]
