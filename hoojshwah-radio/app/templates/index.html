@@ -11,7 +11,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="icon" href="/static/icons/hoojshwah-icon-192.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/static/icons/apple-touch-icon-180.png">
-  <link rel="stylesheet" href="/static/css/styles.css?v=phase4d-final-polish-1">
+  <link rel="stylesheet" href="/static/css/styles.css?v=android-live-clock-qr-1">
   <link rel="stylesheet" href="/static/css/arcade.css?v=phase4c-ticker-reverted-1">
 </head>
 <body>
@@ -44,7 +44,6 @@
         <div class="button-row">
           <button id="play-button" type="button">Play Signal</button>
           <button id="resync-button" type="button">Resync Signal</button>
-          <button id="share-button" type="button">Copy Station Link</button>
         </div>
         <p id="share-status" class="signal-status"></p>
 
@@ -256,6 +255,29 @@
         </div>
       </section>
 
+      <section class="station-qr-card" aria-labelledby="station-qr-heading">
+        <p class="label">Share the Signal</p>
+        <h2 id="station-qr-heading">Scan / share KHJW</h2>
+        <button
+          id="station-qr-copy"
+          class="station-qr-copy"
+          type="button"
+          aria-label="Copy the KHJW station link to the clipboard"
+          aria-describedby="station-qr-copy-help station-qr-copy-status"
+        >
+          <img
+            src="/static/images/khjw-station-qr.png"
+            alt=""
+            width="492"
+            height="492"
+          >
+        </button>
+        <p id="station-qr-copy-help" class="station-qr-copy-help">
+          Scan with a phone camera, or select the QR code to copy the station link.
+        </p>
+        <p id="station-qr-copy-status" class="station-qr-copy-status" role="status" aria-live="polite"></p>
+      </section>
+
 
       <section class="bottom-actions-card" aria-label="Support the station">
         <div class="donation-menu bottom-donation-menu">
@@ -293,7 +315,7 @@
 
   </main>
 
-  <script src="/static/js/player.js?v=android-native-bridge-1"></script>
+  <script src="/static/js/player.js?v=android-live-clock-qr-1"></script>
   <script src="/static/js/arcade.js?v=phase4c-arcade-guestbook-fixes-1"></script>
 </body>
 </html>

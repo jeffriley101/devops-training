@@ -3315,3 +3315,73 @@ html body button#arcade-time-secret-trigger.arcade-time-secret-trigger {
 .bottom-donation-panel .donation-links {
   justify-content: center !important;
 }
+
+/* Beta cleanup: local station QR directly before the donation card */
+.station-qr-card {
+  display: grid;
+  justify-items: center;
+  gap: 0.55rem;
+  margin-top: 1.5rem;
+  padding: 1.25rem;
+  border: 1px solid rgba(255, 210, 94, 0.3);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255, 210, 94, 0.18), transparent 48%),
+    rgba(255, 255, 255, 0.06);
+  text-align: center;
+}
+
+.station-qr-card .label,
+.station-qr-card h2,
+.station-qr-card p {
+  margin: 0;
+  text-align: center;
+}
+
+.station-qr-copy {
+  width: auto !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  margin: 0.25rem 0 0 !important;
+  padding: 0.55rem !important;
+  border: 0 !important;
+  border-radius: 16px !important;
+  background: #ffffff !important;
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.3) !important;
+  cursor: pointer;
+}
+
+.station-qr-copy:hover {
+  transform: translateY(-2px);
+}
+
+.station-qr-copy:focus-visible {
+  outline: 3px solid #ffd25e;
+  outline-offset: 4px;
+}
+
+.station-qr-copy img {
+  display: block;
+  width: clamp(160px, 42vw, 190px);
+  height: auto;
+  image-rendering: pixelated;
+}
+
+.station-qr-copy-help {
+  max-width: 34rem;
+  color: #f3dfaa;
+  font-size: 0.92rem;
+}
+
+.station-qr-copy-status {
+  min-height: 1.35em;
+  color: #ffe7aa;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+@media (max-width: 560px) {
+  .station-qr-card {
+    padding: 1rem;
+  }
+}

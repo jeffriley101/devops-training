@@ -33,5 +33,23 @@ class StationPositionTest {
         assertEquals(0, position.trackIndex)
         assertEquals(5_000L, position.offsetMilliseconds)
     }
-}
 
+    @Test
+    fun recalculatesTheBroadcastPositionAtTheTimePlaybackRejoins() {
+        val pausedPosition = StationPositionCalculator.calculate(
+            tracks = tracks,
+            totalDurationSeconds = 75.0,
+            unixTimeMilliseconds = 10_000L,
+        )
+        val rejoinedPosition = StationPositionCalculator.calculate(
+            tracks = tracks,
+            totalDurationSeconds = 75.0,
+            unixTimeMilliseconds = 55_000L,
+        )
+
+        assertEquals(0, pausedPosition.trackIndex)
+        assertEquals(10_000L, pausedPosition.offsetMilliseconds)
+        assertEquals(1, rejoinedPosition.trackIndex)
+        assertEquals(25_000L, rejoinedPosition.offsetMilliseconds)
+    }
+}

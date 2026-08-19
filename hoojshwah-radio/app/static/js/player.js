@@ -5,8 +5,9 @@ const nowTitle = document.querySelector("#now-title");
 const nowArtist = document.querySelector("#now-artist");
 const upNext = document.querySelector("#up-next");
 const trackList = document.querySelector("#track-list");
-const shareButton = document.querySelector("#share-button");
 const shareStatus = document.querySelector("#share-status");
+const stationQrCopyButton = document.querySelector("#station-qr-copy");
+const stationQrCopyStatus = document.querySelector("#station-qr-copy-status");
 const trackProgress = document.querySelector("#track-progress");
 const signalTimer = document.querySelector("#signal-timer");
 const signalEvent = document.querySelector("#signal-event");
@@ -24,6 +25,7 @@ const androidNativePlayer = androidAppMode && window.khjwNativePlayer
   && typeof window.khjwNativePlayer.postMessage === "function"
   ? window.khjwNativePlayer
   : null;
+const stationUrl = "https://hoojshwah-radio-live.onrender.com/";
 
 let station = null;
 let currentTrackIndex = 0;
@@ -31,6 +33,8 @@ let backstageUnlocked = false;
 let backstagePickActive = false;
 let userWantsPlayback = false;
 let playbackRecoveryTimeout = null;
+let androidLiveClockInterval = null;
+let stationQrCopyStatusTimeout = null;
 
 if (androidAppMode) {
   resyncButton.hidden = true;
@@ -222,13 +226,15 @@ function renderTrackProgress(track = null, currentSecondsOverride = null) {
   }
 
   const currentTrack = track || station?.tracks?.[currentTrackIndex];
-  const fullSeconds = Number.isFinite(audio.duration) && audio.duration > 0
-    ? audio.duration
-    : currentTrack?.duration_seconds || 0;
+  const fullSeconds = androidAppMode
+    ? currentTrack?.duration_seconds || 0
+    : Number.isFinite(audio.duration) && audio.duration > 0
+      ? audio.duration
+      : currentTrack?.duration_seconds || 0;
 
   const currentSeconds = Number.isFinite(currentSecondsOverride)
     ? currentSecondsOverride
-    : Number.isFinite(audio.currentTime)
+    : !androidAppMode && Number.isFinite(audio.currentTime)
       ? audio.currentTime
       : 0;
 
@@ -265,6 +271,48 @@ function findCurrentTrack(tracks, loopPositionSeconds) {
     nextTrack: tracks[1] || tracks[0],
     offsetSeconds: 0
   };
+}
+
+function renderAndroidLiveClock() {
+  if (!androidAppMode || !station?.tracks?.length || !station.total_duration_seconds) {
+    return;
+  }
+
+  const loopPosition = getLoopPosition(station.total_duration_seconds);
+  const result = findCurrentTrack(station.tracks, loopPosition);
+  const trackChanged = currentTrackIndex !== result.trackIndex;
+
+  currentTrackIndex = result.trackIndex;
+
+  if (trackChanged) {
+    renderTrackInfo(result);
+    renderTrackList(station.tracks, result.track.id);
+  } else {
+    renderTrackProgress(result.track, result.offsetSeconds);
+  }
+}
+
+function startAndroidLiveClock() {
+  if (
+    !androidAppMode ||
+    androidLiveClockInterval ||
+    !station?.tracks?.length ||
+    !station.total_duration_seconds
+  ) {
+    return;
+  }
+
+  renderAndroidLiveClock();
+  androidLiveClockInterval = window.setInterval(renderAndroidLiveClock, 1000);
+}
+
+function stopAndroidLiveClock() {
+  if (!androidLiveClockInterval) {
+    return;
+  }
+
+  window.clearInterval(androidLiveClockInterval);
+  androidLiveClockInterval = null;
 }
 
 function renderLoopLength(totalSeconds) {
@@ -424,11 +472,7 @@ function tuneStation() {
   renderTrackList(station.tracks, result.track.id);
 
   if (androidAppMode) {
-    const remainingMilliseconds = Math.max(
-      1000,
-      ((result.track.duration_seconds || 0) - result.offsetSeconds) * 1000 + 250
-    );
-    window.setTimeout(tuneStation, remainingMilliseconds);
+    startAndroidLiveClock();
     return;
   }
 
@@ -578,20 +622,30 @@ if (trackListToggle && trackList) {
   });
 }
 
-if (shareButton) {
-  shareButton.addEventListener("click", async () => {
-    const stationUrl = "https://hoojshwah-radio-live.onrender.com/";
-
+if (stationQrCopyButton && stationQrCopyStatus) {
+  stationQrCopyButton.addEventListener("click", async () => {
     try {
-      await navigator.clipboard.writeText(stationUrl);
-      if (shareStatus) {
-        shareStatus.textContent = "Station link copied.";
+      if (!navigator.clipboard || typeof navigator.clipboard.writeText !== "function") {
+        throw new Error("Clipboard API unavailable");
       }
+
+      await navigator.clipboard.writeText(stationUrl);
+
+      stationQrCopyStatus.textContent = "Station link copied.";
+      if (stationQrCopyStatusTimeout) {
+        window.clearTimeout(stationQrCopyStatusTimeout);
+      }
+      stationQrCopyStatusTimeout = window.setTimeout(() => {
+        stationQrCopyStatus.textContent = "";
+        stationQrCopyStatusTimeout = null;
+      }, 2400);
     } catch (error) {
       console.error("Could not copy station link:", error);
-      if (shareStatus) {
-        shareStatus.textContent = stationUrl;
+      if (stationQrCopyStatusTimeout) {
+        window.clearTimeout(stationQrCopyStatusTimeout);
+        stationQrCopyStatusTimeout = null;
       }
+      stationQrCopyStatus.textContent = `Copy this station link: ${stationUrl}`;
     }
   });
 }
@@ -716,6 +770,9 @@ document.addEventListener("visibilitychange", () => {
     schedulePlaybackRecovery("visibilitychange");
   }
 });
+
+window.addEventListener("pagehide", stopAndroidLiveClock);
+window.addEventListener("pageshow", startAndroidLiveClock);
 
 window.addEventListener("online", () => {
   logSignalEvent("online");

@@ -4,9 +4,11 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
+import androidx.media3.common.ForwardingPlayer
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
@@ -15,6 +17,8 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
+import com.google.common.util.concurrent.Futures
+import com.google.common.util.concurrent.ListenableFuture
 import com.hoojshwah.khjw.data.Station
 import com.hoojshwah.khjw.data.StationRepository
 import com.hoojshwah.khjw.data.StationTrack
@@ -28,7 +32,6 @@ class KhjwPlaybackService : MediaSessionService() {
 
     private var playableTracks: List<StationTrack> = emptyList()
     private var synchronizationDurationSeconds = 0.0
-    private var hasUserStartedPlayback = false
     private var errorSkipsRemaining = 1
 
     override fun onCreate() {
@@ -49,7 +52,23 @@ class KhjwPlaybackService : MediaSessionService() {
                 addListener(playerListener)
             }
 
-        mediaSession = MediaSession.Builder(this, player).build()
+        val radioSessionPlayer = object : ForwardingPlayer(player) {
+            override fun play() {
+                handlePlayRequest()
+            }
+
+            override fun pause() {
+                handlePauseRequest()
+            }
+
+            override fun setPlayWhenReady(playWhenReady: Boolean) {
+                if (playWhenReady) handlePlayRequest() else handlePauseRequest()
+            }
+        }
+
+        mediaSession = MediaSession.Builder(this, radioSessionPlayer)
+            .setCallback(sessionCallback)
+            .build()
 
         updateStatus("Loading the KHJW station…")
         repository.loadStation { result ->
@@ -94,11 +113,11 @@ class KhjwPlaybackService : MediaSessionService() {
 
         val userAlreadyRequestedPlayback = player.playWhenReady
         setPlaylistAtLivePosition(prepare = userAlreadyRequestedPlayback)
-        hasUserStartedPlayback = userAlreadyRequestedPlayback
 
         val skipped = station.tracks.size - playableTracks.size
         updateStatus(
-            if (skipped == 0) "Ready — tap Play to join the live signal"
+            if (userAlreadyRequestedPlayback) "Joining the live KHJW signal…"
+            else if (skipped == 0) "Ready — tap Play to join the live signal"
             else "Ready — skipped $skipped track(s) with missing media data"
         )
     }
@@ -110,11 +129,54 @@ class KhjwPlaybackService : MediaSessionService() {
             tracks = playableTracks,
             totalDurationSeconds = synchronizationDurationSeconds,
         )
+        val selectedTrack = playableTracks[position.trackIndex]
+
+        Log.i(
+            TAG,
+            "Live position: index=${position.trackIndex}, " +
+                "track=${selectedTrack.id ?: selectedTrack.title}, " +
+                "offsetMs=${position.offsetMilliseconds}",
+        )
 
         val mediaItems = playableTracks.mapIndexed { index, track -> track.toMediaItem(index) }
         player.setMediaItems(mediaItems, position.trackIndex, position.offsetMilliseconds)
         player.repeatMode = Player.REPEAT_MODE_ALL
-        if (prepare) player.prepare()
+        if (prepare) {
+            player.prepare()
+            logPlaybackParameters("live join")
+        }
+    }
+
+    private fun handlePlayRequest() {
+        if (player.isPlaying) {
+            Log.i(TAG, "Play received while already playing; no-op")
+            return
+        }
+
+        Log.i(TAG, "Play received; rejoining live signal")
+        if (playableTracks.isEmpty()) {
+            // Preserve the play intent. configureStation() will calculate a fresh live
+            // position and prepare playback once the station data arrives.
+            player.play()
+            Log.i(TAG, "Play is waiting for station data")
+            updateStatus("Still loading KHJW — playback will begin when ready")
+            return
+        }
+
+        // Establish the current live position before allowing audible playback, including
+        // when ExoPlayer is idle/stopped but playWhenReady was already true.
+        setPlaylistAtLivePosition(prepare = true)
+        player.play()
+    }
+
+    private fun handlePauseRequest() {
+        Log.i(TAG, "Pause received")
+        player.pause()
+    }
+
+    private fun logPlaybackParameters(event: String) {
+        val parameters = player.playbackParameters
+        Log.i(TAG, "Playback parameters at $event: speed=${parameters.speed}, pitch=${parameters.pitch}")
     }
 
     private fun StationTrack.toMediaItem(index: Int): MediaItem =
@@ -136,19 +198,31 @@ class KhjwPlaybackService : MediaSessionService() {
         mediaSession.setSessionExtras(Bundle().apply { putString(EXTRA_STATUS, message) })
     }
 
+    private val sessionCallback = object : MediaSession.Callback {
+        override fun onConnectAsync(
+            session: MediaSession,
+            controller: MediaSession.ControllerInfo,
+        ): ListenableFuture<MediaSession.ConnectionResult> =
+            Futures.immediateFuture(
+                MediaSession.ConnectionResult.AcceptedResultBuilder(session, controller)
+                    .setAvailablePlayerCommands(RADIO_PLAYER_COMMANDS)
+                    .build()
+            )
+    }
+
     private val playerListener = object : Player.Listener {
         override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
-            if (!playWhenReady || hasUserStartedPlayback) return
+            Log.i(TAG, "PlayWhenReady changed: playWhenReady=$playWhenReady, reason=$reason")
+        }
 
-            if (playableTracks.isEmpty()) {
-                updateStatus("Still loading KHJW — playback will begin when ready")
-                return
-            }
-
-            // The first Play tap joins the current simulated-live position, not the
-            // position from when the Activity or service happened to open.
-            hasUserStartedPlayback = true
-            setPlaylistAtLivePosition(prepare = true)
+        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            val parameters = player.playbackParameters
+            Log.i(
+                TAG,
+                "Media item transition: reason=$reason, index=${player.currentMediaItemIndex}, " +
+                    "track=${mediaItem?.mediaId ?: "unknown"}, speed=${parameters.speed}, " +
+                    "pitch=${parameters.pitch}",
+            )
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
@@ -169,6 +243,7 @@ class KhjwPlaybackService : MediaSessionService() {
         }
 
         override fun onPlayerError(error: PlaybackException) {
+            Log.e(TAG, "Player error: ${error.errorCodeName}", error)
             if (errorSkipsRemaining > 0 && player.mediaItemCount > 1) {
                 errorSkipsRemaining -= 1
                 updateStatus("A track was unavailable; trying the next track…")
@@ -182,7 +257,19 @@ class KhjwPlaybackService : MediaSessionService() {
 
     companion object {
         const val EXTRA_STATUS = "com.hoojshwah.khjw.STATUS"
+        private const val TAG = "KHJWPlayback"
         private const val STATION_ARTWORK_URL =
             "https://hoojshwah-radio-live.onrender.com/static/icons/hoojshwah-icon-512.png"
+
+        private val RADIO_PLAYER_COMMANDS = Player.Commands.Builder()
+            .addAll(
+                Player.COMMAND_PLAY_PAUSE,
+                Player.COMMAND_GET_CURRENT_MEDIA_ITEM,
+                Player.COMMAND_GET_METADATA,
+                Player.COMMAND_GET_AUDIO_ATTRIBUTES,
+                Player.COMMAND_GET_VOLUME,
+                Player.COMMAND_GET_DEVICE_VOLUME,
+            )
+            .build()
     }
 }
