@@ -19,6 +19,11 @@ const backstageTrigger = document.querySelector("#backstage-trigger");
 const backstageDialog = document.querySelector("#backstage-dialog");
 const backstageForm = document.querySelector("#backstage-form");
 const backstagePass = document.querySelector("#backstage-pass");
+const androidAppMode = new URLSearchParams(window.location.search).get("app") === "android";
+const androidNativePlayer = androidAppMode && window.khjwNativePlayer
+  && typeof window.khjwNativePlayer.postMessage === "function"
+  ? window.khjwNativePlayer
+  : null;
 
 let station = null;
 let currentTrackIndex = 0;
@@ -26,6 +31,44 @@ let backstageUnlocked = false;
 let backstagePickActive = false;
 let userWantsPlayback = false;
 let playbackRecoveryTimeout = null;
+
+if (androidAppMode) {
+  resyncButton.hidden = true;
+  resyncButton.disabled = true;
+  signalTimer.hidden = true;
+  audio.removeAttribute("src");
+  playButton.textContent = "Play Signal";
+  playButton.disabled = !androidNativePlayer;
+  playButton.dataset.nativePlaybackState = "paused";
+
+  if (shareStatus) {
+    shareStatus.textContent = androidNativePlayer
+      ? "Audio continues through KHJW when the app is in the background."
+      : "Native KHJW playback is unavailable. Reopen the app to retry.";
+  }
+}
+
+function renderNativePlaybackState(state) {
+  if (!androidAppMode || (state !== "playing" && state !== "paused")) {
+    return;
+  }
+
+  playButton.dataset.nativePlaybackState = state;
+  playButton.textContent = state === "playing" ? "Pause Signal" : "Play Signal";
+  playButton.setAttribute("aria-pressed", state === "playing" ? "true" : "false");
+}
+
+if (androidNativePlayer) {
+  androidNativePlayer.addEventListener("message", (event) => {
+    renderNativePlaybackState(event.data);
+  });
+}
+
+if (androidAppMode) {
+  window.addEventListener("message", (event) => {
+    renderNativePlaybackState(event.data);
+  });
+}
 
 function setMediaSessionPlaybackState(state) {
   if (!("mediaSession" in navigator)) {
@@ -40,7 +83,7 @@ function setMediaSessionPlaybackState(state) {
 }
 
 function updateMediaSession(track) {
-  if (!("mediaSession" in navigator) || typeof MediaMetadata === "undefined" || !track) {
+  if (androidAppMode || !("mediaSession" in navigator) || typeof MediaMetadata === "undefined" || !track) {
     return;
   }
 
@@ -128,7 +171,7 @@ function resetActivePlaybackTimer() {
 }
 
 function schedulePlaybackRecovery(reason) {
-  if (!userWantsPlayback || !station) {
+  if (androidAppMode || !userWantsPlayback || !station) {
     return;
   }
 
@@ -380,6 +423,15 @@ function tuneStation() {
   renderTrackInfo(result);
   renderTrackList(station.tracks, result.track.id);
 
+  if (androidAppMode) {
+    const remainingMilliseconds = Math.max(
+      1000,
+      ((result.track.duration_seconds || 0) - result.offsetSeconds) * 1000 + 250
+    );
+    window.setTimeout(tuneStation, remainingMilliseconds);
+    return;
+  }
+
   audio.src = result.track.audio_url;
 
   audio.addEventListener(
@@ -415,6 +467,10 @@ function playTrackByIndex(index) {
   renderTrackInfo(result);
   renderTrackList(station.tracks, track.id);
 
+  if (androidAppMode) {
+    return;
+  }
+
   audio.src = track.audio_url;
   audio.currentTime = 0;
   renderTrackProgress(track, 0);
@@ -422,6 +478,13 @@ function playTrackByIndex(index) {
 
 async function playBackstageTrack(index) {
   if (!backstageUnlocked || !station || !station.tracks || station.tracks.length === 0) {
+    return;
+  }
+
+  if (androidAppMode) {
+    if (shareStatus) {
+      shareStatus.textContent = "Backstage audio remains on the native live KHJW signal in the Android app.";
+    }
     return;
   }
 
@@ -547,6 +610,16 @@ resyncButton.addEventListener("click", () => {
 });
 
 playButton.addEventListener("click", async () => {
+  if (androidAppMode) {
+    if (!androidNativePlayer) {
+      return;
+    }
+
+    const command = playButton.dataset.nativePlaybackState === "playing" ? "pause" : "play";
+    androidNativePlayer.postMessage(command);
+    return;
+  }
+
   if (!station) {
     return;
   }

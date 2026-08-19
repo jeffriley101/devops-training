@@ -1,0 +1,11 @@
+<resources>
+    <style name="Theme.KHJW" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/khjw_gold</item>
+        <item name="colorPrimaryDark">@color/khjw_gold_dark</item>
+        <item name="colorAccent">@color/khjw_gold</item>
+        <item name="android:statusBarColor">@color/khjw_ink</item>
+        <item name="android:navigationBarColor">@color/khjw_ink</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>
+
