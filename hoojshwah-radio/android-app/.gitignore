@@ -5,3 +5,6 @@ local.properties
 captures/
 .idea/
 *.iml
+signing.properties
+*.jks
+*.keystore
