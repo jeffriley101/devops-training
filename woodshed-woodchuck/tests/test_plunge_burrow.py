@@ -166,6 +166,76 @@ console.log(JSON.stringify({best:game.best,dandelionEmpty:!occupied.has(`${game.
     assert 'playEffect("' not in GAME_JS[: GAME_JS.index("const game = new PlungeBurrowGame")]
 
 
+def test_running_game_keeps_one_dandelion_after_normal_collection() -> None:
+    result = run_game_core(
+        r"""
+const {PlungeBurrowGame} = require('./static/js/plunge-burrow.js');
+const game = new PlungeBurrowGame({random: () => 0.31});
+game.obstacles = []; game.portals = []; game.carrot = null; game.instrument = null;
+game.dandelion = {x: game.trail[0].x + 1, y: game.trail[0].y};
+game.start(); game.tick();
+const dandelionOnTrail = game.dandelion && game.trail.some((cell) => cell.x === game.dandelion.x && cell.y === game.dandelion.y);
+console.log(JSON.stringify({score: game.score, length: game.trail.length, dandelion: Boolean(game.dandelion), dandelionOnTrail}));
+"""
+    )
+    assert result == {"score": 1, "length": 4, "dandelion": True, "dandelionOnTrail": False}
+
+
+def test_full_grid_collection_releases_one_tail_cell_for_a_dandelion() -> None:
+    result = run_game_core(
+        r"""
+const {PlungeBurrowGame} = require('./static/js/plunge-burrow.js');
+const game = new PlungeBurrowGame({random: () => 0.25});
+game.obstacles = []; game.portals = []; game.carrot = null; game.instrument = null;
+game.trail = [{x: 10, y: 10}];
+for (let y = 0; y < game.gridSize; y += 1) {
+  for (let x = 0; x < game.gridSize; x += 1) {
+    if ((x === 10 && y === 10) || (x === 11 && y === 10)) continue;
+    game.trail.push({x, y});
+  }
+}
+const tailBefore = {...game.trail[game.trail.length - 1]};
+game.dandelion = {x: 11, y: 10}; game.direction = 'right'; game.pendingGrowth = 0;
+game.start(); game.tick();
+const dandelionOnTrail = game.trail.some((cell) => cell.x === game.dandelion.x && cell.y === game.dandelion.y);
+console.log(JSON.stringify({
+  status: game.status, score: game.score, trailLength: game.trail.length,
+  dandelion: game.dandelion, tailBefore, dandelionOnTrail,
+}));
+"""
+    )
+    assert result["status"] == "running"
+    assert result["score"] == 1
+    assert result["trailLength"] == 399
+    assert result["dandelion"] == result["tailBefore"]
+    assert result["dandelionOnTrail"] is False
+
+
+def test_collision_relocation_and_deterministic_running_ticks_keep_a_dandelion() -> None:
+    result = run_game_core(
+        r"""
+const {PlungeBurrowGame} = require('./static/js/plunge-burrow.js');
+const game = new PlungeBurrowGame({random: () => 0.41});
+game.obstacles = []; game.portals = [];
+game.dandelion = {x: 10, y: 10};
+game.trail = [{x: 19, y: 10}, {x: 18, y: 10}]; game.direction = 'right';
+game.start(); game.tick();
+const afterCollision = Boolean(game.dandelion) && !game.trail.some((cell) => cell.x === game.dandelion.x && cell.y === game.dandelion.y);
+let allRunningSnapshotsHaveDandelion = afterCollision;
+for (let index = 0; index < 20; index += 1) {
+  game.status = 'running'; game.trail = game.initialTrail(); game.direction = 'right';
+  game.queuedDirection = null; game.pendingGrowth = 0; game.obstacles = []; game.portals = [];
+  game.carrot = null; game.instrument = null;
+  game.dandelion = {x: game.trail[0].x + 1, y: game.trail[0].y};
+  game.tick();
+  allRunningSnapshotsHaveDandelion = allRunningSnapshotsHaveDandelion && Boolean(game.dandelion);
+}
+console.log(JSON.stringify({afterCollision, allRunningSnapshotsHaveDandelion}));
+"""
+    )
+    assert result == {"afterCollision": True, "allRunningSnapshotsHaveDandelion": True}
+
+
 def test_lifecycle_inputs_and_single_animation_loop_are_present() -> None:
     assert "requestAnimationFrame(animate)" in GAME_JS
     assert "if (frameId === null" in GAME_JS

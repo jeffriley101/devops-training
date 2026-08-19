@@ -180,6 +180,7 @@
       } else {
         this.trail.pop();
       }
+      this.ensureDandelion();
       this.onChange(this.snapshot());
       return true;
     }
@@ -203,6 +204,7 @@
         this.pendingGrowth = 0;
         this.portalCooldown = null;
         this.relocatePickupsFromTrail();
+        this.ensureDandelion();
       }
       if (this.status === "gameover") this.clearRunCollections();
       this.hitLocked = false;
@@ -233,6 +235,16 @@
     }
 
     spawnDandelion() { return this.randomEmptyCell(this.occupiedSet({ dandelion: false })); }
+
+    ensureDandelion() {
+      if (this.dandelion) return true;
+      this.dandelion = this.spawnDandelion();
+      if (this.dandelion) return true;
+      const releasedTail = this.trail.pop();
+      if (!releasedTail) return false;
+      this.dandelion = this.spawnDandelion();
+      return Boolean(this.dandelion);
+    }
 
     spawnCarrot() {
       if (this.carrot) return this.carrot;
@@ -274,7 +286,6 @@
         this.interval = Math.max(MIN_INTERVAL, START_INTERVAL - Math.floor(this.dandelionsCollected / SPEED_MILESTONE) * SPEED_STEP);
         this.dandelion = null;
         if (this.dandelionsCollected % CARROT_MILESTONE === 0 && !this.carrot) this.spawnCarrot();
-        this.dandelion = this.spawnDandelion();
         this.maybeSpawnInstrument();
         this.emit("dandelion", { score: this.score, count: this.dandelionsCollected });
         return;
