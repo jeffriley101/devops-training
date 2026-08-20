@@ -3380,6 +3380,36 @@ html body button#arcade-time-secret-trigger.arcade-time-secret-trigger {
   font-weight: 800;
 }
 
+.android-download {
+  display: grid;
+  justify-items: center;
+  gap: 0.45rem;
+  width: 100%;
+  margin-top: 0.55rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(226, 184, 91, 0.24);
+}
+
+.station-qr-card .android-download-button {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  width: min(18rem, 100%) !important;
+  max-width: 18rem !important;
+  min-height: 3rem !important;
+  margin: 0 !important;
+  padding-inline: 1.1rem !important;
+  text-align: center;
+  text-decoration: none;
+}
+
+.android-download-note {
+  color: #f3dfaa;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  text-align: center;
+}
+
 @media (max-width: 560px) {
   .station-qr-card {
     padding: 1rem;
