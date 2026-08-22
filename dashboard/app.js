@@ -223,19 +223,6 @@ function setupInternetHealthControls() {
 
 async function init() {
   try {
-    const site = await loadJson("data/site-sync-status.json");
-    const siteStatus = document.getElementById("site-sync-status");
-    if (siteStatus) {
-      siteStatus.textContent = `Last dashboard sync: ${site.last_synced_utc}`;
-    }
-  } catch (error) {
-    const siteStatus = document.getElementById("site-sync-status");
-    if (siteStatus) {
-      siteStatus.textContent = "Latest dashboard sync status unavailable.";
-    }
-  }
-
-  try {
     const envInspector = await loadJson("data/env-inspector-latest.json");
     renderMetadata("env-inspector-metadata", envInspector, [
       { key: "timestamp_utc_human", label: "Last Updated" },
