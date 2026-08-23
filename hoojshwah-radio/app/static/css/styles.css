@@ -3415,3 +3415,77 @@ html body button#arcade-time-secret-trigger.arcade-time-secret-trigger {
     padding: 1rem;
   }
 }
+
+/* Android/mobile bar: fixed scenery with an independently scrolling shelf track */
+.bottle-shelf-wrap {
+  padding: 0 !important;
+  overflow: hidden !important;
+  background:
+    radial-gradient(circle at 86% 18%, rgba(255, 238, 112, 0.95) 0 26px, transparent 28px),
+    linear-gradient(180deg, rgba(37, 13, 72, 0.96), rgba(13, 28, 76, 0.96)) !important;
+}
+
+.bar-moon {
+  position: absolute;
+  top: 22px;
+  left: 14%;
+  width: 48px;
+  height: 48px;
+  overflow: hidden;
+  border-radius: 50%;
+  background: #fff1c2;
+  box-shadow: 0 0 18px rgba(255, 241, 194, 0.5);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.bar-moon::after {
+  content: "";
+  position: absolute;
+  top: -6px;
+  left: 14px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #25104a;
+}
+
+.bottle-shelf-scroll {
+  position: relative;
+  z-index: 5;
+  width: 100%;
+  min-height: 260px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.bottle-shelf-track {
+  position: relative;
+  width: max-content;
+  min-width: 100%;
+  min-height: 260px;
+  padding: 2rem 1rem 1.4rem;
+  box-sizing: border-box;
+}
+
+.bottle-shelf-track > .bottle-shelf {
+  width: max-content !important;
+  min-width: calc(100% - 2rem) !important;
+  max-width: none !important;
+}
+
+.bottle-shelf-track > .bottle-shelf-back,
+.bottle-shelf-track > .bottle-bar-rail {
+  left: 0 !important;
+  right: auto !important;
+  width: 100% !important;
+  min-width: 100% !important;
+  max-width: none !important;
+}
+
+/* The skyline, moon, sun, stadium, and Arch belong to the stationary backdrop. */
+.bottle-shelf::before {
+  display: none;
+  content: none;
+}

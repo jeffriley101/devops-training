@@ -11,7 +11,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="icon" href="/static/icons/hoojshwah-icon-192.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/static/icons/apple-touch-icon-180.png">
-  <link rel="stylesheet" href="/static/css/styles.css?v=android-beta-download-1">
+  <link rel="stylesheet" href="/static/css/styles.css?v=khjw-android-bar-fix-1">
   <link rel="stylesheet" href="/static/css/arcade.css?v=phase4c-ticker-reverted-1">
 </head>
 <body>
@@ -176,11 +176,16 @@
           </form>
 
           <div class="bottle-shelf-wrap" aria-label="Bottle shelf">
+            <div class="bar-moon" aria-hidden="true"></div>
             <div class="stl-stadium" aria-hidden="true"></div>
             <div class="gateway-arch" aria-hidden="true"></div>
-            <div class="bottle-shelf-back"></div>
-            <ul id="bottle-list" class="bottle-list bottle-shelf"></ul>
-            <div class="bottle-bar-rail"></div>
+            <div class="bottle-shelf-scroll">
+              <div class="bottle-shelf-track">
+                <div class="bottle-shelf-back"></div>
+                <ul id="bottle-list" class="bottle-list bottle-shelf"></ul>
+                <div class="bottle-bar-rail"></div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
