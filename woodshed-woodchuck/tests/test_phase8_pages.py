@@ -28,7 +28,10 @@ def test_shed_nameplate_level_team_badge_and_mirrored_secret_hooks() -> None:
     assert html.count('id="woodchuck-name-value"') == 1
     assert "shed-readout-name" in html and ".shed-readout-name" in css
     assert 'id="shed-team-button"' in html and 'id="dandelion-object"' not in html
-    assert "border: 0 !important" in css and ".shed-readout-level" in css
+    level_css = css[css.rindex(".shed-readout-level {"):css.index("\n}", css.rindex(".shed-readout-level {"))]
+    assert "background: radial-gradient" in level_css
+    assert "border: 3px ridge #8b5c1d !important" in level_css
+    assert "border-radius: 50%" in level_css
     assert "bottom: calc(4.75rem + env(safe-area-inset-bottom))" in css
     assert "width: 44px" in css and "height: 44px" in css
 

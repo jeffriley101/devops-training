@@ -76,8 +76,8 @@ def perform_rollover(session: Session):
     return rollover_season(
         session,
         source_key="band-camp-2026",
-        next_key="band-camp-2027",
-        next_name="Band Camp 2027",
+        next_key="back-to-school-2026",
+        next_name="Back to School 2026",
         next_starts_on=date(2026, 8, 3),
         next_ends_on=date(2026, 8, 16),
         now=ROLLOVER_NOW,
@@ -147,7 +147,9 @@ def test_successful_rollover_generates_complete_central_weeks_and_is_idempotent(
     assert created.created is True and created.weeks_created == 2
     assert repeated.created is False and repeated.weeks_created == 2
     assert source.status == "closed"
-    next_season = session.scalar(select(Season).where(Season.key == "band-camp-2027"))
+    next_season = session.scalar(select(Season).where(
+        Season.key == "back-to-school-2026"
+    ))
     assert next_season is not None
     assert (next_season.status, next_season.timezone) == ("active", "America/Chicago")
     weeks = session.scalars(select(ContestWeek).where(
@@ -231,7 +233,9 @@ def test_rollover_transaction_rolls_back_close_and_partial_weeks(
 
     session.expire_all()
     assert source.status == "active"
-    assert session.scalar(select(Season).where(Season.key == "band-camp-2027")) is None
+    assert session.scalar(select(Season).where(
+        Season.key == "back-to-school-2026"
+    )) is None
     assert session.scalar(select(func.count()).select_from(ContestWeek)) == 1
 
 
@@ -356,7 +360,7 @@ def test_new_season_standings_start_empty_and_new_awards_use_current_week(
         now=datetime(2026, 8, 4, 18, tzinfo=timezone.utc),
         current_profile_id=student.id,
     )
-    assert empty["season"]["key"] == "band-camp-2027"
+    assert empty["season"]["key"] == "back-to-school-2026"
     assert all(not standings.get("open") for standings in empty["standings"].values())
     assert "verified" not in empty["standings"]["weekly-camp-points"]
     assert empty["standings"]["weekly-points-leaders"]["verified"] == []

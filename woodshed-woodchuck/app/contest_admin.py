@@ -24,7 +24,12 @@ from .contest_seasons import (
     rollover_season,
     season_status_payload,
 )
-from .contests import CENTRAL, finalize_contest_week, utc_iso
+from .contests import (
+    CENTRAL,
+    contest_season_clause,
+    finalize_contest_week,
+    utc_iso,
+)
 from .db import SessionLocal
 from .models import ContestWeek, Season, Team, TeamReport
 
@@ -72,7 +77,7 @@ def _active_season(session: Session) -> Season | None:
     return session.scalar(
         select(Season).where(
             Season.status == "active",
-            Season.key.like("band-camp-%"),
+            contest_season_clause(),
         ).order_by(Season.starts_on.desc())
     )
 

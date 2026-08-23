@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from .contests import (
     CENTRAL,
     aware_utc,
+    contest_season_clause,
     finalize_contest_week,
 )
 from .db import SessionLocal
@@ -113,7 +114,7 @@ def audit_or_repair_history(
     """
     week = session.scalar(select(ContestWeek).join(Season).where(
         ContestWeek.week_start == week_start,
-        Season.key.like("band-camp-%"),
+        contest_season_clause(),
     ))
     if week is None:
         raise ValueError("Contest week not found.")
@@ -245,7 +246,7 @@ def _load_candidates(factory: sessionmaker[Session]) -> list[WeekCandidate]:
         rows = session.scalars(
             select(ContestWeek)
             .join(Season, Season.id == ContestWeek.season_id)
-            .where(Season.key.like("band-camp-%"))
+            .where(contest_season_clause())
             .order_by(ContestWeek.week_start)
         ).all()
         return [

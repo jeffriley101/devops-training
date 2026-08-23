@@ -1682,7 +1682,9 @@ def test_hall_aggregates_students_instruments_divisions_and_prior_seasons(
         "qualifying_wins": 0, "target_wins": 10,
         "earned": True, "earned_count": 1,
     }
-    assert payload["instruments"][0] == {
+    flute = payload["instruments"][0]
+    achievements = flute.pop("achievements")
+    assert flute == {
         "instrument_key": "flute",
         "instrument_label": "Flute",
         "instrument_icon": "🪈",
@@ -1693,6 +1695,18 @@ def test_hall_aggregates_students_instruments_divisions_and_prior_seasons(
         },
         "divisions": ["open", "verified"],
     }
+    assert [
+        (
+            achievement["season"]["name"],
+            achievement["contest"]["key"],
+            achievement["division"],
+            achievement["medals"]["total"],
+        )
+        for achievement in achievements
+    ] == [
+        ("Band Camp", "weekly-practice-by-instrument", "verified", 1),
+        ("Band Camp 2025", "weekly-practice-by-instrument", "open", 1),
+    ]
     assert current_season.key == "band-camp-2026"
 
 

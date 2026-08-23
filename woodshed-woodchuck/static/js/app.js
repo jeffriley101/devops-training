@@ -2073,14 +2073,10 @@
     window.addEventListener("pagehide", stopMetronome);
   }
 
-  const BAND_CAMP_MARCHING_CHALLENGES = [
-    "Mark time for one minute while counting evenly.",
-    "Practice eight steps forward while keeping your upper body still.",
-    "Stand at attention with tall posture for thirty seconds.",
-    "March sixteen counts while quietly singing your part.",
-    "Practice a clean eight-count halt.",
-    "Check that your toes, shoulders, and instrument face forward.",
-    "March in place while clapping a steady four-beat pulse.",
+  const BACK_TO_SCHOOL_READINESS_CHALLENGES = [
+    "Check your supplies: reeds, slide grease, valve oil, string rosin, sticks, or picks—whichever your instrument needs.",
+    "Get rehearsal-ready: bring your music, a pencil, black socks if needed, and your music stand.",
+    "Get your instrument ready: remove the reed after playing, pull a snake through the horn, or check and adjust a peg or drum head.",
   ];
 
   function wireBandCamp(state) {
@@ -2090,6 +2086,18 @@
     const playerPointsEl = document.getElementById("board-player-season-points");
     const playerWeeklyPointsEl = document.getElementById(
       "board-player-weekly-points"
+    );
+    const playerBurrowBestEl = document.getElementById(
+      "board-player-burrow-best"
+    );
+    const burrowLeaderboardEl = document.getElementById(
+      "board-burrow-leaderboard"
+    );
+    const burrowLeaderboardEmptyEl = document.getElementById(
+      "board-burrow-leaderboard-empty"
+    );
+    const burrowLeaderboardStatusEl = document.getElementById(
+      "board-burrow-leaderboard-status"
     );
 
     const hoursCheckbox = document.getElementById("camp-hours-checkbox");
@@ -2128,9 +2136,87 @@
     const dayIndex = getDayIndex(new Date());
     let trivia = null;
     const marchingChallenge =
-      BAND_CAMP_MARCHING_CHALLENGES[
-        dayIndex % BAND_CAMP_MARCHING_CHALLENGES.length
+      BACK_TO_SCHOOL_READINESS_CHALLENGES[
+        dayIndex % BACK_TO_SCHOOL_READINESS_CHALLENGES.length
       ];
+
+    function storedBurrowBest() {
+      try {
+        const storedBest = Number(window.localStorage.getItem(
+          "woodshed.plungeBurrow.bestScore"
+        ));
+        return Number.isInteger(storedBest) && storedBest > 0 ? storedBest : 0;
+      } catch (_error) {
+        return 0;
+      }
+    }
+
+    function renderBurrowBest(payload) {
+      if (!payload || !Number.isInteger(payload.best_score) ||
+          !Array.isArray(payload.leaderboard)) {
+        throw new Error("Invalid Burrow standings response");
+      }
+      if (playerBurrowBestEl) {
+        playerBurrowBestEl.textContent = String(payload.best_score);
+      }
+      if (!burrowLeaderboardEl) return;
+      burrowLeaderboardEl.replaceChildren();
+      payload.leaderboard.forEach((row) => {
+        if (!Number.isInteger(row.rank) || !Number.isInteger(row.score) ||
+            typeof row.display_name !== "string") return;
+        const item = document.createElement("article");
+        item.className = `contest-ranked-row contest-rank-${Math.min(row.rank, 4)}`;
+        item.setAttribute("role", "listitem");
+        if (row.is_current_user === true) item.classList.add("is-current-user");
+        const rank = document.createElement("span");
+        rank.className = "contest-rank-badge";
+        rank.textContent = String(row.rank);
+        const name = document.createElement("span");
+        name.className = "contest-ranked-subject";
+        name.textContent = row.display_name;
+        const score = document.createElement("strong");
+        score.className = "contest-ranked-score";
+        score.textContent = String(row.score);
+        item.append(rank, name, score);
+        burrowLeaderboardEl.append(item);
+      });
+      if (burrowLeaderboardEmptyEl) {
+        burrowLeaderboardEmptyEl.classList.toggle(
+          "hidden", payload.leaderboard.length > 0
+        );
+      }
+    }
+
+    async function loadBurrowBest() {
+      if (!playerBurrowBestEl) return;
+      try {
+        let response = await fetch("/xp/plunge-best", {
+          credentials: "same-origin",
+          cache: "no-store",
+        });
+        if (!response.ok) throw new Error("Burrow standings unavailable");
+        let payload = await response.json();
+        const browserBest = storedBurrowBest();
+        if (browserBest > payload.best_score) {
+          response = await fetch("/xp/plunge-best", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ score: browserBest }),
+          });
+          if (!response.ok) throw new Error("Burrow best migration failed");
+          payload = await response.json();
+        }
+        renderBurrowBest(payload);
+        if (burrowLeaderboardStatusEl) burrowLeaderboardStatusEl.textContent = "";
+      } catch (_error) {
+        if (burrowLeaderboardStatusEl) {
+          burrowLeaderboardStatusEl.textContent = "Burrow scores are unavailable right now.";
+        }
+      }
+    }
+
+    void loadBurrowBest();
 
     function freshBandCampDay(dateKey) {
       return {
@@ -2259,8 +2345,6 @@
 
       if (complete && details.dataset.serverComplete !== "true") {
         details.open = false;
-      } else if (!complete) {
-        details.open = true;
       }
       details.dataset.serverComplete = String(complete);
     }
@@ -2435,7 +2519,7 @@
     let current = prepareCurrentDay(stateApi.getState());
     renderBoard(current);
     loadPersistedCampAwards().catch(() => {
-      // Leave activities open when server completion cannot be confirmed.
+      // Keep the user's locker disclosure state when server status is unavailable.
     });
 
     if (triviaOptionsEl) {
@@ -2457,7 +2541,7 @@
         try {
           const persistedAward = await persistCampPoint("hours");
           if (!persistedAward) {
-            throw new Error("Band Camp Hours could not be saved.");
+            throw new Error("Rehearsal or lesson activity could not be saved.");
           }
           if (persistedAward.created === true) {
             awardContest(next, "hours");
@@ -2470,13 +2554,13 @@
           hoursCheckbox.disabled = false;
           hoursActivity.open = true;
           feedbackEl.textContent = error.message ||
-            "Band Camp Hours could not be saved. Please try again.";
+            "Rehearsal or lesson activity could not be saved. Please try again.";
           return;
         }
 
         stateApi.saveState(next);
         feedbackEl.textContent =
-          "Band Camp Hours completed. +1 Camp Point and +1 dandelion.";
+          "Rehearsal or lesson completed. +1 Camp Point and +1 dandelion.";
 
         renderBoard(next);
         hydrateHome(next);
@@ -2601,7 +2685,7 @@
         let persistedAward;
         try {
           persistedAward = await persistCampPoint("marching");
-          if (!persistedAward) throw new Error("Marching challenge could not be saved.");
+          if (!persistedAward) throw new Error("Readiness challenge could not be saved.");
         } catch (error) {
           marchingButton.disabled = false;
           marchingButton.textContent = readyText;
@@ -2620,7 +2704,7 @@
         stateApi.saveState(next);
 
         feedbackEl.textContent =
-          "Marching challenge completed. +1 Camp Point and +1 dandelion.";
+          "Readiness challenge completed. +1 Camp Point and +1 dandelion.";
 
         renderBoard(next);
         hydrateHome(next);
@@ -2781,7 +2865,7 @@
     function positionMessage(division, position, campPoints = false) {
       if (!position || position.has_score !== true) {
         if (campPoints) {
-          return "No Camp points yet · Complete a Band Camp activity to join the board.";
+          return "No Camp points yet · Complete a Back to School activity to join the board.";
         }
         return division === "verified"
           ? "No verified minutes yet · Approved P-Charts appear here."
@@ -2938,11 +3022,11 @@
           headers: { Accept: "application/json" },
         });
         if (response.status === 401) {
-          showError("Sign in to view the current Band Camp standings.");
+          showError("Sign in to view the current Back to School standings.");
           return;
         }
         if (!response.ok) {
-          showError("Band Camp standings are unavailable right now.");
+          showError("Back to School standings are unavailable right now.");
           return;
         }
 
@@ -2977,7 +3061,7 @@
           campPointsThisWeek < 0 ||
           campPointsSeason < campPointsThisWeek
         ) {
-          showError("Band Camp standings could not be read.");
+          showError("Back to School standings could not be read.");
           return;
         }
 
@@ -3029,7 +3113,7 @@
         if (weekStatusEl) weekStatusEl.classList.add("hidden");
         root.setAttribute("aria-busy", "false");
       } catch (_error) {
-        showError("Band Camp standings are unavailable right now.");
+        showError("Back to School standings are unavailable right now.");
       } finally {
         requestInFlight = false;
         if (refreshQueued) {
@@ -3417,6 +3501,23 @@
           .map((value) => value === "open" ? "Open" : "Verified")
           .join(", ")}`;
         card.appendChild(represented);
+
+        const achievementList = document.createElement("ul");
+        achievementList.className = "champion-achievements";
+        champion.achievements
+          .filter((achievement) => division === "all" || achievement.division === division)
+          .forEach((achievement) => {
+            const item = document.createElement("li");
+            const divisionLabel = achievement.division === "open" ? "Open" : "Verified";
+            const medalParts = [
+              ["Gold", achievement.medals.gold],
+              ["Silver", achievement.medals.silver],
+              ["Bronze", achievement.medals.bronze],
+            ].filter((entry) => entry[1] > 0).map((entry) => `${entry[0]} ${entry[1]}`);
+            item.textContent = `${achievement.season.name} · ${achievement.contest.name} · ${divisionLabel} — ${medalParts.join(", ")}`;
+            achievementList.appendChild(item);
+          });
+        card.appendChild(achievementList);
         list.appendChild(card);
       });
 
@@ -3450,6 +3551,13 @@
         validCounts(champion.by_division.open) &&
         validCounts(champion.by_division.verified) &&
         Array.isArray(champion.divisions) &&
+        Array.isArray(champion.achievements) && champion.achievements.every(
+          (achievement) => achievement && achievement.season &&
+            typeof achievement.season.name === "string" &&
+            achievement.contest && typeof achievement.contest.name === "string" &&
+            ["open", "verified"].includes(achievement.division) &&
+            validCounts(achievement.medals)
+        ) &&
         (type === "instruments" || (
           champion.crown &&
           Number.isInteger(champion.crown.qualifying_wins) &&

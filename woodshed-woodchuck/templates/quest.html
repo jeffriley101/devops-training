@@ -3,11 +3,15 @@
 {% block content %}
 <section class="card board-page">
   <a id="plunge-burrow-button" class="board-plunge-button" href="/plunge-burrow" aria-label="Play Plunge Burrow" title="Play Plunge Burrow"><span aria-hidden="true">🕳️</span></a>
+  <div class="back-to-school-streamers" aria-hidden="true">
+    {% for index in range(9) %}<span></span>{% endfor %}
+  </div>
   <div class="section-head">
-    <h2 class="board-season-title" aria-label="Band Camp">
-      <span>B</span><span>a</span><span>n</span><span>d</span>
-      <span class="letter-gap" aria-hidden="true"></span>
-      <span>C</span><span>a</span><span>m</span><span>p</span>
+    <h2 class="board-season-title" aria-label="{{ board_season.title }}">
+      {% for word in board_season.title_words %}
+      {% if not loop.first %}<span class="letter-gap" aria-hidden="true"></span>{% endif %}
+      {% for letter in word %}<span>{{ letter }}</span>{% endfor %}
+      {% endfor %}
     </h2>
   </div>
 
@@ -38,15 +42,25 @@
         Season Camp Points
         <strong id="board-player-season-points">0</strong>
       </p>
+      <p>
+        Highest Burrow Score to Date
+        <strong id="board-player-burrow-best">0</strong>
+      </p>
+      <section class="board-burrow-leaders" aria-labelledby="board-burrow-leaders-title">
+        <h4 id="board-burrow-leaders-title">Highest Burrow Scores</h4>
+        <div id="board-burrow-leaderboard" class="contest-ranked-list" role="list"></div>
+        <p id="board-burrow-leaderboard-empty" class="hidden">No saved Burrow scores yet.</p>
+        <small id="board-burrow-leaderboard-status" role="status" aria-live="polite"></small>
+      </section>
     </div>
 
   </section>
 
   <div class="board-layout">
-    <section class="board-contests" aria-label="Band Camp contests">
-      <details id="camp-hours-activity" class="board-contest-card board-activity" open>
+    <section class="board-contests" aria-label="Back to School activities">
+      <details id="camp-hours-activity" class="board-contest-card board-activity board-locker">
         <summary>
-          <span>Band Camp Bonus</span>
+          <span>Rehearsal / Lesson</span>
           <small id="camp-hours-summary">Not completed today</small>
         </summary>
         <div class="board-activity-body">
@@ -54,7 +68,7 @@
         <div>
           <label class="camp-hours-checkbox-label" for="camp-hours-checkbox">
             <input id="camp-hours-checkbox" type="checkbox" />
-            <span>Were you at band camp or mini-camp today?</span>
+            <span>Did you have rehearsal or a lesson outside of school hours today?</span>
           </label>
           <p>Actual practice time comes from submitted P-Charts and appears in This Week’s Practice and Career Practice.</p>
 
@@ -63,7 +77,7 @@
         </div>
       </details>
 
-      <details id="instrument-care-activity" class="board-contest-card board-activity" open>
+      <details id="instrument-care-activity" class="board-contest-card board-activity board-locker">
         <summary>
           <span>Instrument Care</span>
           <small id="instrument-care-summary">Not completed today</small>
@@ -84,7 +98,7 @@
         </div>
       </details>
 
-      <details id="trivia-activity" class="board-contest-card board-activity" open>
+      <details id="trivia-activity" class="board-contest-card board-activity board-locker">
         <summary>
           <span>Daily Trivia</span>
           <small id="trivia-summary">One attempt per day</small>
@@ -115,13 +129,13 @@
         </div>
       </details>
 
-      <details id="marching-activity" class="board-contest-card board-activity" open>
+      <details id="marching-activity" class="board-contest-card board-activity board-locker">
         <summary>
-          <span>Marching Challenge</span>
+          <span>Readiness Challenge</span>
           <small id="marching-challenge-summary">Not completed today</small>
         </summary>
         <div class="board-activity-body">
-        <span class="board-contest-icon" aria-hidden="true">🥁</span>
+        <span class="board-contest-icon" aria-hidden="true">🎒</span>
         <div>
           <p id="marching-challenge-text">
             Loading today’s challenge...
@@ -150,7 +164,7 @@
       >
         <header class="scoreboard-header">
           <p class="scoreboard-kicker">Live competition board</p>
-          <h3 id="band-camp-standings-title">Band Camp Standings</h3>
+          <h3 id="band-camp-standings-title">Back to School Standings</h3>
           <p class="board-standings-week">
             <span id="contest-week-range">Current week</span>
             <span id="contest-week-context">Open division</span>
@@ -159,7 +173,7 @@
         </header>
 
         <p id="contest-standings-loading" class="scoreboard-notice" role="status">
-          Loading Band Camp standings…
+          Loading Back to School standings…
         </p>
         <div
           id="contest-standings-error"
@@ -219,7 +233,7 @@
           <section class="contest-camp-points-section" aria-labelledby="open-camp-points-title">
             <h4 id="open-camp-points-title">WEEKLY BAND CAMP POINTS</h4>
             <p class="contest-division-explanation">Camp activities completed this week</p>
-            <div id="contest-open-camp-points" class="contest-ranked-list contest-camp-points-list" role="list" aria-label="Open Band Camp points leaders"></div>
+            <div id="contest-open-camp-points" class="contest-ranked-list contest-camp-points-list" role="list" aria-label="Open Camp Points leaders"></div>
             <p id="contest-open-camp-points-empty" class="contest-empty-state hidden">
               No Camp points have been earned this week yet.
             </p>
@@ -287,8 +301,9 @@
         aria-labelledby="past-winners-title"
         aria-busy="true"
       >
+        <p class="scoreboard-kicker">Historical winners</p>
         <h3 id="past-winners-title">Medal Board of Past Winners</h3>
-        <p class="medal-board-intro">Weekly Gold, Silver, and Bronze winners</p>
+        <p class="medal-board-intro">Weekly Gold, Silver, and Bronze winners by season and division</p>
 
         <div id="past-winners-loading" class="medal-board-state" role="status">
           Loading Medal Board of Past Winners…
@@ -386,8 +401,9 @@
         aria-labelledby="hall-of-champions-title"
         aria-busy="true"
       >
+        <p class="scoreboard-kicker">All-time history</p>
         <h3 id="hall-of-champions-title">Hall of Champions</h3>
-        <p>All-time Band Camp medal leaders</p>
+        <p>Historical medal leaders, grouped by season, category, and division</p>
 
         <div id="champions-loading" class="medal-board-state" role="status">
           Loading Hall of Champions…

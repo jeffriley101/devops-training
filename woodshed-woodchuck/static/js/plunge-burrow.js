@@ -512,6 +512,21 @@
     }
   }
 
+  function reportBestScore(score) {
+    if (typeof root.fetch !== "function" || !Number.isInteger(score) || score < 0) return;
+    try {
+      const request = root.fetch("/xp/plunge-best", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ score }),
+      });
+      if (request && typeof request.catch === "function") request.catch(function () {});
+    } catch (_error) {
+      // Best-score reporting is supplemental and must never interrupt the game.
+    }
+  }
+
   const game = new PlungeBurrowGame({
     storage: root.localStorage,
     onChange: renderState,
@@ -545,7 +560,11 @@
       }
       if (event === "pause") announce("Game paused.");
       if (event === "resume") announce("Game resumed.");
-      if (event === "gameover") { stopMusic(); announce(`Game over. Final score ${detail.score}.`); }
+      if (event === "gameover") {
+        reportBestScore(detail.best);
+        stopMusic();
+        announce(`Game over. Final score ${detail.score}.`);
+      }
     },
   });
 

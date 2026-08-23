@@ -84,7 +84,7 @@ def test_remove_clears_only_server_placement_and_preserves_copy_ui() -> None:
 def test_collision_uses_only_other_owned_decorations_and_restores_on_rejection() -> None:
     collision = DECORATIONS[DECORATIONS.index("function overlapsPlaced"):DECORATIONS.index("function nextOpenPlacement")]
     assert "ownedItems.some" in collision
-    assert "item.id !== ignoredId" in collision
+    assert "itemId(item) !== String(ignoredId)" in collision
     assert "Math.abs(item.placement_x - x) < COLLISION_SIZE" in collision
     assert "room-object" not in collision
     save = DECORATIONS[DECORATIONS.index("async function savePlacement"):DECORATIONS.index("async function removePlacement")]

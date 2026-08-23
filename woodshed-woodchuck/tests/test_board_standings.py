@@ -53,7 +53,7 @@ def test_board_contains_loading_and_empty_states() -> None:
     markup = board_template()
 
     assert 'id="contest-standings-loading"' in markup
-    assert "Loading Band Camp standings" in markup
+    assert "Loading Back to School standings" in markup
     assert "No P-Charts have been submitted this week yet." in markup
     assert "No verified P-Charts have been approved this week yet." in markup
     assert 'id="contest-standings-error"' in markup
@@ -64,7 +64,7 @@ def test_board_authentication_behavior_is_unchanged() -> None:
     response = TestClient(app).get("/quest")
 
     assert response.status_code == 200
-    assert "Band Camp Standings" in response.text
+    assert "Back to School Standings" in response.text
 
 
 def test_board_template_contains_no_private_account_fields() -> None:
@@ -317,7 +317,8 @@ def test_completed_band_camp_activities_use_server_backed_disclosures() -> None:
     assert '`/contests/camp-points/awards/${encodeURIComponent(today)}`' in javascript
     assert "serverConfirmedAwards.has(activityType)" in javascript
     assert "details.open = false" in javascript
-    assert "Leave activities open when server completion cannot be confirmed" in javascript
+    assert "Keep the user's locker disclosure state when server status is unavailable" in javascript
+    assert "else if (!complete)" not in javascript
     assert 'content: "▶"' in css
 
 
@@ -342,7 +343,7 @@ def test_board_weekly_points_and_hours_checkbox_contract() -> None:
         javascript.index("function renderBoard(current)"):
         javascript.index("let current = prepareCurrentDay")
     ]
-    assert "Were you at band camp or mini-camp today?" in hours_panel
+    assert "Did you have rehearsal or a lesson outside of school hours today?" in hours_panel
     assert 'id="camp-hours-checkbox" type="checkbox"' in hours_panel
     assert 'for="camp-hours-checkbox"' in hours_panel
     assert 'type="number"' not in hours_panel

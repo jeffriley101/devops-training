@@ -90,7 +90,7 @@ def test_batch_b_markup_and_privacy_hooks() -> None:
     assert 'id="p-book-include-contests"' in book and "checked" in book
     assert "Include this chart in Band Camp contests" in book
     assert "include_contests: includeContests" in javascript
-    assert "Band Camp Bonus" in board
+    assert "Rehearsal / Lesson" in board
     assert "Band Camp Hours Bonus" not in board
     assert "Actual practice time comes from submitted P-Charts" in board
     assert "Weekly Gold, Silver, and Bronze winners" in board

@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -43,6 +43,11 @@ BAND_CAMP_NAME = "Band Camp"
 BAND_CAMP_START = date(2026, 7, 27)
 CENTRAL_TIMEZONE = "America/Chicago"
 CENTRAL = ZoneInfo(CENTRAL_TIMEZONE)
+CONTEST_SEASON_PREFIXES = ("band-camp-", "back-to-school-")
+
+
+def contest_season_clause():
+    return or_(*(Season.key.like(f"{prefix}%") for prefix in CONTEST_SEASON_PREFIXES))
 
 CONTEST_DEFINITIONS = (
     {
@@ -160,12 +165,71 @@ TRIVIA_QUESTIONS = (
     {"id": "metronome-purpose", "question": "What does a metronome help a musician maintain?", "choices": (
         {"id": "tempo", "text": "Tempo"}, {"id": "instrument-color", "text": "Instrument color"}, {"id": "stand-height", "text": "Music-stand height"},
     ), "correct_answer_id": "tempo"},
+    {"id": "forte-marking", "question": "What does the marking forte mean?", "choices": (
+        {"id": "loudly", "text": "Play loudly"}, {"id": "slowly", "text": "Play slowly"}, {"id": "smoothly", "text": "Play smoothly"},
+    ), "correct_answer_id": "loudly"},
+    {"id": "rest-purpose", "question": "What does a rest tell a musician to do?", "choices": (
+        {"id": "stay-silent", "text": "Stay silent for a measured time"}, {"id": "speed-up", "text": "Speed up"}, {"id": "change-instruments", "text": "Change instruments"},
+    ), "correct_answer_id": "stay-silent"},
+    {"id": "repeat-sign", "question": "What does a repeat sign usually tell musicians to do?", "choices": (
+        {"id": "play-again", "text": "Play a section again"}, {"id": "skip-a-measure", "text": "Skip a measure"}, {"id": "play-one-octave-higher", "text": "Play one octave higher"},
+    ), "correct_answer_id": "play-again"},
+    {"id": "sharp-symbol", "question": "What does a sharp sign usually do to a note?", "choices": (
+        {"id": "raises-half-step", "text": "Raises it one half step"}, {"id": "lowers-half-step", "text": "Lowers it one half step"}, {"id": "doubles-length", "text": "Doubles its length"},
+    ), "correct_answer_id": "raises-half-step"},
+    {"id": "flat-symbol", "question": "What does a flat sign usually do to a note?", "choices": (
+        {"id": "lowers-half-step", "text": "Lowers it one half step"}, {"id": "raises-half-step", "text": "Raises it one half step"}, {"id": "makes-it-louder", "text": "Makes it louder"},
+    ), "correct_answer_id": "lowers-half-step"},
+    {"id": "fermata", "question": "What does a fermata ask a musician to do?", "choices": (
+        {"id": "hold-note", "text": "Hold the note or rest"}, {"id": "repeat-section", "text": "Repeat the section"}, {"id": "play-staccato", "text": "Play staccato"},
+    ), "correct_answer_id": "hold-note"},
+    {"id": "staccato", "question": "How are staccato notes usually played?", "choices": (
+        {"id": "short-separated", "text": "Short and separated"}, {"id": "smooth-connected", "text": "Smooth and connected"}, {"id": "as-loud-as-possible", "text": "As loud as possible"},
+    ), "correct_answer_id": "short-separated"},
+    {"id": "legato", "question": "How are legato notes usually played?", "choices": (
+        {"id": "smooth-connected", "text": "Smooth and connected"}, {"id": "short-separated", "text": "Short and separated"}, {"id": "without-rhythm", "text": "Without rhythm"},
+    ), "correct_answer_id": "smooth-connected"},
+    {"id": "tuning-note", "question": "Which concert pitch is commonly used to tune an ensemble?", "choices": (
+        {"id": "a440", "text": "A = 440 Hz"}, {"id": "c100", "text": "C = 100 Hz"}, {"id": "f800", "text": "F = 800 Hz"},
+    ), "correct_answer_id": "a440"},
+    {"id": "woodwind-section", "question": "Which instrument belongs to the woodwind family?", "choices": (
+        {"id": "clarinet", "text": "Clarinet"}, {"id": "trombone", "text": "Trombone"}, {"id": "snare-drum", "text": "Snare drum"},
+    ), "correct_answer_id": "clarinet"},
+    {"id": "percussion-section", "question": "Which instrument belongs to the percussion family?", "choices": (
+        {"id": "snare-drum", "text": "Snare drum"}, {"id": "flute", "text": "Flute"}, {"id": "tuba", "text": "Tuba"},
+    ), "correct_answer_id": "snare-drum"},
+    {"id": "time-signature-top", "question": "In a time signature, what does the top number tell you?", "choices": (
+        {"id": "beats-per-measure", "text": "How many beats are in each measure"}, {"id": "key-signature", "text": "The key signature"}, {"id": "dynamic-level", "text": "The dynamic level"},
+    ), "correct_answer_id": "beats-per-measure"},
+    {"id": "quarter-note-44", "question": "How many beats does a quarter note receive in 4/4 time?", "choices": (
+        {"id": "one", "text": "1"}, {"id": "two", "text": "2"}, {"id": "four", "text": "4"},
+    ), "correct_answer_id": "one"},
+    {"id": "half-note-44", "question": "How many beats does a half note receive in 4/4 time?", "choices": (
+        {"id": "one", "text": "1"}, {"id": "two", "text": "2"}, {"id": "four", "text": "4"},
+    ), "correct_answer_id": "two"},
+    {"id": "diminuendo", "question": "Which word means to gradually get softer?", "choices": (
+        {"id": "diminuendo", "text": "Diminuendo"}, {"id": "crescendo", "text": "Crescendo"}, {"id": "accent", "text": "Accent"},
+    ), "correct_answer_id": "diminuendo"},
+    {"id": "pencil-rehearsal", "question": "Why should a musician bring a pencil to rehearsal?", "choices": (
+        {"id": "mark-music", "text": "To mark helpful notes in the music"}, {"id": "tune-instrument", "text": "To tune the instrument"}, {"id": "conduct-ensemble", "text": "To conduct the ensemble"},
+    ), "correct_answer_id": "mark-music"},
+    {"id": "warm-up-purpose", "question": "What is a good reason to warm up before rehearsing?", "choices": (
+        {"id": "prepare-body-sound", "text": "Prepare your body and sound"}, {"id": "avoid-reading-music", "text": "Avoid reading the music"}, {"id": "make-rehearsal-shorter", "text": "Make rehearsal shorter"},
+    ), "correct_answer_id": "prepare-body-sound"},
 )
+
+LEGACY_TRIVIA_QUESTION_COUNT = 7
+EXPANDED_TRIVIA_START = date(2026, 8, 23)
 
 
 def trivia_question_for(activity_date: date) -> dict[str, object]:
+    if activity_date < EXPANDED_TRIVIA_START:
+        return TRIVIA_QUESTIONS[
+            activity_date.timetuple().tm_yday % LEGACY_TRIVIA_QUESTION_COUNT
+        ]
+    expanded_day = (activity_date - EXPANDED_TRIVIA_START).days
     return TRIVIA_QUESTIONS[
-        activity_date.timetuple().tm_yday % len(TRIVIA_QUESTIONS)
+        (LEGACY_TRIVIA_QUESTION_COUNT + expanded_day) % len(TRIVIA_QUESTIONS)
     ]
 
 
@@ -266,7 +330,7 @@ def ensure_band_camp_data(
     season = session.scalar(
         select(Season).where(
             Season.status == "active",
-            Season.key.like("band-camp-%"),
+            contest_season_clause(),
             Season.starts_on <= central_today,
             (Season.ends_on.is_(None) | (Season.ends_on >= central_today)),
         ).order_by(Season.starts_on.desc())
@@ -1081,7 +1145,7 @@ def _legacy_finalize_contest_week(
         .join(Season, Season.id == ContestWeek.season_id)
         .where(
             ContestWeek.week_start == week_start,
-            Season.key.like("band-camp-%"),
+            contest_season_clause(),
         )
         .with_for_update()
     )
@@ -1505,7 +1569,7 @@ def finalize_contest_week(
         raise ValueError("The current time must be timezone-aware.")
     week = session.scalar(select(ContestWeek).join(Season).where(
         ContestWeek.week_start == week_start,
-        Season.key.like("band-camp-%"),
+        contest_season_clause(),
     ).with_for_update())
     if week is None:
         raise HTTPException(status_code=404, detail="Contest week not found.")
@@ -1713,7 +1777,7 @@ def finalized_weeks_payload(session: Session) -> dict[str, object]:
         .join(Season, Season.id == ContestWeek.season_id)
         .where(
             ContestWeek.status == "finalized",
-            Season.key.like("band-camp-%"),
+            contest_season_clause(),
         )
         .order_by(
             ContestWeek.week_start.desc(),
@@ -1754,21 +1818,60 @@ def _champion_sort_key(champion: dict[str, object]) -> tuple[object, ...]:
     )
 
 
+def _record_champion_achievement(
+    champion: dict[str, object],
+    *,
+    season: Season,
+    contest: Contest,
+    division: str,
+    medal: str,
+) -> None:
+    grouped = champion.setdefault("_achievement_groups", {})
+    key = (season.key, contest.key, division)
+    achievement = grouped.get(key)
+    if achievement is None:
+        achievement = {
+            "season": {"key": season.key, "name": season.name},
+            "contest": {"key": contest.key, "name": contest.name},
+            "division": division,
+            "medals": _empty_medal_counts(),
+            "_starts_on": season.starts_on,
+        }
+        grouped[key] = achievement
+    _increment_medal(achievement["medals"], medal)
+
+
+def _finalize_champion_achievements(champion: dict[str, object]) -> None:
+    grouped = champion.pop("_achievement_groups", {})
+    achievements = sorted(
+        grouped.values(),
+        key=lambda item: (
+            -item["_starts_on"].toordinal(),
+            item["contest"]["name"].casefold(),
+            item["division"],
+        ),
+    )
+    for achievement in achievements:
+        achievement.pop("_starts_on", None)
+    champion["achievements"] = achievements
+
+
 def hall_of_champions_payload(session: Session) -> dict[str, object]:
-    rows = session.scalars(
-        select(ContestResult)
+    rows = session.execute(
+        select(ContestResult, Contest, Season)
+        .join(Contest, Contest.id == ContestResult.contest_id)
         .join(ContestWeek, ContestWeek.id == ContestResult.contest_week_id)
         .join(Season, Season.id == ContestWeek.season_id)
         .where(
             ContestWeek.status == "finalized",
-            Season.key.like("band-camp-%"),
+            contest_season_clause(),
         )
         .order_by(ContestWeek.week_start.desc(), ContestResult.id.desc())
     ).all()
 
     students_by_profile: dict[int, dict[str, object]] = {}
     instruments_by_key: dict[str, dict[str, object]] = {}
-    for result in rows:
+    for result, contest, season in rows:
         if result.subject_type == "student" and result.profile_id is not None:
             champion = students_by_profile.get(result.profile_id)
             if champion is None:
@@ -1780,6 +1883,7 @@ def hall_of_champions_payload(session: Session) -> dict[str, object]:
                         "verified": _empty_medal_counts(),
                     },
                     "divisions": set(),
+                    "_achievement_groups": {},
                 }
                 students_by_profile[result.profile_id] = champion
         elif result.subject_type == "instrument":
@@ -1799,6 +1903,7 @@ def hall_of_champions_payload(session: Session) -> dict[str, object]:
                         "verified": _empty_medal_counts(),
                     },
                     "divisions": set(),
+                    "_achievement_groups": {},
                 }
                 instruments_by_key[result.subject_key] = champion
         else:
@@ -1807,30 +1912,50 @@ def hall_of_champions_payload(session: Session) -> dict[str, object]:
         _increment_medal(champion["medals"], result.medal)
         _increment_medal(champion["by_division"][result.division], result.medal)
         champion["divisions"].add(result.division)
+        _record_champion_achievement(
+            champion,
+            season=season,
+            contest=contest,
+            division=result.division,
+            medal=result.medal,
+        )
 
     # Team champion wins are public Hall credit for each snapshotted,
     # P-Chart-eligible recipient, represented by the idempotent crown grant.
     team_wins = session.execute(
-        select(RewardGrant, ContestResult, WoodchuckProfile)
+        select(RewardGrant, ContestResult, WoodchuckProfile, Contest, Season)
         .join(ContestResult, ContestResult.id == RewardGrant.contest_result_id)
         .join(WoodchuckProfile, WoodchuckProfile.id == RewardGrant.profile_id)
+        .join(Contest, Contest.id == ContestResult.contest_id)
+        .join(ContestWeek, ContestWeek.id == ContestResult.contest_week_id)
+        .join(Season, Season.id == ContestWeek.season_id)
         .where(
             RewardGrant.reward_type == "crown_win",
             RewardGrant.category_key == "team-crown",
             ContestResult.subject_type == "team",
             ContestResult.rank == 1,
+            ContestWeek.status == "finalized",
+            contest_season_clause(),
         )
     ).all()
-    for _grant, result, profile in team_wins:
+    for _grant, result, profile, contest, season in team_wins:
         champion = students_by_profile.setdefault(profile.id, {
             "display_name": public_woodchuck_name(profile),
             "medals": _empty_medal_counts(),
             "by_division": {"open": _empty_medal_counts(), "verified": _empty_medal_counts()},
             "divisions": set(),
+            "_achievement_groups": {},
         })
         _increment_medal(champion["medals"], "gold")
         _increment_medal(champion["by_division"][result.division], "gold")
         champion["divisions"].add(result.division)
+        _record_champion_achievement(
+            champion,
+            season=season,
+            contest=contest,
+            division=result.division,
+            medal="gold",
+        )
 
     points_contest = session.scalar(
         select(Contest).where(Contest.key == "weekly-points-leaders")
@@ -1866,6 +1991,7 @@ def hall_of_champions_payload(session: Session) -> dict[str, object]:
     for profile_id, champion in students_by_profile.items():
         progress = crown_by_profile.get(profile_id)
         champion["divisions"] = sorted(champion["divisions"])
+        _finalize_champion_achievements(champion)
         champion["crown"] = {
             "qualifying_wins": progress.qualifying_wins if progress else 0,
             "target_wins": 10,
@@ -1877,6 +2003,7 @@ def hall_of_champions_payload(session: Session) -> dict[str, object]:
     instruments = list(instruments_by_key.values())
     for champion in instruments:
         champion["divisions"] = sorted(champion["divisions"])
+        _finalize_champion_achievements(champion)
     students.sort(key=_champion_sort_key)
     instruments.sort(key=_champion_sort_key)
     return {"students": students, "instruments": instruments}
@@ -2846,7 +2973,7 @@ def contest_week_results(week_start: date, request: Request) -> dict[str, object
             .join(Season, Season.id == ContestWeek.season_id)
             .where(
                 ContestWeek.week_start == week_start,
-                Season.key.like("band-camp-%"),
+                contest_season_clause(),
                 ContestWeek.status == "finalized",
             )
             .order_by(Season.starts_on.desc())

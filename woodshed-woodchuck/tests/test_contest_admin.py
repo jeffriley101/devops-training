@@ -117,7 +117,7 @@ def test_admin_page_requires_valid_token_and_is_not_in_student_navigation(
     board = client.get("/quest").text
     shop = client.get("/store").text
     assert 'href="/contests/admin"' not in board + shop
-    assert "Band Camp Standings" in board
+    assert "Back to School Standings" in board
     assert "The GOAT Tracker" in shop
     assert "Your Permanent Crown" not in shop
 

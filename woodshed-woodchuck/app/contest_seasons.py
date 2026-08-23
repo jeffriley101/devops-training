@@ -11,12 +11,15 @@ from .contests import (
     CENTRAL,
     aware_utc,
     contest_week_schedule,
+    contest_season_clause,
     ensure_contest_definitions,
 )
 from .models import ContestWeek, Season
 
 
-SEASON_KEY_PATTERN = re.compile(r"^band-camp-[a-z0-9][a-z0-9-]*$")
+SEASON_KEY_PATTERN = re.compile(
+    r"^(?:band-camp|back-to-school)-[a-z0-9][a-z0-9-]*$"
+)
 
 
 class SeasonRolloverError(ValueError):
@@ -112,7 +115,9 @@ def rollover_season(
     if blockers:
         raise SeasonRolloverError("Rollover blocked: " + ", ".join(blockers))
     if not SEASON_KEY_PATTERN.fullmatch(next_key):
-        raise SeasonRolloverError("Next season key must use the band-camp-* format.")
+        raise SeasonRolloverError(
+            "Next season key must use the band-camp-* or back-to-school-* format."
+        )
     if next_key == source_key or existing_next is not None:
         raise SeasonRolloverError("Next season key already exists.")
     if not normalized_name:
@@ -174,7 +179,7 @@ def season_status_payload(session: Session, *, now: datetime) -> dict[str, objec
     active = session.scalar(
         select(Season).where(
             Season.status == "active",
-            Season.key.like("band-camp-%"),
+            contest_season_clause(),
         ).order_by(Season.starts_on.desc())
     )
     if active is None:

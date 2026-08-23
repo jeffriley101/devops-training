@@ -81,7 +81,7 @@ def test_book_phase6a_timer_text_structure_and_stone_hooks() -> None:
     content = (ROOT / "app/content.py").read_text(encoding="utf-8")
     css = (ROOT / "static/css/styles.css").read_text(encoding="utf-8")
     definition = "Practice counts whenever you give your instrument real attention—playing it, cleaning it, fingering through music, or thinking about what you want to improve. Thinking-only time counts as half-minutes. We trust you to keep it honest!"
-    assert "Preset email addresses" in book
+    assert "Preset email addresses" not in book
     assert "Do not submit your band director or teacher's email address without talking with them first, please!" in book
     assert "P-Chart sharing contacts" not in book
     assert "Choose one connected" not in book + javascript
@@ -137,7 +137,7 @@ def test_board_trivia_and_visible_copy_refinements() -> None:
     board = (ROOT / "templates/quest.html").read_text(encoding="utf-8")
     javascript = (ROOT / "static/js/app.js").read_text(encoding="utf-8")
     contests_source = (ROOT / "app/contests.py").read_text(encoding="utf-8")
-    assert "Band Camp Bonus" in board and "Band Camp Hours Bonus" not in board
+    assert "Rehearsal / Lesson" in board and "Band Camp Hours Bonus" not in board
     assert '"marching": "marching", "hours": "band-camp-hours"' in contests_source
     assert "Keep getting faster... Then one day we will show you double-tonguing!" not in board + javascript
     assert "serverConfirmedTriviaAttempt !== null" in javascript

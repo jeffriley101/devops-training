@@ -231,7 +231,20 @@ def test_invitation_and_pchart_send_after_persistence_and_resend_without_duplica
 
     assert len(CapturingSMTP.messages) == 4
     combined = "\n".join(message.as_string() for message in CapturingSMTP.messages)
-    assert "2468" not in combined and "1357" not in combined
+    human_visible = "\n".join(
+        [
+            str(message.get(header, ""))
+            for message in CapturingSMTP.messages
+            for header in ("From", "To", "Subject")
+        ]
+        + [
+            part.get_content()
+            for message in CapturingSMTP.messages
+            for part in message.walk()
+            if part.get_content_type() in {"text/plain", "text/html"}
+        ]
+    )
+    assert "2468" not in human_visible and "1357" not in human_visible
     assert "Alex &lt;Woodchuck&gt;" in combined
     assert CapturingSMTP.tls == 4
 

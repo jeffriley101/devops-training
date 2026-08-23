@@ -81,7 +81,7 @@ def test_tuner_is_full_screen_minimal_and_uses_locked_state_colors():
     assert ".tuner-state-flat,\n.tuner-state-sharp" in CSS
     assert ".tuner-state-very-flat,\n.tuner-state-very-sharp" in CSS
     assert "/static/js/tuner.js?v=1" in BASE
-    assert BASE.index("/static/js/tuner.js?v=1") < BASE.index("/static/js/app.js?v=52")
+    assert BASE.index("/static/js/tuner.js?v=1") < BASE.index("/static/js/app.js?v=54")
 
 
 def test_tuner_requests_microphone_smooths_results_and_releases_resources():

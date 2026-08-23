@@ -14,11 +14,12 @@ def _section(start: str, end: str) -> str:
 def test_water_check_preserves_mum_response_then_launches_digital_rain() -> None:
     mum = _section("function wireMum(state)", "function wireMetronome()")
     assert 'data-mum-choice="water"' in HOME
-    assert 'water:\n        "Take a few steady sips.' in mum
+    assert 'water: "Take a few steady sips.' in mum
     response_position = mum.index("messageEl.textContent = response;")
     launch_position = mum.index("launchDigitalRain(button);")
     assert response_position < launch_position
-    assert 'button.dataset.mumChoice === "water"' in mum
+    assert 'const choice = button.dataset.mumChoice;' in mum
+    assert 'if (choice === "water") launchDigitalRain(button);' in mum
 
 
 def test_digital_rain_is_self_contained_and_stoppable() -> None:

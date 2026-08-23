@@ -19,7 +19,7 @@ def shop_markup() -> str:
 def test_shop_is_one_viking_scene_with_balanced_control_columns() -> None:
     markup = shop_markup()
     assert 'class="shop-scene"' in markup
-    assert '/static/img/sax-viking-portrait.png' in markup
+    assert '/static/img/shop new artwork.png' in markup
     assert markup.count("shop-object-column-left") == 1
     assert markup.count("shop-object-column-right") == 1
     assert markup.index("shop-object-column-left") < markup.index("shop-object-column-right")

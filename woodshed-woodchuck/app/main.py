@@ -1,8 +1,10 @@
 import os
 import base64
+from datetime import datetime
 from io import BytesIO
 from pathlib import Path
 from urllib.parse import quote
+from zoneinfo import ZoneInfo
 
 import qrcode
 import qrcode.image.svg
@@ -41,6 +43,7 @@ from .content import (
 )
 from .instruments import instrument_definition_payloads, shed_artwork_url
 from .models import WoodchuckState
+from .board_seasons import board_season_for_date
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -283,6 +286,9 @@ def p_book(request: Request):
 @app.get("/quest")
 def quest(request: Request):
     member_since = None
+    board_season = board_season_for_date(
+        datetime.now(ZoneInfo("America/Chicago")).date()
+    )
     with SessionLocal() as session:
         profile = current_profile(request, session)
         if profile is not None:
@@ -295,6 +301,7 @@ def quest(request: Request):
     return _render(
         request, "quest.html", title="board", active_nav="quest",
         page_class="main-app-page", member_since=member_since,
+        board_season=board_season,
     )
 
 

@@ -5,16 +5,22 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from .models import CampPointAward, PlungePointAward, PracticeChart
+from .models import (
+    CampPointAward,
+    PlungePointAward,
+    PracticeChart,
+    WoodchuckProfile,
+)
 
 
 CENTRAL = ZoneInfo("America/Chicago")
 LEVEL_THRESHOLDS = (0, 250, 750, 1500, 3000, 5000, 8000, 12000, 18000, 25000)
 PLUNGE_DAILY_XP_CAP = 10
+MAX_PLUNGE_BEST_SCORE = 2_147_483_647
 PLUNGE_EVENT_POINTS = {
     "dandelion": 1,
     "carrot": 3,
@@ -25,6 +31,93 @@ PLUNGE_EVENT_POINTS = {
 
 class PlungeEventConflictError(ValueError):
     pass
+
+
+def record_plunge_best_score(
+    session: Session,
+    *,
+    profile_id: int,
+    score: int,
+) -> tuple[int, bool]:
+    if type(score) is not int or not 0 <= score <= MAX_PLUNGE_BEST_SCORE:
+        raise ValueError("A valid Plunge Burrow score is required.")
+
+    result = session.execute(
+        update(WoodchuckProfile)
+        .where(
+            WoodchuckProfile.id == profile_id,
+            WoodchuckProfile.status == "active",
+            WoodchuckProfile.plunge_best_score < score,
+        )
+        .values(plunge_best_score=score)
+    )
+    stored_score = session.scalar(
+        select(WoodchuckProfile.plunge_best_score).where(
+            WoodchuckProfile.id == profile_id,
+            WoodchuckProfile.status == "active",
+        )
+    )
+    if stored_score is None:
+        raise ValueError("The signed-in Woodchuck profile is unavailable.")
+    return int(stored_score), result.rowcount == 1
+
+
+def plunge_best_payload(
+    session: Session,
+    *,
+    profile_id: int,
+) -> dict[str, object]:
+    profiles = session.scalars(
+        select(WoodchuckProfile)
+        .where(
+            WoodchuckProfile.status == "active",
+            WoodchuckProfile.plunge_best_score > 0,
+        )
+        .order_by(
+            WoodchuckProfile.plunge_best_score.desc(),
+            func.lower(WoodchuckProfile.display_name),
+            WoodchuckProfile.display_name,
+            WoodchuckProfile.id,
+        )
+    ).all()
+
+    ranked_rows: list[dict[str, object]] = []
+    previous_score: int | None = None
+    rank = 0
+    for position, profile in enumerate(profiles, start=1):
+        score = int(profile.plunge_best_score)
+        if score != previous_score:
+            rank = position
+            previous_score = score
+        display_name = " ".join(profile.display_name.split()) or "Woodchuck"
+        ranked_rows.append({
+            "rank": rank,
+            "display_name": display_name,
+            "score": score,
+            "is_current_user": profile.id == profile_id,
+        })
+
+    current_score = session.scalar(
+        select(WoodchuckProfile.plunge_best_score).where(
+            WoodchuckProfile.id == profile_id,
+            WoodchuckProfile.status == "active",
+        )
+    )
+    if current_score is None:
+        raise ValueError("The signed-in Woodchuck profile is unavailable.")
+
+    visible_rows = ranked_rows[:5]
+    if not any(row["is_current_user"] for row in visible_rows):
+        current_row = next(
+            (row for row in ranked_rows if row["is_current_user"]),
+            None,
+        )
+        if current_row is not None:
+            visible_rows.append(current_row)
+    return {
+        "best_score": int(current_score),
+        "leaderboard": visible_rows,
+    }
 
 
 def _aware_utc(value: datetime) -> datetime:

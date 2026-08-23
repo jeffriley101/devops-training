@@ -34,6 +34,9 @@ class WoodchuckProfile(Base):
         CheckConstraint(
             "status IN ('active', 'deleted')", name="ck_woodchuck_profile_status"
         ),
+        CheckConstraint(
+            "plunge_best_score >= 0", name="ck_woodchuck_profile_plunge_best_score"
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -70,6 +73,9 @@ class WoodchuckProfile(Base):
     )
     deletion_last_failed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
+    )
+    plunge_best_score: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0", nullable=False
     )
 
     display_name_changed_at: Mapped[datetime | None] = mapped_column(
