@@ -4914,7 +4914,7 @@ select {
 .practice-room-emoji-control:disabled { opacity: 0.58; cursor: not-allowed; }
 
 .practice-tool-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(12rem, 100%), 1fr));
   align-items: stretch;
 }
 
@@ -4940,6 +4940,42 @@ select {
   font-size: 1.8rem;
   text-align: center;
   text-shadow: 0 2px 2px rgba(38, 21, 11, 0.85);
+}
+
+.practice-room-door-tag {
+  position: absolute;
+  top: 0.75rem;
+  left: 50%;
+  min-width: 2.4rem;
+  padding: 0.3rem 0.55rem;
+  transform: translateX(-50%);
+  border: 2px solid #3f281a;
+  border-radius: 0.3rem;
+  color: #3b2618;
+  background: #f7dfa1;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55), 0 2px 3px rgba(38, 21, 11, 0.4);
+  font-size: 0.78rem;
+  font-weight: 950;
+  letter-spacing: 0.04em;
+  line-height: 1.15;
+  text-shadow: none;
+}
+
+.practice-room-door-window {
+  display: grid;
+  width: min(5.25rem, calc(100% - 3.5rem));
+  min-height: 3.4rem;
+  place-items: center;
+  border: 5px solid #4b2d1c;
+  border-radius: 0.25rem;
+  background:
+    linear-gradient(90deg, transparent 47%, rgba(52, 86, 98, 0.34) 48% 52%, transparent 53%),
+    linear-gradient(180deg, #d9f4f5, #8ebbc2);
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 255, 255, 0.42),
+    0 2px 3px rgba(38, 21, 11, 0.5);
+  font-size: 1.65rem;
+  line-height: 1;
 }
 
 .practice-room-door::after {

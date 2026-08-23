@@ -81,15 +81,24 @@ def test_practice_room_destinations_are_preserved_as_three_doors() -> None:
         STORE.index('data-shop-panel-content="practice-room"'):
         STORE.index('data-shop-panel-content="artist"')
     ]
-    assert practice.count("practice-room-door") == 3
+    assert practice.count('class="practice-room-emoji-control practice-room-door"') == 3
     assert 'href="https://brassspectrogram.netlify.app/"' in practice
     assert 'target="_blank" rel="noopener noreferrer"' in practice
     assert "Pristine P-Chart — Coming Soon" in practice
     assert 'href="/arcade" aria-label="Open Arcade Room"' in practice
+    assert practice.count('class="practice-room-door-tag"') == 3
+    assert practice.count('class="practice-room-door-window" aria-hidden="true"') == 3
+    for letter in ("A", "B", "C"):
+        assert f'class="practice-room-door-tag">{letter}</span>' in practice
+    for retired_tag in ("A — Brass", "B — Pristine", "C — Arcade"):
+        assert retired_tag not in practice
     door_css = CSS[CSS.index(".practice-room-door {"):CSS.index("/* Arcade Room")]
     assert "min-height: 12rem" in door_css
     assert "border: 6px solid" in door_css
     assert ".practice-room-door::after" in door_css
+    assert ".practice-room-door-tag" in door_css
+    assert ".practice-room-door-window" in door_css
+    assert "repeat(auto-fit, minmax(min(12rem, 100%), 1fr))" in CSS
 
 
 def test_arcade_room_renders_three_touch_friendly_cabinets() -> None:

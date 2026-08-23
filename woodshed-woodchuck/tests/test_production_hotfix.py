@@ -22,7 +22,7 @@ def test_instrument_assets_are_cache_busted_and_failures_are_visible() -> None:
     home = (ROOT / "templates/home.html").read_text(encoding="utf-8")
     account_js = (ROOT / "static/js/account.js").read_text(encoding="utf-8")
 
-    assert "/static/css/styles.css?v=94" in base
+    assert "/static/css/styles.css?v=95" in base
     assert "/static/manifest.webmanifest?v=4" in base
     assert "/static/js/instruments.js?v=3" in base
     assert "/static/js/app.js?v=62" in base
