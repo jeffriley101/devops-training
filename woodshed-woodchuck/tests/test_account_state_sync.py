@@ -169,13 +169,19 @@ def test_page_initialization_and_server_hydration_do_not_request_state_put() -> 
     assert "stateApi.saveState(next, { sync: false });\n        renderEntries(next);" in javascript
     assert "saveState(restored, { sync: false })" in state_js
     assert 'fetch("/account/state"' not in javascript
-    assert javascript.count('method: "PUT"') == 1
+    assert javascript.count('method: "PUT"') == 2
     placement = javascript[
         javascript.index("async function savePlacement"):
         javascript.index("async function removePlacement")
     ]
     assert 'method: "PUT"' in placement
     assert "/store/inventory/${item.id}/placement" in placement
+    size_preference = javascript[
+        javascript.index("async function savePreferredSize"):
+        javascript.index("function overlapsPlaced")
+    ]
+    assert 'method: "PUT"' in size_preference
+    assert "/store/inventory/${item.id}/size" in size_preference
     assert account_js.count('method: "PUT"') == 2  # missing-state login + sync
     create_flow = account_js[
         account_js.index("function wireCreateAccount"):

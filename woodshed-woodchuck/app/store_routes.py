@@ -19,6 +19,7 @@ from .store_inventory import (
     place_inventory_item,
     purchase_catalog_item,
     remove_inventory_item_placement,
+    update_inventory_item_size,
 )
 
 
@@ -36,7 +37,13 @@ class StorePlacementSubmission(BaseModel):
 
     x: float = Field(ge=0, le=1)
     y: float = Field(ge=0, le=1)
-    size: Literal["small", "medium", "large"] = "medium"
+    size: Literal["small", "medium", "large"] = "small"
+
+
+class StoreSizeSubmission(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    size: Literal["small", "medium", "large"]
 
 
 class MumSnackSubmission(BaseModel):
@@ -102,6 +109,33 @@ def delete_store_item_placement(inventory_id: str, request: Request):
                 session,
                 profile_id=profile.id,
                 inventory_id=inventory_id,
+            )
+            session.commit()
+        except OwnedItemAccessError as error:
+            session.rollback()
+            raise HTTPException(status_code=404, detail=str(error)) from error
+        except Exception:
+            session.rollback()
+            raise
+        return {"item": item}
+
+
+@router.put("/inventory/{inventory_id}/size")
+def update_store_item_size(
+    inventory_id: str,
+    submitted: StoreSizeSubmission,
+    request: Request,
+):
+    with SessionLocal() as session:
+        profile = current_profile(request, session)
+        if profile is None:
+            raise HTTPException(status_code=401, detail="Student sign-in is required.")
+        try:
+            item = update_inventory_item_size(
+                session,
+                profile_id=profile.id,
+                inventory_id=inventory_id,
+                placement_size=submitted.size,
             )
             session.commit()
         except OwnedItemAccessError as error:

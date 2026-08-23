@@ -11,7 +11,10 @@ from app.db import Base
 from app.main import app
 from app.models import OwnedItemCopy, WoodchuckProfile
 from app.security import hash_pin
-from app.store_inventory import DECORATION_HITBOX_NORMALIZED
+from app.store_inventory import (
+    DECORATION_HITBOX_NORMALIZED,
+    PLACEMENT_HITBOX_NORMALIZED,
+)
 
 
 @pytest.fixture()
@@ -88,13 +91,13 @@ def test_owned_unplaced_item_is_listed_with_null_placement(placement_database) -
             "purchase_price": 25,
             "placement_x": None,
             "placement_y": None,
-            "placement_size": "medium",
+            "placement_size": "small",
             "acquired_at": response.json()["items"][0]["acquired_at"],
         }
     ]
 
 
-def test_existing_placed_copy_without_explicit_size_loads_as_medium(
+def test_existing_placed_copy_without_explicit_size_loads_as_small(
     placement_database,
 ) -> None:
     client, profile_id = signed_in_client(placement_database, suffix="LEGACY")
@@ -103,7 +106,7 @@ def test_existing_placed_copy_without_explicit_size_loads_as_medium(
     assert item["id"] == copy_id
     assert item["placement_x"] == 0.35
     assert item["placement_y"] == 0.45
-    assert item["placement_size"] == "medium"
+    assert item["placement_size"] == "small"
 
 
 def test_placing_and_moving_update_the_same_owned_copy(placement_database) -> None:
@@ -143,6 +146,32 @@ def test_discrete_size_persists_across_inventory_reload(
     assert reloaded.json()["items"][0]["placement_size"] == size
     with placement_database() as session:
         assert session.get(OwnedItemCopy, copy_id).placement_size == size
+
+
+def test_unplaced_owned_copy_saves_preferred_size_for_its_next_placement(
+    placement_database,
+) -> None:
+    client, profile_id = signed_in_client(placement_database, suffix="PREFERRED")
+    copy_id = add_copy(placement_database, profile_id)
+
+    preferred = client.put(
+        f"/store/inventory/{copy_id}/size", json={"size": "large"}
+    )
+    assert preferred.status_code == 200
+    assert preferred.json()["item"]["placement_x"] is None
+    assert preferred.json()["item"]["placement_size"] == "large"
+
+    reloaded = client.get("/store/inventory").json()["items"][0]
+    placed = client.put(
+        f"/store/inventory/{copy_id}/placement",
+        json={"x": 0.25, "y": 0.35, "size": reloaded["placement_size"]},
+    )
+    returned = client.delete(f"/store/inventory/{copy_id}/placement")
+
+    assert placed.status_code == returned.status_code == 200
+    assert placed.json()["item"]["placement_size"] == "large"
+    assert returned.json()["item"]["placement_x"] is None
+    assert returned.json()["item"]["placement_size"] == "large"
 
 
 def test_size_change_and_later_move_update_the_same_copy(placement_database) -> None:
@@ -204,7 +233,16 @@ def test_unknown_decoration_size_is_rejected(placement_database) -> None:
     with placement_database() as session:
         owned = session.get(OwnedItemCopy, copy_id)
         assert owned.placement_x is None
-        assert owned.placement_size == "medium"
+        assert owned.placement_size == "small"
+
+
+def test_collision_hitboxes_follow_rendered_decoration_scale() -> None:
+    assert PLACEMENT_HITBOX_NORMALIZED == {
+        "small": 0.10,
+        "medium": 0.19,
+        "large": 0.33,
+    }
+    assert DECORATION_HITBOX_NORMALIZED == PLACEMENT_HITBOX_NORMALIZED["small"]
 
 
 def test_removing_clears_placement_without_deleting_ownership(placement_database) -> None:
@@ -242,7 +280,10 @@ def test_cannot_move_or_remove_another_profiles_copy(placement_database) -> None
         f"/store/inventory/{other_copy_id}/placement", json={"x": 0.6, "y": 0.6}
     )
     removed = client.delete(f"/store/inventory/{other_copy_id}/placement")
-    assert moved.status_code == removed.status_code == 404
+    resized = client.put(
+        f"/store/inventory/{other_copy_id}/size", json={"size": "large"}
+    )
+    assert moved.status_code == removed.status_code == resized.status_code == 404
     with placement_database() as session:
         other = session.get(OwnedItemCopy, other_copy_id)
         assert (other.placement_x, other.placement_y) == (0.3, 0.3)
@@ -297,5 +338,8 @@ def test_placement_endpoints_require_authentication(placement_database) -> None:
     assert client.get("/store/inventory").status_code == 401
     assert client.put(
         f"/store/inventory/{copy_id}/placement", json={"x": 0.2, "y": 0.2}
+    ).status_code == 401
+    assert client.put(
+        f"/store/inventory/{copy_id}/size", json={"size": "medium"}
     ).status_code == 401
     assert client.delete(f"/store/inventory/{copy_id}/placement").status_code == 401

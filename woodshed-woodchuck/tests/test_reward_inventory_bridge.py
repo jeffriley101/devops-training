@@ -122,7 +122,9 @@ def test_crown_placement_and_return_never_change_crown_ownership(bridge_database
     with bridge_database() as session:
         crown = session.get(CrownAward, award_id)
         assert crown is not None and crown.earned_at is not None
-        assert session.scalar(select(func.count()).select_from(RewardInventoryPlacement)) == 0
+        placement = session.scalar(select(RewardInventoryPlacement))
+        assert placement is not None
+        assert placement.placement_x is placement.placement_y is None
 
 
 def test_same_category_crowns_are_independent_inventory_copies(bridge_database) -> None:
@@ -159,22 +161,28 @@ def test_same_category_crowns_are_independent_inventory_copies(bridge_database) 
         assert session.scalar(select(func.count()).select_from(CrownAward)) == 2
         assert session.scalar(
             select(func.count()).select_from(RewardInventoryPlacement)
-        ) == 1
+        ) == 2
         assert session.scalar(select(func.count()).select_from(OwnedItemCopy)) == 0
 
 
 def test_crown_size_persists_without_changing_permanent_ownership(bridge_database) -> None:
     client, profile_id = signed_client(bridge_database, "CROWN-SIZE")
     award_id = earn_crown(bridge_database, profile_id)
+    preferred = client.put(
+        f"/store/inventory/crown:{award_id}/size", json={"size": "large"}
+    )
     placed = client.put(
         f"/store/inventory/crown:{award_id}/placement",
         json={"x": 0.2, "y": 0.3, "size": "large"},
     )
+    returned = client.delete(f"/store/inventory/crown:{award_id}/placement")
     reloaded = client.get("/store/inventory").json()["items"]
     crown = next(item for item in reloaded if item["id"] == f"crown:{award_id}")
 
-    assert placed.status_code == 200
+    assert preferred.status_code == placed.status_code == returned.status_code == 200
+    assert preferred.json()["item"]["placement_x"] is None
     assert crown["placement_size"] == "large"
+    assert crown["placement_x"] is None
     with bridge_database() as session:
         assert session.get(CrownAward, award_id) is not None
 
@@ -208,17 +216,25 @@ def test_trophies_and_goat_rewards_are_independent_permanent_stickers(
         (f"reward:{goat_id}:1", "🐐", "goat"),
     ]
 
+    preferred = client.put(
+        f"/store/inventory/reward:{trophy_id}:1/size",
+        json={"size": "large"},
+    )
+    assert preferred.status_code == 200
+    assert preferred.json()["item"]["placement_x"] is None
+    assert preferred.json()["item"]["placement_size"] == "large"
+
     first = client.put(
         f"/store/inventory/reward:{trophy_id}:1/placement",
-        json={"x": 0.2, "y": 0.3, "size": "small"},
+        json={"x": 0.2, "y": 0.3, "size": "large"},
     )
     second = client.put(
         f"/store/inventory/reward:{trophy_id}:2/placement",
-        json={"x": 0.5, "y": 0.3, "size": "large"},
+        json={"x": 0.6, "y": 0.3, "size": "large"},
     )
     goat_placed = client.put(
         f"/store/inventory/reward:{goat_id}:1/placement",
-        json={"x": 0.8, "y": 0.3, "size": "medium"},
+        json={"x": 0.9, "y": 0.3, "size": "medium"},
     )
     returned = client.delete(
         f"/store/inventory/reward:{trophy_id}:1/placement"
@@ -232,8 +248,14 @@ def test_trophies_and_goat_rewards_are_independent_permanent_stickers(
         assert session.get(RewardGrant, goat_id).amount == 1
         placements = session.scalars(select(RewardInventoryPlacement)).all()
         assert {(row.reward_grant_id, row.reward_ordinal) for row in placements} == {
-            (trophy_id, 2), (goat_id, 1)
+            (trophy_id, 1), (trophy_id, 2), (goat_id, 1)
         }
+        returned_row = next(
+            row for row in placements
+            if (row.reward_grant_id, row.reward_ordinal) == (trophy_id, 1)
+        )
+        assert returned_row.placement_x is returned_row.placement_y is None
+        assert returned_row.placement_size == "large"
         assert session.scalar(select(func.count()).select_from(OwnedItemCopy)) == 0
 
 

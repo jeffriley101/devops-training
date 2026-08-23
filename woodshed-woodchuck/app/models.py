@@ -208,7 +208,7 @@ class OwnedItemCopy(Base):
     placement_x: Mapped[float | None] = mapped_column(Float, nullable=True)
     placement_y: Mapped[float | None] = mapped_column(Float, nullable=True)
     placement_size: Mapped[str] = mapped_column(
-        String(10), default="medium", server_default="medium", nullable=False
+        String(10), default="small", server_default="small", nullable=False
     )
     acquired_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
@@ -271,6 +271,11 @@ class RewardInventoryPlacement(Base):
             name="ck_reward_inventory_placement_ordinal",
         ),
         CheckConstraint(
+            "(placement_x IS NULL AND placement_y IS NULL) OR "
+            "(placement_x IS NOT NULL AND placement_y IS NOT NULL)",
+            name="ck_reward_inventory_placement_pair",
+        ),
+        CheckConstraint(
             "placement_x >= 0 AND placement_x <= 1",
             name="ck_reward_inventory_placement_x",
         ),
@@ -299,10 +304,10 @@ class RewardInventoryPlacement(Base):
         nullable=True,
     )
     reward_ordinal: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    placement_x: Mapped[float] = mapped_column(Float, nullable=False)
-    placement_y: Mapped[float] = mapped_column(Float, nullable=False)
+    placement_x: Mapped[float | None] = mapped_column(Float, nullable=True)
+    placement_y: Mapped[float | None] = mapped_column(Float, nullable=True)
     placement_size: Mapped[str] = mapped_column(
-        String(10), default="medium", server_default="medium", nullable=False
+        String(10), default="small", server_default="small", nullable=False
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False

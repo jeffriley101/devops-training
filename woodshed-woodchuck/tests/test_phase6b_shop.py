@@ -19,7 +19,7 @@ def shop_markup() -> str:
 def test_shop_is_one_viking_scene_with_balanced_control_columns() -> None:
     markup = shop_markup()
     assert 'class="shop-scene"' in markup
-    assert '/static/img/shop new artwork.png' in markup
+    assert '/static/img/shop3.png' in markup
     assert markup.count("shop-object-column-left") == 1
     assert markup.count("shop-object-column-right") == 1
     assert markup.index("shop-object-column-left") < markup.index("shop-object-column-right")
@@ -31,9 +31,9 @@ def test_shop_is_one_viking_scene_with_balanced_control_columns() -> None:
     assert "shop-donate-button" not in markup
 
 
-def test_left_controls_preserve_rewards_crowns_definition_and_share() -> None:
+def test_left_controls_preserve_rewards_and_community_actions() -> None:
     markup = shop_markup()
-    controls = ["🌼", "👑", "🐐", "🗿", "↗"]
+    controls = ["🌼", "👑", "🐐", "📬", "💝"]
     assert [markup.index(item) for item in controls] == sorted(markup.index(item) for item in controls)
     assert 'id="credits-value"' in markup
     assert 'data-shop-panel="crown"' in markup
@@ -46,9 +46,9 @@ def test_left_controls_preserve_rewards_crowns_definition_and_share() -> None:
     assert 'href="{{ public_site_url }}"' in markup
 
 
-def test_right_controls_and_donation_are_unique() -> None:
+def test_right_controls_and_donation_link_are_unique() -> None:
     markup = shop_markup()
-    controls = ["🧢", "🐛", "🚪", "📬", "💝"]
+    controls = ["🧢", "🐛", "↗", "🚪", "🗿"]
     assert [markup.index(item) for item in controls] == sorted(markup.index(item) for item in controls)
     assert "Open Spectrogram" in markup
     assert "Pristine P-Chart — Coming Soon" in markup
@@ -140,10 +140,10 @@ def test_mobile_shop_keeps_both_vertical_columns_over_the_scene() -> None:
     right = markup[
         right_start:markup.index("</div>\n  </div>", right_start)
     ]
-    for control in ("🌼", "👑", "🐐", "🗿", "↗"):
+    for control in ("🌼", "👑", "🐐", "📬", "💝"):
         assert control in left
-    for control in ("🧢", "🐛", "🚪", "📬", "💝"):
+    for control in ("🧢", "🐛", "↗", "🚪", "🗿"):
         assert control in right
     assert 'class="shop-dandelion-count"' in left
-    assert 'aria-label="Shop rewards and sharing"' in markup
-    assert 'aria-label="Shop shelves and rooms"' in markup
+    assert 'aria-label="Shop rewards and community"' in markup
+    assert 'aria-label="Shop shelves, sharing, and rooms"' in markup

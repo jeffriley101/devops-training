@@ -232,7 +232,7 @@ def test_weekly_streak_crown_uses_stickerbook_and_shed_placement(
     crown = next(item for item in inventory if item["item_key"] == "crown:weekly-login-streak")
     assert crown["name"] == "Weekly Streak Crown"
     assert crown["emoji"] == "👑"
-    assert crown["placement_size"] == "medium"
+    assert crown["placement_size"] == "small"
 
     placed = client.put(
         f"/store/inventory/{crown['id']}/placement",
@@ -249,7 +249,10 @@ def test_weekly_streak_crown_uses_stickerbook_and_shed_placement(
         assert session.scalar(select(func.count()).select_from(OwnedItemCopy)) == 0
         assert session.scalar(
             select(func.count()).select_from(RewardInventoryPlacement)
-        ) == 0
+        ) == 1
+        placement = session.scalar(select(RewardInventoryPlacement))
+        assert placement.placement_x is placement.placement_y is None
+        assert placement.placement_size == "large"
 
 
 def test_login_streak_endpoint_requires_authentication() -> None:
