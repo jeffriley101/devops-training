@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="arcade-game" data-arcade-game="{{ arcade_game.key }}" aria-labelledby="arcade-game-title">
+  <header class="arcade-room-header">
+    <div>
+      <h1 id="arcade-game-title">{{ arcade_game.name }}</h1>
+      {% if arcade_game.description %}
+      <p>{{ arcade_game.description }}</p>
+      {% endif %}
+    </div>
+    <a class="btn btn-secondary" href="/arcade">Back to Arcade</a>
+  </header>
+
+  <div class="arcade-game-status" aria-label="Game status">
+    <p>Score <strong id="arcade-game-score">0</strong></p>
+    <p>Best <strong id="arcade-game-best">0</strong></p>
+    <p>Time <strong id="arcade-game-time">30</strong></p>
+  </div>
+
+  {% if arcade_game.key == "blue" %}
+  <div id="blue-game-field" class="blue-game-field" aria-label="Blue game field">
+    <canvas
+      id="blue-game-canvas"
+      class="blue-game-canvas"
+      width="960"
+      height="360"
+      aria-label="Side-view platform game"
+    ></canvas>
+    <div class="blue-game-touch-controls" aria-label="Blue game controls">
+      <button type="button" data-blue-action="left" aria-label="Move left" disabled>◀</button>
+      <button type="button" data-blue-action="jump" aria-label="Jump" disabled>▲</button>
+      <button type="button" data-blue-action="right" aria-label="Move right" disabled>▶</button>
+    </div>
+  </div>
+  {% else %}
+  <div class="radio-game-field" aria-label="Try to find the radio station arcade game">
+    <div class="radio-game-track" aria-hidden="true">
+      <div class="radio-game-target"></div>
+      <div id="radio-game-needle" class="radio-game-needle"></div>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="arcade-game-actions">
+    <button id="arcade-game-start" class="btn btn-primary" type="button">Start 30-Second Game</button>
+    {% if arcade_game.key == "radio-tuner" %}
+    <button id="radio-game-tap" class="btn btn-primary" type="button" disabled>Tap / Tune</button>
+    {% endif %}
+    <p id="arcade-game-message" role="status" aria-live="polite">Ready</p>
+  </div>
+
+  <section class="arcade-game-leaderboard" aria-labelledby="arcade-game-leaderboard-title">
+    <h2 id="arcade-game-leaderboard-title">Top 5</h2>
+    <ol data-arcade-leaderboard="{{ arcade_game.key }}"><li>Loading…</li></ol>
+  </section>
+</section>
+{% endblock %}
+
+{% block page_scripts %}
+<script src="/static/js/arcade.js?v=4"></script>
+{% endblock %}

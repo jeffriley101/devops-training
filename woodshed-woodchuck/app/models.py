@@ -874,6 +874,47 @@ class PlungePointAward(Base):
     )
 
 
+class ArcadeHighScore(Base):
+    __tablename__ = "arcade_high_scores"
+    __table_args__ = (
+        UniqueConstraint(
+            "profile_id",
+            "game_key",
+            name="uq_arcade_high_score_profile_game",
+        ),
+        CheckConstraint(
+            "game_key IN ('blue', 'radio-tuner')",
+            name="ck_arcade_high_score_game_key",
+        ),
+        CheckConstraint(
+            "best_score >= 0",
+            name="ck_arcade_high_score_nonnegative",
+        ),
+        Index(
+            "ix_arcade_high_scores_game_score",
+            "game_key",
+            "best_score",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    profile_id: Mapped[int] = mapped_column(
+        ForeignKey("woodchuck_profiles.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    game_key: Mapped[str] = mapped_column(String(30), nullable=False)
+    best_score: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0", nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+    )
+
+
 class DailyTriviaAttempt(Base):
     __tablename__ = "daily_trivia_attempts"
     __table_args__ = (

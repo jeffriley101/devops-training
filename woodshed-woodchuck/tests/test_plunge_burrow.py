@@ -32,11 +32,17 @@ def test_game_route_navigation_and_page_only_script() -> None:
     response = TestClient(app).get("/plunge-burrow")
     assert response.status_code == 200
     assert "<title>Plunge Burrow · Woodshed Woodchuck</title>" in response.text
-    assert 'href="/quest">Back to BOARD</a>' in response.text
+    assert 'href="/arcade">Back to Arcade</a>' in response.text
     assert 'href="/plunge-burrow"' in BOARD
     assert "/static/js/plunge-burrow.js?v=5" in TEMPLATE
     assert "/static/js/plunge-burrow.js" not in BASE
-    assert '"/plunge-burrow"].includes(path)' in (ROOT / "static/js/app.js").read_text(encoding="utf-8")
+    route_guard = (ROOT / "static/js/app.js").read_text(encoding="utf-8")
+    route_guard = route_guard[
+        route_guard.index("function routeGuard"):
+        route_guard.index("function hydrateHome")
+    ]
+    assert '"/plunge-burrow"' in route_guard
+    assert '"/arcade"' in route_guard
 
 
 def test_page_is_responsive_accessible_and_has_all_controls() -> None:

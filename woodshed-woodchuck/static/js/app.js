@@ -45,6 +45,10 @@
     window.setTimeout(() => burst.remove(), 1400);
   }
 
+  window.addEventListener("woodshed:celebrate", function () {
+    celebrateSuccess(document.body);
+  });
+
   function parseJsonFromId(id, fallback) {
     const el = document.getElementById(id);
     if (!el) return fallback;
@@ -255,7 +259,7 @@
   function routeGuard(state) {
     const path = window.location.pathname;
 
-    if (["/home", "/p-book", "/quest", "/store", "/plunge-burrow"].includes(path) && !hasProfile(state)) {
+    if (["/home", "/p-book", "/quest", "/store", "/plunge-burrow", "/arcade", "/arcade/blue", "/arcade/radio-tuner"].includes(path) && !hasProfile(state)) {
       window.location.replace("/setup");
       return false;
     }

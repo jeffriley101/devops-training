@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="arcade-room" aria-label="Arcade">
+  <header class="arcade-room-header">
+    <a class="btn btn-secondary" href="/store">Back to SHOP</a>
+  </header>
+
+  <div class="arcade-cabinet-grid">
+    <article class="arcade-cabinet arcade-cabinet-plunge">
+      <a class="arcade-cabinet-link" href="/plunge-burrow" aria-label="Play Plunge Burrow">
+        <span class="arcade-cabinet-screen" aria-hidden="true">🕳️</span>
+        <strong>Plunge Burrow</strong>
+        <span>Burrow, collect, and build your band.</span>
+      </a>
+      <section class="arcade-leaderboard" aria-label="Plunge Burrow Top 5">
+        <h2>Top 5</h2>
+        <ol data-arcade-leaderboard="plunge-burrow"><li>Loading…</li></ol>
+      </section>
+    </article>
+
+    <article class="arcade-cabinet arcade-cabinet-blue">
+      <a class="arcade-cabinet-link" href="/arcade/blue" aria-label="Play Blue">
+        <span class="arcade-cabinet-screen" aria-hidden="true">🟦</span>
+        <strong>Blue</strong>
+        <span>Run, jump, and collect blue sparks.</span>
+      </a>
+      <section class="arcade-leaderboard" aria-label="Blue Top 5">
+        <h2>Top 5</h2>
+        <ol data-arcade-leaderboard="blue"><li>Loading…</li></ol>
+      </section>
+    </article>
+
+    <article class="arcade-cabinet arcade-cabinet-radio">
+      <a class="arcade-cabinet-link" href="/arcade/radio-tuner" aria-label="Play Radio Tuner">
+        <span class="arcade-cabinet-screen" aria-hidden="true">📻</span>
+        <strong>Radio Tuner</strong>
+        <span>Find the target signal before time runs out.</span>
+      </a>
+      <section class="arcade-leaderboard" aria-label="Radio Tuner Top 5">
+        <h2>Top 5</h2>
+        <ol data-arcade-leaderboard="radio-tuner"><li>Loading…</li></ol>
+      </section>
+    </article>
+  </div>
+</section>
+{% endblock %}
+
+{% block page_scripts %}
+<script src="/static/js/arcade.js?v=4"></script>
+{% endblock %}

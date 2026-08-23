@@ -218,6 +218,29 @@ def test_inventory_lists_each_copy_and_only_the_signed_in_profile(store_database
     assert profile_id
 
 
+def test_authenticated_store_and_both_shelves_load_with_inventory(
+    store_database,
+) -> None:
+    client, _profile_id = signed_in_client(store_database, credits=100)
+    assert client.post("/store/purchases", json={"item_key": "candle"}).status_code == 201
+
+    page = client.get("/store")
+    catalog = client.get("/store/catalog")
+    inventory = client.get("/store/inventory")
+
+    assert page.status_code == catalog.status_code == inventory.status_code == 200
+    shelves = catalog.json()["shelves"]
+    assert len(shelves["gear"]) == 5
+    assert len(shelves["little_buddy"]) == 4
+    assert {item["item_key"] for item in shelves["gear"]} >= {
+        "candle", "fruit", "ice-cream", "ufo",
+    }
+    assert {item["item_key"] for item in shelves["little_buddy"]} >= {
+        "ladybug", "caterpillar", "snail",
+    }
+    assert [item["item_key"] for item in inventory.json()["items"]] == ["candle"]
+
+
 def test_mum_free_grant_is_idempotent_and_never_deducts_balance(store_database) -> None:
     profile_id = create_student(store_database, credits=12)
     with store_database() as session:

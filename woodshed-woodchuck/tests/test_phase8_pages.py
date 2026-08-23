@@ -51,15 +51,17 @@ def test_board_wording_team_cards_placard_and_plunge_accessibility() -> None:
     assert html.count('class="board-practice-section bonus-challenge-section"') == 1
 
 
-def test_shop_practice_rooms_has_only_two_safe_emoji_choices() -> None:
+def test_shop_practice_rooms_preserve_tools_and_add_arcade_door() -> None:
     html = (ROOT / "templates/store.html").read_text(encoding="utf-8")
     script = (ROOT / "static/js/app.js").read_text(encoding="utf-8")
     assert '"practice-room": "Practice Rooms"' in script
     assert "Take a private lesson using special tools to help develop your Woodchuck's musical skills." in html
     assert 'href="https://brassspectrogram.netlify.app/"' in html
     assert 'target="_blank" rel="noopener noreferrer"' in html
-    assert 'aria-label="Open Spectrogram" title="Brass Practice Tool">🎺</a>' in html
-    assert 'disabled aria-label="Pristine P-Chart — Coming Soon" title="Pristine P-Chart — Coming Soon">🚧</button>' in html
+    assert 'aria-label="Open Spectrogram" title="Brass Practice Tool"' in html
+    assert 'disabled aria-label="Pristine P-Chart — Coming Soon" title="Pristine P-Chart — Coming Soon"' in html
+    assert 'href="/arcade" aria-label="Open Arcade Room"' in html
+    assert html.count("practice-room-door") == 3
     assert "iframe" not in html.casefold() and "microphone" not in html.casefold()
 
 

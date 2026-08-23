@@ -34,8 +34,10 @@ def test_shelves_render_every_server_catalog_item_including_ufo() -> None:
     )
     assert "catalog?.shelves?.gear" in SHOP_WIRING
     assert "catalog?.shelves?.little_buddy" in SHOP_WIRING
-    assert "gear.length !== 4" in SHOP_WIRING
-    assert "littleBuddy.length !== 4" in SHOP_WIRING
+    assert "!Array.isArray(gear) || !gear.length" in SHOP_WIRING
+    assert "!Array.isArray(littleBuddy) || !littleBuddy.length" in SHOP_WIRING
+    assert "gear.length !== 4" not in SHOP_WIRING
+    assert "littleBuddy.length !== 4" not in SHOP_WIRING
     assert "shelfItems[shelfKey].forEach((item)" in SHOP_WIRING
     for field in ("item.emoji", "item.name", "item.price", "item.item_key"):
         assert field in SHOP_WIRING

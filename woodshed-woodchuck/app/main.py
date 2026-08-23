@@ -29,6 +29,7 @@ from .contest_admin import router as contest_admin_router
 from .teams import router as team_router
 from .xp_routes import router as xp_router
 from .store_routes import router as store_router
+from .arcade_routes import router as arcade_router
 from .db import SessionLocal
 from .content import (
     ART_SUBMISSION_EMAIL,
@@ -72,6 +73,7 @@ app.include_router(contest_admin_router)
 app.include_router(team_router)
 app.include_router(xp_router)
 app.include_router(store_router)
+app.include_router(arcade_router)
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
@@ -311,7 +313,53 @@ def plunge_burrow(request: Request):
         request,
         "plunge_burrow.html",
         title="Plunge Burrow",
-        active_nav="quest",
+        active_nav="store",
+    )
+
+
+@app.get("/arcade")
+def arcade(request: Request):
+    return _render(
+        request,
+        "arcade.html",
+        title="Arcade",
+        active_nav="store",
+        page_class="main-app-page arcade-screen",
+    )
+
+
+@app.get("/arcade/blue")
+def arcade_blue(request: Request):
+    return _render(
+        request,
+        "arcade_game.html",
+        title="Blue",
+        active_nav="store",
+        page_class="main-app-page arcade-screen",
+        arcade_game={
+            "key": "blue",
+            "name": "Blue",
+            "description": "",
+        },
+    )
+
+
+@app.get("/arcade/radio-tuner")
+def arcade_radio_tuner(request: Request):
+    return _render(
+        request,
+        "arcade_game.html",
+        title="Radio Tuner",
+        active_nav="store",
+        page_class="main-app-page arcade-screen",
+        arcade_game={
+            "key": "radio-tuner",
+            "name": "Radio Tuner",
+            "description": (
+                "You have 30 seconds to tap the needle when it is in the "
+                "gold zone as many times as you can."
+            ),
+        },
     )
 
 
