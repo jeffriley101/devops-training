@@ -78,6 +78,14 @@ def completion_payload() -> dict[str, object]:
     }
 
 
+def bonus_reward_count(session) -> int:
+    return session.scalar(
+        select(func.count())
+        .select_from(RewardGrant)
+        .where(RewardGrant.source_key.like("bonus-challenge:%"))
+    ) or 0
+
+
 def test_existing_quest_rules_define_both_reward_amounts_and_no_camp_activity() -> None:
     rewards = {
         quest["reward_credits"]
@@ -158,7 +166,7 @@ def test_full_completion_route_persists_reward_once_and_returns_authority(
         with quest_database() as session:
             contests.ensure_band_camp_data(session, now=datetime.now(timezone.utc))
             assert session.scalar(select(func.count()).select_from(QuestCompletion)) == 0
-            assert session.scalar(select(func.count()).select_from(RewardGrant)) == 0
+            assert bonus_reward_count(session) == 0
             assert session.scalar(select(func.count()).select_from(CampPointAward)) == 0
 
         first = client.post("/contests/quest/completions", json=completion_payload())
@@ -168,17 +176,19 @@ def test_full_completion_route_persists_reward_once_and_returns_authority(
         assert payload["reward_created"] is True
         assert payload["camp_point_created"] is True
         assert payload["completion"]["reward_amount"] == 5
-        assert payload["credits"] == 12
+        assert payload["credits"] == 13
         assert payload["camp_points_this_week"] == 2
         assert payload["camp_points_season"] == 2
 
         with quest_database() as session:
             assert session.scalar(select(func.count()).select_from(QuestCompletion)) == 1
-            assert session.scalar(select(func.count()).select_from(RewardGrant)) == 1
+            assert bonus_reward_count(session) == 1
             assert session.scalar(select(func.count()).select_from(CampPointAward)) == 1
             assert session.scalar(select(func.count()).select_from(CrownProgress)) == 0
             completion = session.scalar(select(QuestCompletion))
-            grant = session.scalar(select(RewardGrant))
+            grant = session.scalar(select(RewardGrant).where(
+                RewardGrant.source_key.like("bonus-challenge:%")
+            ))
             state = session.get(WoodchuckState, profile_id)
             assert (completion.quest_id, completion.reward_amount) == ("flute-trill", 5)
             assert (grant.source_key, grant.reward_type, grant.amount) == (
@@ -188,21 +198,21 @@ def test_full_completion_route_persists_reward_once_and_returns_authority(
             assert (award.points_awarded, award.team_id) == (2, None)
             assert state.state_json["daily"]["completed"] is True
             assert state.state_json["daily"]["loggedMinutes"] == 10
-            assert state.state_json["progress"]["credits"] == 12
+            assert state.state_json["progress"]["credits"] == 13
             assert state.state_json["practiceLog"][0]["source"] == "quest"
 
         duplicate = client.post("/contests/quest/completions", json=completion_payload())
         assert duplicate.status_code == 200
         assert duplicate.json()["created"] is False
         assert duplicate.json()["reward_created"] is False
-        assert duplicate.json()["credits"] == 12
+        assert duplicate.json()["credits"] == 13
         with quest_database() as session:
             assert session.scalar(select(func.count()).select_from(QuestCompletion)) == 1
-            assert session.scalar(select(func.count()).select_from(RewardGrant)) == 1
+            assert bonus_reward_count(session) == 1
 
         refreshed = client.get("/account/state").json()
         assert refreshed["state"]["daily"]["completed"] is True
-        assert refreshed["state"]["progress"]["credits"] == 12
+        assert refreshed["state"]["progress"]["credits"] == 13
 
 
 def test_server_grants_nothing_before_configured_threshold(quest_database) -> None:
@@ -215,9 +225,9 @@ def test_server_grants_nothing_before_configured_threshold(quest_database) -> No
         assert response.status_code == 400
         with quest_database() as session:
             assert session.scalar(select(func.count()).select_from(QuestCompletion)) == 0
-            assert session.scalar(select(func.count()).select_from(RewardGrant)) == 0
+            assert bonus_reward_count(session) == 0
             assert session.scalar(select(func.count()).select_from(CampPointAward)) == 0
-            assert session.scalar(select(WoodchuckState)).state_json["progress"]["credits"] == 4
+            assert session.scalar(select(WoodchuckState)).state_json["progress"]["credits"] == 5
 
 
 def test_bonus_progress_endpoint_persists_increment_then_rewards_threshold(
@@ -240,7 +250,7 @@ def test_bonus_progress_endpoint_persists_increment_then_rewards_threshold(
         assert first.json()["camp_points_awarded"] == 2
         with quest_database() as session:
             assert session.scalar(select(func.count()).select_from(QuestCompletion)) == 1
-            assert session.scalar(select(func.count()).select_from(RewardGrant)) == 1
+            assert bonus_reward_count(session) == 1
             assert session.scalar(select(func.count()).select_from(CampPointAward)) == 1
             assert session.scalar(select(func.count()).select_from(PracticeChart)) == 0
         refreshed = client.get("/account/state").json()["state"]
@@ -256,7 +266,7 @@ def test_bonus_progress_endpoint_persists_increment_then_rewards_threshold(
         assert duplicate.json()["camp_points_awarded"] == 0
         with quest_database() as session:
             assert session.scalar(select(func.count()).select_from(QuestCompletion)) == 1
-            assert session.scalar(select(func.count()).select_from(RewardGrant)) == 1
+            assert bonus_reward_count(session) == 1
             assert session.scalar(select(func.count()).select_from(CampPointAward)) == 1
             assert session.scalar(select(func.count()).select_from(PracticeChart)) == 0
             award = session.scalar(select(CampPointAward))
@@ -404,9 +414,9 @@ def test_multiple_tabs_are_idempotent(quest_database) -> None:
         assert sorted(response.json()["created"] for response in responses) == [False, True]
         with quest_database() as session:
             assert session.scalar(select(func.count()).select_from(QuestCompletion)) == 1
-            assert session.scalar(select(func.count()).select_from(RewardGrant)) == 1
+            assert bonus_reward_count(session) == 1
             state = session.scalar(select(WoodchuckState))
-            assert state.state_json["progress"]["credits"] == 5
+            assert state.state_json["progress"]["credits"] == 6
             assert session.scalar(select(func.count()).select_from(CampPointAward)) == 1
 
 
@@ -430,10 +440,10 @@ def test_failed_reward_insert_rolls_back_completion_and_state(quest_database) ->
 
         with quest_database() as session:
             assert session.scalar(select(func.count()).select_from(QuestCompletion)) == 0
-            assert session.scalar(select(func.count()).select_from(RewardGrant)) == 0
+            assert bonus_reward_count(session) == 0
             assert session.scalar(select(func.count()).select_from(CampPointAward)) == 0
             state = session.get(WoodchuckState, profile_id)
-            assert state.state_json["progress"]["credits"] == 3
+            assert state.state_json["progress"]["credits"] == 4
             assert state.state_json.get("daily", {}).get("completed") is not True
 
 

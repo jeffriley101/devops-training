@@ -99,7 +99,7 @@ def test_ufo_purchase_uses_existing_balance_and_duplicate_copy_rules(store_datab
     assert first.status_code == second.status_code == 201
     assert first.json()["item"]["purchase_price"] == 1000
     assert first.json()["item"]["id"] != second.json()["item"]["id"]
-    assert second.json()["dandelion_balance"] == 500
+    assert second.json()["dandelion_balance"] == 501
     assert insufficient.status_code == 409
     with store_database() as session:
         copies = session.scalars(select(OwnedItemCopy).where(
@@ -107,7 +107,7 @@ def test_ufo_purchase_uses_existing_balance_and_duplicate_copy_rules(store_datab
             OwnedItemCopy.item_key == "ufo",
         )).all()
         assert len(copies) == 2
-        assert session.get(WoodchuckState, profile_id).state_json["progress"]["credits"] == 500
+        assert session.get(WoodchuckState, profile_id).state_json["progress"]["credits"] == 501
 
 
 def test_daily_rotation_is_deterministic_and_central_date_owned() -> None:
@@ -133,7 +133,7 @@ def test_purchase_deducts_authoritative_balance_and_creates_one_copy(store_datab
     client, profile_id = signed_in_client(store_database, credits=80)
     response = client.post("/store/purchases", json={"item_key": "candle"})
     assert response.status_code == 201
-    assert response.json()["dandelion_balance"] == 55
+    assert response.json()["dandelion_balance"] == 56
     assert response.json()["item"]["purchase_price"] == 25
     assert response.json()["item"]["placement_x"] is None
     assert response.json()["item"]["placement_y"] is None
@@ -141,8 +141,8 @@ def test_purchase_deducts_authoritative_balance_and_creates_one_copy(store_datab
     with store_database() as session:
         state = session.get(WoodchuckState, profile_id)
         owned = session.scalar(select(OwnedItemCopy))
-        assert state.state_json["progress"]["credits"] == 55
-        assert state.revision == 4
+        assert state.state_json["progress"]["credits"] == 56
+        assert state.revision == 5
         assert owned.item_key == "candle"
         assert owned.acquisition_source == "store"
 
@@ -153,7 +153,7 @@ def test_duplicate_purchases_create_distinct_owned_copy_rows(store_database) -> 
     second = client.post("/store/purchases", json={"item_key": "candle"})
     assert first.status_code == second.status_code == 201
     assert first.json()["item"]["id"] != second.json()["item"]["id"]
-    assert second.json()["dandelion_balance"] == 25
+    assert second.json()["dandelion_balance"] == 26
 
     with store_database() as session:
         copies = session.scalars(select(OwnedItemCopy).where(
@@ -164,7 +164,7 @@ def test_duplicate_purchases_create_distinct_owned_copy_rows(store_database) -> 
 
 
 def test_insufficient_balance_changes_nothing(store_database) -> None:
-    client, profile_id = signed_in_client(store_database, credits=24)
+    client, profile_id = signed_in_client(store_database, credits=23)
     response = client.post("/store/purchases", json={"item_key": "candle"})
     assert response.status_code == 409
     with store_database() as session:
@@ -189,8 +189,8 @@ def test_owned_copy_failure_rolls_back_balance_atomically(store_database) -> Non
 
     with store_database() as session:
         state = session.get(WoodchuckState, profile_id)
-        assert state.state_json["progress"]["credits"] == 80
-        assert state.revision == 3
+        assert state.state_json["progress"]["credits"] == 81
+        assert state.revision == 4
         assert session.scalar(select(func.count()).select_from(OwnedItemCopy)) == 0
 
 

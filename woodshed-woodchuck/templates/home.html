@@ -146,6 +146,21 @@
 
   </div>
 
+  <section id="login-streak-card" class="login-streak-card" aria-labelledby="login-streak-title">
+    <div class="login-streak-summary">
+      <span class="login-streak-icon" aria-hidden="true">🔥</span>
+      <div>
+        <h2 id="login-streak-title">Day <span id="login-streak-days">—</span> Login Streak</h2>
+        <p id="login-streak-status" role="status" aria-live="polite">Checking today’s streak…</p>
+      </div>
+    </div>
+    <div class="login-streak-crown-progress">
+      <span aria-hidden="true">👑</span>
+      <progress id="login-streak-progress" max="7" value="0" aria-label="Progress toward the next weekly streak crown">0 of 7 days</progress>
+      <span id="login-streak-progress-text">0 / 7</span>
+    </div>
+  </section>
+
   <section id="shed-decorate-panel" class="mentor-card shed-decorate-panel hidden" hidden aria-labelledby="shed-stickerbook-title">
     <div class="shed-decorate-panel-head">
       <h2 id="shed-stickerbook-title">Stickerbook</h2>

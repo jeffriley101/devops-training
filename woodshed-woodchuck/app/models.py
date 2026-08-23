@@ -127,6 +127,38 @@ class WoodchuckState(Base):
         nullable=False,
     )
 
+
+class LoginStreak(Base):
+    __tablename__ = "login_streaks"
+    __table_args__ = (
+        CheckConstraint(
+            "current_days >= 0",
+            name="ck_login_streak_current_days",
+        ),
+    )
+
+    profile_id: Mapped[int] = mapped_column(
+        ForeignKey("woodchuck_profiles.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    current_days: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+        server_default="0",
+        nullable=False,
+    )
+    last_login_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        onupdate=utc_now,
+        nullable=False,
+    )
+
+
 class OwnedItemCopy(Base):
     __tablename__ = "owned_item_copies"
     __table_args__ = (

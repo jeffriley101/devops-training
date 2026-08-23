@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{{ title }} · Woodshed Woodchuck</title>
-  <link rel="stylesheet" href="/static/css/styles.css?v=86" />
+  <link rel="stylesheet" href="/static/css/styles.css?v=87" />
 
   <!-- Woodshed app icons -->
   <link
@@ -37,7 +37,7 @@
   />
   <!-- End Woodshed app icons -->
 </head>
-<body{% if page_class %} class="{{ page_class }}"{% endif %}>
+<body{% if page_class %} class="{{ page_class }}"{% endif %} data-authenticated="{{ 'true' if authenticated_profile else 'false' }}">
   <div class="bg-orbs" aria-hidden="true"></div>
   <div class="app-shell">
     <main class="content-wrap">
@@ -75,7 +75,7 @@
   <script src="/static/vendor/tone/Tone.js?v=15.1.22"></script>
   <script src="/static/js/audio.js?v=9"></script>
   <script src="/static/js/tuner.js?v=1"></script>
-  <script src="/static/js/app.js?v=55"></script>
+  <script src="/static/js/app.js?v=56"></script>
   <script src="/static/js/account.js?v=13"></script>
   {% block page_scripts %}{% endblock %}
 </body>

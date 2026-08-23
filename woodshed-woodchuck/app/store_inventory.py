@@ -56,6 +56,7 @@ CROWN_NAMES = {
     "marching": "Marching Crown",
     "band-camp-hours": "Band Camp Hours Crown",
     "team-crown": "Team Crown",
+    "weekly-login-streak": "Weekly Streak Crown",
 }
 PLACEABLE_REWARD_TYPES = {
     "trophy": {"name": "Trophy", "emoji": "🏆"},

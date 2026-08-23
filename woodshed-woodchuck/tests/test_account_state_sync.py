@@ -224,7 +224,7 @@ def test_create_atomically_returns_authoritative_state_and_credentials(
     )
 
     assert result["authenticated"] is True
-    assert result["revision"] == 0
+    assert result["revision"] == 1
     assert result["credentials"] == {
         "woodchuck_id": result["profile"]["woodchuck_id"],
         "pin": "2468",
@@ -236,12 +236,14 @@ def test_create_atomically_returns_authoritative_state_and_credentials(
         "lastSyncedAt": None,
     }
     assert result["state"]["profile"]["woodchuckName"] == "New Chuck"
-    assert result["state"]["progress"]["credits"] == 9
+    assert result["state"]["progress"]["credits"] == 10
+    assert result["login_streak"]["current_streak"] == 1
+    assert result["login_streak"]["dandelions_awarded"] == 1
     with sessions() as session:
         assert len(session.query(WoodchuckProfile).all()) == 1
         assert len(session.query(WoodchuckState).all()) == 1
         saved = session.query(WoodchuckState).one()
-        assert saved.revision == 0
+        assert saved.revision == 1
         assert saved.state_json == result["state"]
 
 

@@ -26,6 +26,7 @@ from .instruments import INSTRUMENTS_BY_LABEL, shed_artwork_url
 from .content import LEVEL_OPTIONS
 from .db import SessionLocal
 from .models import RewardGrant, WoodchuckProfile, WoodchuckState
+from .login_streaks import apply_daily_login
 from .account_deletion import (
     DeletionCredentialsError,
     DeletionRateLimited,
@@ -61,6 +62,20 @@ class DailySecretSubmission(BaseModel):
 
 SECRET_REWARD_TIMEZONE = ZoneInfo("America/Chicago")
 SECRET_REWARD_AMOUNT = 20
+
+
+def _record_login_streak(session: Session, *, profile_id: int) -> dict[str, object]:
+    try:
+        payload = apply_daily_login(session, profile_id=profile_id)
+        session.commit()
+        return payload
+    except IntegrityError:
+        # A simultaneous device may have won the dated grant uniqueness race.
+        # The first transaction is atomic; retrying reads its completed result.
+        session.rollback()
+        payload = apply_daily_login(session, profile_id=profile_id)
+        session.commit()
+        return payload
 
 
 def profile_payload(profile: WoodchuckProfile) -> dict[str, object]:
@@ -173,11 +188,14 @@ def create_account(
                 "createdAt": profile.created_at.isoformat(),
             })
             authoritative_state["profile"] = browser_profile
-            session.add(WoodchuckState(
+            state_row = WoodchuckState(
                 profile_id=profile.id,
                 state_json=authoritative_state,
                 revision=0,
-            ))
+            )
+            session.add(state_row)
+            login_streak = apply_daily_login(session, profile_id=profile.id)
+            authoritative_state = deepcopy(state_row.state_json)
             session.commit()
         except ValueError as exc:
             session.rollback()
@@ -197,7 +215,8 @@ def create_account(
                 "pin": pin,
             },
             "state": authoritative_state,
-            "revision": 0,
+            "revision": state_row.revision,
+            "login_streak": login_streak,
         }
 
 
@@ -220,13 +239,25 @@ def login(
                 detail="Woodchuck ID or PIN was not recognized.",
             )
 
+        login_streak = _record_login_streak(session, profile_id=profile.id)
+
         request.session[SESSION_PROFILE_ID] = profile.id
         request.session[SESSION_PROFILE_VERSION] = profile.session_version
 
         return {
             "authenticated": True,
             "profile": profile_payload(profile),
+            "login_streak": login_streak,
         }
+
+
+@router.post("/login-streak")
+def record_login_streak(request: Request):
+    with SessionLocal() as session:
+        profile = current_profile(request, session)
+        if profile is None:
+            raise HTTPException(status_code=401, detail="Student sign-in is required.")
+        return _record_login_streak(session, profile_id=profile.id)
 
 
 @router.get("/me")

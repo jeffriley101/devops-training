@@ -1023,6 +1023,71 @@
     }
   }
 
+  function wireLoginStreak() {
+    const card = document.getElementById("login-streak-card");
+    const daysEl = document.getElementById("login-streak-days");
+    const statusEl = document.getElementById("login-streak-status");
+    const progressEl = document.getElementById("login-streak-progress");
+    const progressTextEl = document.getElementById("login-streak-progress-text");
+    if (document.body.dataset.authenticated !== "true") return;
+    if (document.documentElement.dataset.loginStreakWired === "true") return;
+    document.documentElement.dataset.loginStreakWired = "true";
+
+    function render(payload) {
+      if (!Number.isInteger(payload.current_streak) || payload.current_streak < 1) {
+        throw new Error("Invalid login streak response");
+      }
+      const interval = Number.isInteger(payload.crown_interval)
+        ? payload.crown_interval
+        : 7;
+      const progress = Number.isInteger(payload.crown_progress)
+        ? Math.max(0, Math.min(interval, payload.crown_progress))
+        : 0;
+      if (card && daysEl && statusEl && progressEl && progressTextEl) {
+        daysEl.textContent = String(payload.current_streak);
+        progressEl.max = interval;
+        progressEl.value = progress;
+        progressEl.textContent = `${progress} of ${interval} days`;
+        progressTextEl.textContent = `${progress} / ${interval}`;
+        progressEl.setAttribute(
+          "aria-label",
+          `${progress} of ${interval} days toward the next weekly streak crown`
+        );
+        statusEl.textContent = payload.crown_awarded
+          ? `+${payload.dandelions_awarded} dandelions today — weekly streak crown earned!`
+          : payload.awarded_today
+            ? `+${payload.dandelions_awarded} dandelions today. ${payload.days_to_next_crown} days to the next crown.`
+            : `${payload.days_to_next_crown} days to the next weekly streak crown.`;
+      }
+
+      const next = stateApi.getState();
+      if (Number.isInteger(payload.dandelion_balance)) {
+        next.progress.credits = payload.dandelion_balance;
+      }
+      if (Number.isInteger(payload.state_revision)) {
+        next.account.serverRevision = payload.state_revision;
+      }
+      stateApi.saveState(next, { sync: false });
+      hydrateHome(next);
+    }
+
+    fetch("/account/login-streak", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { Accept: "application/json" },
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Login streak unavailable");
+        return response.json();
+      })
+      .then(render)
+      .catch(() => {
+        if (statusEl) {
+          statusEl.textContent = "Your streak will update when you’re back online.";
+        }
+      });
+  }
+
   function updateStreak(progress, today) {
     if (progress.lastCompletedDate === today) return;
 
@@ -5186,6 +5251,7 @@
   hydrateHome(state);
   wireXpPanel();
   wireShedDecorations();
+  wireLoginStreak();
   wireShedSecret();
   wireShedTeamBadge();
   if (document.getElementById("woodchuck-name-value")) refreshPracticeStreak();

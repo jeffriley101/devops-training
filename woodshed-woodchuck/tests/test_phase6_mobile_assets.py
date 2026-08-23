@@ -7,7 +7,7 @@ from app.main import app
 
 
 ROOT = Path(__file__).resolve().parents[1]
-STYLESHEET_URL = "/static/css/styles.css?v=86"
+STYLESHEET_URL = "/static/css/styles.css?v=87"
 
 
 def source(path: str) -> str:

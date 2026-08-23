@@ -28,7 +28,11 @@ def test_shared_sound_controls_render_on_main_pages_except_shop() -> None:
     assert '<body class="main-app-page' in shop.text
     assert 'class="sound-effects-controls"' not in shop.text
 
-    assert '<body{% if page_class %} class="{{ page_class }}"{% endif %}>' in BASE
+    assert (
+        '<body{% if page_class %} class="{{ page_class }}"{% endif %} '
+        'data-authenticated="{{ \'true\' if authenticated_profile else \'false\' }}">'
+        in BASE
+    )
     assert '{% if active_nav not in ("home", "store") %}' in BASE
     assert CSS.count(".main-app-page .sound-effects-controls") == 1
     assert ".woodshed-object-column-right > .shed-sound-effects-controls" in CSS
