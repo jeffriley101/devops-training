@@ -4121,7 +4121,7 @@
         const inventory = inventoryResponse.ok ? await inventoryResponse.json() : { items: [] };
         const gear = catalog?.shelves?.gear;
         const littleBuddy = catalog?.shelves?.little_buddy;
-        if (!Array.isArray(gear) || gear.length !== 4 || !Array.isArray(littleBuddy) || littleBuddy.length !== 4) {
+        if (!Array.isArray(gear) || !gear.length || !Array.isArray(littleBuddy) || !littleBuddy.length) {
           throw new Error("The SHOP catalog is unavailable right now.");
         }
         shelfItems.gear = gear;
