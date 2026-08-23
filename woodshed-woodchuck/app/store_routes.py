@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -34,6 +36,7 @@ class StorePlacementSubmission(BaseModel):
 
     x: float = Field(ge=0, le=1)
     y: float = Field(ge=0, le=1)
+    size: Literal["small", "medium", "large"] = "medium"
 
 
 class MumSnackSubmission(BaseModel):
@@ -73,6 +76,7 @@ def update_store_item_placement(
                 inventory_id=inventory_id,
                 placement_x=submitted.x,
                 placement_y=submitted.y,
+                placement_size=submitted.size,
             )
             session.commit()
         except OwnedItemAccessError as error:

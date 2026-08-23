@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from .models import (
     CrownAward,
     OwnedItemCopy,
+    RewardGrant,
     RewardInventoryPlacement,
     WoodchuckProfile,
     WoodchuckState,
@@ -39,7 +40,13 @@ class DecorationCollisionError(ValueError):
     pass
 
 
-DECORATION_HITBOX_NORMALIZED = 0.10
+PLACEMENT_SIZES = ("small", "medium", "large")
+PLACEMENT_HITBOX_NORMALIZED = {
+    "small": 0.075,
+    "medium": 0.10,
+    "large": 0.14,
+}
+DECORATION_HITBOX_NORMALIZED = PLACEMENT_HITBOX_NORMALIZED["medium"]
 CROWN_EMOJI = "👑"
 CROWN_NAMES = {
     "weekly-points-leaders": "Practice Crown",
@@ -49,6 +56,10 @@ CROWN_NAMES = {
     "marching": "Marching Crown",
     "band-camp-hours": "Band Camp Hours Crown",
     "team-crown": "Team Crown",
+}
+PLACEABLE_REWARD_TYPES = {
+    "trophy": {"name": "Trophy", "emoji": "🏆"},
+    "goat": {"name": "GOAT Reward", "emoji": "🐐"},
 }
 
 
@@ -73,6 +84,25 @@ def crown_award_id_from_inventory_key(inventory_key: str) -> int | None:
     except ValueError:
         return None
     return award_id if award_id > 0 else None
+
+
+def reward_inventory_key(grant_id: int, ordinal: int) -> str:
+    return f"reward:{grant_id}:{ordinal}"
+
+
+def reward_identity_from_inventory_key(
+    inventory_key: str,
+) -> tuple[int, int] | None:
+    parts = inventory_key.split(":")
+    if len(parts) != 3 or parts[0] != "reward":
+        return None
+    try:
+        grant_id, ordinal = int(parts[1]), int(parts[2])
+    except ValueError:
+        return None
+    if grant_id <= 0 or ordinal <= 0:
+        return None
+    return grant_id, ordinal
 
 
 def crown_name(category_key: str) -> str:
@@ -100,6 +130,7 @@ def owned_item_payload(item: OwnedItemCopy) -> dict[str, object]:
         "purchase_price": item.purchase_price,
         "placement_x": item.placement_x,
         "placement_y": item.placement_y,
+        "placement_size": item.placement_size or "medium",
         "acquired_at": item.acquired_at.isoformat(),
     }
 
@@ -126,7 +157,29 @@ def crown_inventory_payload(
         "purchase_price": None,
         "placement_x": placement.placement_x if placement else None,
         "placement_y": placement.placement_y if placement else None,
+        "placement_size": placement.placement_size if placement else "medium",
         "acquired_at": award.earned_at.isoformat(),
+    }
+
+
+def earned_reward_inventory_payload(
+    grant: RewardGrant,
+    ordinal: int,
+    placement: RewardInventoryPlacement | None,
+) -> dict[str, object]:
+    definition = PLACEABLE_REWARD_TYPES[grant.reward_type]
+    return {
+        "id": reward_inventory_key(grant.id, ordinal),
+        "item_key": f"reward:{grant.reward_type}",
+        "name": definition["name"],
+        "emoji": definition["emoji"],
+        "shelf": "earned",
+        "acquisition_source": grant.reward_type,
+        "purchase_price": None,
+        "placement_x": placement.placement_x if placement else None,
+        "placement_y": placement.placement_y if placement else None,
+        "placement_size": placement.placement_size if placement else "medium",
+        "acquired_at": grant.created_at.isoformat(),
     }
 
 
@@ -140,7 +193,7 @@ def list_inventory_payloads(session: Session, *, profile_id: int) -> list[dict[s
         .where(CrownAward.profile_id == profile_id)
         .order_by(CrownAward.earned_at.asc(), CrownAward.id.asc())
     ).all())
-    placements = {
+    crown_placements = {
         placement.crown_award_id: placement
         for placement in session.scalars(
             select(RewardInventoryPlacement).where(
@@ -149,10 +202,37 @@ def list_inventory_payloads(session: Session, *, profile_id: int) -> list[dict[s
         ).all()
     }
     crown_payloads = [
-        crown_inventory_payload(award, placements.get(award.id))
+        crown_inventory_payload(award, crown_placements.get(award.id))
         for award in earned_crowns
     ]
-    return [*owned_payloads, *crown_payloads]
+    earned_rewards = list(session.scalars(
+        select(RewardGrant)
+        .where(
+            RewardGrant.profile_id == profile_id,
+            RewardGrant.reward_type.in_(tuple(PLACEABLE_REWARD_TYPES)),
+            RewardGrant.amount > 0,
+        )
+        .order_by(RewardGrant.created_at.asc(), RewardGrant.id.asc())
+    ).all())
+    reward_placements = {
+        (placement.reward_grant_id, placement.reward_ordinal): placement
+        for placement in session.scalars(
+            select(RewardInventoryPlacement).where(
+                RewardInventoryPlacement.profile_id == profile_id,
+                RewardInventoryPlacement.reward_grant_id.is_not(None),
+            )
+        ).all()
+    }
+    reward_payloads = [
+        earned_reward_inventory_payload(
+            grant,
+            ordinal,
+            reward_placements.get((grant.id, ordinal)),
+        )
+        for grant in earned_rewards
+        for ordinal in range(1, grant.amount + 1)
+    ]
+    return [*owned_payloads, *crown_payloads, *reward_payloads]
 
 
 def _normalized_coordinate(value: float) -> float:
@@ -160,6 +240,30 @@ def _normalized_coordinate(value: float) -> float:
     if not math.isfinite(coordinate) or coordinate < 0 or coordinate > 1:
         raise ValueError("Decoration coordinates must be between 0 and 1.")
     return coordinate
+
+
+def _normalized_size(value: str) -> str:
+    if value not in PLACEMENT_SIZES:
+        raise ValueError("Decoration size must be small, medium, or large.")
+    return value
+
+
+def _placements_overlap(
+    x: float,
+    y: float,
+    size: str,
+    other_x: float,
+    other_y: float,
+    other_size: str,
+) -> bool:
+    collision_distance = (
+        PLACEMENT_HITBOX_NORMALIZED[_normalized_size(size)]
+        + PLACEMENT_HITBOX_NORMALIZED[_normalized_size(other_size)]
+    ) / 2
+    return (
+        abs(other_x - x) < collision_distance
+        and abs(other_y - y) < collision_distance
+    )
 
 
 def _lock_placement_profile(session: Session, *, profile_id: int) -> None:
@@ -179,9 +283,11 @@ def place_owned_item_copy(
     owned_item_id: int,
     placement_x: float,
     placement_y: float,
+    placement_size: str = "medium",
 ) -> OwnedItemCopy:
     x = _normalized_coordinate(placement_x)
     y = _normalized_coordinate(placement_y)
+    size = _normalized_size(placement_size)
     _lock_placement_profile(session, profile_id=profile_id)
     owned = session.scalar(
         select(OwnedItemCopy)
@@ -205,9 +311,13 @@ def place_owned_item_copy(
         .with_for_update()
     ).all()
     for other in placed_items:
-        if (
-            abs(float(other.placement_x) - x) < DECORATION_HITBOX_NORMALIZED
-            and abs(float(other.placement_y) - y) < DECORATION_HITBOX_NORMALIZED
+        if _placements_overlap(
+            x,
+            y,
+            size,
+            float(other.placement_x),
+            float(other.placement_y),
+            other.placement_size or "medium",
         ):
             raise DecorationCollisionError(
                 "That spot overlaps another decoration. Choose another spot."
@@ -218,9 +328,13 @@ def place_owned_item_copy(
         .with_for_update()
     ).all()
     for other in reward_placements:
-        if (
-            abs(float(other.placement_x) - x) < DECORATION_HITBOX_NORMALIZED
-            and abs(float(other.placement_y) - y) < DECORATION_HITBOX_NORMALIZED
+        if _placements_overlap(
+            x,
+            y,
+            size,
+            float(other.placement_x),
+            float(other.placement_y),
+            other.placement_size or "medium",
         ):
             raise DecorationCollisionError(
                 "That spot overlaps another decoration. Choose another spot."
@@ -228,6 +342,7 @@ def place_owned_item_copy(
 
     owned.placement_x = x
     owned.placement_y = y
+    owned.placement_size = size
     session.flush()
     return owned
 
@@ -280,8 +395,9 @@ def _placement_collides(
     profile_id: int,
     x: float,
     y: float,
+    size: str,
     ignored_owned_item_id: int | None = None,
-    ignored_crown_award_id: int | None = None,
+    ignored_placement_id: int | None = None,
 ) -> bool:
     owned = session.scalars(
         select(OwnedItemCopy)
@@ -295,9 +411,13 @@ def _placement_collides(
     for other in owned:
         if other.id == ignored_owned_item_id:
             continue
-        if (
-            abs(float(other.placement_x) - x) < DECORATION_HITBOX_NORMALIZED
-            and abs(float(other.placement_y) - y) < DECORATION_HITBOX_NORMALIZED
+        if _placements_overlap(
+            x,
+            y,
+            size,
+            float(other.placement_x),
+            float(other.placement_y),
+            other.placement_size or "medium",
         ):
             return True
     rewards = session.scalars(
@@ -306,11 +426,15 @@ def _placement_collides(
         .with_for_update()
     ).all()
     for other in rewards:
-        if other.crown_award_id == ignored_crown_award_id:
+        if other.id == ignored_placement_id:
             continue
-        if (
-            abs(float(other.placement_x) - x) < DECORATION_HITBOX_NORMALIZED
-            and abs(float(other.placement_y) - y) < DECORATION_HITBOX_NORMALIZED
+        if _placements_overlap(
+            x,
+            y,
+            size,
+            float(other.placement_x),
+            float(other.placement_y),
+            other.placement_size or "medium",
         ):
             return True
     return False
@@ -323,39 +447,44 @@ def place_crown_inventory_item(
     inventory_key: str,
     placement_x: float,
     placement_y: float,
+    placement_size: str = "medium",
 ) -> dict[str, object]:
     x = _normalized_coordinate(placement_x)
     y = _normalized_coordinate(placement_y)
+    size = _normalized_size(placement_size)
     _lock_placement_profile(session, profile_id=profile_id)
     award = _earned_crown_for_key(
         session, profile_id=profile_id, inventory_key=inventory_key
+    )
+    placement = session.scalar(
+        select(RewardInventoryPlacement)
+        .where(RewardInventoryPlacement.crown_award_id == award.id)
+        .with_for_update()
     )
     if _placement_collides(
         session,
         profile_id=profile_id,
         x=x,
         y=y,
-        ignored_crown_award_id=award.id,
+        size=size,
+        ignored_placement_id=placement.id if placement else None,
     ):
         raise DecorationCollisionError(
             "That spot overlaps another decoration. Choose another spot."
         )
-    placement = session.scalar(
-        select(RewardInventoryPlacement)
-        .where(RewardInventoryPlacement.crown_award_id == award.id)
-        .with_for_update()
-    )
     if placement is None:
         placement = RewardInventoryPlacement(
             profile_id=profile_id,
             crown_award_id=award.id,
             placement_x=x,
             placement_y=y,
+            placement_size=size,
         )
         session.add(placement)
     else:
         placement.placement_x = x
         placement.placement_y = y
+        placement.placement_size = size
     session.flush()
     return crown_inventory_payload(award, placement)
 
@@ -378,6 +507,108 @@ def remove_crown_inventory_placement(
     return crown_inventory_payload(award, None)
 
 
+def _earned_reward_for_key(
+    session: Session,
+    *,
+    profile_id: int,
+    inventory_key: str,
+) -> tuple[RewardGrant, int]:
+    identity = reward_identity_from_inventory_key(inventory_key)
+    if identity is None:
+        raise OwnedItemAccessError("That reward is unavailable.")
+    grant_id, ordinal = identity
+    grant = session.scalar(
+        select(RewardGrant)
+        .where(
+            RewardGrant.id == grant_id,
+            RewardGrant.profile_id == profile_id,
+            RewardGrant.reward_type.in_(tuple(PLACEABLE_REWARD_TYPES)),
+        )
+        .with_for_update()
+    )
+    if grant is None or ordinal > grant.amount:
+        raise OwnedItemAccessError("That reward is unavailable.")
+    return grant, ordinal
+
+
+def place_earned_reward_inventory_item(
+    session: Session,
+    *,
+    profile_id: int,
+    inventory_key: str,
+    placement_x: float,
+    placement_y: float,
+    placement_size: str = "medium",
+) -> dict[str, object]:
+    x = _normalized_coordinate(placement_x)
+    y = _normalized_coordinate(placement_y)
+    size = _normalized_size(placement_size)
+    _lock_placement_profile(session, profile_id=profile_id)
+    grant, ordinal = _earned_reward_for_key(
+        session, profile_id=profile_id, inventory_key=inventory_key
+    )
+    placement = session.scalar(
+        select(RewardInventoryPlacement)
+        .where(
+            RewardInventoryPlacement.reward_grant_id == grant.id,
+            RewardInventoryPlacement.reward_ordinal == ordinal,
+        )
+        .with_for_update()
+    )
+    if _placement_collides(
+        session,
+        profile_id=profile_id,
+        x=x,
+        y=y,
+        size=size,
+        ignored_placement_id=placement.id if placement else None,
+    ):
+        raise DecorationCollisionError(
+            "That spot overlaps another decoration. Choose another spot."
+        )
+    if placement is None:
+        placement = RewardInventoryPlacement(
+            profile_id=profile_id,
+            crown_award_id=None,
+            reward_grant_id=grant.id,
+            reward_ordinal=ordinal,
+            placement_x=x,
+            placement_y=y,
+            placement_size=size,
+        )
+        session.add(placement)
+    else:
+        placement.placement_x = x
+        placement.placement_y = y
+        placement.placement_size = size
+    session.flush()
+    return earned_reward_inventory_payload(grant, ordinal, placement)
+
+
+def remove_earned_reward_inventory_placement(
+    session: Session,
+    *,
+    profile_id: int,
+    inventory_key: str,
+) -> dict[str, object]:
+    _lock_placement_profile(session, profile_id=profile_id)
+    grant, ordinal = _earned_reward_for_key(
+        session, profile_id=profile_id, inventory_key=inventory_key
+    )
+    placement = session.scalar(
+        select(RewardInventoryPlacement)
+        .where(
+            RewardInventoryPlacement.reward_grant_id == grant.id,
+            RewardInventoryPlacement.reward_ordinal == ordinal,
+        )
+        .with_for_update()
+    )
+    if placement is not None:
+        session.delete(placement)
+        session.flush()
+    return earned_reward_inventory_payload(grant, ordinal, None)
+
+
 def place_inventory_item(
     session: Session,
     *,
@@ -385,6 +616,7 @@ def place_inventory_item(
     inventory_id: str,
     placement_x: float,
     placement_y: float,
+    placement_size: str = "medium",
 ) -> dict[str, object]:
     crown_award_id = crown_award_id_from_inventory_key(inventory_id)
     if crown_award_id is not None:
@@ -394,6 +626,16 @@ def place_inventory_item(
             inventory_key=inventory_id,
             placement_x=placement_x,
             placement_y=placement_y,
+            placement_size=placement_size,
+        )
+    if reward_identity_from_inventory_key(inventory_id) is not None:
+        return place_earned_reward_inventory_item(
+            session,
+            profile_id=profile_id,
+            inventory_key=inventory_id,
+            placement_x=placement_x,
+            placement_y=placement_y,
+            placement_size=placement_size,
         )
     try:
         owned_item_id = int(inventory_id)
@@ -405,6 +647,7 @@ def place_inventory_item(
         owned_item_id=owned_item_id,
         placement_x=placement_x,
         placement_y=placement_y,
+        placement_size=placement_size,
     ))
 
 
@@ -413,6 +656,10 @@ def remove_inventory_item_placement(
 ) -> dict[str, object]:
     if crown_award_id_from_inventory_key(inventory_id) is not None:
         return remove_crown_inventory_placement(
+            session, profile_id=profile_id, inventory_key=inventory_id
+        )
+    if reward_identity_from_inventory_key(inventory_id) is not None:
+        return remove_earned_reward_inventory_placement(
             session, profile_id=profile_id, inventory_key=inventory_id
         )
     try:

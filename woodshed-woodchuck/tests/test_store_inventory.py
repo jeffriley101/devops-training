@@ -80,10 +80,34 @@ def test_catalog_has_locked_shelves_items_and_prices() -> None:
         ("caterpillar", "🐛", 50),
         ("snail", "🐌", 75),
     ]
-    assert len(gear) == len(buddies) == 4
+    assert len(gear) == 5
+    assert len(buddies) == 4
+    assert (gear[3]["item_key"], gear[3]["emoji"], gear[3]["price"]) == (
+        "ufo", "🛸", 1000
+    )
     assert gear[-1]["rotating"] is True and gear[-1]["price"] == 100
     assert buddies[-1]["rotating"] is True and buddies[-1]["price"] == 100
     assert not any("instrument" in item.name.casefold() for item in ALL_ITEMS.values())
+
+
+def test_ufo_purchase_uses_existing_balance_and_duplicate_copy_rules(store_database) -> None:
+    client, profile_id = signed_in_client(store_database, credits=2500)
+    first = client.post("/store/purchases", json={"item_key": "ufo"})
+    second = client.post("/store/purchases", json={"item_key": "ufo"})
+    insufficient = client.post("/store/purchases", json={"item_key": "ufo"})
+
+    assert first.status_code == second.status_code == 201
+    assert first.json()["item"]["purchase_price"] == 1000
+    assert first.json()["item"]["id"] != second.json()["item"]["id"]
+    assert second.json()["dandelion_balance"] == 500
+    assert insufficient.status_code == 409
+    with store_database() as session:
+        copies = session.scalars(select(OwnedItemCopy).where(
+            OwnedItemCopy.profile_id == profile_id,
+            OwnedItemCopy.item_key == "ufo",
+        )).all()
+        assert len(copies) == 2
+        assert session.get(WoodchuckState, profile_id).state_json["progress"]["credits"] == 500
 
 
 def test_daily_rotation_is_deterministic_and_central_date_owned() -> None:

@@ -16,6 +16,7 @@ from app.models import (
     CrownAward,
     CrownProgress,
     OwnedItemCopy,
+    RewardGrant,
     RewardInventoryPlacement,
     WoodchuckProfile,
     WoodchuckState,
@@ -160,6 +161,100 @@ def test_same_category_crowns_are_independent_inventory_copies(bridge_database) 
             select(func.count()).select_from(RewardInventoryPlacement)
         ) == 1
         assert session.scalar(select(func.count()).select_from(OwnedItemCopy)) == 0
+
+
+def test_crown_size_persists_without_changing_permanent_ownership(bridge_database) -> None:
+    client, profile_id = signed_client(bridge_database, "CROWN-SIZE")
+    award_id = earn_crown(bridge_database, profile_id)
+    placed = client.put(
+        f"/store/inventory/crown:{award_id}/placement",
+        json={"x": 0.2, "y": 0.3, "size": "large"},
+    )
+    reloaded = client.get("/store/inventory").json()["items"]
+    crown = next(item for item in reloaded if item["id"] == f"crown:{award_id}")
+
+    assert placed.status_code == 200
+    assert crown["placement_size"] == "large"
+    with bridge_database() as session:
+        assert session.get(CrownAward, award_id) is not None
+
+
+def test_trophies_and_goat_rewards_are_independent_permanent_stickers(
+    bridge_database,
+) -> None:
+    client, profile_id = signed_client(bridge_database, "PERMANENT")
+    with bridge_database() as session:
+        trophy = RewardGrant(
+            profile_id=profile_id,
+            source_key="test:trophies",
+            reward_type="trophy",
+            amount=2,
+        )
+        goat = RewardGrant(
+            profile_id=profile_id,
+            source_key="test:goat",
+            reward_type="goat",
+            amount=1,
+        )
+        session.add_all([trophy, goat])
+        session.commit()
+        trophy_id, goat_id = trophy.id, goat.id
+
+    inventory = client.get("/store/inventory").json()["items"]
+    rewards = [item for item in inventory if item["id"].startswith("reward:")]
+    assert [(item["id"], item["emoji"], item["acquisition_source"]) for item in rewards] == [
+        (f"reward:{trophy_id}:1", "🏆", "trophy"),
+        (f"reward:{trophy_id}:2", "🏆", "trophy"),
+        (f"reward:{goat_id}:1", "🐐", "goat"),
+    ]
+
+    first = client.put(
+        f"/store/inventory/reward:{trophy_id}:1/placement",
+        json={"x": 0.2, "y": 0.3, "size": "small"},
+    )
+    second = client.put(
+        f"/store/inventory/reward:{trophy_id}:2/placement",
+        json={"x": 0.5, "y": 0.3, "size": "large"},
+    )
+    goat_placed = client.put(
+        f"/store/inventory/reward:{goat_id}:1/placement",
+        json={"x": 0.8, "y": 0.3, "size": "medium"},
+    )
+    returned = client.delete(
+        f"/store/inventory/reward:{trophy_id}:1/placement"
+    )
+
+    assert first.status_code == second.status_code == goat_placed.status_code == 200
+    assert returned.status_code == 200
+    assert second.json()["item"]["placement_size"] == "large"
+    with bridge_database() as session:
+        assert session.get(RewardGrant, trophy_id).amount == 2
+        assert session.get(RewardGrant, goat_id).amount == 1
+        placements = session.scalars(select(RewardInventoryPlacement)).all()
+        assert {(row.reward_grant_id, row.reward_ordinal) for row in placements} == {
+            (trophy_id, 2), (goat_id, 1)
+        }
+        assert session.scalar(select(func.count()).select_from(OwnedItemCopy)) == 0
+
+
+def test_another_profile_cannot_place_a_permanent_reward(bridge_database) -> None:
+    _owner, profile_id = signed_client(bridge_database, "REWARD-OWNER")
+    with bridge_database() as session:
+        grant = RewardGrant(
+            profile_id=profile_id,
+            source_key="test:private-trophy",
+            reward_type="trophy",
+            amount=1,
+        )
+        session.add(grant)
+        session.commit()
+        grant_id = grant.id
+    other, _ = signed_client(bridge_database, "REWARD-OTHER")
+    response = other.put(
+        f"/store/inventory/reward:{grant_id}:1/placement",
+        json={"x": 0.4, "y": 0.4, "size": "medium"},
+    )
+    assert response.status_code == 404
 
 
 def test_crown_and_owned_copy_share_collision_protection(bridge_database) -> None:

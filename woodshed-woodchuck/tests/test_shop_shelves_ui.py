@@ -22,11 +22,16 @@ def test_hat_and_buddy_open_the_two_catalog_shelves() -> None:
     assert "coming soon" not in (hat + buddy).casefold()
 
 
-def test_each_shelf_renders_exactly_four_server_catalog_items() -> None:
+def test_shelves_render_every_server_catalog_item_including_ufo() -> None:
     response = TestClient(app).get("/store/catalog")
     assert response.status_code == 200
     shelves = response.json()["shelves"]
-    assert len(shelves["gear"]) == len(shelves["little_buddy"]) == 4
+    assert len(shelves["gear"]) == 5
+    assert len(shelves["little_buddy"]) == 4
+    assert any(
+        item["item_key"] == "ufo" and item["price"] == 1000
+        for item in shelves["gear"]
+    )
     assert "catalog?.shelves?.gear" in SHOP_WIRING
     assert "catalog?.shelves?.little_buddy" in SHOP_WIRING
     assert "gear.length !== 4" in SHOP_WIRING

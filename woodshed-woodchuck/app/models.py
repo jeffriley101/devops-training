@@ -157,6 +157,10 @@ class OwnedItemCopy(Base):
             "placement_y IS NULL OR (placement_y >= 0 AND placement_y <= 1)",
             name="ck_owned_item_copy_placement_y",
         ),
+        CheckConstraint(
+            "placement_size IN ('small', 'medium', 'large')",
+            name="ck_owned_item_copy_placement_size",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -171,6 +175,9 @@ class OwnedItemCopy(Base):
     purchase_price: Mapped[int | None] = mapped_column(Integer, nullable=True)
     placement_x: Mapped[float | None] = mapped_column(Float, nullable=True)
     placement_y: Mapped[float | None] = mapped_column(Float, nullable=True)
+    placement_size: Mapped[str] = mapped_column(
+        String(10), default="medium", server_default="medium", nullable=False
+    )
     acquired_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
     )
@@ -215,6 +222,22 @@ class RewardInventoryPlacement(Base):
             "crown_award_id",
             name="uq_reward_inventory_placement_crown_award",
         ),
+        UniqueConstraint(
+            "reward_grant_id",
+            "reward_ordinal",
+            name="uq_reward_inventory_placement_grant_ordinal",
+        ),
+        CheckConstraint(
+            "(crown_award_id IS NOT NULL AND reward_grant_id IS NULL "
+            "AND reward_ordinal IS NULL) OR "
+            "(crown_award_id IS NULL AND reward_grant_id IS NOT NULL "
+            "AND reward_ordinal IS NOT NULL)",
+            name="ck_reward_inventory_placement_source",
+        ),
+        CheckConstraint(
+            "reward_ordinal IS NULL OR reward_ordinal > 0",
+            name="ck_reward_inventory_placement_ordinal",
+        ),
         CheckConstraint(
             "placement_x >= 0 AND placement_x <= 1",
             name="ck_reward_inventory_placement_x",
@@ -222,6 +245,10 @@ class RewardInventoryPlacement(Base):
         CheckConstraint(
             "placement_y >= 0 AND placement_y <= 1",
             name="ck_reward_inventory_placement_y",
+        ),
+        CheckConstraint(
+            "placement_size IN ('small', 'medium', 'large')",
+            name="ck_reward_inventory_placement_size",
         ),
     )
 
@@ -231,12 +258,20 @@ class RewardInventoryPlacement(Base):
         nullable=False,
         index=True,
     )
-    crown_award_id: Mapped[int] = mapped_column(
+    crown_award_id: Mapped[int | None] = mapped_column(
         ForeignKey("crown_awards.id", ondelete="CASCADE"),
-        nullable=False,
+        nullable=True,
     )
+    reward_grant_id: Mapped[int | None] = mapped_column(
+        ForeignKey("reward_grants.id", ondelete="CASCADE"),
+        nullable=True,
+    )
+    reward_ordinal: Mapped[int | None] = mapped_column(Integer, nullable=True)
     placement_x: Mapped[float] = mapped_column(Float, nullable=False)
     placement_y: Mapped[float] = mapped_column(Float, nullable=False)
+    placement_size: Mapped[str] = mapped_column(
+        String(10), default="medium", server_default="medium", nullable=False
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
     )

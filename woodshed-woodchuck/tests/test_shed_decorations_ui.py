@@ -24,25 +24,27 @@ def test_decorate_mode_has_a_dedicated_scene_layer_and_inventory_panel() -> None
     decorate_button = right_column[decorate:decorate_end]
     assert chair < decorate
     assert 'class="room-object shed-decorate-button"' in decorate_button
-    assert 'aria-label="Decorate the SHED"' in decorate_button
+    assert 'aria-label="Open Stickerbook"' in decorate_button
     assert '<span class="room-object-icon" aria-hidden="true">🎨</span>' in decorate_button
     assert "<span>Decorate</span>" not in decorate_button
     assert "Return to Inventory" in DECORATIONS
     panel = HOME[HOME.index('id="shed-decorate-panel"'):HOME.index('id="xp-panel"')]
-    assert "Owned Items" not in panel
-    assert ">Decorate the SHED<" not in panel
+    assert 'id="shed-stickerbook-title">Stickerbook</h2>' in panel
     assert "Tap an inventory item" not in panel
     assert panel.count("<h3>") == 2
-    assert ">Inventory<" in panel and ">In the SHED<" in panel
+    assert ">Available Stickers<" in panel and ">In the SHED<" in panel
     assert 'id="shed-decorate-close"' in panel
     assert 'id="shed-decoration-feedback" class="sr-only"' in panel
 
 
-def test_inventory_rows_show_only_emoji_and_required_action() -> None:
+def test_stickerbook_cards_show_identity_source_size_and_required_actions() -> None:
     rows = DECORATIONS[DECORATIONS.index("function makeInventoryRow"):DECORATIONS.index("function renderInventory")]
-    assert 'document.createElement("strong")' not in rows
-    assert "identity.append(emoji)" in rows
+    assert "identity.append(emoji, details)" in rows
     assert 'emoji.setAttribute("role", "img")' in rows
+    assert 'document.createElement("strong")' in rows
+    assert 'source.textContent = {' in rows
+    assert 'sizeButton.dataset.decorationSize = size' in rows
+    assert 'sizeButton.setAttribute("aria-pressed"' in rows
     assert 'button.setAttribute("aria-label", `${actionLabel} ${itemLabel(item)}`)' in rows
     assert '"Place"' in DECORATIONS
     assert '"Return to Inventory"' in DECORATIONS
@@ -64,8 +66,8 @@ def test_owned_inventory_and_placed_items_render_from_server_copies() -> None:
 def test_tapping_inventory_places_and_dragging_moves_normalized_coordinates() -> None:
     assert "data-decoration-action" in DECORATIONS
     assert "placeFromInventory(item)" in DECORATIONS
-    assert "nextOpenPlacement()" in DECORATIONS
-    assert "body: JSON.stringify({ x, y })" in DECORATIONS
+    assert "nextOpenPlacement(item)" in DECORATIONS
+    assert "body: JSON.stringify({ x, y, size })" in DECORATIONS
     assert "method: \"PUT\"" in DECORATIONS
     assert "left / maxLeft" in DECORATIONS
     assert "top / maxTop" in DECORATIONS
@@ -85,7 +87,7 @@ def test_collision_uses_only_other_owned_decorations_and_restores_on_rejection()
     collision = DECORATIONS[DECORATIONS.index("function overlapsPlaced"):DECORATIONS.index("function nextOpenPlacement")]
     assert "ownedItems.some" in collision
     assert "itemId(item) !== String(ignoredId)" in collision
-    assert "Math.abs(item.placement_x - x) < COLLISION_SIZE" in collision
+    assert "COLLISION_SIZES[size] + COLLISION_SIZES[itemSize(item)]" in collision
     assert "room-object" not in collision
     save = DECORATIONS[DECORATIONS.index("async function savePlacement"):DECORATIONS.index("async function removePlacement")]
     assert "updateOwnedItem(payload.item)" in save
@@ -105,6 +107,26 @@ def test_normal_mode_is_visual_only_and_decorate_mode_enables_dragging() -> None
     assert "pointer-events: none" in decoration
     assert "pointer-events: auto" in active
     assert "touch-action: none" in active
+
+
+def test_stickerbook_grid_and_size_controls_are_phone_safe() -> None:
+    assert ".shed-decoration-inventory {" in CSS
+    assert "repeat(auto-fill, minmax(9.5rem, 1fr))" in CSS
+    assert ".shed-decoration-size-controls" in CSS
+    assert "grid-template-columns: repeat(3, minmax(44px, 1fr))" in CSS
+    assert "min-height: 44px" in CSS
+    mobile = CSS[CSS.rindex("@media (max-width: 640px)"):]
+    assert "grid-template-columns: repeat(2, minmax(0, 1fr))" in mobile
+    for size in ("small", "medium", "large"):
+        assert f".shed-decoration-size-{size}" in CSS
+
+
+def test_mobile_artwork_zoom_and_decoration_layer_share_scene_geometry() -> None:
+    mobile = CSS[CSS.rindex("@media (max-width: 640px)"):]
+    assert "background-size: auto 92%" in mobile
+    assert ".shed-decoration-layer" in mobile
+    assert "inset: 4% 0" in mobile
+    assert "window.addEventListener(\"resize\", renderPlacedDecorations)" in DECORATIONS
 
 
 def test_decoration_size_and_phone_layout_are_safe() -> None:

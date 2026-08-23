@@ -511,7 +511,8 @@
     if (control.dataset.decorateWired === "true") return;
     control.dataset.decorateWired = "true";
 
-    const COLLISION_SIZE = 0.10;
+    const PLACEMENT_SIZES = ["small", "medium", "large"];
+    const COLLISION_SIZES = {small: 0.075, medium: 0.10, large: 0.14};
     const placementRequests = new Set();
     const itemId = (item) => String(item.id);
     let ownedItems = [];
@@ -520,6 +521,12 @@
 
     function isPlaced(item) {
       return Number.isFinite(item.placement_x) && Number.isFinite(item.placement_y);
+    }
+
+    function itemSize(item) {
+      return PLACEMENT_SIZES.includes(item.placement_size)
+        ? item.placement_size
+        : "medium";
     }
 
     function itemLabel(item) {
@@ -544,7 +551,7 @@
       layer.replaceChildren();
       ownedItems.filter(isPlaced).forEach((item) => {
         const decoration = document.createElement(decorateMode ? "button" : "span");
-        decoration.className = "shed-decoration";
+        decoration.className = `shed-decoration shed-decoration-size-${itemSize(item)}`;
         if (decorateMode) decoration.type = "button";
         else decoration.setAttribute("role", "img");
         decoration.dataset.ownedCopyId = String(item.id);
@@ -573,7 +580,41 @@
       emoji.setAttribute("role", "img");
       emoji.setAttribute("aria-label", itemLabel(item));
       emoji.textContent = item.emoji;
-      identity.append(emoji);
+      const details = document.createElement("span");
+      details.className = "shed-decoration-inventory-details";
+      const name = document.createElement("strong");
+      name.textContent = itemLabel(item);
+      const source = document.createElement("small");
+      source.textContent = {
+        store: "Purchased",
+        mum: "Snack",
+        crown: "Earned crown",
+        trophy: "Earned trophy",
+        goat: "Earned GOAT reward",
+      }[item.acquisition_source] || "Owned reward";
+      details.append(name, source);
+      identity.append(emoji, details);
+      const controls = document.createElement("div");
+      controls.className = "shed-decoration-card-controls";
+      if (isPlaced(item)) {
+        const sizeGroup = document.createElement("div");
+        sizeGroup.className = "shed-decoration-size-controls";
+        sizeGroup.setAttribute("role", "group");
+        sizeGroup.setAttribute("aria-label", `Size for ${itemLabel(item)}`);
+        PLACEMENT_SIZES.forEach((size) => {
+          const sizeButton = document.createElement("button");
+          sizeButton.type = "button";
+          sizeButton.className = "shed-decoration-size-button";
+          sizeButton.dataset.decorationSize = size;
+          sizeButton.dataset.ownedCopyId = String(item.id);
+          sizeButton.textContent = size.charAt(0).toUpperCase();
+          sizeButton.title = `${size.charAt(0).toUpperCase()}${size.slice(1)}`;
+          sizeButton.setAttribute("aria-pressed", String(itemSize(item) === size));
+          sizeButton.disabled = placementRequests.has(itemId(item));
+          sizeGroup.append(sizeButton);
+        });
+        controls.append(sizeGroup);
+      }
       const button = document.createElement("button");
       button.className = "btn btn-secondary shed-decoration-action";
       button.type = "button";
@@ -582,7 +623,8 @@
       button.textContent = placementRequests.has(itemId(item)) ? "Saving…" : actionLabel;
       button.setAttribute("aria-label", `${actionLabel} ${itemLabel(item)}`);
       button.disabled = placementRequests.has(itemId(item));
-      row.append(identity, button);
+      controls.append(button);
+      row.append(identity, controls);
       return row;
     }
 
@@ -613,7 +655,7 @@
       return payload;
     }
 
-    async function savePlacement(item, x, y) {
+    async function savePlacement(item, x, y, size = itemSize(item)) {
       if (placementRequests.has(itemId(item))) return false;
       placementRequests.add(itemId(item));
       renderInventory();
@@ -622,7 +664,7 @@
           method: "PUT",
           credentials: "same-origin",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ x, y }),
+          body: JSON.stringify({ x, y, size }),
         });
         const payload = await responsePayload(response, "That decoration could not be placed.");
         updateOwnedItem(payload.item);
@@ -655,27 +697,29 @@
       }
     }
 
-    function overlapsPlaced(x, y, ignoredId = null) {
+    function overlapsPlaced(x, y, ignoredId = null, size = "medium") {
       return ownedItems.some((item) => (
         itemId(item) !== String(ignoredId)
         && isPlaced(item)
-        && Math.abs(item.placement_x - x) < COLLISION_SIZE
-        && Math.abs(item.placement_y - y) < COLLISION_SIZE
+        && Math.abs(item.placement_x - x) <
+          ((COLLISION_SIZES[size] + COLLISION_SIZES[itemSize(item)]) / 2)
+        && Math.abs(item.placement_y - y) <
+          ((COLLISION_SIZES[size] + COLLISION_SIZES[itemSize(item)]) / 2)
       ));
     }
 
-    function nextOpenPlacement() {
+    function nextOpenPlacement(item) {
       const positions = [0.28, 0.42, 0.56, 0.70];
       for (const y of positions) {
         for (const x of positions) {
-          if (!overlapsPlaced(x, y)) return { x, y };
+          if (!overlapsPlaced(x, y, null, itemSize(item))) return { x, y };
         }
       }
       return null;
     }
 
     async function placeFromInventory(item) {
-      const position = nextOpenPlacement();
+      const position = nextOpenPlacement(item);
       if (!position) {
         setFeedback("The middle of the SHED is full. Move or return a decoration first.", true);
         return;
@@ -726,11 +770,20 @@
     });
     closeButton.addEventListener("click", closeDecorateMode);
     panel.addEventListener("click", function (event) {
-      const button = event.target.closest("[data-decoration-action]");
+      const button = event.target.closest(
+        "[data-decoration-action], [data-decoration-size]"
+      );
       if (!button) return;
       const ownedCopyId = button.dataset.ownedCopyId;
       const item = ownedItems.find((candidate) => itemId(candidate) === ownedCopyId);
       if (!item) return;
+      if (button.dataset.decorationSize && isPlaced(item)) {
+        const size = button.dataset.decorationSize;
+        if (size !== itemSize(item)) {
+          void savePlacement(item, item.placement_x, item.placement_y, size);
+        }
+        return;
+      }
       if (button.dataset.decorationAction === "place") void placeFromInventory(item);
       if (button.dataset.decorationAction === "remove") void removePlacement(item);
     });

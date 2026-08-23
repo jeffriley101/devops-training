@@ -88,9 +88,22 @@ def test_owned_unplaced_item_is_listed_with_null_placement(placement_database) -
             "purchase_price": 25,
             "placement_x": None,
             "placement_y": None,
+            "placement_size": "medium",
             "acquired_at": response.json()["items"][0]["acquired_at"],
         }
     ]
+
+
+def test_existing_placed_copy_without_explicit_size_loads_as_medium(
+    placement_database,
+) -> None:
+    client, profile_id = signed_in_client(placement_database, suffix="LEGACY")
+    copy_id = add_copy(placement_database, profile_id, x=0.35, y=0.45)
+    item = client.get("/store/inventory").json()["items"][0]
+    assert item["id"] == copy_id
+    assert item["placement_x"] == 0.35
+    assert item["placement_y"] == 0.45
+    assert item["placement_size"] == "medium"
 
 
 def test_placing_and_moving_update_the_same_owned_copy(placement_database) -> None:
@@ -110,6 +123,88 @@ def test_placing_and_moving_update_the_same_owned_copy(placement_database) -> No
         assert session.scalar(select(func.count()).select_from(OwnedItemCopy)) == 1
         owned = session.get(OwnedItemCopy, copy_id)
         assert (owned.placement_x, owned.placement_y) == (0.65, 0.75)
+
+
+@pytest.mark.parametrize("size", ["small", "medium", "large"])
+def test_discrete_size_persists_across_inventory_reload(
+    placement_database, size: str
+) -> None:
+    client, profile_id = signed_in_client(placement_database, suffix=size.upper())
+    copy_id = add_copy(placement_database, profile_id)
+
+    placed = client.put(
+        f"/store/inventory/{copy_id}/placement",
+        json={"x": 0.25, "y": 0.35, "size": size},
+    )
+    reloaded = client.get("/store/inventory")
+
+    assert placed.status_code == reloaded.status_code == 200
+    assert placed.json()["item"]["placement_size"] == size
+    assert reloaded.json()["items"][0]["placement_size"] == size
+    with placement_database() as session:
+        assert session.get(OwnedItemCopy, copy_id).placement_size == size
+
+
+def test_size_change_and_later_move_update_the_same_copy(placement_database) -> None:
+    client, profile_id = signed_in_client(placement_database, suffix="RESIZE")
+    copy_id = add_copy(placement_database, profile_id)
+    assert client.put(
+        f"/store/inventory/{copy_id}/placement",
+        json={"x": 0.2, "y": 0.3, "size": "medium"},
+    ).status_code == 200
+
+    resized = client.put(
+        f"/store/inventory/{copy_id}/placement",
+        json={"x": 0.2, "y": 0.3, "size": "large"},
+    )
+    moved = client.put(
+        f"/store/inventory/{copy_id}/placement",
+        json={"x": 0.7, "y": 0.8, "size": "large"},
+    )
+
+    assert resized.status_code == moved.status_code == 200
+    assert moved.json()["item"]["placement_size"] == "large"
+    with placement_database() as session:
+        owned = session.get(OwnedItemCopy, copy_id)
+        assert (owned.placement_x, owned.placement_y, owned.placement_size) == (
+            0.7, 0.8, "large"
+        )
+
+
+def test_size_is_available_in_a_separate_signed_in_session(placement_database) -> None:
+    first_device, profile_id = signed_in_client(
+        placement_database, suffix="CROSSDEVICE"
+    )
+    copy_id = add_copy(placement_database, profile_id)
+    assert first_device.put(
+        f"/store/inventory/{copy_id}/placement",
+        json={"x": 0.3, "y": 0.4, "size": "small"},
+    ).status_code == 200
+
+    second_device = TestClient(app)
+    login = second_device.post(
+        "/account/login",
+        data={"woodchuck_id": "WC-PLACE-CROSSDEVICE", "pin": "2468"},
+    )
+    assert login.status_code == 200
+    item = second_device.get("/store/inventory").json()["items"][0]
+    assert (item["placement_x"], item["placement_y"], item["placement_size"]) == (
+        0.3, 0.4, "small"
+    )
+
+
+def test_unknown_decoration_size_is_rejected(placement_database) -> None:
+    client, profile_id = signed_in_client(placement_database, suffix="BADSIZE")
+    copy_id = add_copy(placement_database, profile_id)
+    response = client.put(
+        f"/store/inventory/{copy_id}/placement",
+        json={"x": 0.2, "y": 0.3, "size": "giant"},
+    )
+    assert response.status_code == 422
+    with placement_database() as session:
+        owned = session.get(OwnedItemCopy, copy_id)
+        assert owned.placement_x is None
+        assert owned.placement_size == "medium"
 
 
 def test_removing_clears_placement_without_deleting_ownership(placement_database) -> None:

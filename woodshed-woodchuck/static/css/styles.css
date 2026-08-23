@@ -5488,3 +5488,168 @@ select {
   .board-account-identity { align-items: flex-start; }
   .authenticated-access-controls { bottom: calc(8.05rem + env(safe-area-inset-bottom)); }
 }
+
+/* SHED Stickerbook and discrete decoration sizes */
+.shed-decorate-panel {
+  width: min(58rem, calc(100vw - 1.5rem));
+  max-width: 58rem;
+}
+
+.shed-decorate-panel-head {
+  align-items: center;
+  justify-content: space-between;
+}
+
+.shed-decorate-panel-head h2,
+.shed-decorate-panel > h3 {
+  margin: 0.3rem 0;
+  text-align: left;
+}
+
+.shed-decoration-inventory {
+  grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+}
+
+.shed-decoration-placed-list {
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+}
+
+.shed-decoration-inventory-item,
+.shed-decoration-placed-list .shed-decoration-inventory-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: space-between;
+  justify-items: stretch;
+  min-width: 0;
+  min-height: 10rem;
+  padding: 0.75rem;
+}
+
+.shed-decoration-inventory-identity,
+.shed-decoration-placed-list .shed-decoration-inventory-identity {
+  display: grid;
+  grid-template-columns: 3rem minmax(0, 1fr);
+  align-items: center;
+  justify-content: start;
+  width: 100%;
+  min-width: 0;
+}
+
+.shed-decoration-inventory-emoji {
+  font-size: 2.25rem;
+  line-height: 1;
+}
+
+.shed-decoration-inventory-details {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.shed-decoration-inventory-details strong,
+.shed-decoration-inventory-details small {
+  overflow-wrap: anywhere;
+}
+
+.shed-decoration-inventory-details small {
+  color: #6e5638;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.shed-decoration-card-controls {
+  display: grid;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.shed-decoration-card-controls .shed-decoration-action {
+  width: 100%;
+  min-width: 0;
+  justify-self: stretch;
+  white-space: normal;
+}
+
+.shed-decoration-size-controls {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(44px, 1fr));
+  gap: 0.3rem;
+}
+
+.shed-decoration-size-button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0.25rem;
+  border: 1px solid #8b6728;
+  border-radius: 0.5rem;
+  color: #3d2b16;
+  background: #fff8e8;
+  font-weight: 1000;
+}
+
+.shed-decoration-size-button[aria-pressed="true"] {
+  color: #fff8e8;
+  background: #76502d;
+  box-shadow: inset 0 0 0 2px #f4d35e;
+}
+
+.shed-decoration-size-small {
+  width: clamp(1.25rem, 2.65vw, 1.7rem);
+  height: clamp(1.25rem, 2.65vw, 1.7rem);
+  font-size: clamp(1.05rem, 2.25vw, 1.5rem);
+}
+
+.shed-decoration-size-medium {
+  width: clamp(1.65rem, 3.5vw, 2.25rem);
+  height: clamp(1.65rem, 3.5vw, 2.25rem);
+  font-size: clamp(1.45rem, 3vw, 2rem);
+}
+
+.shed-decoration-size-large {
+  width: clamp(2.2rem, 4.75vw, 3rem);
+  height: clamp(2.2rem, 4.75vw, 3rem);
+  font-size: clamp(1.95rem, 4.1vw, 2.7rem);
+}
+
+@media (max-width: 640px) {
+  .woodshed-scene {
+    background-size: auto 92%;
+    background-position: center;
+    background-color: #9a7047;
+  }
+
+  .shed-decoration-layer {
+    inset: 4% 0;
+  }
+
+  .shed-decoration-inventory {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .shed-decoration-placed-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .shed-decoration-inventory-item,
+  .shed-decoration-placed-list .shed-decoration-inventory-item {
+    min-height: 9.5rem;
+  }
+
+  .shed-decoration-size-small {
+    width: 1.3rem;
+    height: 1.3rem;
+    font-size: 1.1rem;
+  }
+
+  .shed-decoration-size-medium {
+    width: 1.7rem;
+    height: 1.7rem;
+    font-size: 1.5rem;
+  }
+
+  .shed-decoration-size-large {
+    width: 2.3rem;
+    height: 2.3rem;
+    font-size: 2.05rem;
+  }
+}

@@ -25,6 +25,7 @@ GEAR_FIXED = (
     CatalogItem("candle", "Candle", "🕯️", 25, "gear"),
     CatalogItem("fruit", "Fruit", "🍎", 50, "gear"),
     CatalogItem("ice-cream", "Ice Cream", "🍦", 75, "gear"),
+    CatalogItem("ufo", "UFO", "🛸", 1000, "gear"),
 )
 GEAR_ROTATION = (
     CatalogItem("camp-lantern", "Camp Lantern", "🏮", 100, "gear", True),
