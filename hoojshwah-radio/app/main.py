@@ -19,15 +19,11 @@ templates = Jinja2Templates(directory="app/templates")
 
 BOTTLES_PATH = Path(os.environ.get("BOTTLES_PATH", "data/bottles.json"))
 REACTIONS_PATH = Path(os.environ.get("REACTIONS_PATH", "data/reactions.json"))
-GAME_SCORES_PATH = Path(os.environ.get("GAME_SCORES_PATH", "data/game_scores.json"))
 ALLOWED_BOTTLE_STYLES = {"green", "brown", "clear", "fancy", "jug", "can", "water-bottle", "energy-drink", "cigarette", "mushroom", "cola-two-liter", "coffee-mug",
     "skinny-can",
     "cigar",
     "egg-salad-sandwich",}
 ALLOWED_REACTIONS = {"🔥", "🍺", "❤️", "🕺", "👽", "🎷", "😎"}
-ALLOWED_GAMES = {"signal"}
-MAX_SIGNAL_GAME_SCORE = 50000
-MAX_STORED_GAME_SCORES = 250
 
 
 class BottleCreate(BaseModel):
@@ -38,12 +34,6 @@ class BottleCreate(BaseModel):
 class ReactionCreate(BaseModel):
     track_id: str = Field(min_length=1, max_length=80)
     emoji: str = Field(min_length=1, max_length=4)
-
-
-class GameScoreCreate(BaseModel):
-    initials: str = Field(min_length=1, max_length=3)
-    score: int = Field(ge=0, le=MAX_SIGNAL_GAME_SCORE)
-    game_name: str = Field(default="signal", min_length=1, max_length=40)
 
 
 def load_bottles():
@@ -84,37 +74,6 @@ def save_reactions(reactions):
     with REACTIONS_PATH.open("w", encoding="utf-8") as file:
         json.dump(reactions, file, indent=2, ensure_ascii=False)
         file.write("\n")
-
-
-def load_game_scores():
-    if not GAME_SCORES_PATH.exists():
-        return []
-
-    with GAME_SCORES_PATH.open("r", encoding="utf-8") as file:
-        return json.load(file)
-
-
-def save_game_scores(scores):
-    GAME_SCORES_PATH.parent.mkdir(parents=True, exist_ok=True)
-
-    with GAME_SCORES_PATH.open("w", encoding="utf-8") as file:
-        json.dump(scores, file, indent=2)
-        file.write("\n")
-
-
-def clean_initials(initials):
-    return "".join(character for character in initials.strip().upper() if character.isalpha())[:3]
-
-
-def make_score_stamp():
-    return datetime.now(timezone.utc).isoformat()
-
-
-def sorted_game_scores(scores, game_name="signal", limit=10):
-    return sorted(
-        [score for score in scores if score.get("game_name") == game_name],
-        key=lambda score: (-int(score.get("score", 0)), score.get("created_at", "")),
-    )[:limit]
 
 
 @app.get("/")
@@ -215,50 +174,4 @@ def create_reaction(reaction: ReactionCreate):
         "emoji": emoji,
         "count": track_reactions[emoji],
         "reactions": track_reactions,
-    }
-
-
-@app.get("/api/game-scores")
-def game_scores(game_name: str = "signal"):
-    game_name = game_name.strip().lower()
-
-    if game_name not in ALLOWED_GAMES:
-        raise HTTPException(status_code=400, detail="Invalid game")
-
-    return {
-        "scores": sorted_game_scores(load_game_scores(), game_name=game_name)
-    }
-
-
-@app.post("/api/game-scores")
-def create_game_score(game_score: GameScoreCreate):
-    game_name = game_score.game_name.strip().lower()
-    initials = clean_initials(game_score.initials)
-    score_value = int(game_score.score)
-
-    if game_name not in ALLOWED_GAMES:
-        raise HTTPException(status_code=400, detail="Invalid game")
-
-    if len(initials) != 3:
-        raise HTTPException(status_code=400, detail="Initials must be exactly 3 letters")
-
-    if score_value < 0 or score_value > MAX_SIGNAL_GAME_SCORE:
-        raise HTTPException(status_code=400, detail="Invalid score")
-
-    scores = load_game_scores()
-    new_score = {
-        "id": str(uuid4()),
-        "game_name": game_name,
-        "initials": initials,
-        "score": score_value,
-        "created_at": make_score_stamp(),
-    }
-
-    scores.append(new_score)
-    scores = sorted_game_scores(scores, game_name=game_name, limit=MAX_STORED_GAME_SCORES)
-    save_game_scores(scores)
-
-    return {
-        "score": new_score,
-        "scores": sorted_game_scores(scores, game_name=game_name),
     }

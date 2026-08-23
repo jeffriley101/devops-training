@@ -12,7 +12,6 @@
   <link rel="icon" href="/static/icons/hoojshwah-icon-192.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/static/icons/apple-touch-icon-180.png">
   <link rel="stylesheet" href="/static/css/styles.css?v=khjw-android-bar-fix-1">
-  <link rel="stylesheet" href="/static/css/arcade.css?v=phase4c-ticker-reverted-1">
 </head>
 <body>
   <main class="radio-shell">
@@ -190,76 +189,6 @@
         </div>
       </section>
 
-      <button id="arcade-time-secret-trigger" class="arcade-time-secret-trigger" type="button" aria-label="Arcade time boost">
-        ⁂
-      </button>
-
-      <div id="arcade-time-secret-dialog" class="arcade-time-secret-dialog" hidden>
-        <form id="arcade-time-secret-form" class="arcade-time-secret-form">
-          <input
-            id="arcade-time-secret-pass"
-            class="arcade-time-secret-pass"
-            type="password"
-            autocomplete="off"
-            spellcheck="false"
-            placeholder="signal"
-          >
-        </form>
-      </div>
-
-      <section id="khjw-arcade" class="arcade-card">
-        <p class="label">KHJW Arcade Game</p>
-        <h2>Try to find the radio station!</h2>
-        <p class="arcade-copy">
-          You have 30 seconds to tap the needle when it is in the gold zone as many times as you can.
-          <br>
-          Type your initials and click Save Score to be remembered as a Top Signal Tuner!
-          <br>
-          Current known world record: <strong>LAR with an astonishing 4,127 points!</strong>
-        </p>
-
-        <div class="arcade-machine" aria-label="Try to find the radio station arcade game">
-          <div class="arcade-scoreboard">
-            <span>Score: <strong id="arcade-score">0</strong></span>
-            <span>Time: <strong id="arcade-time">30</strong></span>
-          </div>
-
-          <div class="arcade-track" aria-hidden="true">
-            <div class="arcade-target"></div>
-            <div id="arcade-needle" class="arcade-needle"></div>
-          </div>
-
-          <p id="arcade-status" class="arcade-status"></p>
-
-          <div class="arcade-buttons">
-            <button id="arcade-start" type="button">Start Game</button>
-            <button id="arcade-tap" type="button" disabled>Tap / Tune</button>
-          </div>
-
-          <form id="arcade-form" class="arcade-form" hidden>
-            <label>
-              Initials
-              <input
-                id="arcade-initials"
-                type="text"
-                maxlength="3"
-                autocomplete="off"
-                spellcheck="false"
-                placeholder="AAA"
-              >
-            </label>
-            <button type="submit">Save Score</button>
-          </form>
-        </div>
-
-        <div class="arcade-leaderboard">
-          <p class="label">Top Signal Tuners</p>
-          <ol id="arcade-scores" class="arcade-scores">
-            <li>Loading arcade board...</li>
-          </ol>
-        </div>
-      </section>
-
       <section class="station-qr-card" aria-labelledby="station-qr-heading">
         <p class="label">Share the Signal</p>
         <h2 id="station-qr-heading">Scan / share KHJW</h2>
@@ -331,6 +260,5 @@
   </main>
 
   <script src="/static/js/player.js?v=android-live-clock-qr-1"></script>
-  <script src="/static/js/arcade.js?v=phase4c-arcade-guestbook-fixes-1"></script>
 </body>
 </html>

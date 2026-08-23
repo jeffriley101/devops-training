@@ -1125,8 +1125,6 @@ function unlockMasterSignal() {
 
   unlockSecretGuestbookItems();
 
-  window.dispatchEvent(new CustomEvent("khjw:arcade-boost"));
-
   document.body.classList.add("master-signal-active");
 
   if (masterSecretDialog) {

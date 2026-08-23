@@ -2592,43 +2592,6 @@ body {
   background: rgba(92, 120, 47, 0.65);
 }
 
-/* Phase 4C arcade secret time boost */
-.arcade-time-secret-trigger {
-  position: fixed;
-  top: 0.35rem;
-  right: 0.45rem;
-  left: auto;
-  z-index: 50;
-  border: 0;
-  background: transparent;
-  color: rgba(255, 214, 102, 0.32);
-  font-size: 1.1rem;
-  cursor: pointer;
-  text-align: right;
-}
-
-.arcade-time-secret-trigger:hover,
-.arcade-time-secret-trigger:focus {
-  color: rgba(255, 214, 102, 0.9);
-}
-
-.arcade-time-secret-dialog {
-  position: fixed;
-  top: 2rem;
-  right: 0.75rem;
-  z-index: 51;
-}
-
-.arcade-time-secret-pass {
-  width: 7rem;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 214, 102, 0.6);
-  padding: 0.35rem 0.65rem;
-  background: rgba(0, 0, 0, 0.82);
-  color: #ffd666;
-  text-align: left;
-}
-
 /* Phase 4C keep guestbook secret fixed like other secret symbols */
 .secret-guestbook-trigger {
   position: fixed !important;
@@ -2871,24 +2834,6 @@ button[aria-expanded][aria-controls] {
   box-sizing: border-box !important;
 }
 
-/* Phase 4C arcade initials field alignment */
-.arcade-form {
-  align-items: flex-start !important;
-}
-
-.arcade-form label,
-.arcade-form input {
-  display: block !important;
-  width: min(280px, 88vw) !important;
-  max-width: 280px !important;
-  box-sizing: border-box !important;
-  text-align: left !important;
-}
-
-.arcade-form input {
-  min-height: 44px !important;
-}
-
 /* Phase 4C guestbook status as radio ticker */
 #bottle-status,
 .bottle-status,
@@ -2965,9 +2910,7 @@ button[data-target="playlist"] {
     0 8px 18px rgba(0, 0, 0, 0.24) !important;
 }
 
-/* Phase 4C undo accidental ticker effect on arcade/status messages */
-#arcade-status,
-.arcade-status,
+/* Phase 4C undo accidental ticker effect on guestbook status messages */
 #bottle-status,
 .bottle-status,
 .bar-status,
@@ -3054,22 +2997,6 @@ button.show-playlist-wide {
   width: 225px !important;
   min-width: 225px !important;
   max-width: 225px !important;
-}
-
-/* Phase 4C god_mode secret: keep clickable area tight to symbol */
-html body button#arcade-time-secret-trigger.arcade-time-secret-trigger {
-  width: 1.35rem !important;
-  min-width: 1.35rem !important;
-  max-width: 1.35rem !important;
-  height: 1.35rem !important;
-  min-height: 1.35rem !important;
-  padding: 0 !important;
-  margin: 0 !important;
-  display: inline-flex !important;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
-  box-sizing: border-box;
 }
 
 /* Phase 4D quick park: track time, bottom donation, game-show bar */
@@ -3223,10 +3150,6 @@ html body button#arcade-time-secret-trigger.arcade-time-secret-trigger {
   line-height: 1.15 !important;
 }
 
-.arcade-card {
-  text-align: left !important;
-}
-
 .show-playlist-wide,
 #track-list-toggle {
   display: block !important;
@@ -3275,7 +3198,7 @@ html body button#arcade-time-secret-trigger.arcade-time-secret-trigger {
   }
 }
 
-/* Phase 4D final correction: force bottom donation left, restore arcade default alignment */
+/* Phase 4D final correction: force bottom donation left */
 .hero-card .bottom-actions-card {
   display: block !important;
   text-align: left !important;
