@@ -1,92 +1,170 @@
-# DevOps Training Projects
+# Technical Project Portfolio
 
-This repository is my public DevOps, cloud, platform engineering, and applied software portfolio. It contains hands-on projects built to demonstrate containerized automation, scheduled cloud workloads, CI/CD delivery, observability, artifact management, production-style troubleshooting, and user-facing Python web applications.
+This repository is my public portfolio for systems, DevOps, application engineering,
+automation, and applied software development.
 
-Rather than presenting isolated scripts, this portfolio shows how I build and operate complete systems: application code, containers, deployment workflows, runtime behavior, stored artifacts, operational debugging, documentation, and lifecycle cleanup.
+The projects here span full-stack web applications, Linux automation, PostgreSQL-backed
+systems, Android audio engineering, cloud infrastructure, CI/CD, monitoring, data
+pipelines, and production-style troubleshooting.
+
+Rather than presenting isolated scripts, this portfolio shows how I build and operate
+complete systems: application code, persistence, deployment workflows, runtime behavior,
+testing, observability, documentation, and lifecycle cleanup.
 
 ---
 
-## Live Dashboard
+## Live Portfolio
 
-GitHub Pages Dashboard:
+GitHub Pages:
 
 ```text
 https://jeffriley101.github.io/devops-training/
 ```
 
-The dashboard presents project artifacts, preview images, metadata, and preserved proof from the projects in this repository. Some earlier AWS scheduled workloads are now paused as part of cost-governance cleanup after final screenshots and artifacts were preserved.
+The dashboard highlights my current application projects first, followed by preserved
+evidence from completed AWS and automation projects.
 
 ---
 
-## Career Focus
+## Featured Projects
 
-I am using this portfolio to support my transition into roles such as:
+### Woodshed Woodchuck
 
-- DevOps Engineer
-- Platform Engineer
-- Automation Engineer
-- Cloud / Infrastructure Engineer
-- Site Reliability Engineer
-- Production Support / Technical Operations Engineer
+`woodshed-woodchuck/`
 
-The projects here are intentionally aligned with the work I want to do professionally:
+A full-stack music-practice application designed to make practice more engaging for
+student musicians through persistent accounts, practice tracking, challenges, contests,
+rewards, verification workflows, and interactive music tools.
 
-- containerized automation
-- scheduled cloud workloads
-- CI/CD delivery workflows
-- AWS infrastructure
-- monitoring and observability
-- artifact-oriented system design
-- operational troubleshooting across code and infrastructure
-- Python web applications connected to real data workflows
-- practical lifecycle and cost-governance decisions
-
----
-
-## What This Repository Demonstrates
-
-Across the projects in this repository, the main capabilities include:
-
-- Python-based automation packaged for container execution
-- Docker image build workflows for repeatable deployment
-- Amazon ECR image publishing
-- Amazon ECS Fargate task execution
-- Amazon EventBridge scheduled job orchestration
-- GitHub Actions CI/CD pipelines
-- AWS OIDC-based CI authentication
-- Amazon S3 artifact storage and retention design
-- Amazon CloudWatch logging and runtime visibility
-- Terraform-managed infrastructure
-- environment-aware runtime configuration
-- historical artifact generation for trend analysis
-- operational debugging across application, scheduler, task definition, and storage layers
-- FastAPI application development
-- PostgreSQL-backed application design
-- Render deployment for public testing
-- cost-governance cleanup after successful cloud demos
-
----
-
-## Portfolio Projects
-
-### Env Inspector
-
-`containerized-tools/env-inspector/`
-
-A production-style containerized automation platform that collects runtime environment data, runs on AWS Fargate, and stores structured artifacts in Amazon S3 with deployment traceability metadata.
+The application has grown from a browser-based prototype into a database-backed
+multi-user system with persistent state, seasonal competition, rewards, trusted-adult
+practice verification, and responsive interfaces for desktop and mobile use.
 
 **What it shows**
 
-- scheduled container automation on AWS
-- CI/CD-driven deployment workflow
-- ECS task definition revision management
-- artifact persistence and traceability
-- runtime debugging and operator-focused output design
-- completed cloud demo lifecycle with scheduled execution paused when no longer needed
+- FastAPI application architecture
+- PostgreSQL-backed persistent application state
+- SQLAlchemy data models and Alembic migrations
+- authenticated user workflows
+- cross-device persistence
+- practice verification workflows
+- seasonal challenges, contests, rewards, and progression systems
+- responsive JavaScript / HTML / CSS application design
+- automated testing across core user and gameplay workflows
+- production deployment and migration management on Render
 
-**Preview image**
+**Technologies**
 
-`dashboard/images/env-inspector-preview.png`
+Python · FastAPI · PostgreSQL · SQLAlchemy · Alembic · JavaScript · HTML/CSS ·
+Git · GitHub · Render
+
+---
+
+### KHJW / Hoojshwah Radio
+
+`hoojshwah-radio/`
+
+A simulated-live internet radio platform for original music, combining a browser-based
+station with a native Android client.
+
+The web application provides the station interface and programming experience, while
+the Android client uses native Media3 playback so audio can continue reliably during
+screen-off and background use.
+
+**What it shows**
+
+- FastAPI web application development
+- browser-based streaming interface
+- native Android background audio
+- Media3 / ExoPlayer playback architecture
+- MediaSessionService and MediaController integration
+- lock-screen, notification, Bluetooth, and headset playback controls
+- web UI and native playback integration
+- mobile troubleshooting across browser and native application behavior
+- Render deployment
+- Gradle / Android build workflow
+
+**Technologies**
+
+Python · FastAPI · JavaScript · HTML/CSS · Android · Media3 · ExoPlayer ·
+MediaSessionService · Gradle · Git · GitHub · Render
+
+---
+
+### JILT + JILT GAME
+
+`jilt/`
+`jilt-game/`
+
+A Python and PostgreSQL analytics pipeline paired with a FastAPI prediction game.
+
+JILT processes historical intraday market data, normalizes timestamps, stores structured
+records in PostgreSQL, derives daily results with SQL, and generates reporting artifacts.
+
+JILT GAME consumes those results and turns them into an interactive browser-based
+prediction game with persisted guesses and results.
+
+**What it shows**
+
+- Python and PostgreSQL integration
+- relational schema design
+- SQL query development and derived summaries
+- time-series data ingestion
+- time-zone-aware normalization
+- JSON and chart artifact generation
+- FastAPI / Jinja web application development
+- PostgreSQL-backed game-state persistence
+- loosely coupled analytics-to-application integration
+- local-first development followed by hosted public testing
+
+**Technologies**
+
+Python · PostgreSQL · SQL · FastAPI · Jinja2 · HTML/CSS · Render
+
+---
+
+## Cloud Lifecycle & Cost Governance
+
+The AWS projects in this repository completed their intended demonstration lifecycle.
+
+After preserving source code, screenshots, documentation, generated artifacts, and
+representative runtime evidence, I retired unnecessary scheduled infrastructure and
+removed obsolete AWS-dependent CI/CD configuration.
+
+I also converted the portfolio itself to static GitHub Pages deployment and removed
+reproducible local Terraform provider caches and retired-project Python environments.
+
+This work is part of the portfolio story: building infrastructure is only one part of
+engineering. Systems also need to be documented, cost-controlled, maintained, and
+retired responsibly when they are no longer needed.
+
+---
+
+## Completed AWS / DevOps Projects
+
+### Internet Health Monitor
+
+`containerized-tools/internet-health-monitor/`
+
+A containerized monitoring platform that performed scheduled HTTP health checks,
+measured latency, classified service state, and published historical observability
+artifacts for operator review.
+
+**What it shows**
+
+- Docker-based monitoring workloads
+- AWS ECS / Fargate execution
+- EventBridge scheduling
+- CloudWatch logging
+- S3 artifact publishing
+- latency trend generation
+- operator-readable reporting
+- Terraform-managed infrastructure
+- lifecycle and cost-governance cleanup
+
+**Preview**
+
+`dashboard/images/internet-health-preview.png`
 
 ---
 
@@ -94,114 +172,53 @@ A production-style containerized automation platform that collects runtime envir
 
 `containerized-tools/market-snapshot-bot/`
 
-A containerized AWS market-monitoring workload built to demonstrate scheduled cloud execution, artifact pipelines, real-data workflow integration, and production-style troubleshooting.
+A containerized market-data automation project built around scheduled cloud execution,
+historical artifacts, chart generation, and external-data workflows.
 
-This project began with a platform baseline using mock workflows, then evolved into a real-data system while preserving mock mode for safe development and rollback. It includes persisted price-history tracking, chart artifact generation, and a completed lifecycle/cost-governance phase where scheduled cloud runs were paused after final proof was preserved.
+The project began with mock workflows and later added real market-data integration while
+preserving a safe development path.
 
 **What it shows**
 
-- reusable scheduled workload architecture
-- external data workflow integration
-- structured JSON, CSV, and PNG artifact generation
-- environment-aware runtime design
-- persisted price-history workflow design
-- careful extension of a working platform without destabilizing the baseline
-- debugging across logs, task definitions, scheduler targets, and artifact outputs
-- lifecycle cleanup and cost governance after project completion
+- scheduled container workloads
+- external-data integration
+- JSON, CSV, and PNG artifact generation
+- persisted history
+- environment-aware runtime configuration
+- ECS / Fargate execution
+- EventBridge scheduling
+- CloudWatch troubleshooting
+- S3 artifact storage
+- lifecycle cleanup after project completion
 
-**Preview image**
+**Preview**
 
 `dashboard/images/market-snapshot-preview.png`
 
-**Final proof**
-
-`containerized-tools/market-snapshot-bot/final-screenshots/`
-
 ---
 
-### Internet Health Monitor
+### Env Inspector
 
-`containerized-tools/internet-health-monitor/`
+`containerized-tools/env-inspector/`
 
-A containerized AWS monitoring platform that performs HTTP health checks, measures latency, classifies service state, and publishes historical observability artifacts for operator review.
-
-The project successfully demonstrated scheduled monitoring, S3 artifact publishing, latency trend generation, and dashboard presentation. Scheduled cloud runs are currently paused as part of cost-governance cleanup while final screenshots and artifacts are preserved.
+A containerized automation project that captured runtime environment metadata and
+deployment traceability information from AWS ECS tasks.
 
 **What it shows**
 
-- reliability-focused automation design
-- service health monitoring and classification
-- historical latency trend generation
-- operator-readable reporting
-- cloud-scheduled monitoring workflows
-- observability-oriented artifact pipelines
-- lifecycle cleanup and cost governance after project completion
+- GitHub Actions CI/CD
+- AWS OIDC authentication
+- immutable ECR image publishing
+- ECS task-definition revision management
+- Fargate execution
+- runtime metadata capture
+- S3 artifact persistence
+- CloudWatch logging
+- deployment traceability using Git SHA and task metadata
 
-**Preview image**
+**Preview**
 
-`dashboard/images/internet-health-preview.png`
-
-**Final proof**
-
-`containerized-tools/internet-health-monitor/final-screenshots/`
-
----
-
-### JILT — Jeff’s Intraday Low Toolkit
-
-`jilt/`
-
-A local-first Python and PostgreSQL analytics project built to analyze historical intraday market data and determine which 5-minute bucket most often contains a symbol’s daily low.
-
-This project was designed to strengthen practical SQL, relational schema design, market-data normalization, derived-summary workflows, operator-readable reporting, and chart artifact generation through a real system instead of isolated exercises.
-
-**What it shows**
-
-- Python and PostgreSQL integration
-- practical SQL schema design and query development
-- historical intraday market-data ingestion
-- derived summary-table workflows
-- time-zone-aware data normalization
-- CLI-based local analytics workflow design
-- operator-readable terminal reporting and saved chart artifacts
-
-**Project README**
-
-`jilt/README.md`
-
----
-
-### JILT-GAME
-
-`jilt-game/`
-
-A FastAPI web-game prototype that turns JILT intraday-low analytics into a playable daily bucket-guessing game.
-
-JILT-GAME was deployed on Render for limited public testing and uses PostgreSQL, Jinja templates, generated result artifacts, and chart integration to connect a backend analytics workflow to a user-facing browser game.
-
-**What it shows**
-
-- FastAPI web application development
-- PostgreSQL-backed game-state persistence
-- Render deployment for public testing
-- artifact-driven integration with an analytics pipeline
-- Jinja template rendering and HTML/CSS interface design
-- daily result ingestion and winner display
-- turning backend analytics into an interactive product prototype
-
-**Project README**
-
-`jilt-game/README.md`
-
----
-
-### Woodshed Woodchuck
-
-`woodshed-woodchuck/`
-
-A game for musicians.
-
-This project is in development.
+`dashboard/images/env-inspector-preview.png`
 
 ---
 
@@ -209,101 +226,94 @@ This project is in development.
 
 ### QQQ Volume Anomalies
 
-During the transition from mock data to real Yahoo Finance minute-volume data, the QQQ volume workflow began showing isolated zero-minute samples and distorted spikes in the generated chart.
+During the transition from mock data to real Yahoo Finance minute-volume data, the
+Market Snapshot Bot began showing isolated zero-minute samples and distorted spikes.
 
-I approached the issue as a production-style data pipeline investigation rather than assuming the chart code was wrong. I traced when the real-data path entered the project, then validated the upstream feed independently outside the application workflow. That testing showed the anomaly was present in the Yahoo minute data itself, not just introduced by chart rendering.
+I treated the issue as a data-pipeline investigation rather than assuming the charting
+code was wrong.
 
-Rather than forcing a cosmetic fix, I treated this as a data-quality and observability problem:
+The investigation included:
 
-- isolated the symptom in generated artifacts
-- traced the change that introduced the real-data path
-- reproduced the issue directly against the upstream dependency
-- avoided hard-coding a misleading normalization rule before gathering more evidence
-- evaluated whether slightly wider aggregation windows would produce more stable operator-facing charts
+- isolating the symptom in generated artifacts
+- tracing when the real-data path entered the project
+- testing the upstream data independently from the application
+- confirming that anomalous samples were present in the upstream feed
+- avoiding a cosmetic normalization rule before gathering enough evidence
+- evaluating wider aggregation windows for more stable operator-facing charts
 
-This is the kind of troubleshooting work I want these projects to demonstrate: not just building automated workflows, but diagnosing unexpected behavior in production-style systems.
+This project became useful evidence of production-style troubleshooting: following the
+data through the system, validating dependencies independently, and avoiding a fix that
+would hide rather than explain the underlying behavior.
 
-For expanded notes and raw validation output, see:
+Expanded notes are preserved under:
 
 `containerized-tools/market-snapshot-bot/doc`
 
 ---
 
-## Cost-Governance / Lifecycle Note
+## Engineering Capabilities Demonstrated
 
-Several AWS scheduled workloads in this repository successfully demonstrated their intended architecture and behavior. After preserving final screenshots, generated artifacts, and README documentation, their schedules were paused to avoid unnecessary ongoing cloud usage.
+Across these projects:
 
-This is part of the portfolio story: I did not only build cloud workloads; I also managed their lifecycle responsibly.
-
-Currently paused scheduled workloads include:
-
-- Env Inspector schedule
-- Internet Health Monitor schedule
-- Market Snapshot Bot price schedule
-- Market Snapshot Bot volume schedule
+- Linux-based development and troubleshooting
+- Python application and automation development
+- FastAPI web application architecture
+- PostgreSQL and SQL
+- SQLAlchemy and Alembic
+- server-backed persistent application state
+- JavaScript / HTML / CSS interfaces
+- Android native media playback
+- Docker containerization
+- Git and GitHub workflows
+- GitHub Actions CI/CD
+- AWS ECS / Fargate
+- Amazon ECR
+- Amazon EventBridge
+- Amazon S3
+- Amazon CloudWatch
+- IAM / OIDC-based CI authentication
+- Terraform infrastructure
+- external-data pipelines
+- generated JSON, CSV, and chart artifacts
+- responsive desktop/mobile application testing
+- operational debugging across application and infrastructure layers
+- lifecycle and cost-governance decisions
 
 ---
 
 ## What I Learned Building These Projects
 
-These projects helped move me from learning tools individually to operating them as connected systems.
+### 1. Application behavior and infrastructure are connected
 
-### 1. A working platform is already meaningful engineering value
+Many real failures are not purely code bugs. They involve configuration, persistence,
+network behavior, runtime assumptions, deployment wiring, and external dependencies.
 
-Proving container builds, scheduled execution, logging, storage, and artifact flow is itself a substantial outcome.
+### 2. Logs, state, and artifacts provide evidence
 
-### 2. Infrastructure and application behavior are tightly connected
+I rely on logs, database state, generated artifacts, runtime metadata, and reproducible
+tests rather than assuming a deployment behaved correctly.
 
-Many issues were not purely code bugs. They involved task definitions, environment variables, scheduler targets, storage paths, deployment wiring, and runtime assumptions.
+### 3. Safe evolution matters
 
-### 3. Logs and artifacts are the truth
+Several projects began as smaller working systems and were expanded incrementally while
+preserving existing behavior.
 
-I learned to verify behavior through CloudWatch logs, generated files, charts, stored outputs, and runtime metadata rather than assuming the system behaved correctly.
+### 4. Persistence changes application design
 
-### 4. Safe evolution matters
+Moving from browser-only state into PostgreSQL-backed accounts, progression, contests,
+and verification workflows required stronger thinking about data integrity, migrations,
+ownership, and cross-device behavior.
 
-Across these projects, I focused on preserving a working baseline, then extending it carefully instead of destabilizing what already worked.
+### 5. Platform limitations sometimes require architectural changes
 
-### 5. Operational troubleshooting is a real engineering skill
+KHJW's mobile playback work is an example: browser behavior alone could not provide the
+reliability I wanted, so the project gained a native Android playback layer.
 
-A major part of the work involved diagnosing why infrastructure, scheduling, deployment, or runtime behavior did not match expectations.
+### 6. Lifecycle management is engineering work
 
-### 6. Lifecycle management matters
-
-A cloud project is not finished just because it runs. It also needs to be documented, validated, cost-controlled, and either maintained or intentionally paused.
-
-### 7. Communication matters too
-
-README quality, architecture explanation, artifact examples, and project clarity are part of professional engineering value, not extras.
-
----
-
-## AWS / DevOps Technologies Used
-
-- Python
-- Docker
-- GitHub Actions
-- Terraform
-- Amazon ECS
-- AWS Fargate
-- Amazon EventBridge Scheduler
-- Amazon ECR
-- Amazon S3
-- Amazon CloudWatch Logs
-- IAM
-- Git / GitHub
-
----
-
-## Application / Data Technologies Used
-
-- FastAPI
-- Jinja templates
-- PostgreSQL
-- SQL
-- HTML / CSS
-- JSON and CSV artifacts
-- Render
+A project is not finished just because it runs. It also needs to be tested, documented,
+cost-controlled, preserved appropriately, and eventually retired when its operational
+purpose is complete.
 
 ---
 
@@ -316,22 +326,32 @@ README quality, architecture explanation, artifact examples, and project clarity
 │   ├── internet-health-monitor/
 │   └── market-snapshot-bot/
 ├── dashboard/
+├── hoojshwah-radio/
 ├── jilt/
 ├── jilt-game/
 ├── woodshed-woodchuck/
 └── README.md
 ```
 
-Each project directory contains its own implementation details, architecture notes, usage instructions, and project-specific documentation.
+Individual project directories contain implementation details, documentation, tests,
+and project-specific notes.
 
 ---
 
-## Why This Repository Matters
+## Career Focus
 
-This repository is meant to show more than familiarity with DevOps concepts.
+I am using this portfolio to support roles such as:
 
-It demonstrates that I can take a workload from source control through build, deployment, execution, observability, artifact storage, operational troubleshooting, documentation, and lifecycle cleanup.
+- Linux Systems Engineer
+- Infrastructure Support Engineer
+- Production Support Engineer
+- Technical Operations Engineer
+- Platform Engineer
+- DevOps Engineer
+- Cloud Operations Engineer
+- Site Reliability Engineer
+- Automation Engineer
 
-It also shows that I can extend backend automation and analytics into user-facing applications when the project calls for it.
-
-For recruiters and hiring managers, that is the point of this portfolio: practical evidence of hands-on DevOps, platform, automation, and applied software engineering work.
+The common thread across these projects is practical systems work: building applications,
+automating operations, diagnosing failures, managing persistent state, deploying software,
+and maintaining systems through their full lifecycle.
