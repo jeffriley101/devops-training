@@ -80,6 +80,8 @@ def test_tapping_inventory_places_and_dragging_moves_normalized_coordinates() ->
     assert "method: \"PUT\"" in DECORATIONS
     assert "left / maxLeft" in DECORATIONS
     assert "top / maxTop" in DECORATIONS
+    assert "layer.clientWidth - element.offsetWidth" in DECORATIONS
+    assert "layer.clientHeight - element.offsetHeight" in DECORATIONS
     assert "pointerdown" in DECORATIONS
     assert "pointermove" in DECORATIONS
     assert "pointerup" in DECORATIONS
@@ -145,41 +147,48 @@ def test_stickerbook_grid_and_size_controls_are_phone_safe() -> None:
     assert ".shed-decoration-size-controls" in CSS
     assert "grid-template-columns: repeat(3, minmax(44px, 1fr))" in CSS
     assert "min-height: 44px" in CSS
-    mobile = CSS[CSS.rindex("@media (max-width: 640px)"):]
+    mobile = CSS[
+        CSS.index("@media (max-width: 640px)", CSS.index(".shed-decoration-size-xlarge")):
+    ]
     assert ".shed-decoration-inventory {" in mobile
     assert "grid-template-columns: minmax(0, 1fr)" in mobile
-    for size in ("small", "medium", "large"):
+    for size in ("medium", "large", "xlarge"):
         assert f".shed-decoration-size-{size}" in CSS
+    assert ".shed-decoration-size-small" not in CSS
+    assert 'medium: {short: "M", title: "Medium"}' in DECORATIONS
+    assert 'large: {short: "L", title: "Large"}' in DECORATIONS
+    assert 'xlarge: {short: "XL", title: "Extra Large"}' in DECORATIONS
 
 
-def test_decoration_sizes_use_legacy_small_and_shed_width_scale() -> None:
-    small = CSS[
-        CSS.index(".shed-decoration-size-small {"):
-        CSS.index(".shed-decoration-size-medium {")
-    ]
+def test_decoration_sizes_use_medium_large_and_extra_large_shed_width_scale() -> None:
     medium = CSS[
         CSS.index(".shed-decoration-size-medium {"):
         CSS.index(".shed-decoration-size-large {")
     ]
     large = CSS[
         CSS.index(".shed-decoration-size-large {"):
-        CSS.index("@media (max-width: 640px)", CSS.index(".shed-decoration-size-large {"))
+        CSS.index(".shed-decoration-size-xlarge {")
     ]
-    assert "width: clamp(1.65rem, 3.5vw, 2.25rem)" in small
-    assert "height: clamp(1.65rem, 3.5vw, 2.25rem)" in small
-    assert "font-size: clamp(1.45rem, 3vw, 2rem)" in small
+    xlarge = CSS[
+        CSS.index(".shed-decoration-size-xlarge {"):
+        CSS.index("@media (max-width: 640px)", CSS.index(".shed-decoration-size-xlarge {"))
+    ]
     assert "width: 19%" in medium and "height: 19cqw" in medium
     assert "width: 33%" in large and "height: 33cqw" in large
+    assert "width: 47%" in xlarge and "height: 47cqw" in xlarge
     assert "aspect-ratio: 1 / 1" in medium
     assert "aspect-ratio: 1 / 1" in large
+    assert "aspect-ratio: 1 / 1" in xlarge
     assert "container-type: inline-size" in CSS[
         CSS.index(".shed-decoration-layer {"):CSS.index(".shed-decoration {")
     ]
-    assert 0.10 < 0.19 < 0.33
+    assert 0.19 < 0.33 < 0.47
 
 
 def test_mobile_artwork_zoom_and_decoration_layer_share_scene_geometry() -> None:
-    mobile = CSS[CSS.rindex("@media (max-width: 640px)"):]
+    mobile = CSS[
+        CSS.index("@media (max-width: 640px)", CSS.index(".shed-decoration-size-xlarge")):
+    ]
     assert "background-size: auto 86%" in mobile
     assert "background-position: center" in mobile
     assert ".shed-decoration-layer" in mobile

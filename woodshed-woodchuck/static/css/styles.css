@@ -2167,7 +2167,9 @@ select {
   }
 
   .board-layout {
-    grid-template-columns: minmax(0, 1.55fr) minmax(240px, 0.75fr);
+    grid-template-columns: minmax(0, 1fr);
+    width: min(100%, 72rem);
+    margin-inline: auto;
   }
 }
 
@@ -6084,12 +6086,6 @@ select {
   box-shadow: inset 0 0 0 2px #f4d35e;
 }
 
-.shed-decoration-size-small {
-  width: clamp(1.65rem, 3.5vw, 2.25rem);
-  height: clamp(1.65rem, 3.5vw, 2.25rem);
-  font-size: clamp(1.45rem, 3vw, 2rem);
-}
-
 .shed-decoration-size-medium {
   width: 19%;
   height: 19cqw;
@@ -6102,6 +6098,13 @@ select {
   height: 33cqw;
   aspect-ratio: 1 / 1;
   font-size: 29cqw;
+}
+
+.shed-decoration-size-xlarge {
+  width: 47%;
+  height: 47cqw;
+  aspect-ratio: 1 / 1;
+  font-size: 42cqw;
 }
 
 @media (max-width: 640px) {
@@ -6125,10 +6128,216 @@ select {
 
 }
 
-@media (max-width: 480px) {
-  .shed-decoration-size-small {
-    width: 1.7rem;
-    height: 1.7rem;
-    font-size: 1.5rem;
+/* === TEMP SHED 5X2 CONTROL GRID === */
+
+@media (max-width: 640px) {
+  /*
+   * Exact mirrored SHED control positions.
+   *
+   * LEFT             RIGHT
+   * Name             Team
+   * Instrument       Level
+   * XP               Metronome
+   * Inventory        Tuner
+   * Chair            Audio
+   */
+
+  .woodshed-foreground.ww-shed-grid {
+    position: absolute !important;
+    inset: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+
+    width: auto !important;
+    max-width: none !important;
+    height: 100% !important;
+    min-height: 0 !important;
+
+    display: block !important;
+    padding: 0 !important;
+
+    z-index: 5 !important;
+    pointer-events: none;
+  }
+
+  .ww-shed-control-column {
+    display: contents !important;
+  }
+
+  .woodshed-foreground.ww-shed-grid
+    #woodchuck-name-value,
+  .woodshed-foreground.ww-shed-grid
+    #instrument-object,
+  .woodshed-foreground.ww-shed-grid
+    #xp-level-control,
+  .woodshed-foreground.ww-shed-grid
+    #shed-decorate-button,
+  .woodshed-foreground.ww-shed-grid
+    #mum-open-button,
+  .woodshed-foreground.ww-shed-grid
+    #shed-team-button,
+  .woodshed-foreground.ww-shed-grid
+    #level-value,
+  .woodshed-foreground.ww-shed-grid
+    #metronome-open-button,
+  .woodshed-foreground.ww-shed-grid
+    #tuner-open-button,
+  .woodshed-foreground.ww-shed-grid
+    .shed-sound-effects-controls {
+    position: absolute !important;
+
+    margin: 0 !important;
+    inset: auto !important;
+
+    transform: translateY(-50%) !important;
+
+    pointer-events: auto !important;
+    z-index: 6 !important;
+  }
+
+  /* ROW 1 */
+  #woodchuck-name-value {
+    top: 8% !important;
+    left: 0.65rem !important;
+  }
+
+  #shed-team-button {
+    top: 8% !important;
+    right: 0.65rem !important;
+  }
+
+  /* ROW 2 */
+  #instrument-object {
+    top: 28% !important;
+    left: 0.65rem !important;
+  }
+
+  #level-value {
+    top: 28% !important;
+    right: 0.65rem !important;
+  }
+
+  /* ROW 3 */
+  #xp-level-control {
+    top: 48% !important;
+    left: 0.65rem !important;
+  }
+
+  #metronome-open-button {
+    top: 48% !important;
+    right: 0.65rem !important;
+  }
+
+  /* ROW 4 */
+  #shed-decorate-button {
+    top: 68% !important;
+    left: 0.65rem !important;
+  }
+
+  #tuner-open-button {
+    top: 68% !important;
+    right: 0.65rem !important;
+  }
+
+  /* ROW 5 */
+  #mum-open-button {
+    top: 88% !important;
+    left: 0.65rem !important;
+  }
+
+  .shed-sound-effects-controls {
+    top: 88% !important;
+    right: 0.65rem !important;
+
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+
+  #sound-effects-button {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+
+    visibility: visible !important;
+    opacity: 1 !important;
+
+    min-width: 44px !important;
+    min-height: 44px !important;
+
+    font-size: 2rem !important;
   }
 }
+
+
+/* SHOP dandelion balance stays hidden until tapped. */
+
+.shop-dandelion-count {
+  display: none !important;
+}
+
+#dandelion-object {
+  cursor: pointer;
+}
+
+#dandelion-object:focus-visible {
+  outline: 4px solid #f4d35e;
+  outline-offset: 4px;
+  border-radius: 999px;
+}
+
+.shop-dandelion-balance-burst {
+  position: fixed;
+  left: 50%;
+  top: 48%;
+  z-index: 10020;
+  pointer-events: none;
+
+  color: #ffd84f;
+  font-size: clamp(5rem, 24vw, 10rem);
+  font-weight: 950;
+  line-height: 1;
+
+  text-shadow:
+    0 4px 0 #87591d,
+    0 9px 22px rgba(0, 0, 0, 0.45);
+
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.35);
+
+  animation:
+    shop-dandelion-balance-fly
+    1250ms
+    cubic-bezier(.18, .82, .28, 1)
+    forwards;
+}
+
+@keyframes shop-dandelion-balance-fly {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.35);
+  }
+
+  18% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(0.85);
+  }
+
+  62% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.25);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.8);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shop-dandelion-balance-burst {
+    animation-duration: 500ms;
+  }
+}
+
+/* === END TEMP SHED 5X2 CONTROL GRID === */

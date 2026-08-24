@@ -126,7 +126,10 @@ def test_mobile_shop_keeps_both_vertical_columns_over_the_scene() -> None:
     assert "position: absolute" in mobile
     assert "display: flex" in mobile
     assert "flex-direction: column" in mobile
+    assert "top: .65rem" in mobile
+    assert "bottom: .65rem" in mobile
     assert "justify-content: space-between" in mobile
+    assert "translateY(-50%)" not in mobile
     assert ".shop-object-column-left { left: .35rem; }" in mobile
     assert ".shop-object-column-right { right: .35rem; }" in mobile
     assert "flex-direction: row" not in mobile

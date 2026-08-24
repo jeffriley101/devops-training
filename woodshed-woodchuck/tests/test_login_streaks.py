@@ -232,7 +232,7 @@ def test_weekly_streak_crown_uses_stickerbook_and_shed_placement(
     crown = next(item for item in inventory if item["item_key"] == "crown:weekly-login-streak")
     assert crown["name"] == "Weekly Streak Crown"
     assert crown["emoji"] == "👑"
-    assert crown["placement_size"] == "small"
+    assert crown["placement_size"] == "medium"
 
     placed = client.put(
         f"/store/inventory/{crown['id']}/placement",

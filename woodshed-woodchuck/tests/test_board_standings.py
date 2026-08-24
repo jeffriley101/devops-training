@@ -66,6 +66,24 @@ def test_live_competitions_use_requested_order_and_tpr_placeholder() -> None:
     assert "data-team-board" not in tpr
 
 
+def test_desktop_board_uses_centered_single_column_without_changing_mobile_flow() -> None:
+    css = (TEMPLATE_PATH.parents[1] / "static" / "css" / "styles.css").read_text(
+        encoding="utf-8"
+    )
+    desktop_start = css.index("@media (min-width: 760px)", css.index(".board-scoreboard"))
+    desktop = css[desktop_start:css.index("@media (max-width: 520px)", desktop_start)]
+
+    assert ".board-layout" in desktop
+    assert "grid-template-columns: minmax(0, 1fr)" in desktop
+    assert "width: min(100%, 72rem)" in desktop
+    assert "margin-inline: auto" in desktop
+    assert "1.55fr" not in desktop
+    assert 'class="board-layout"' in board_template()
+    assert board_template().index('class="board-contests"') < board_template().index(
+        'class="board-scoreboard"'
+    )
+
+
 def test_board_preserves_past_winners_and_hall_without_personal_crown() -> None:
     markup = board_template()
 

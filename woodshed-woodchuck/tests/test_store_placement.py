@@ -91,13 +91,13 @@ def test_owned_unplaced_item_is_listed_with_null_placement(placement_database) -
             "purchase_price": 25,
             "placement_x": None,
             "placement_y": None,
-            "placement_size": "small",
+            "placement_size": "medium",
             "acquired_at": response.json()["items"][0]["acquired_at"],
         }
     ]
 
 
-def test_existing_placed_copy_without_explicit_size_loads_as_small(
+def test_existing_placed_copy_without_explicit_size_loads_as_medium(
     placement_database,
 ) -> None:
     client, profile_id = signed_in_client(placement_database, suffix="LEGACY")
@@ -106,7 +106,7 @@ def test_existing_placed_copy_without_explicit_size_loads_as_small(
     assert item["id"] == copy_id
     assert item["placement_x"] == 0.35
     assert item["placement_y"] == 0.45
-    assert item["placement_size"] == "small"
+    assert item["placement_size"] == "medium"
 
 
 def test_placing_and_moving_update_the_same_owned_copy(placement_database) -> None:
@@ -128,7 +128,7 @@ def test_placing_and_moving_update_the_same_owned_copy(placement_database) -> No
         assert (owned.placement_x, owned.placement_y) == (0.65, 0.75)
 
 
-@pytest.mark.parametrize("size", ["small", "medium", "large"])
+@pytest.mark.parametrize("size", ["medium", "large", "xlarge"])
 def test_discrete_size_persists_across_inventory_reload(
     placement_database, size: str
 ) -> None:
@@ -155,11 +155,11 @@ def test_unplaced_owned_copy_saves_preferred_size_for_its_next_placement(
     copy_id = add_copy(placement_database, profile_id)
 
     preferred = client.put(
-        f"/store/inventory/{copy_id}/size", json={"size": "large"}
+        f"/store/inventory/{copy_id}/size", json={"size": "xlarge"}
     )
     assert preferred.status_code == 200
     assert preferred.json()["item"]["placement_x"] is None
-    assert preferred.json()["item"]["placement_size"] == "large"
+    assert preferred.json()["item"]["placement_size"] == "xlarge"
 
     reloaded = client.get("/store/inventory").json()["items"][0]
     placed = client.put(
@@ -169,9 +169,9 @@ def test_unplaced_owned_copy_saves_preferred_size_for_its_next_placement(
     returned = client.delete(f"/store/inventory/{copy_id}/placement")
 
     assert placed.status_code == returned.status_code == 200
-    assert placed.json()["item"]["placement_size"] == "large"
+    assert placed.json()["item"]["placement_size"] == "xlarge"
     assert returned.json()["item"]["placement_x"] is None
-    assert returned.json()["item"]["placement_size"] == "large"
+    assert returned.json()["item"]["placement_size"] == "xlarge"
 
 
 def test_size_change_and_later_move_update_the_same_copy(placement_database) -> None:
@@ -207,7 +207,7 @@ def test_size_is_available_in_a_separate_signed_in_session(placement_database) -
     copy_id = add_copy(placement_database, profile_id)
     assert first_device.put(
         f"/store/inventory/{copy_id}/placement",
-        json={"x": 0.3, "y": 0.4, "size": "small"},
+        json={"x": 0.3, "y": 0.4, "size": "xlarge"},
     ).status_code == 200
 
     second_device = TestClient(app)
@@ -218,7 +218,7 @@ def test_size_is_available_in_a_separate_signed_in_session(placement_database) -
     assert login.status_code == 200
     item = second_device.get("/store/inventory").json()["items"][0]
     assert (item["placement_x"], item["placement_y"], item["placement_size"]) == (
-        0.3, 0.4, "small"
+        0.3, 0.4, "xlarge"
     )
 
 
@@ -233,16 +233,16 @@ def test_unknown_decoration_size_is_rejected(placement_database) -> None:
     with placement_database() as session:
         owned = session.get(OwnedItemCopy, copy_id)
         assert owned.placement_x is None
-        assert owned.placement_size == "small"
+        assert owned.placement_size == "medium"
 
 
 def test_collision_hitboxes_follow_rendered_decoration_scale() -> None:
     assert PLACEMENT_HITBOX_NORMALIZED == {
-        "small": 0.10,
         "medium": 0.19,
         "large": 0.33,
+        "xlarge": 0.47,
     }
-    assert DECORATION_HITBOX_NORMALIZED == PLACEMENT_HITBOX_NORMALIZED["small"]
+    assert DECORATION_HITBOX_NORMALIZED == PLACEMENT_HITBOX_NORMALIZED["medium"]
 
 
 def test_removing_clears_placement_without_deleting_ownership(placement_database) -> None:

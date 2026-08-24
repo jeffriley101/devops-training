@@ -40,13 +40,13 @@ class DecorationCollisionError(ValueError):
     pass
 
 
-PLACEMENT_SIZES = ("small", "medium", "large")
+PLACEMENT_SIZES = ("medium", "large", "xlarge")
 PLACEMENT_HITBOX_NORMALIZED = {
-    "small": 0.10,
     "medium": 0.19,
     "large": 0.33,
+    "xlarge": 0.47,
 }
-DECORATION_HITBOX_NORMALIZED = PLACEMENT_HITBOX_NORMALIZED["small"]
+DECORATION_HITBOX_NORMALIZED = PLACEMENT_HITBOX_NORMALIZED["medium"]
 CROWN_EMOJI = "👑"
 CROWN_NAMES = {
     "weekly-points-leaders": "Practice Crown",
@@ -131,7 +131,7 @@ def owned_item_payload(item: OwnedItemCopy) -> dict[str, object]:
         "purchase_price": item.purchase_price,
         "placement_x": item.placement_x,
         "placement_y": item.placement_y,
-        "placement_size": item.placement_size or "small",
+        "placement_size": _normalized_size(item.placement_size or "medium"),
         "acquired_at": item.acquired_at.isoformat(),
     }
 
@@ -158,7 +158,9 @@ def crown_inventory_payload(
         "purchase_price": None,
         "placement_x": placement.placement_x if placement else None,
         "placement_y": placement.placement_y if placement else None,
-        "placement_size": placement.placement_size if placement else "small",
+        "placement_size": _normalized_size(
+            placement.placement_size if placement else "medium"
+        ),
         "acquired_at": award.earned_at.isoformat(),
     }
 
@@ -179,7 +181,9 @@ def earned_reward_inventory_payload(
         "purchase_price": None,
         "placement_x": placement.placement_x if placement else None,
         "placement_y": placement.placement_y if placement else None,
-        "placement_size": placement.placement_size if placement else "small",
+        "placement_size": _normalized_size(
+            placement.placement_size if placement else "medium"
+        ),
         "acquired_at": grant.created_at.isoformat(),
     }
 
@@ -244,8 +248,10 @@ def _normalized_coordinate(value: float) -> float:
 
 
 def _normalized_size(value: str) -> str:
+    if value == "small":
+        return "medium"
     if value not in PLACEMENT_SIZES:
-        raise ValueError("Decoration size must be small, medium, or large.")
+        raise ValueError("Decoration size must be medium, large, or extra large.")
     return value
 
 
@@ -284,7 +290,7 @@ def place_owned_item_copy(
     owned_item_id: int,
     placement_x: float,
     placement_y: float,
-    placement_size: str = "small",
+    placement_size: str = "medium",
 ) -> OwnedItemCopy:
     x = _normalized_coordinate(placement_x)
     y = _normalized_coordinate(placement_y)
@@ -318,7 +324,7 @@ def place_owned_item_copy(
             size,
             float(other.placement_x),
             float(other.placement_y),
-            other.placement_size or "small",
+            other.placement_size or "medium",
         ):
             raise DecorationCollisionError(
                 "That spot overlaps another decoration. Choose another spot."
@@ -339,7 +345,7 @@ def place_owned_item_copy(
             size,
             float(other.placement_x),
             float(other.placement_y),
-            other.placement_size or "small",
+            other.placement_size or "medium",
         ):
             raise DecorationCollisionError(
                 "That spot overlaps another decoration. Choose another spot."
@@ -422,7 +428,7 @@ def _placement_collides(
             size,
             float(other.placement_x),
             float(other.placement_y),
-            other.placement_size or "small",
+            other.placement_size or "medium",
         ):
             return True
     rewards = session.scalars(
@@ -443,7 +449,7 @@ def _placement_collides(
             size,
             float(other.placement_x),
             float(other.placement_y),
-            other.placement_size or "small",
+            other.placement_size or "medium",
         ):
             return True
     return False
@@ -456,7 +462,7 @@ def place_crown_inventory_item(
     inventory_key: str,
     placement_x: float,
     placement_y: float,
-    placement_size: str = "small",
+    placement_size: str = "medium",
 ) -> dict[str, object]:
     x = _normalized_coordinate(placement_x)
     y = _normalized_coordinate(placement_y)
@@ -548,7 +554,7 @@ def place_earned_reward_inventory_item(
     inventory_key: str,
     placement_x: float,
     placement_y: float,
-    placement_size: str = "small",
+    placement_size: str = "medium",
 ) -> dict[str, object]:
     x = _normalized_coordinate(placement_x)
     y = _normalized_coordinate(placement_y)
@@ -627,7 +633,7 @@ def place_inventory_item(
     inventory_id: str,
     placement_x: float,
     placement_y: float,
-    placement_size: str = "small",
+    placement_size: str = "medium",
 ) -> dict[str, object]:
     crown_award_id = crown_award_id_from_inventory_key(inventory_id)
     if crown_award_id is not None:

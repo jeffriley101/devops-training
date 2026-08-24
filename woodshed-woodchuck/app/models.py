@@ -190,7 +190,7 @@ class OwnedItemCopy(Base):
             name="ck_owned_item_copy_placement_y",
         ),
         CheckConstraint(
-            "placement_size IN ('small', 'medium', 'large')",
+            "placement_size IN ('medium', 'large', 'xlarge')",
             name="ck_owned_item_copy_placement_size",
         ),
     )
@@ -208,7 +208,7 @@ class OwnedItemCopy(Base):
     placement_x: Mapped[float | None] = mapped_column(Float, nullable=True)
     placement_y: Mapped[float | None] = mapped_column(Float, nullable=True)
     placement_size: Mapped[str] = mapped_column(
-        String(10), default="small", server_default="small", nullable=False
+        String(10), default="medium", server_default="medium", nullable=False
     )
     acquired_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
@@ -284,7 +284,7 @@ class RewardInventoryPlacement(Base):
             name="ck_reward_inventory_placement_y",
         ),
         CheckConstraint(
-            "placement_size IN ('small', 'medium', 'large')",
+            "placement_size IN ('medium', 'large', 'xlarge')",
             name="ck_reward_inventory_placement_size",
         ),
     )
@@ -307,7 +307,7 @@ class RewardInventoryPlacement(Base):
     placement_x: Mapped[float | None] = mapped_column(Float, nullable=True)
     placement_y: Mapped[float | None] = mapped_column(Float, nullable=True)
     placement_size: Mapped[str] = mapped_column(
-        String(10), default="small", server_default="small", nullable=False
+        String(10), default="medium", server_default="medium", nullable=False
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False

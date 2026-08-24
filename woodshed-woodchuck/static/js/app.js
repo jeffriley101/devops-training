@@ -514,8 +514,13 @@
     if (control.dataset.decorateWired === "true") return;
     control.dataset.decorateWired = "true";
 
-    const PLACEMENT_SIZES = ["small", "medium", "large"];
-    const COLLISION_SIZES = {small: 0.10, medium: 0.19, large: 0.33};
+    const PLACEMENT_SIZES = ["medium", "large", "xlarge"];
+    const PLACEMENT_SIZE_LABELS = {
+      medium: {short: "M", title: "Medium"},
+      large: {short: "L", title: "Large"},
+      xlarge: {short: "XL", title: "Extra Large"},
+    };
+    const COLLISION_SIZES = {medium: 0.19, large: 0.33, xlarge: 0.47};
     const placementRequests = new Set();
     const itemId = (item) => String(item.id);
     let ownedItems = [];
@@ -527,9 +532,10 @@
     }
 
     function itemSize(item) {
+      if (item.placement_size === "small") return "medium";
       return PLACEMENT_SIZES.includes(item.placement_size)
         ? item.placement_size
-        : "small";
+        : "medium";
     }
 
     function itemLabel(item) {
@@ -620,8 +626,8 @@
         sizeButton.className = "shed-decoration-size-button";
         sizeButton.dataset.decorationSize = size;
         sizeButton.dataset.ownedCopyId = String(item.id);
-        sizeButton.textContent = size.charAt(0).toUpperCase();
-        sizeButton.title = `${size.charAt(0).toUpperCase()}${size.slice(1)}`;
+        sizeButton.textContent = PLACEMENT_SIZE_LABELS[size].short;
+        sizeButton.title = PLACEMENT_SIZE_LABELS[size].title;
         sizeButton.setAttribute("aria-pressed", String(itemSize(item) === size));
         sizeButton.disabled = placementRequests.has(itemId(item));
         sizeGroup.append(sizeButton);
@@ -733,7 +739,7 @@
       }
     }
 
-    function overlapsPlaced(x, y, ignoredId = null, size = "small") {
+    function overlapsPlaced(x, y, ignoredId = null, size = "medium") {
       return ownedItems.some((item) => (
         itemId(item) !== String(ignoredId)
         && isPlaced(item)
@@ -5361,3 +5367,208 @@
   wireShopPolish();
   wirePBook(state);
 })();
+
+/* === TEMP SHED GRID + SHOP DANDELION STAGE === */
+
+(function () {
+  function stageShedGrid() {
+    if (window.location.pathname !== "/home") return;
+
+    const foreground = document.querySelector(".woodshed-foreground");
+    if (!foreground || foreground.dataset.wwGridStaged === "true") return;
+
+    const leftSelectors = [
+      "#woodchuck-name-value",
+      "#instrument-object",
+      "#xp-level-control",
+      "#shed-decorate-button",
+      "#mum-open-button",
+    ];
+
+    const rightSelectors = [
+      "#shed-team-button",
+      "#level-value",
+      "#metronome-open-button",
+      "#tuner-open-button",
+      ".shed-sound-effects-controls",
+    ];
+
+    const left = document.createElement("div");
+    left.className =
+      "ww-shed-control-column ww-shed-control-left";
+
+    const right = document.createElement("div");
+    right.className =
+      "ww-shed-control-column ww-shed-control-right";
+
+    leftSelectors.forEach((selector) => {
+      const element = document.querySelector(selector);
+      if (element) left.appendChild(element);
+    });
+
+    rightSelectors.forEach((selector) => {
+      const element = document.querySelector(selector);
+      if (element) right.appendChild(element);
+    });
+
+    foreground.replaceChildren(left, right);
+    foreground.classList.add("ww-shed-grid");
+    foreground.dataset.wwGridStaged = "true";
+  }
+
+
+  function stageShopDandelion() {
+    if (window.location.pathname !== "/store") return;
+
+    const control = document.getElementById("dandelion-object");
+    const count = document.getElementById("credits-value");
+
+    if (!control || !count || control.dataset.wwBurstWired === "true") return;
+
+    control.dataset.wwBurstWired = "true";
+    control.setAttribute("role", "button");
+    control.setAttribute("tabindex", "0");
+    control.setAttribute(
+      "aria-label",
+      `${count.textContent.trim() || "0"} dandelions. Show balance.`
+    );
+
+    function revealBalance() {
+      document.querySelector(".shop-dandelion-balance-burst")?.remove();
+
+      const burst = document.createElement("div");
+      burst.className = "shop-dandelion-balance-burst";
+      burst.setAttribute("aria-hidden", "true");
+      burst.textContent = count.textContent.trim() || "0";
+
+      document.body.appendChild(burst);
+
+      /*
+       * Reuse Woodshed's existing celebration/confetti system.
+       */
+      window.dispatchEvent(new CustomEvent("woodshed:celebrate"));
+
+      window.setTimeout(() => {
+        burst.remove();
+      }, 1400);
+    }
+
+    control.addEventListener("click", revealBalance);
+
+    control.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+
+      event.preventDefault();
+      revealBalance();
+    });
+  }
+
+
+  function stageUi() {
+    stageShedGrid();
+    stageShopDandelion();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", stageUi, { once: true });
+  } else {
+    stageUi();
+  }
+})();
+
+/* === END TEMP SHED GRID + SHOP DANDELION STAGE === */
+
+/* === TEMP SHED INLINE POSITION FIX === */
+(function () {
+  function forceShedPositions() {
+    if (window.location.pathname !== "/home") return;
+
+    const foreground = document.querySelector(".woodshed-foreground");
+    const left = document.querySelector(".ww-shed-control-left");
+    const right = document.querySelector(".ww-shed-control-right");
+
+    if (!foreground || !left || !right) return;
+
+    function imp(el, prop, value) {
+      el.style.setProperty(prop, value, "important");
+    }
+
+    imp(foreground, "position", "absolute");
+    imp(foreground, "inset", "0");
+    imp(foreground, "width", "100%");
+    imp(foreground, "height", "100%");
+    imp(foreground, "padding", "0");
+    imp(foreground, "display", "block");
+    imp(foreground, "pointer-events", "none");
+    imp(foreground, "z-index", "10");
+
+    for (const [column, side] of [[left, "left"], [right, "right"]]) {
+      imp(column, "position", "absolute");
+      imp(column, "top", "4%");
+      imp(column, "bottom", "4%");
+      imp(column, side, "0.65rem");
+      imp(column, "width", "42%");
+      imp(column, "height", "auto");
+
+      imp(column, "display", "grid");
+      imp(column, "grid-template-rows", "repeat(5, 1fr)");
+      imp(column, "align-items", "center");
+
+      if (side === "left") {
+        imp(column, "justify-items", "start");
+      } else {
+        imp(column, "justify-items", "end");
+      }
+
+      for (const child of column.children) {
+        imp(child, "position", "static");
+        imp(child, "inset", "auto");
+        imp(child, "top", "auto");
+        imp(child, "right", "auto");
+        imp(child, "bottom", "auto");
+        imp(child, "left", "auto");
+        imp(child, "margin", "0");
+        imp(child, "transform", "none");
+        imp(child, "align-self", "center");
+        imp(child, "pointer-events", "auto");
+
+        if (side === "left") {
+          imp(child, "justify-self", "start");
+        } else {
+          imp(child, "justify-self", "end");
+        }
+      }
+    }
+
+    const audio = document.querySelector(".shed-sound-effects-controls");
+    const audioButton = document.getElementById("sound-effects-button");
+
+    if (audio) {
+      imp(audio, "display", "block");
+      imp(audio, "visibility", "visible");
+      imp(audio, "opacity", "1");
+    }
+
+    if (audioButton) {
+      imp(audioButton, "display", "inline-flex");
+      imp(audioButton, "visibility", "visible");
+      imp(audioButton, "opacity", "1");
+      imp(audioButton, "font-size", "2rem");
+    }
+  }
+
+  function run() {
+    forceShedPositions();
+
+    /* Run again after the rest of app.js has hydrated the SHED. */
+    setTimeout(forceShedPositions, 100);
+    setTimeout(forceShedPositions, 500);
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", run, { once: true });
+  } else {
+    run();
+  }
+})();
+/* === END TEMP SHED INLINE POSITION FIX === */
