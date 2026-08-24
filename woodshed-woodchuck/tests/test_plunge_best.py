@@ -215,13 +215,10 @@ def test_best_score_api_requires_authentication_and_exposes_no_identifiers(
     assert "pin" not in serialized.casefold()
 
 
-def test_board_migrates_browser_best_upward_and_renders_server_leaderboard() -> None:
-    assert 'id="board-player-burrow-best"' in BOARD
-    assert 'id="board-burrow-leaderboard"' in BOARD
-    assert 'fetch("/xp/plunge-best"' in APP_JS
-    assert "if (browserBest > payload.best_score)" in APP_JS
-    assert "renderBurrowBest(payload)" in APP_JS
-    assert "playerBurrowBestEl.textContent = String(payload.best_score)" in APP_JS
+def test_board_keeps_burrow_standings_outside_board_and_preserves_launcher() -> None:
+    assert 'id="board-player-burrow-best"' not in BOARD
+    assert 'id="board-burrow-leaderboard"' not in BOARD
+    assert 'id="plunge-burrow-button"' in BOARD
 
 
 def test_game_reports_its_best_without_using_local_storage_as_server_evidence() -> None:

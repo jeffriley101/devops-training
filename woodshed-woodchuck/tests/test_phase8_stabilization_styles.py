@@ -34,14 +34,20 @@ def test_member_since_is_only_on_board_beneath_name() -> None:
     assert "Member Since" not in SHED
     name_at = BOARD.index('id="board-player-name"')
     member_at = BOARD.index("Member Since")
-    weekly_at = BOARD.index("This Week’s Camp Points")
+    weekly_at = BOARD.index("Board Activity Points this Week")
     assert name_at < member_at < weekly_at
     assert "Member’s Since" not in BOARD
     assert 'datetime="{{ member_since.timestamp }}"' in BOARD
 
 
 def test_board_heading_cherry_description_and_team_contrast_hooks() -> None:
-    assert BOARD.count("PRACTICE MINUTES LEADERBOARD") >= 3
+    practice_category = BOARD[
+        BOARD.index('data-contest-category="weekly-points-leaders"'):
+        BOARD.index('data-contest-category="weekly-practice-by-instrument"')
+    ]
+    assert "Practice Minutes" in practice_category
+    assert 'data-division="open"' in practice_category
+    assert 'data-division="verified"' in practice_category
     assert 'contest-description-plain">All submitted P-Charts' in BOARD
     assert "contest-description-cherry" not in BOARD
     plain_at = CSS.index(".contest-description-plain")

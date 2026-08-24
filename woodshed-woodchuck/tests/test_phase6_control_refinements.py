@@ -99,7 +99,7 @@ def test_trivia_restores_native_checked_and_visual_selected_state() -> None:
     assert ".trivia-option.is-selected" in css
     assert 'content: "Selected"' in css
     assert "serverConfirmedTriviaAttempt?.selected_answer_id" in band_camp
-    assert "+1 Camp Point · +1 dandelion" in band_camp
+    assert "+1 Board Activity Point · +1 dandelion" in band_camp
     assert "Attempt used" in band_camp
 
 

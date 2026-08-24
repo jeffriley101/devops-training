@@ -8,7 +8,7 @@ APP = (ROOT / "static/js/app.js").read_text(encoding="utf-8")
 
 
 def run_team_grouping(rows):
-    start = APP.index("  function groupTeamContestResults(rows) {")
+    start = APP.index("  const BOARD_CONTEST_TITLES")
     end = APP.index("  function wirePastWinners()", start)
     function_source = APP[start:end]
     script = (
@@ -55,6 +55,11 @@ def test_historical_team_rank_sequences_are_grouped_by_contest_scope():
         "team-average-practice",
         "team-seasonal-points",
         "team-weekly-practice",
+    ]
+    assert [group["contestName"] for group in groups] == [
+        "Practice Minutes this Week by Team Average",
+        "Lifetime Board Activity Points by Team",
+        "Practice Minutes this Week by Team",
     ]
     for group in groups:
         assert {row["contest"]["key"] for row in group["results"]} == {

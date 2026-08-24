@@ -169,7 +169,7 @@ def test_trivia_client_never_displays_raw_response_index_and_summarizes_result()
     assert "Your answer:" not in band_camp
     assert "input.checked = choice.id === selectedAnswerId" in band_camp
     assert "Number(selected.value)" not in band_camp
-    assert "+1 Camp Point · +1 dandelion" in band_camp
+    assert "+1 Board Activity Point · +1 dandelion" in band_camp
     assert "Attempt used" in band_camp
     assert "Completed; no reward earned" in band_camp
 

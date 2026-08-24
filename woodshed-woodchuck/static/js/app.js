@@ -1324,7 +1324,7 @@
         next.quest.completed = payload.completed === true;
         if (Number.isInteger(payload.credits)) next.progress.credits = payload.credits;
         const rewardMessage = payload.created === true
-          ? `Challenge complete: +5 dandelions and +2 Camp Points. Total: ${payload.credits} dandelions.`
+          ? `Challenge complete: +5 dandelions and +2 Board Activity Points. Total: ${payload.credits} dandelions.`
           : payload.completed === true
             ? "Challenge already completed. No additional reward was added."
             : `${pickMessage("supportive", dateKey)} (${payload.logged_minutes}/${payload.target_minutes} minutes)`;
@@ -2476,7 +2476,7 @@
         });
         const payload = await response.json();
         if (!response.ok) {
-          throw new Error(payload.detail || "Camp points could not be saved.");
+          throw new Error(payload.detail || "Board Activity Points could not be saved.");
         }
         playNewCrownIfConfirmed(payload);
         playNewMedalIfConfirmed(payload);
@@ -2504,7 +2504,7 @@
       const rewarded = activityType !== "trivia"
         || serverConfirmedTriviaAttempt?.correct === true;
       summary.innerHTML = complete && rewarded
-        ? '+1 Camp Point · +1 dandelion <span class="confirmed-checkmark" aria-hidden="true">✓</span><span class="sr-only"> Completed</span>'
+        ? '+1 Board Activity Point · +1 dandelion <span class="confirmed-checkmark" aria-hidden="true">✓</span><span class="sr-only"> Completed</span>'
         : complete
           ? 'Attempt used <span class="confirmed-checkmark" aria-hidden="true">✓</span><span class="sr-only"> Completed; no reward earned</span>'
         : activityType === "trivia"
@@ -2728,7 +2728,7 @@
 
         stateApi.saveState(next);
         feedbackEl.textContent =
-          "Rehearsal or lesson completed. +1 Camp Point and +1 dandelion.";
+          "Rehearsal or lesson completed. +1 Board Activity Point and +1 dandelion.";
 
         renderBoard(next);
         hydrateHome(next);
@@ -2747,7 +2747,7 @@
             playCampReward(false);
           }
         } catch (error) {
-          feedbackEl.textContent = error.message || "Camp points could not be saved.";
+          feedbackEl.textContent = error.message || "Board Activity Points could not be saved.";
           return;
         }
 
@@ -2756,7 +2756,7 @@
         stateApi.saveState(next);
 
         feedbackEl.textContent =
-          "Instrument care completed. +1 Camp Point and +1 dandelion.";
+          "Instrument care completed. +1 Board Activity Point and +1 dandelion.";
 
         renderBoard(next);
         hydrateHome(next);
@@ -2827,7 +2827,7 @@
           }
           window.dispatchEvent(new CustomEvent("ww:camp-points-saved"));
           feedbackEl.textContent =
-            "Correct! +1 Camp Point and +1 dandelion.";
+            "Correct! +1 Board Activity Point and +1 dandelion.";
         } else {
           if (checkedAnswer.created === true) playSound("incorrectTrivia");
           feedbackEl.textContent =
@@ -2858,7 +2858,7 @@
           marchingButton.disabled = false;
           marchingButton.textContent = readyText;
           marchingActivity.open = true;
-          feedbackEl.textContent = error.message || "Camp points could not be saved.";
+          feedbackEl.textContent = error.message || "Board Activity Points could not be saved.";
           return;
         }
 
@@ -2872,7 +2872,7 @@
         stateApi.saveState(next);
 
         feedbackEl.textContent =
-          "Readiness challenge completed. +1 Camp Point and +1 dandelion.";
+          "Readiness challenge completed. +1 Board Activity Point and +1 dandelion.";
 
         renderBoard(next);
         hydrateHome(next);
@@ -2898,63 +2898,9 @@
     );
     const retryButton = document.getElementById("contest-standings-retry");
     const weekRangeEl = document.getElementById("contest-week-range");
-    const weekContextEl = document.getElementById("contest-week-context");
     const weekStatusEl = document.getElementById("contest-week-status");
-    let selectedDivision = "open";
     let requestInFlight = false;
     let refreshQueued = false;
-    const tabs = [
-      document.getElementById("contest-open-tab"),
-      document.getElementById("contest-verified-tab"),
-    ].filter(Boolean);
-    const panels = {
-      open: document.getElementById("contest-open-panel"),
-      verified: document.getElementById("contest-verified-panel"),
-    };
-
-    function selectDivision(division, focusTab) {
-      selectedDivision = division;
-      tabs.forEach((tab) => {
-        const selected = tab.id === `contest-${division}-tab`;
-        tab.setAttribute("aria-selected", String(selected));
-        tab.tabIndex = selected ? 0 : -1;
-        if (selected && focusTab) tab.focus();
-      });
-
-      Object.entries(panels).forEach(([key, panel]) => {
-        if (!panel) return;
-        const selected = key === division;
-        panel.hidden = !selected;
-        panel.classList.toggle("hidden", !selected);
-      });
-      if (weekContextEl) {
-        weekContextEl.textContent = `${division === "open" ? "Open" : "Verified"} division`;
-      }
-    }
-
-    tabs.forEach((tab, index) => {
-      tab.addEventListener("click", function () {
-        selectDivision(tab.id.includes("verified") ? "verified" : "open", false);
-      });
-      tab.addEventListener("keydown", function (event) {
-        let nextIndex = null;
-        if (event.key === "ArrowRight" || event.key === "ArrowDown") {
-          nextIndex = (index + 1) % tabs.length;
-        } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
-          nextIndex = (index - 1 + tabs.length) % tabs.length;
-        } else if (event.key === "Home") {
-          nextIndex = 0;
-        } else if (event.key === "End") {
-          nextIndex = tabs.length - 1;
-        }
-        if (nextIndex === null) return;
-        event.preventDefault();
-        selectDivision(
-          tabs[nextIndex].id.includes("verified") ? "verified" : "open",
-          true
-        );
-      });
-    });
 
     function formatContestDate(value) {
       if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
@@ -3011,7 +2957,7 @@
         subject.textContent = `${icon} ${teamName || row.instrument}`;
         const score = document.createElement("strong");
         score.className = "contest-ranked-score";
-        score.textContent = `${row.total_minutes} min`;
+        score.textContent = String(row.total_minutes);
         rankedRow.append(rank, subject, score);
         list.appendChild(rankedRow);
       });
@@ -3033,7 +2979,7 @@
     function positionMessage(division, position, campPoints = false) {
       if (!position || position.has_score !== true) {
         if (campPoints) {
-          return "No Camp points yet · Complete a Back to School activity to join the board.";
+          return "No Board Activity Points yet · Complete a Back to School activity to join the board.";
         }
         return division === "verified"
           ? "No verified minutes yet · Approved P-Charts appear here."
@@ -3051,7 +2997,7 @@
           ? `Tied for ${ordinal(position.rank)}`
           : `Rank ${position.rank}`,
         campPoints
-          ? `${score} Camp ${score === 1 ? "point" : "points"}`
+          ? `${score} Board Activity ${score === 1 ? "Point" : "Points"}`
           : `${score} min`,
       ];
       if (position.rank === 1) {
@@ -3103,7 +3049,7 @@
           : row.display_name;
         rankedRow.setAttribute(
           "aria-label",
-          `Rank ${row.rank}, ${publicName}, ${scoreValue} ${campPoints ? "Camp points" : "practice minutes"}`
+          `Rank ${row.rank}, ${publicName}, ${scoreValue} ${campPoints ? "Board Activity Points" : "practice minutes"}`
         );
         const rank = document.createElement("span");
         rank.className = "contest-rank-badge";
@@ -3113,9 +3059,7 @@
         subject.textContent = publicName;
         const score = document.createElement("strong");
         score.className = "contest-ranked-score";
-        score.textContent = campPoints
-          ? `${scoreValue} Camp ${scoreValue === 1 ? "point" : "points"}`
-          : `${scoreValue} min`;
+        score.textContent = String(scoreValue);
         rankedRow.append(rank, subject, score);
         list.appendChild(rankedRow);
       });
@@ -3147,10 +3091,12 @@
             const teamName = document.createElement("span"); teamName.textContent = row.team_name;
             subject.append(emblem, teamName);
             const score = document.createElement("strong"); score.className = "contest-ranked-score";
-            score.textContent = key === "team-average-practice"
-              ? `${(row.score / 100).toFixed(2)} min`
+            const scoreValue = key === "team-average-practice"
+              ? (row.score / 100).toFixed(2)
               : String(row.score);
-            item.setAttribute("aria-label", `Rank ${row.rank}, ${row.team_name}, ${score.textContent}`);
+            score.textContent = scoreValue;
+            const scoreUnit = key === "team-seasonal-points" ? "Board Activity Points" : "practice minutes";
+            item.setAttribute("aria-label", `Rank ${row.rank}, ${row.team_name}, ${scoreValue} ${scoreUnit}`);
             item.append(rank, subject, score); list.append(item);
           });
         });
@@ -3275,7 +3221,6 @@
           "camp-points"
         );
         renderTeamBoards(payload.standings);
-        selectDivision(selectedDivision, false);
         if (loadingEl) loadingEl.classList.add("hidden");
         if (errorEl) errorEl.classList.add("hidden");
         if (weekStatusEl) weekStatusEl.classList.add("hidden");
@@ -3291,11 +3236,24 @@
       }
     }
 
-    selectDivision("open", false);
     retryButton.addEventListener("click", loadStandings);
     window.addEventListener("ww:p-chart-saved", loadStandings);
     window.addEventListener("ww:camp-points-saved", loadStandings);
     loadStandings();
+  }
+
+  const BOARD_CONTEST_TITLES = Object.freeze({
+    "weekly-camp-points": "Board Activity Points this Week",
+    "team-seasonal-points": "Lifetime Board Activity Points by Team",
+    "weekly-points-leaders": "Practice Minutes this Week",
+    "weekly-practice-by-instrument": "Practice Minutes this Week by Instrument",
+    "team-weekly-practice": "Practice Minutes this Week by Team",
+    "team-average-practice": "Practice Minutes this Week by Team Average",
+    "team-season-practice": "Practice Minutes this Season by Team",
+  });
+
+  function boardContestTitle(contest) {
+    return BOARD_CONTEST_TITLES[contest.key] || contest.name || contest.key;
   }
 
   function groupTeamContestResults(rows) {
@@ -3306,7 +3264,7 @@
       if (!groups.has(contest.key)) {
         groups.set(contest.key, {
           contestKey: contest.key,
-          contestName: contest.name || contest.key,
+          contestName: boardContestTitle(contest),
           results: [],
         });
       }
@@ -3477,7 +3435,7 @@
           const score = document.createElement("span");
           score.className = "medal-row-score";
           if (type === "camp-points") {
-            score.textContent = `${result.score} Camp ${result.score === 1 ? "point" : "points"}`;
+            score.textContent = `${result.score} Board Activity ${result.score === 1 ? "Point" : "Points"}`;
           } else if (type === "teams" && result.contest.key === "team-seasonal-points") {
             score.textContent = `${result.score} ${result.score === 1 ? "point" : "points"}`;
           } else if (type === "teams" && result.contest.key === "team-average-practice") {
@@ -3564,6 +3522,7 @@
     const emptyEl = document.getElementById("champions-empty");
     const errorEl = document.getElementById("champions-error");
     const contentEl = document.getElementById("champions-content");
+    const seasonalList = document.getElementById("seasonal-champions-list");
     const retryButton = document.getElementById("champions-retry");
     const filterButtons = Array.from(
       root.querySelectorAll("[data-champions-division]")
@@ -3722,7 +3681,8 @@
         Array.isArray(champion.achievements) && champion.achievements.every(
           (achievement) => achievement && achievement.season &&
             typeof achievement.season.name === "string" &&
-            achievement.contest && typeof achievement.contest.name === "string" &&
+            achievement.contest && typeof achievement.contest.key === "string" &&
+            typeof achievement.contest.name === "string" &&
             ["open", "verified"].includes(achievement.division) &&
             validCounts(achievement.medals)
         ) &&
@@ -3733,6 +3693,104 @@
           champion.crown.target_wins === 10 &&
           typeof champion.crown.earned === "boolean"
         ));
+    }
+
+    function renderSeasonalHall() {
+      if (!seasonalList) return;
+      const categories = new Map();
+      Object.entries(champions).forEach(([type, entries]) => {
+        entries.forEach((champion, championIndex) => {
+          champion.achievements.forEach((achievement) => {
+            const categoryKey = achievement.contest.key;
+            let category = categories.get(categoryKey);
+            if (!category) {
+              category = {
+                name: boardContestTitle(achievement.contest),
+                divisions: { open: new Map(), verified: new Map() },
+              };
+              categories.set(categoryKey, category);
+            }
+            const championKey = `${type}:${championIndex}`;
+            const divisionEntries = category.divisions[achievement.division];
+            let entry = divisionEntries.get(championKey);
+            if (!entry) {
+              const instrumentName = type === "instruments"
+                ? (window.WWInstruments.teamLabel(champion.instrument_label) || champion.instrument_label)
+                : "";
+              entry = {
+                type,
+                name: type === "students"
+                  ? champion.display_name
+                  : `${champion.instrument_icon} ${instrumentName}`,
+                crownEarned: type === "students" && champion.crown.earned,
+                history: [],
+              };
+              divisionEntries.set(championKey, entry);
+            }
+            entry.history.push({
+              season: achievement.season.name,
+              medals: achievement.medals,
+            });
+          });
+        });
+      });
+
+      seasonalList.replaceChildren();
+      Array.from(categories.entries())
+        .sort((left, right) => left[1].name.localeCompare(right[1].name, undefined, {
+          sensitivity: "base",
+        }))
+        .forEach(([categoryKey, category]) => {
+          const categoryDetails = document.createElement("details");
+          categoryDetails.className = "hall-category-card";
+          categoryDetails.dataset.hallCategory = categoryKey;
+          const categorySummary = document.createElement("summary");
+          categorySummary.textContent = category.name;
+          categoryDetails.appendChild(categorySummary);
+          const divisions = document.createElement("div");
+          divisions.className = "hall-category-divisions";
+
+          ["open", "verified"].forEach((divisionKey) => {
+            const divisionSection = document.createElement("section");
+            divisionSection.className = "hall-division-card";
+            divisionSection.dataset.division = divisionKey;
+            const heading = document.createElement("h4");
+            heading.textContent = divisionKey === "open" ? "Open" : "Verified";
+            divisionSection.appendChild(heading);
+            const entries = Array.from(category.divisions[divisionKey].values());
+            if (!entries.length) {
+              const empty = document.createElement("p");
+              empty.className = "contest-empty-state";
+              empty.textContent = "No champion in this division yet.";
+              divisionSection.appendChild(empty);
+            } else {
+              entries.forEach((entry) => {
+                const card = document.createElement("article");
+                card.className = "champion-card";
+                const name = document.createElement("strong");
+                name.textContent = `${entry.name}${entry.crownEarned ? " 👑" : ""}`;
+                const achievements = document.createElement("ul");
+                achievements.className = "champion-achievements";
+                entry.history.forEach((history) => {
+                  const item = document.createElement("li");
+                  const medalParts = [
+                    ["Gold", history.medals.gold],
+                    ["Silver", history.medals.silver],
+                    ["Bronze", history.medals.bronze],
+                  ].filter((medal) => medal[1] > 0)
+                    .map((medal) => `${medal[0]} ${medal[1]}`);
+                  item.textContent = `${history.season} — ${medalParts.join(", ")}`;
+                  achievements.appendChild(item);
+                });
+                card.append(name, achievements);
+                divisionSection.appendChild(card);
+              });
+            }
+            divisions.appendChild(divisionSection);
+          });
+          categoryDetails.appendChild(divisions);
+          seasonalList.appendChild(categoryDetails);
+        });
     }
 
     async function loadChampions() {
@@ -3756,31 +3814,13 @@
         if (!champions.students.length && !champions.instruments.length) {
           return showState(emptyEl);
         }
-        render();
+        renderSeasonalHall();
         showState(contentEl);
       } catch (_error) {
         showState(errorEl);
       }
     }
 
-    filterButtons.forEach((button) => {
-      button.addEventListener("click", function () {
-        division = button.dataset.championsDivision;
-        expanded.students = false;
-        expanded.instruments = false;
-        render();
-      });
-    });
-    ["students", "instruments"].forEach((type) => {
-      const singular = type === "students" ? "student" : "instrument";
-      document.getElementById(`${singular}-champions-show-all`).addEventListener(
-        "click",
-        function () {
-          expanded[type] = true;
-          renderType(type);
-        }
-      );
-    });
     retryButton.addEventListener("click", loadChampions);
     loadChampions();
   }

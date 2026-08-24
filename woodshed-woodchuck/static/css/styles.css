@@ -5833,7 +5833,114 @@ select {
   overflow-wrap: anywhere;
 }
 
+.contest-category-list,
+.hall-seasonal-categories {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.contest-category-card,
+.hall-category-card {
+  overflow: hidden;
+  border: 2px solid rgba(255, 224, 138, 0.72);
+  border-radius: 0.7rem;
+  background: rgba(20, 38, 45, 0.38);
+}
+
+.contest-category-card > summary,
+.hall-category-card > summary,
+.history-disclosure > summary {
+  display: flex;
+  min-height: 3.25rem;
+  padding: 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  cursor: pointer;
+  font-weight: 950;
+  list-style: none;
+}
+
+.contest-category-card > summary::-webkit-details-marker,
+.hall-category-card > summary::-webkit-details-marker,
+.history-disclosure > summary::-webkit-details-marker { display: none; }
+
+.contest-category-card > summary::after,
+.hall-category-card > summary::after,
+.history-disclosure > summary::after {
+  content: "+";
+  flex: none;
+  font-size: 1.25rem;
+}
+
+.contest-category-card[open] > summary::after,
+.hall-category-card[open] > summary::after,
+.history-disclosure[open] > summary::after { content: "−"; }
+
+.contest-category-divisions,
+.hall-category-divisions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.65rem;
+  padding: 0.7rem;
+  border-top: 1px solid rgba(255, 224, 138, 0.45);
+}
+
+.contest-category-divisions {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.contest-division-card,
+.hall-division-card {
+  min-width: 0;
+  padding: 0.65rem;
+  border: 1px solid rgba(121, 167, 164, 0.68);
+  border-radius: 0.55rem;
+  background: rgba(5, 12, 20, 0.68);
+}
+
+.contest-division-card > h4,
+.hall-division-card > h4 { margin: 0 0 0.5rem; }
+
+.contest-division-coming-soon {
+  display: grid;
+  min-height: 5.5rem;
+  place-content: center;
+  color: #4a3824;
+  background: #e8d8ae;
+  border-style: dashed;
+  text-align: center;
+}
+
+.contest-division-coming-soon p { margin: 0; }
+
+.history-disclosure {
+  width: 100%;
+  overflow: hidden;
+  padding: 0;
+}
+
+.history-disclosure > summary {
+  padding: 0.8rem;
+  border: 3px ridge #9b7023;
+  border-radius: 5px;
+  color: #2e210c;
+  background: linear-gradient(145deg, #f0d577, #ad7d27);
+  font-size: 1.2rem;
+  text-align: left;
+}
+
+.history-disclosure-body { padding: 0.8rem; }
+.hall-seasonal > h3 { margin: 0.35rem 0; }
+.hall-category-card { border-color: rgba(92, 63, 32, 0.55); background: rgba(247, 228, 174, 0.55); }
+.hall-category-card > summary { color: #302314; }
+.hall-division-card { color: #302314; background: rgba(255, 248, 232, 0.78); border-color: rgba(92, 63, 32, 0.34); }
+.hall-division-card .champion-card + .champion-card { margin-top: 0.55rem; }
+
 @media (max-width: 640px) {
+  .contest-category-divisions,
+  .hall-category-divisions { grid-template-columns: 1fr; }
   .board-page > .back-to-school-streamers { height: 1.9rem; }
   .board-locker > summary {
     min-height: 6.5rem;

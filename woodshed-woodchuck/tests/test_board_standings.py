@@ -18,26 +18,52 @@ def test_board_contains_live_standings_markup() -> None:
     markup = board_template()
 
     assert 'id="band-camp-standings"' in markup
-    assert 'id="contest-division-tabs"' in markup
-    assert 'id="contest-open-tab"' in markup
-    assert 'id="contest-verified-tab"' in markup
-    assert 'aria-selected="true"' in markup
-    assert 'role="tabpanel"' in markup
+    assert 'class="contest-category-list"' in markup
+    assert 'data-contest-category="weekly-points-leaders"' in markup
+    assert 'data-contest-category="weekly-camp-points"' in markup
+    assert 'data-contest-category="weekly-practice-by-instrument"' in markup
+    assert 'data-division="open"' in markup
+    assert 'data-division="verified"' in markup
+    assert "Pristine" in markup and "MVP" in markup
+    assert "Under construction" in markup
     assert 'class="contest-ranked-list"' in markup
     assert 'role="list"' in markup
     assert 'id="contest-open-points"' in markup
     assert 'id="contest-verified-points"' in markup
-    assert "PRACTICE MINUTES LEADERBOARD" in markup
+    assert "Practice Minutes" in markup
     assert 'aria-label="Open minutes leaders"' in markup
     assert 'aria-label="Verified minutes leaders"' in markup
     assert 'aria-label="Open points leaders"' not in markup
     assert 'aria-label="Verified points leaders"' not in markup
-    assert "WEEKLY PRACTICE BY INSTRUMENT" in markup
-    assert "WEEKLY BAND CAMP POINTS" in markup
+    assert "Practice Minutes this Week by Instrument" in markup
+    assert "Board Activity Points this Week" in markup
     assert 'id="contest-open-camp-points"' in markup
     assert 'id="contest-open-camp-position"' not in markup
     assert 'id="contest-verified-camp-points"' not in markup
     assert "Your Position" not in markup
+
+
+def test_live_competitions_use_requested_order_and_tpr_placeholder() -> None:
+    markup = TestClient(app).get("/quest").text
+    titles = (
+        "Board Activity Points this Week",
+        "Board Activity Points this Week by Team",
+        "Practice Minutes this Week",
+        "Practice Minutes this Week by Instrument",
+        "Practice Minutes this Week by Team",
+        "Practice Minutes this Week by Team Average",
+        "Practice Minutes Lifetime by Team",
+        "Team Practice Rating",
+    )
+    positions = [markup.index(f"<span>{title}</span>") for title in titles]
+
+    assert positions == sorted(positions)
+    tpr = markup[
+        markup.index('data-contest-category="team-practice-rating"'):
+        markup.index('data-contest-category="team-practice-rating"') + 900
+    ]
+    assert "Under construction" in tpr
+    assert "data-team-board" not in tpr
 
 
 def test_board_preserves_past_winners_and_hall_without_personal_crown() -> None:
@@ -133,37 +159,54 @@ def test_past_winners_javascript_handles_medals_ties_and_failures() -> None:
     assert "Medal Board of Past Winners could not be loaded." in board_template() + javascript
 
 
-def test_board_contains_hall_panels_filters_states_and_show_all() -> None:
+def test_board_contains_collapsed_seasonal_hall_states_and_nested_target() -> None:
     markup = board_template()
 
     for element_id in (
-        "hall-of-champions", "champions-loading", "champions-auth",
+        "past-winners", "hall-of-champions", "champions-loading", "champions-auth",
         "champions-empty", "champions-error", "champions-retry",
-        "champions-division-filters", "student-champions-list",
-        "instrument-champions-list", "student-champions-show-all",
-        "instrument-champions-show-all",
+        "champions-content", "seasonal-champions-title",
+        "seasonal-champions-list",
     ):
         assert f'id="{element_id}"' in markup
-    for division in ("all", "open", "verified"):
-        assert f'data-champions-division="{division}"' in markup
-    assert "Student Champions" in markup
-    assert "Instrument Champions" in markup
+    medal_opening = markup[markup.index('<details\n        id="past-winners"'):]
+    hall_opening = markup[markup.index('<details\n        id="hall-of-champions"'):]
+    assert " open" not in medal_opening[:medal_opening.index(">")]
+    assert " open" not in hall_opening[:hall_opening.index(">")]
+    assert '<summary id="past-winners-title">Medal Board of Past Winners</summary>' in markup
+    assert '<summary id="hall-of-champions-title">Hall of Champions</summary>' in markup
+    assert "Historical winners" not in markup
+    assert markup.index('id="past-winners"') < markup.index('id="hall-of-champions"')
+    assert markup.count('class="board-panel medal-board history-disclosure"') == 1
+    assert markup.count('class="board-panel hall-of-champions history-disclosure"') == 1
+    assert "Seasonal" in markup
     assert "No finalized champions yet." in markup
 
+    css = (TEMPLATE_PATH.parents[1] / "static" / "css" / "styles.css").read_text(encoding="utf-8")
+    disclosure_css = css[css.index(".history-disclosure > summary"):]
+    assert 'content: "+"' in disclosure_css
+    assert '.history-disclosure[open] > summary::after { content: "−"; }' in disclosure_css
+    assert ".history-disclosure-body { padding: 0.8rem; }" in disclosure_css
+    assert "min-height: 3.25rem" in css[
+        css.index(".contest-category-card > summary,"):
+        css.index(".contest-category-divisions,")
+    ]
 
-def test_hall_javascript_uses_top_ten_filters_medals_crown_and_retry() -> None:
+
+def test_hall_javascript_groups_category_division_identity_and_season() -> None:
     javascript = (
         Path(__file__).resolve().parents[1] / "static" / "js" / "app.js"
     ).read_text(encoding="utf-8")
 
     assert 'fetch("/contests/hall-of-champions"' in javascript
-    assert "ordered.slice(0, 10)" in javascript
-    assert 'division === "all"' in javascript
-    assert 'medalStat("🥇", "Gold"' in javascript
-    assert 'medalStat("🥈", "Silver"' in javascript
-    assert 'medalStat("🥉", "Bronze"' in javascript
-    assert "Permanent crown earned" in javascript
-    assert "champions-show-all" in javascript
+    hall = javascript[javascript.index("function wireHallOfChampions"):javascript.index("function wirePersonalCrownProgress")]
+    assert 'function renderSeasonalHall()' in hall
+    assert 'const championKey = `${type}:${championIndex}`' in hall
+    assert 'categoryDetails.dataset.hallCategory = categoryKey' in hall
+    assert '["open", "verified"].forEach' in hall
+    assert 'item.textContent = `${history.season}' in hall
+    assert 'entry.crownEarned ? " 👑"' in hall
+    assert "Pristine" not in hall and "MVP" not in hall
     assert 'retryButton.addEventListener("click", loadChampions)' in javascript
 
 
@@ -244,8 +287,34 @@ def test_live_scoreboard_javascript_uses_actual_ranks_and_preserves_ties() -> No
     assert "Math.min(row.rank, 4)" in javascript
     assert "position.tied === true" in javascript
     assert "position.in_top_five === false" in javascript
-    assert ': `${scoreValue} min`' in javascript
+    assert ': `${score} min`' in javascript
     assert ': `${behind} min behind leader`' in javascript
+
+
+def test_live_leaderboard_rows_show_numeric_scores_without_repeated_units() -> None:
+    javascript = (
+        Path(__file__).resolve().parents[1] / "static" / "js" / "app.js"
+    ).read_text(encoding="utf-8")
+    instruments = javascript[
+        javascript.index("function renderDivision"):
+        javascript.index("function ordinal")
+    ]
+    students = javascript[
+        javascript.index("function renderPointsDivision"):
+        javascript.index("function renderTeamBoards")
+    ]
+    teams = javascript[
+        javascript.index("function renderTeamBoards"):
+        javascript.index("function showError", javascript.index("function renderTeamBoards"))
+    ]
+
+    assert "score.textContent = String(row.total_minutes)" in instruments
+    assert "score.textContent = String(scoreValue)" in students
+    assert "score.textContent = scoreValue" in teams
+    for renderer in (instruments, students):
+        score_assignment = renderer[renderer.index("score.textContent"):]
+        assert "Camp ${" not in score_assignment.split("rankedRow.append", 1)[0]
+        assert " min`" not in score_assignment.split("rankedRow.append", 1)[0]
 
 
 def test_instrument_standings_use_collective_team_labels() -> None:
@@ -270,14 +339,15 @@ def test_instrument_standings_use_collective_team_labels() -> None:
     )
 
 
-def test_live_scoreboard_switching_refresh_and_retry_are_wired() -> None:
+def test_live_scoreboard_native_disclosures_refresh_and_retry_are_wired() -> None:
     javascript = (
         Path(__file__).resolve().parents[1] / "static" / "js" / "app.js"
     ).read_text(encoding="utf-8")
 
-    assert 'event.key === "ArrowRight"' in javascript
-    assert 'event.key === "ArrowLeft"' in javascript
-    assert "selectDivision(selectedDivision, false)" in javascript
+    markup = board_template()
+    assert 'class="contest-category-card"' in markup
+    assert "selectDivision(selectedDivision, false)" not in javascript
+    assert "Open and Verified divisions" not in markup + javascript
     assert "if (requestInFlight) {" in javascript
     assert "refreshQueued = true" in javascript
     assert 'retryButton.addEventListener("click", loadStandings)' in javascript
@@ -301,7 +371,7 @@ def test_camp_point_actions_persist_and_guard_duplicate_clicks() -> None:
     assert 'activity_date: today' in javascript
     assert 'new CustomEvent("ww:camp-points-saved")' in javascript
     assert 'standings["weekly-camp-points"]' in javascript
-    assert '"Camp points"' in javascript
+    assert '"Board Activity Points"' in javascript
 
 
 def test_completed_band_camp_activities_use_server_backed_disclosures() -> None:
@@ -327,8 +397,8 @@ def test_board_weekly_points_and_hours_checkbox_contract() -> None:
     markup = (root / "templates" / "quest.html").read_text(encoding="utf-8")
     javascript = (root / "static" / "js" / "app.js").read_text(encoding="utf-8")
     css = (root / "static" / "css" / "styles.css").read_text(encoding="utf-8")
-    weekly = markup.index("This Week’s Camp Points")
-    season = markup.index("Season Camp Points")
+    weekly = markup.index("Board Activity Points this Week")
+    season = markup.index("Lifetime Board Activity Points")
     hours_panel = markup[
         markup.index('id="camp-hours-activity"'):
         markup.index('id="instrument-care-activity"')
@@ -337,7 +407,8 @@ def test_board_weekly_points_and_hours_checkbox_contract() -> None:
     assert weekly < season
     assert 'id="board-player-weekly-points">0</strong>' in markup
     assert 'id="board-player-season-points">0</strong>' in markup
-    assert "Career Band Camp Points" not in markup
+    assert "Camp Points" not in markup
+    assert "Seasonal Points" not in markup
     assert 'document.getElementById("board-player-points")' not in javascript
     assert "current.bandCamp.totals.points" not in javascript[
         javascript.index("function renderBoard(current)"):
@@ -375,7 +446,7 @@ def test_live_scoreboard_week_header_icons_and_status_are_present() -> None:
     ).read_text(encoding="utf-8")
 
     assert 'id="contest-week-range"' in markup
-    assert 'id="contest-week-context"' in markup
+    assert 'id="contest-week-context"' not in markup
     assert 'id="contest-week-status"' in markup
     assert "endDate.setDate(endDate.getDate() - 1)" in javascript
     assert "window.WWInstruments.getDefinition(row.instrument)" in javascript

@@ -44,8 +44,11 @@ def test_board_wording_team_cards_placard_and_plunge_accessibility() -> None:
     assert 'aria-label="Play Plunge Burrow"' in html and 'title="Play Plunge Burrow"' in html
     assert '<span aria-hidden="true">🕳️</span></a>' in html
     for title in (
-        "Team Practice Minutes This Week", "Team Seasonal Points",
-        "Team Average Practice", "Total Practice Minutes This Season",
+        "Board Activity Points this Week by Team",
+        "Practice Minutes this Week by Team",
+        "Practice Minutes this Week by Team Average",
+        "Practice Minutes Lifetime by Team",
+        "Team Practice Rating",
     ):
         assert title in html
     assert html.count('class="board-practice-section bonus-challenge-section"') == 1

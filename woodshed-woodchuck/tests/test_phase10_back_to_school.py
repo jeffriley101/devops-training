@@ -82,12 +82,13 @@ def test_trivia_pool_is_expanded_and_keeps_public_answer_contract() -> None:
     ]
 
 
-def test_streamers_burrow_stat_and_bonus_challenge_contract() -> None:
+def test_streamers_burrow_launcher_and_bonus_challenge_contract() -> None:
     assert 'class="back-to-school-streamers" aria-hidden="true"' in BOARD
     assert ".back-to-school-streamers span" in CSS
-    assert "Highest Burrow Score to Date" in BOARD
-    assert 'id="board-player-burrow-best">0</strong>' in BOARD
-    assert '"woodshed.plungeBurrow.bestScore"' in APP
+    assert 'id="plunge-burrow-button"' in BOARD
+    assert "Highest Burrow Score to Date" not in BOARD
+    assert 'id="board-player-burrow-best"' not in BOARD
+    assert 'id="board-burrow-leaderboard"' not in BOARD
 
     bonus = BOARD[BOARD.index('class="board-practice-section bonus-challenge-section"'):]
     assert "🏆</span> Bonus Challenge" in bonus
@@ -98,11 +99,45 @@ def test_streamers_burrow_stat_and_bonus_challenge_contract() -> None:
 
 
 def test_hall_ui_separates_history_and_groups_achievements() -> None:
-    assert "Historical winners" in BOARD
-    assert "All-time history" in BOARD
-    assert "grouped by season, category, and division" in BOARD
+    assert "Historical winners" not in BOARD
+    assert '<summary id="past-winners-title">Medal Board of Past Winners</summary>' in BOARD
+    assert '<summary id="hall-of-champions-title">Hall of Champions</summary>' in BOARD
+    assert BOARD.count("history-disclosure") >= 2
+    assert "Seasonal history" in BOARD
+    assert 'id="seasonal-champions-list"' in BOARD
     hall = APP[APP.index("function wireHallOfChampions"):APP.index("function wirePersonalCrownProgress")]
-    assert 'achievementList.className = "champion-achievements"' in hall
-    assert "achievement.season.name" in hall
-    assert "achievement.contest.name" in hall
-    assert 'achievement.division === "open" ? "Open" : "Verified"' in hall
+    assert 'function renderSeasonalHall()' in hall
+    assert 'categoryDetails.className = "hall-category-card"' in hall
+    assert 'divisions.className = "hall-category-divisions"' in hall
+    assert 'divisionSection.dataset.division = divisionKey' in hall
+    assert 'history.season' in hall
+
+
+def test_live_contests_are_collapsible_categories_with_future_divisions() -> None:
+    rendered = TestClient(app).get("/quest").text
+    assert rendered.count('class="contest-category-card"') == 8
+    assert rendered.count('data-division="open"') == 7
+    assert rendered.count('data-division="verified"') == 7
+    assert rendered.count('class="contest-division-card contest-division-coming-soon"') == 15
+    assert "Open · Verified · Pristine 🚧 · MVP 🚧" not in rendered
+    for category in (
+        "weekly-points-leaders", "weekly-camp-points",
+        "weekly-practice-by-instrument", "team-weekly-practice",
+        "team-seasonal-points", "team-average-practice",
+        "team-season-practice", "team-practice-rating",
+    ):
+        opening = re.search(
+            rf'<details class="contest-category-card"[^>]*data-contest-category="{category}"[^>]*>',
+            rendered,
+        )
+        assert opening is not None
+        assert " open" not in opening.group(0)
+    assert rendered.count("Pristine") >= 7
+    assert rendered.count("MVP") >= 7
+    assert rendered.count("Under construction") == 15
+    division_layout = CSS[
+        CSS.index(".contest-category-divisions {"):
+        CSS.index(".contest-division-card,")
+    ]
+    assert "grid-template-columns: minmax(0, 1fr)" in division_layout
+    assert "repeat(4" not in division_layout

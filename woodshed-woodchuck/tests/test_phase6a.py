@@ -119,7 +119,7 @@ def test_board_phase6a_feedback_success_and_placeholder_contract() -> None:
     assert "checkedAnswer.correct === true" in javascript
     assert "No reward was earned today" in javascript
     assert "Completed · +1 Camp Point" not in javascript
-    assert "+1 Camp Point · +1 dandelion" in javascript
+    assert "+1 Board Activity Point · +1 dandelion" in javascript
     assert "confirmed-checkmark" in javascript + css
     assert '<span class="sr-only"> Completed</span>' in javascript
     assert "is-confirmed-success" in javascript + css
