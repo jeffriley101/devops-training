@@ -132,7 +132,7 @@ body {
 
 .cards {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 24px;
   padding: 32px 0 48px;
   align-items: start;
@@ -398,4 +398,127 @@ body {
   .metadata dl {
     grid-template-columns: 1fr;
   }
+}
+
+/* Featured portfolio projects */
+
+.featured-projects {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  padding: 32px 0 8px;
+}
+
+.featured-card {
+  min-width: 0;
+  grid-column: 1;
+  border-top: 4px solid #9ca3af;
+}
+
+.featured-primary {
+  grid-column: 1;
+}
+
+.lifecycle-card {
+  grid-column: 1;
+  border-top: 4px solid #9ca3af;
+}
+
+.project-highlights {
+  margin: 14px 0 0;
+  padding-left: 20px;
+  color: #374151;
+}
+
+.project-highlights li {
+  margin-bottom: 8px;
+}
+
+@media (max-width: 800px) {
+  .featured-projects {
+    grid-template-columns: 1fr;
+  }
+
+  .featured-primary,
+  .lifecycle-card {
+    grid-column: 1;
+  }
+}
+
+/* Featured project screenshots */
+
+.project-image-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 22px;
+}
+
+.project-image-grid figure {
+  margin: 0;
+}
+
+.project-image-grid img,
+.project-screenshot {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.project-image-grid figcaption {
+  margin-top: 6px;
+  color: #64748b;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.project-screenshot {
+  margin-top: 22px;
+}
+
+@media (max-width: 700px) {
+  .project-image-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.featured-card .project-screenshot {
+  max-width: 100%;
+  margin-top: 20px;
+}
+
+.featured-card + .featured-card,
+.featured-card + .lifecycle-card {
+  margin-top: 0;
+}
+
+.featured-projects .card {
+  border-top: 4px solid #9ca3af;
+}
+
+/* Completed AWS portfolio section */
+
+.portfolio-section-heading {
+  padding: 44px 0 0;
+}
+
+.portfolio-section-heading h2 {
+  margin: 4px 0 8px;
+  font-size: 1.7rem;
+  color: #1f2937;
+}
+
+.portfolio-section-heading p {
+  max-width: 800px;
+  margin-top: 0;
+  color: #4b5563;
+}
+
+.portfolio-section-heading .section-eyebrow {
+  margin-bottom: 4px;
+  color: #475569;
 }

@@ -3,17 +3,17 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>DevOps Portfolio Dashboard</title>
+  <title>Technical Project Portfolio | Jeffrey Alan Riley</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <header class="hero">
     <div class="container">
-      <p class="eyebrow">Jeffrey Alan Riley • DevOps / Cloud / Automation Portfolio</p>
-      <h1>AWS Project Dashboard</h1>
+      <p class="eyebrow">Jeffrey Alan Riley • Systems / DevOps / Application Engineering Portfolio</p>
+      <h1>Technical Project Portfolio</h1>
       <p class="intro">
-        Live portfolio view of my AWS-based automation, monitoring, and artifact publishing projects,
-        including scheduled container workloads, observability outputs, and external-data workflows.
+        Selected work across full-stack application development, Linux and automation,
+        cloud infrastructure, data workflows, and mobile audio engineering.
       </p>
       <div class="tech-stack" aria-label="Core technologies used in this portfolio">
         <span class="tech-chip">AWS</span>
@@ -27,11 +27,159 @@
         <a class="button" href="../README.md">View Root README</a>
         <a class="button secondary" href="https://github.com/jeffriley101/devops-training">View Repository</a>
       </div>
-      <p class="sync-note" id="site-sync-status">Loading latest portfolio sync status...</p>
+      <p class="sync-note">Portfolio deployed through GitHub Pages.</p>
     </div>
   </header>
 
   <main class="container">
+    <section class="featured-projects">
+
+      <article class="card featured-card featured-primary">
+        <div class="card-header">
+          <div class="card-title-group">
+            <span class="project-pill">Featured Project</span>
+            <h2>Woodshed Woodchuck</h2>
+          </div>
+          <a href="https://github.com/jeffriley101/devops-training/tree/main/woodshed-woodchuck">Project Repo</a>
+        </div>
+
+        <p class="card-summary">
+          Production web application that gamifies music practice for student musicians
+          through persistent accounts, practice tracking, challenges, contests, rewards,
+          practice verification, and interactive music tools.
+        </p>
+
+        <div class="badge-row">
+          <span class="badge badge-blue">FastAPI</span>
+          <span class="badge badge-neutral">PostgreSQL</span>
+          <span class="badge badge-green">SQLAlchemy</span>
+          <span class="badge badge-neutral">Alembic</span>
+          <span class="badge badge-neutral">JavaScript</span>
+          <span class="badge badge-neutral">Render</span>
+        </div>
+
+        <ul class="project-highlights">
+          <li>Persistent accounts and cross-device application state</li>
+          <li>Trusted-adult practice verification workflows</li>
+          <li>Seasonal challenges, contests, rewards, and progression systems</li>
+          <li>Server-backed persistence and data integrity</li>
+          <li>Automated testing across core user and gameplay workflows</li>
+        </ul>
+
+        <div class="project-image-grid" aria-label="Woodshed Woodchuck application screenshots">
+          <figure>
+            <img src="images/ww-shed.png" alt="Woodshed Woodchuck SHED screen" />
+            <figcaption>SHED</figcaption>
+          </figure>
+          <figure>
+            <img src="images/ww-shop.png" alt="Woodshed Woodchuck SHOP screen" />
+            <figcaption>SHOP</figcaption>
+          </figure>
+          <figure>
+            <img src="images/ww-book.png" alt="Woodshed Woodchuck BOOK screen" />
+            <figcaption>BOOK</figcaption>
+          </figure>
+          <figure>
+            <img src="images/ww-board.png" alt="Woodshed Woodchuck BOARD screen" />
+            <figcaption>BOARD</figcaption>
+          </figure>
+        </div>
+      </article>
+
+      <article class="card featured-card">
+        <div class="card-header">
+          <div class="card-title-group">
+            <span class="project-pill">Web + Android</span>
+            <h2>KHJW / Hoojshwah Radio</h2>
+          </div>
+          <a href="https://github.com/jeffriley101/devops-training/tree/main/hoojshwah-radio">Project Repo</a>
+        </div>
+
+        <p class="card-summary">
+          Simulated-live internet radio platform combining a browser-based station with
+          a native Android client built for reliable background and screen-off playback.
+        </p>
+
+        <div class="badge-row">
+          <span class="badge badge-blue">FastAPI</span>
+          <span class="badge badge-neutral">Android</span>
+          <span class="badge badge-green">Media3</span>
+          <span class="badge badge-neutral">ExoPlayer</span>
+          <span class="badge badge-neutral">Gradle</span>
+          <span class="badge badge-neutral">Render</span>
+        </div>
+
+        <ul class="project-highlights">
+          <li>Native Android playback service using Media3 and ExoPlayer</li>
+          <li>Lock-screen, notification, Bluetooth, and headset playback controls</li>
+          <li>Integrated web UI with native background audio ownership</li>
+          <li>Separate browser and Android delivery paths from one project</li>
+        </ul>
+
+        <img
+          class="project-screenshot"
+          src="images/khjw-top.png"
+          alt="KHJW Hoojshwah Radio station interface"
+        />
+      </article>
+
+      <article class="card featured-card">
+        <div class="card-header">
+          <div class="card-title-group">
+            <span class="project-pill">Data + Web</span>
+            <h2>JILT + JILT GAME</h2>
+          </div>
+          <a href="https://github.com/jeffriley101/devops-training/tree/main/jilt">Project Repo</a>
+        </div>
+
+        <p class="card-summary">
+          Python and PostgreSQL analytics pipeline that processes intraday market data,
+          derives daily results with SQL, and feeds those outputs into a FastAPI prediction game.
+        </p>
+
+        <div class="badge-row">
+          <span class="badge badge-blue">Python</span>
+          <span class="badge badge-neutral">PostgreSQL</span>
+          <span class="badge badge-green">SQL</span>
+          <span class="badge badge-neutral">FastAPI</span>
+          <span class="badge badge-neutral">Jinja2</span>
+          <span class="badge badge-neutral">Render</span>
+        </div>
+
+        <img
+          class="chart"
+          src="images/jilt-game-home.png"
+          alt="JILT GAME prediction board"
+        />
+      </article>
+
+      <article class="card lifecycle-card">
+        <div class="card-title-group">
+          <span class="project-pill">Operations</span>
+          <h2>Cloud Lifecycle &amp; Cost Governance</h2>
+        </div>
+
+        <p class="card-summary">
+          After the AWS projects completed their demonstration lifecycle, I preserved
+          source code, documentation, screenshots, and representative artifacts while
+          retiring unnecessary scheduled infrastructure. I also removed obsolete
+          AWS-dependent CI/CD workflows and repository secrets, converted the portfolio
+          to static GitHub Pages deployment, and removed reproducible local Terraform,
+          provider, and Python environment caches.
+        </p>
+      </article>
+
+    </section>
+
+    <section class="portfolio-section-heading">
+      <p class="eyebrow section-eyebrow">Completed Cloud Projects</p>
+      <h2>AWS Infrastructure &amp; Automation</h2>
+      <p>
+        Preserved project evidence from completed AWS-based automation, monitoring,
+        container, infrastructure-as-code, and CI/CD work.
+      </p>
+    </section>
+
     <section class="cards">
       <article class="card card-hero">
         <div class="card-header">
@@ -156,7 +304,7 @@
 
   <footer class="footer">
     <div class="container">
-      <p>Artifacts synced from AWS-published latest outputs into GitHub Pages.</p>
+      <p>Project source, screenshots, and preserved artifacts presented through GitHub Pages.</p>
     </div>
   </footer>
 
