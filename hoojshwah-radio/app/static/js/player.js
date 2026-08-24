@@ -20,6 +20,23 @@ const backstageTrigger = document.querySelector("#backstage-trigger");
 const backstageDialog = document.querySelector("#backstage-dialog");
 const backstageForm = document.querySelector("#backstage-form");
 const backstagePass = document.querySelector("#backstage-pass");
+const secretGuestbookTrigger = document.querySelector("#secret-guestbook-trigger");
+const secretGuestbookDialog = document.querySelector("#secret-guestbook-dialog");
+const secretGuestbookForm = document.querySelector("#secret-guestbook-form");
+const secretGuestbookPass = document.querySelector("#secret-guestbook-pass");
+const transmissionSecretTrigger = document.querySelector("#transmission-secret-trigger");
+const transmissionSecretDialog = document.querySelector("#transmission-secret-dialog");
+const transmissionSecretForm = document.querySelector("#transmission-secret-form");
+const transmissionSecretPass = document.querySelector("#transmission-secret-pass");
+const transmissionCodePanel = document.querySelector("#transmission-code-panel");
+const transmissionCodeForm = document.querySelector("#transmission-code-form");
+const transmissionCodeInput = document.querySelector("#transmission-code");
+const transmissionCodeStatus = document.querySelector("#transmission-code-status");
+const transmissionCodeClose = document.querySelector("#transmission-code-close");
+const masterSecretTrigger = document.querySelector("#master-secret-trigger");
+const masterSecretDialog = document.querySelector("#master-secret-dialog");
+const masterSecretForm = document.querySelector("#master-secret-form");
+const masterSecretPass = document.querySelector("#master-secret-pass");
 const androidAppMode = new URLSearchParams(window.location.search).get("app") === "android";
 const androidNativePlayer = androidAppMode && window.khjwNativePlayer
   && typeof window.khjwNativePlayer.postMessage === "function"
@@ -34,6 +51,8 @@ let backstagePickActive = false;
 let userWantsPlayback = false;
 let playbackRecoveryTimeout = null;
 let androidLiveClockInterval = null;
+let androidBackstagePickStartedAt = 0;
+let androidBackstagePickEndsAt = 0;
 let stationQrCopyStatusTimeout = null;
 
 if (androidAppMode) {
@@ -53,6 +72,18 @@ if (androidAppMode) {
 }
 
 function renderNativePlaybackState(state) {
+  if (state === "backstage-unavailable") {
+    backstagePickActive = false;
+    androidBackstagePickStartedAt = 0;
+    androidBackstagePickEndsAt = 0;
+    document.body.classList.remove("backstage-pick-active");
+    if (shareStatus) {
+      shareStatus.textContent = "This version of the KHJW app cannot play a Hoojshwah playlist pick.";
+    }
+    renderAndroidLiveClock();
+    return;
+  }
+
   if (!androidAppMode || (state !== "playing" && state !== "paused")) {
     return;
   }
@@ -276,6 +307,20 @@ function findCurrentTrack(tracks, loopPositionSeconds) {
 function renderAndroidLiveClock() {
   if (!androidAppMode || !station?.tracks?.length || !station.total_duration_seconds) {
     return;
+  }
+
+  if (backstagePickActive && androidBackstagePickEndsAt > Date.now()) {
+    const track = station.tracks[currentTrackIndex];
+    const elapsedSeconds = Math.max(0, (Date.now() - androidBackstagePickStartedAt) / 1000);
+    renderTrackProgress(track, elapsedSeconds);
+    return;
+  }
+
+  if (backstagePickActive) {
+    backstagePickActive = false;
+    androidBackstagePickStartedAt = 0;
+    androidBackstagePickEndsAt = 0;
+    document.body.classList.remove("backstage-pick-active");
   }
 
   const loopPosition = getLoopPosition(station.total_duration_seconds);
@@ -525,19 +570,31 @@ async function playBackstageTrack(index) {
     return;
   }
 
-  if (androidAppMode) {
-    if (shareStatus) {
-      shareStatus.textContent = "Backstage audio remains on the native live KHJW signal in the Android app.";
-    }
-    return;
-  }
-
   backstagePickActive = true;
   playTrackByIndex(index);
 
   if (trackProgress) {
     trackProgress.textContent = "Backstage Pick";
     trackProgress.classList.add("backstage-pick");
+  }
+
+  if (androidAppMode) {
+    const track = station.tracks[currentTrackIndex];
+
+    if (!androidNativePlayer || !/^[A-Za-z0-9._-]{1,80}$/.test(track.id || "")) {
+      renderNativePlaybackState("backstage-unavailable");
+      return;
+    }
+
+    androidBackstagePickStartedAt = Date.now();
+    androidBackstagePickEndsAt = androidBackstagePickStartedAt + Math.max(0, track.duration_seconds || 0) * 1000;
+    document.body.classList.add("backstage-pick-active");
+    androidNativePlayer.postMessage(`backstage-track:${track.id}`);
+
+    if (shareStatus) {
+      shareStatus.textContent = "Playing a Hoojshwah playlist pick through native KHJW audio.";
+    }
+    return;
   }
 
   try {
@@ -567,6 +624,64 @@ function unlockBackstage() {
   }
 
   renderTrackList(station?.tracks || [], station?.tracks?.[currentTrackIndex]?.id);
+}
+
+function focusSecretInput(input) {
+  if (!input) {
+    return;
+  }
+
+  const focus = () => {
+    try {
+      input.focus({ preventScroll: true });
+    } catch (error) {
+      input.focus();
+    }
+  };
+
+  focus();
+  window.requestAnimationFrame(focus);
+}
+
+function closeSecretDialog(dialog, input) {
+  if (dialog) {
+    dialog.hidden = true;
+  }
+
+  if (input) {
+    input.value = "";
+  }
+}
+
+function closeOtherSecretSurfaces(except = null) {
+  [
+    [backstageDialog, backstagePass],
+    [secretGuestbookDialog, secretGuestbookPass],
+    [transmissionSecretDialog, transmissionSecretPass],
+    [masterSecretDialog, masterSecretPass]
+  ].forEach(([dialog, input]) => {
+    if (dialog !== except) {
+      closeSecretDialog(dialog, input);
+    }
+  });
+
+  if (transmissionCodePanel !== except && transmissionCodePanel) {
+    transmissionCodePanel.hidden = true;
+  }
+}
+
+function toggleSecretDialog(dialog, input) {
+  if (!dialog || !input) {
+    return;
+  }
+
+  const willOpen = dialog.hidden;
+  closeOtherSecretSurfaces(willOpen ? dialog : null);
+  dialog.hidden = !willOpen;
+
+  if (willOpen) {
+    focusSecretInput(input);
+  }
 }
 
 
@@ -785,19 +900,7 @@ window.addEventListener("offline", () => {
 
 if (backstageTrigger && backstageDialog && backstagePass) {
   backstageTrigger.addEventListener("click", () => {
-    if (typeof masterSecretDialog !== "undefined" && masterSecretDialog) {
-      masterSecretDialog.hidden = true;
-    }
-
-    if (typeof masterSecretPass !== "undefined" && masterSecretPass) {
-      masterSecretPass.value = "";
-    }
-
-    backstageDialog.hidden = !backstageDialog.hidden;
-
-    if (!backstageDialog.hidden) {
-      backstagePass.focus();
-    }
+    toggleSecretDialog(backstageDialog, backstagePass);
   });
 }
 
@@ -826,16 +929,8 @@ const bottleForm = document.querySelector("#bottle-form");
 const bottleStyle = document.querySelector("#bottle-style");
 const bottleLabel = document.querySelector("#bottle-label");
 const bottleList = document.querySelector("#bottle-list");
-const secretGuestbookTrigger = document.querySelector("#secret-guestbook-trigger");
-const secretGuestbookDialog = document.querySelector("#secret-guestbook-dialog");
-const secretGuestbookForm = document.querySelector("#secret-guestbook-form");
-const secretGuestbookPass = document.querySelector("#secret-guestbook-pass");
 const reactionStandingsList = document.querySelector("#reaction-standings-list");
 const reactionStandingsToggle = document.querySelector("#reaction-standings-toggle");
-const masterSecretTrigger = document.querySelector("#master-secret-trigger");
-const masterSecretDialog = document.querySelector("#master-secret-dialog");
-const masterSecretForm = document.querySelector("#master-secret-form");
-const masterSecretPass = document.querySelector("#master-secret-pass");
 let masterSignalConfettiTimer = null;
 let showAllReactionStandings = false;
 let latestReactionStandings = [];
@@ -1039,11 +1134,7 @@ if (barToggle && barContent) {
 
 if (secretGuestbookTrigger && secretGuestbookDialog && secretGuestbookForm && secretGuestbookPass) {
   secretGuestbookTrigger.addEventListener("click", () => {
-    secretGuestbookDialog.hidden = !secretGuestbookDialog.hidden;
-
-    if (!secretGuestbookDialog.hidden) {
-      secretGuestbookPass.focus();
-    }
+    toggleSecretDialog(secretGuestbookDialog, secretGuestbookPass);
   });
 
   secretGuestbookForm.addEventListener("submit", (event) => {
@@ -1051,9 +1142,52 @@ if (secretGuestbookTrigger && secretGuestbookDialog && secretGuestbookForm && se
 
     if (secretGuestbookPass.value.trim().toLowerCase() === "khjw") {
       unlockSecretGuestbookItems();
+      closeSecretDialog(secretGuestbookDialog, secretGuestbookPass);
+    } else {
       secretGuestbookPass.value = "";
-      secretGuestbookDialog.hidden = true;
     }
+  });
+}
+
+if (transmissionSecretTrigger && transmissionSecretDialog && transmissionSecretPass) {
+  transmissionSecretTrigger.addEventListener("click", () => {
+    toggleSecretDialog(transmissionSecretDialog, transmissionSecretPass);
+  });
+}
+
+if (transmissionSecretForm && transmissionSecretPass && transmissionCodePanel) {
+  transmissionSecretForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+
+    if (transmissionSecretPass.value.trim().toLowerCase() === "god_mode") {
+      closeOtherSecretSurfaces(transmissionCodePanel);
+      transmissionCodePanel.hidden = false;
+      transmissionSecretPass.value = "";
+      focusSecretInput(transmissionCodeInput);
+    } else {
+      transmissionSecretPass.value = "";
+    }
+  });
+}
+
+if (transmissionCodeForm && transmissionCodeInput && transmissionCodeStatus) {
+  transmissionCodeForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    transmissionCodeInput.value = "";
+    transmissionCodeStatus.textContent = "Transmission-code access is coming soon. No codes are active yet.";
+  });
+}
+
+if (transmissionCodeClose && transmissionCodePanel) {
+  transmissionCodeClose.addEventListener("click", () => {
+    transmissionCodePanel.hidden = true;
+    if (transmissionCodeInput) {
+      transmissionCodeInput.value = "";
+    }
+    if (transmissionCodeStatus) {
+      transmissionCodeStatus.textContent = "";
+    }
+    transmissionSecretTrigger?.focus();
   });
 }
 
@@ -1094,7 +1228,6 @@ document.addEventListener("visibilitychange", () => {
   }
 });
 
-
 function fireMasterSignalConfetti() {
   const burst = document.createElement("div");
   burst.className = "master-signal-confetti";
@@ -1119,22 +1252,8 @@ function fireMasterSignalConfetti() {
 }
 
 function unlockMasterSignal() {
-  backstageUnlocked = true;
-  document.body.classList.add("backstage-active");
-  renderTrackList(station?.tracks || [], station?.tracks?.[currentTrackIndex]?.id);
-
-  unlockSecretGuestbookItems();
-
   document.body.classList.add("master-signal-active");
-
-  if (masterSecretDialog) {
-    masterSecretDialog.hidden = true;
-  }
-
-  if (masterSecretPass) {
-    masterSecretPass.value = "";
-  }
-
+  closeSecretDialog(masterSecretDialog, masterSecretPass);
   fireMasterSignalConfetti();
 
   if (!masterSignalConfettiTimer) {
@@ -1142,21 +1261,17 @@ function unlockMasterSignal() {
   }
 }
 
+function matchesMasterSignal(value) {
+  const expectedCharacterCodes = [103, 101, 112, 104];
+  const normalized = value.trim().toLowerCase();
+
+  return normalized.length === expectedCharacterCodes.length
+    && expectedCharacterCodes.every((code, index) => normalized.charCodeAt(index) === code);
+}
+
 if (masterSecretTrigger && masterSecretDialog && masterSecretPass) {
   masterSecretTrigger.addEventListener("click", () => {
-    if (backstageDialog) {
-      backstageDialog.hidden = true;
-    }
-
-    if (backstagePass) {
-      backstagePass.value = "";
-    }
-
-    masterSecretDialog.hidden = !masterSecretDialog.hidden;
-
-    if (!masterSecretDialog.hidden) {
-      masterSecretPass.focus();
-    }
+    toggleSecretDialog(masterSecretDialog, masterSecretPass);
   });
 }
 
@@ -1164,7 +1279,7 @@ if (masterSecretForm && masterSecretPass) {
   masterSecretForm.addEventListener("submit", (event) => {
     event.preventDefault();
 
-    if (masterSecretPass.value.trim().toLowerCase() === "geph") {
+    if (matchesMasterSignal(masterSecretPass.value)) {
       unlockMasterSignal();
     } else {
       masterSecretPass.value = "";

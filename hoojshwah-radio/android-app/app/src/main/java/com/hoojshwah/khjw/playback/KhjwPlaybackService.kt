@@ -17,6 +17,9 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
+import androidx.media3.session.SessionCommand
+import androidx.media3.session.SessionError
+import androidx.media3.session.SessionResult
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import com.hoojshwah.khjw.data.Station
@@ -33,6 +36,7 @@ class KhjwPlaybackService : MediaSessionService() {
     private var playableTracks: List<StationTrack> = emptyList()
     private var synchronizationDurationSeconds = 0.0
     private var errorSkipsRemaining = 1
+    private var backstageSelectionActive = false
 
     override fun onCreate() {
         super.onCreate()
@@ -95,6 +99,7 @@ class KhjwPlaybackService : MediaSessionService() {
     }
 
     private fun configureStation(station: Station) {
+        backstageSelectionActive = false
         playableTracks = station.tracks.filter {
             it.durationSeconds > 0.0 && !it.audioUrl.isNullOrBlank()
         }
@@ -163,6 +168,8 @@ class KhjwPlaybackService : MediaSessionService() {
             return
         }
 
+        backstageSelectionActive = false
+
         // Establish the current live position before allowing audible playback, including
         // when ExoPlayer is idle/stopped but playWhenReady was already true.
         setPlaylistAtLivePosition(prepare = true)
@@ -172,6 +179,18 @@ class KhjwPlaybackService : MediaSessionService() {
     private fun handlePauseRequest() {
         Log.i(TAG, "Pause received")
         player.pause()
+    }
+
+    private fun playBackstageTrack(trackId: String): Boolean {
+        val requestedIndex = playableTracks.indexOfFirst { track -> track.id == trackId }
+        if (requestedIndex < 0) return false
+
+        backstageSelectionActive = true
+        player.seekToDefaultPosition(requestedIndex)
+        player.prepare()
+        player.play()
+        updateStatus("Playing a Hoojshwah playlist pick")
+        return true
     }
 
     private fun logPlaybackParameters(event: String) {
@@ -202,12 +221,43 @@ class KhjwPlaybackService : MediaSessionService() {
         override fun onConnectAsync(
             session: MediaSession,
             controller: MediaSession.ControllerInfo,
-        ): ListenableFuture<MediaSession.ConnectionResult> =
-            Futures.immediateFuture(
-                MediaSession.ConnectionResult.AcceptedResultBuilder(session, controller)
-                    .setAvailablePlayerCommands(RADIO_PLAYER_COMMANDS)
-                    .build()
-            )
+        ): ListenableFuture<MediaSession.ConnectionResult> {
+            val resultBuilder = MediaSession.ConnectionResult.AcceptedResultBuilder(session, controller)
+                .setAvailablePlayerCommands(RADIO_PLAYER_COMMANDS)
+
+            if (controller.packageName == packageName && controller.uid == applicationInfo.uid) {
+                resultBuilder.setAvailableSessionCommands(
+                    MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS.buildUpon()
+                        .add(NativePlaybackCommands.selectBackstageTrack)
+                        .build()
+                )
+            }
+
+            return Futures.immediateFuture(resultBuilder.build())
+        }
+
+        override fun onCustomCommand(
+            session: MediaSession,
+            controller: MediaSession.ControllerInfo,
+            customCommand: SessionCommand,
+            args: Bundle,
+        ): ListenableFuture<SessionResult> {
+            if (
+                controller.packageName != packageName ||
+                controller.uid != applicationInfo.uid ||
+                customCommand != NativePlaybackCommands.selectBackstageTrack
+            ) {
+                return Futures.immediateFuture(SessionResult(SessionError.ERROR_PERMISSION_DENIED))
+            }
+
+            val trackId = args.getString(NativePlaybackCommands.ARG_TRACK_ID)
+            val resultCode = if (trackId != null && playBackstageTrack(trackId)) {
+                SessionResult.RESULT_SUCCESS
+            } else {
+                SessionError.ERROR_BAD_VALUE
+            }
+            return Futures.immediateFuture(SessionResult(resultCode))
+        }
     }
 
     private val playerListener = object : Player.Listener {
@@ -221,8 +271,16 @@ class KhjwPlaybackService : MediaSessionService() {
                 TAG,
                 "Media item transition: reason=$reason, index=${player.currentMediaItemIndex}, " +
                     "track=${mediaItem?.mediaId ?: "unknown"}, speed=${parameters.speed}, " +
-                    "pitch=${parameters.pitch}",
+                "pitch=${parameters.pitch}",
             )
+
+            if (backstageSelectionActive && reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) {
+                backstageSelectionActive = false
+                mainHandler.post {
+                    setPlaylistAtLivePosition(prepare = true)
+                    player.play()
+                }
+            }
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {

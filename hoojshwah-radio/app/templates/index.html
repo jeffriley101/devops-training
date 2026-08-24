@@ -11,7 +11,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="icon" href="/static/icons/hoojshwah-icon-192.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/static/icons/apple-touch-icon-180.png">
-  <link rel="stylesheet" href="/static/css/styles.css?v=khjw-android-bar-fix-1">
+  <link rel="stylesheet" href="/static/css/styles.css?v=khjw-secret-symbols-1">
 </head>
 <body>
   <main class="radio-shell">
@@ -58,15 +58,19 @@
         ⌤
       </button>
 
-      <div id="backstage-dialog" class="backstage-dialog" hidden>
-        <form id="backstage-form" class="backstage-form">
+      <div id="backstage-dialog" class="backstage-dialog secret-entry-dialog" role="dialog" aria-label="Hoojshwah signal access" hidden>
+        <form id="backstage-form" class="backstage-form secret-entry-form">
           <input
             id="backstage-pass"
-            class="backstage-pass"
+            class="backstage-pass secret-entry-input"
             type="password"
             autocomplete="off"
+            autocapitalize="none"
+            enterkeyhint="go"
             spellcheck="false"
+            aria-label="Hoojshwah signal phrase"
           >
+          <button class="secret-entry-submit" type="submit">Enter</button>
         </form>
       </div>
 
@@ -115,16 +119,20 @@
         ⋔
       </button>
 
-      <div id="secret-guestbook-dialog" class="secret-guestbook-dialog" hidden>
-        <form id="secret-guestbook-form" class="secret-guestbook-form">
+      <div id="secret-guestbook-dialog" class="secret-guestbook-dialog secret-entry-dialog" role="dialog" aria-label="KHJW signal access" hidden>
+        <form id="secret-guestbook-form" class="secret-guestbook-form secret-entry-form">
           <input
             id="secret-guestbook-pass"
-            class="secret-guestbook-pass"
+            class="secret-guestbook-pass secret-entry-input"
             type="password"
             autocomplete="off"
+            autocapitalize="none"
+            enterkeyhint="go"
             spellcheck="false"
             placeholder="signal"
+            aria-label="KHJW signal phrase"
           >
+          <button class="secret-entry-submit" type="submit">Enter</button>
         </form>
       </div>
 
@@ -189,6 +197,63 @@
         </div>
       </section>
 
+      <button id="transmission-secret-trigger" class="transmission-secret-trigger" type="button" aria-label="Listener transmission access">
+        ⁂
+      </button>
+
+      <div id="transmission-secret-dialog" class="transmission-secret-dialog secret-entry-dialog" role="dialog" aria-label="Listener transmission access" hidden>
+        <form id="transmission-secret-form" class="transmission-secret-form secret-entry-form">
+          <input
+            id="transmission-secret-pass"
+            class="transmission-secret-pass secret-entry-input"
+            type="password"
+            autocomplete="off"
+            autocapitalize="none"
+            enterkeyhint="go"
+            spellcheck="false"
+            placeholder="signal"
+            aria-label="Listener transmission phrase"
+          >
+          <button class="secret-entry-submit" type="submit">Enter</button>
+        </form>
+      </div>
+
+      <section
+        id="transmission-code-panel"
+        class="transmission-code-panel"
+        role="dialog"
+        aria-labelledby="transmission-code-heading"
+        aria-describedby="transmission-code-copy transmission-code-status"
+        hidden
+      >
+        <button id="transmission-code-close" class="transmission-code-close" type="button" aria-label="Close listener transmission access">×</button>
+        <p class="label">Listener Transmission</p>
+        <h2 id="transmission-code-heading">Sound-bite access is coming soon.</h2>
+        <p id="transmission-code-copy" class="transmission-code-copy">
+          Purchased one-use and two-use transmission codes will be entered here when access goes live.
+          No transmission codes are active yet.
+        </p>
+        <form
+          id="transmission-code-form"
+          class="transmission-code-form"
+          data-validation-endpoint="/api/listener-transmissions/validate"
+        >
+          <label for="transmission-code">Transmission code</label>
+          <input
+            id="transmission-code"
+            type="text"
+            autocomplete="off"
+            autocapitalize="characters"
+            enterkeyhint="go"
+            spellcheck="false"
+            maxlength="80"
+            placeholder="Code access coming soon"
+          >
+          <button type="submit">Check Code</button>
+        </form>
+        <p id="transmission-code-status" class="transmission-code-status" role="status" aria-live="polite"></p>
+      </section>
+
       <section class="station-qr-card" aria-labelledby="station-qr-heading">
         <p class="label">Share the Signal</p>
         <h2 id="station-qr-heading">Scan / share KHJW</h2>
@@ -244,21 +309,25 @@
         .
       </button>
 
-      <div id="master-secret-dialog" class="master-secret-dialog" hidden>
-        <form id="master-secret-form" class="master-secret-form">
+      <div id="master-secret-dialog" class="master-secret-dialog secret-entry-dialog" role="dialog" aria-label="Master signal access" hidden>
+        <form id="master-secret-form" class="master-secret-form secret-entry-form">
           <input
             id="master-secret-pass"
-            class="master-secret-pass"
+            class="master-secret-pass secret-entry-input"
             type="password"
             autocomplete="off"
+            autocapitalize="none"
+            enterkeyhint="go"
             spellcheck="false"
             placeholder="signal"
+            aria-label="Master signal phrase"
           >
+          <button class="secret-entry-submit" type="submit">Enter</button>
         </form>
       </div>
 
   </main>
 
-  <script src="/static/js/player.js?v=android-live-clock-qr-1"></script>
+  <script src="/static/js/player.js?v=khjw-secret-symbols-1"></script>
 </body>
 </html>

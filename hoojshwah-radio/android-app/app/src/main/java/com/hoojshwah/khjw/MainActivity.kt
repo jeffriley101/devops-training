@@ -24,12 +24,14 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaController
+import androidx.media3.session.SessionResult
 import androidx.media3.session.SessionToken
 import androidx.webkit.WebMessageCompat
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import com.google.common.util.concurrent.ListenableFuture
 import com.hoojshwah.khjw.playback.KhjwPlaybackService
+import com.hoojshwah.khjw.playback.NativePlaybackCommands
 
 @OptIn(UnstableApi::class)
 class MainActivity : AppCompatActivity() {
@@ -85,7 +87,9 @@ class MainActivity : AppCompatActivity() {
 
         ViewCompat.setOnApplyWindowInsetsListener(root) { view, windowInsets ->
             val safeInsets = windowInsets.getInsets(
-                WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
+                WindowInsetsCompat.Type.systemBars() or
+                    WindowInsetsCompat.Type.displayCutout() or
+                    WindowInsetsCompat.Type.ime()
             )
             view.setPadding(safeInsets.left, safeInsets.top, safeInsets.right, safeInsets.bottom)
             windowInsets
@@ -148,10 +152,43 @@ class MainActivity : AppCompatActivity() {
             ) { _, message, sourceOrigin, isMainFrame, replyProxy ->
                 if (!isMainFrame || !isProductionOrigin(sourceOrigin)) return@addWebMessageListener
 
-                when (message.data) {
+                val messageData = message.data ?: return@addWebMessageListener
+
+                when (messageData) {
                     "play" -> controller?.play()
                     "pause" -> controller?.pause()
-                    else -> return@addWebMessageListener
+                    else -> {
+                        val trackId = NativePlaybackCommands.parseBackstageTrackId(messageData)
+                            ?: return@addWebMessageListener
+                        val connectedController = controller
+                        if (connectedController == null) {
+                            replyProxy.postMessage(BACKSTAGE_UNAVAILABLE_STATE)
+                            return@addWebMessageListener
+                        }
+
+                        val result = connectedController.sendCustomCommand(
+                            NativePlaybackCommands.selectBackstageTrack,
+                            Bundle().apply {
+                                putString(NativePlaybackCommands.ARG_TRACK_ID, trackId)
+                            },
+                        )
+                        result.addListener(
+                            {
+                                val state = runCatching { result.get() }
+                                    .map { commandResult ->
+                                        if (commandResult.resultCode == SessionResult.RESULT_SUCCESS) {
+                                            BACKSTAGE_ACCEPTED_STATE
+                                        } else {
+                                            BACKSTAGE_UNAVAILABLE_STATE
+                                        }
+                                    }
+                                    .getOrDefault(BACKSTAGE_UNAVAILABLE_STATE)
+                                replyProxy.postMessage(state)
+                            },
+                            ContextCompat.getMainExecutor(this),
+                        )
+                        return@addWebMessageListener
+                    }
                 }
 
                 replyProxy.postMessage(nativePlaybackState())
@@ -231,5 +268,7 @@ class MainActivity : AppCompatActivity() {
         private const val NATIVE_PLAYER_BRIDGE = "khjwNativePlayer"
         private const val PLAYING_STATE = "playing"
         private const val PAUSED_STATE = "paused"
+        private const val BACKSTAGE_ACCEPTED_STATE = "backstage-accepted"
+        private const val BACKSTAGE_UNAVAILABLE_STATE = "backstage-unavailable"
     }
 }
