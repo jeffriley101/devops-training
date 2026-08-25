@@ -1,27 +1,135 @@
 # Woodshed Woodchuck
 
-Woodshed Woodchuck is a FastAPI music-practice companion game for young musicians.
+Woodshed Woodchuck is a full-stack music-practice application for student musicians.
 
-The app helps students create a Woodchuck, log practice, complete flexible quests, earn credits, buy simple gear, and export practice records for a band director or parent.
+The application combines practice tracking, persistent accounts, challenges, contests,
+rewards, practice verification, and interactive music tools in a responsive experience
+for desktop and mobile devices.
 
-Current features include:
+## Technology
 
-- Woodchuck naming and profile setup
-- band-instrument-focused setup flow
-- Woodshed scene shell with clickable room objects
-- P-Book / P-Chart practice logging
-- optional practice notes
-- copy/export P-Chart
-- email P-Chart handoff through the user's mail app
-- flexible Quest Book with choose/skip quest options
-- instrument-specific Viking Sax advice
-- credits, streaks, and local progress tracking
-- active Store with buy/equip state for hats and hoodies
-- browser localStorage persistence and migration from earlier state
+Woodshed Woodchuck is built with:
 
-## Local run
+- Python
+- FastAPI
+- PostgreSQL
+- SQLAlchemy
+- Alembic
+- Jinja2
+- JavaScript
+- HTML / CSS
+- Git / GitHub
+- Render
 
-From repository root:
+The current application uses server-backed persistence rather than relying on browser
+storage as its primary state system.
+
+## Current capabilities
+
+The application includes:
+
+- persistent Woodchuck accounts and profiles
+- cross-device application state
+- practice logging and practice-history workflows
+- practice verification
+- student and trusted-adult workflows
+- seasonal activities and contests
+- standings, rewards, crowns, and progression
+- persistent inventory and owned-item state
+- interactive music-practice tools
+- responsive desktop and mobile interfaces
+- server-side email workflows
+- administrative support
+- automated testing across core application behavior
+
+## Main application areas
+
+### SHED
+
+The SHED is the Woodchuck's personal space.
+
+Students can interact with practice tools, view and arrange owned items, and customize
+their environment as they progress.
+
+### BOOK
+
+The BOOK contains practice-related workflows, including recording and reviewing practice
+activity and sharing practice information for verification when appropriate.
+
+### BOARD
+
+The BOARD contains seasonal activities, contests, standings, and progression features.
+
+Activity and contest state is stored server-side.
+
+### SHOP
+
+The SHOP allows students to use earned in-app currency for available items and gear.
+
+Purchases and inventory are associated with the student's persistent account.
+
+## Accounts and persistence
+
+Woodshed Woodchuck began as a browser-based prototype but has since moved to a
+server-backed architecture.
+
+Current persistence includes:
+
+- user profiles
+- authenticated sessions
+- cross-device state
+- inventory
+- practice records
+- progression
+- contest participation and results
+- rewards
+
+PostgreSQL is the primary persistence layer.
+
+SQLAlchemy is used for application data access and models, while Alembic manages
+database schema migrations.
+
+## Practice verification
+
+Woodshed Woodchuck supports practice-verification workflows involving trusted adults.
+
+The public documentation describes these capabilities at a high level while intentionally
+omitting internal verification and administrative implementation details.
+
+## Contests and progression
+
+The application includes persistent seasonal competition and progression systems.
+
+Current capabilities include:
+
+- seasonal activities
+- multiple contest categories
+- standings
+- rewards and crowns
+- persistent progression
+- historical results
+- administrative support for contest operations
+
+Exact scoring, reward-control, and internal administrative logic are intentionally not
+documented publicly.
+
+## Testing
+
+The project includes automated tests covering major application areas, including:
+
+- accounts
+- state synchronization
+- practice workflows
+- contests
+- standings
+- rewards
+- email behavior
+- account deletion
+- regression-sensitive application behavior
+
+## Local development
+
+From the repository root:
 
 ```bash
 cd woodshed-woodchuck
@@ -31,71 +139,33 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
-Then open `http://127.0.0.1:8000`.
+Then open:
 
-## Render startup shape
+```text
+http://127.0.0.1:8000
+```
 
-Use the standard Render/FastAPI startup command:
+## Deployment
+
+The application is deployed on Render using FastAPI, Uvicorn, and PostgreSQL.
+
+A typical application startup command is:
 
 ```bash
 uvicorn app.main:app --host 0.0.0.0 --port $PORT
 ```
 
-## Practice, quest, and store rules
+Production deployment also depends on the configured PostgreSQL environment and current
+database migrations.
 
-### P-Book / P-Chart
+## Project status
 
-- Students can log practice date, minutes, and an optional note.
-- Each P-Book submission creates a new practice page.
-- P-Book entries award practice credits.
-- Recent practice pages display in the app.
-- P-Chart can be copied for sharing.
-- P-Chart can be sent through the user's email app with teacher and parent fields.
-- Notes are included in the export when present.
+Woodshed Woodchuck is an actively developed application.
 
-### Quest Book
+It has grown substantially beyond its original browser-only prototype and now includes
+persistent accounts, PostgreSQL-backed state, database migrations, verification
+workflows, seasonal competition, rewards, interactive tools, and production deployment.
 
-- Quest options come from the selected instrument pool.
-- Students can choose another quest or skip to a different quest.
-- Quest practice logs accumulate toward the active target.
-- Quest completion requires cumulative daily logs meeting `targetMinutes`.
-- Credits and streak update only on the first completed quest of the day.
-- Extra same-day practice logs are allowed, but do not award duplicate quest credits.
-- Completion is limited to once per local day.
-
-### Store
-
-- Students earn credits through practice.
-- Store items can be purchased with credits.
-- Duplicate purchases are blocked.
-- Owned items can be equipped.
-- Equipped hat/hoodie state persists in `localStorage`.
-- Clothing state exists, but visual clothing overlays are deferred until proper art assets exist.
-
-## Visual asset hooks
-
-Current assets:
-
-- `/static/img/woodchuck-hero.png`
-- `/static/img/woodchuck-home.png`
-- `/static/img/sax-viking-portrait.png`
-
-Planned / desired future assets:
-
-- `/static/img/woodshed-room-bg.png`
-- `/static/img/woodchuck-base.png`
-- `/static/img/woodchuck-saxophone.png`
-- `/static/img/woodchuck-clarinet.png`
-- `/static/img/woodchuck-flute.png`
-- `/static/img/woodchuck-drums.png`
-- `/static/img/woodchuck-tuba.png`
-
-Future outfit assets may include hat and hoodie overlays, but exact implementation should wait for final art.
-
-## Notes
-
-- Persistence uses browser `localStorage` only.
-- Refreshing or reopening the same browser should preserve state.
-- Different browsers/devices start fresh unless future backend/account sync is added.
-- Backend database, auth, account logic, payment logic, subscriptions, teacher dashboards, and server-sent email are intentionally deferred.
-- Real tuner/metronome tools, achievements, printable/PDF reports, and visual clothing overlays are future phases.
+This README intentionally describes the public architecture and capabilities without
+documenting proprietary gameplay logic, administrative internals, or implementation
+details that do not need to be public.
