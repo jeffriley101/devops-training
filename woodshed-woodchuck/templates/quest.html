@@ -288,11 +288,19 @@
 
           <details class="contest-category-card" data-contest-category="team-practice-rating">
             <summary><span>Team Practice Rating</span></summary>
-            <div class="contest-category-divisions">
-              <section class="contest-division-card contest-division-coming-soon" aria-label="Team Practice Rating unavailable">
-                <h4>Team Practice Rating <span aria-hidden="true">🚧</span></h4>
-                <p>Under construction</p>
+            <div class="contest-category-divisions" data-team-board="team-practice-rating">
+              {% for division in ['open', 'verified'] %}
+              <section class="contest-division-card" data-division="{{ division }}">
+                <h4>{{ division|capitalize }}</h4>
+                <div id="team-practice-rating-{{ division }}" class="contest-ranked-list" role="list"></div>
               </section>
+              {% endfor %}
+              {% for division in ['Pristine', 'MVP'] %}
+              <section class="contest-division-card contest-division-coming-soon" aria-label="{{ division }} unavailable">
+                <h4>{{ division }} <span aria-hidden="true">🚧</span></h4><p>Under construction</p>
+              </section>
+              {% endfor %}
+              <p id="team-practice-rating-empty" class="contest-empty-state">No team scores yet.</p>
             </div>
           </details>
         </div>

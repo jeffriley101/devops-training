@@ -1062,6 +1062,16 @@ class Team(Base):
             "moderation_status IN ('active', 'under_review', 'hidden')",
             name="ck_team_moderation_status",
         ),
+        CheckConstraint(
+            "visibility IN ('public', 'private')",
+            name="ck_team_visibility",
+        ),
+        CheckConstraint(
+            "(director_led = false AND join_code IS NULL) OR "
+            "(director_led = true AND visibility = 'private' AND join_code IS NOT NULL)",
+            name="ck_team_director_led_private",
+        ),
+        UniqueConstraint("join_code", name="uq_team_join_code"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -1073,6 +1083,16 @@ class Team(Base):
     emblem_key: Mapped[str] = mapped_column(String(50), nullable=False)
     creator_profile_id: Mapped[int | None] = mapped_column(
         ForeignKey("woodchuck_profiles.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    visibility: Mapped[str] = mapped_column(
+        String(20), default="public", server_default="public", nullable=False,
+        index=True,
+    )
+    director_led: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="0", nullable=False, index=True
+    )
+    join_code: Mapped[str | None] = mapped_column(
+        String(16), nullable=True, index=True
     )
     moderation_status: Mapped[str] = mapped_column(
         String(20), default="active", server_default="active", nullable=False,
@@ -1145,6 +1165,75 @@ class TeamMembership(Base):
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+
+class TeamJoinRequest(Base):
+    __tablename__ = "team_join_requests"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('pending', 'approved', 'rejected', 'cancelled')",
+            name="ck_team_join_request_status",
+        ),
+        Index(
+            "uq_team_join_request_pending_profile_season",
+            "profile_id", "season_id", unique=True,
+            sqlite_where=text("status = 'pending'"),
+            postgresql_where=text("status = 'pending'"),
+        ),
+        Index("ix_team_join_request_team_status", "team_id", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    season_id: Mapped[int] = mapped_column(
+        ForeignKey("seasons.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    team_id: Mapped[int] = mapped_column(
+        ForeignKey("teams.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    profile_id: Mapped[int] = mapped_column(
+        ForeignKey("woodchuck_profiles.id", ondelete="CASCADE"), nullable=False,
+        index=True,
+    )
+    status: Mapped[str] = mapped_column(
+        String(20), default="pending", server_default="pending", nullable=False,
+        index=True,
+    )
+    requested_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
+    resolved_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    resolved_by_profile_id: Mapped[int | None] = mapped_column(
+        ForeignKey("woodchuck_profiles.id", ondelete="SET NULL"), nullable=True
+    )
+
+
+class ProfileCapability(Base):
+    __tablename__ = "profile_capabilities"
+    __table_args__ = (
+        UniqueConstraint(
+            "profile_id", "capability", name="uq_profile_capability"
+        ),
+        CheckConstraint(
+            "capability IN ('band_director')",
+            name="ck_profile_capability_value",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    profile_id: Mapped[int] = mapped_column(
+        ForeignKey("woodchuck_profiles.id", ondelete="CASCADE"), nullable=False,
+        index=True,
+    )
+    capability: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    granted_by: Mapped[str] = mapped_column(
+        String(40), default="contest-admin", server_default="contest-admin",
+        nullable=False,
+    )
+    granted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
 
 
 class TeamWeekMembershipSnapshot(Base):

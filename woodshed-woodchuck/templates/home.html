@@ -210,6 +210,13 @@
       <h3>Join Another Team</h3>
       <div id="shed-team-options" class="team-tile-grid" role="radiogroup" aria-label="Other available teams"></div>
     </section>
+    <section class="shed-team-subsection" aria-labelledby="shed-private-team-title">
+      <h3 id="shed-private-team-title">Join a Private Team</h3>
+      <label for="shed-private-team-code">Team code</label>
+      <input id="shed-private-team-code" maxlength="16" autocomplete="off" />
+      <button id="shed-private-team-request" class="btn btn-green" type="button">Request to Join</button>
+      <p id="shed-private-team-status" aria-live="polite"></p>
+    </section>
     <section class="shed-team-subsection shed-team-create-section" aria-labelledby="shed-team-create-title">
       <h3 id="shed-team-create-title">Create a New Team</h3>
       <label for="shed-team-name">New team name</label>
@@ -221,6 +228,9 @@
       </div>
       <button id="shed-team-create" class="btn btn-green" type="button">Create and Join Team</button>
     </section>
+    <p id="shed-director-team-link" hidden>
+      <a class="btn btn-secondary" href="/teams/director/manage">Director Team Management</a>
+    </p>
     <p id="shed-team-feedback" role="status" aria-live="polite"></p>
   </section>
 

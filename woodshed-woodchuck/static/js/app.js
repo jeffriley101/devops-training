@@ -965,6 +965,8 @@
     const emblemPreview = document.getElementById("shed-team-emblem-preview");
     const otherSection = document.getElementById("shed-team-other-section");
     const reportPanel = document.getElementById("shed-team-report-panel");
+    const privateStatus = document.getElementById("shed-private-team-status");
+    const directorLink = document.getElementById("shed-director-team-link");
     let currentTeamId = null;
     if (!trigger || !panel || !options || !status || !emblemChoice) return;
     function updateEmblemPreview() {
@@ -985,6 +987,13 @@
         const current = payload.membership?.team || null;
         currentTeamId = current?.id || null;
         if (reportPanel) reportPanel.hidden = !currentTeamId;
+        if (directorLink) directorLink.hidden = payload.band_director !== true;
+        if (privateStatus) {
+          const pending = payload.pending_private_request;
+          privateStatus.textContent = pending
+            ? `Pending approval from ${pending.team.name}.`
+            : "";
+        }
         renderTeamEmblem(emblem, current?.emblem || "");
         trigger.setAttribute("aria-label", current ? `Team ${current.name}` : "Choose a team");
         trigger.title = current ? current.name : "Choose a team";
@@ -1031,6 +1040,21 @@
         name: document.getElementById("shed-team-name").value, emblem_key: emblemChoice.value,
       })});
       const payload = await response.json(); feedback.textContent = response.ok ? "Team created and selected." : payload.detail;
+      if (response.ok) await load();
+    });
+    document.getElementById("shed-private-team-request")?.addEventListener("click", async function () {
+      const codeInput = document.getElementById("shed-private-team-code");
+      const response = await fetch("/teams/private-requests", {
+        method: "POST", credentials: "same-origin",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({join_code: codeInput?.value || ""}),
+      });
+      const payload = await response.json();
+      if (privateStatus) {
+        privateStatus.textContent = response.ok
+          ? (payload.status === "joined" ? "You already belong to that team." : "Request sent. Waiting for director approval.")
+          : (payload.detail || "That private team request could not be sent.");
+      }
       if (response.ok) await load();
     });
     document.getElementById("shed-team-report-submit")?.addEventListener("click", async function () {
@@ -3069,7 +3093,7 @@
     }
 
     function renderTeamBoards(standings) {
-      const boardKeys = ["team-weekly-practice", "team-seasonal-points", "team-average-practice", "team-season-practice"];
+      const boardKeys = ["team-weekly-practice", "team-seasonal-points", "team-average-practice", "team-season-practice", "team-practice-rating"];
       boardKeys.forEach((key) => {
         let anyRows = false;
         ["open", "verified"].forEach((division) => {
@@ -3089,9 +3113,13 @@
             const score = document.createElement("strong"); score.className = "contest-ranked-score";
             const scoreValue = key === "team-average-practice"
               ? (row.score / 100).toFixed(2)
-              : String(row.score);
+              : key === "team-practice-rating"
+                ? Number(row.score).toFixed(1)
+                : String(row.score);
             score.textContent = scoreValue;
-            const scoreUnit = key === "team-seasonal-points" ? "Board Activity Points" : "practice minutes";
+            const scoreUnit = key === "team-seasonal-points"
+              ? "Board Activity Points"
+              : key === "team-practice-rating" ? "Team Practice Rating" : "practice minutes";
             item.setAttribute("aria-label", `Rank ${row.rank}, ${row.team_name}, ${scoreValue} ${scoreUnit}`);
             item.append(rank, subject, score); list.append(item);
           });
@@ -3246,6 +3274,7 @@
     "team-weekly-practice": "Practice Minutes this Week by Team",
     "team-average-practice": "Practice Minutes this Week by Team Average",
     "team-season-practice": "Practice Minutes this Season by Team",
+    "team-practice-rating": "Team Practice Rating",
   });
 
   function boardContestTitle(contest) {

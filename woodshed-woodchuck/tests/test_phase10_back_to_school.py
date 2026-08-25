@@ -116,9 +116,9 @@ def test_hall_ui_separates_history_and_groups_achievements() -> None:
 def test_live_contests_are_collapsible_categories_with_future_divisions() -> None:
     rendered = TestClient(app).get("/quest").text
     assert rendered.count('class="contest-category-card"') == 8
-    assert rendered.count('data-division="open"') == 7
-    assert rendered.count('data-division="verified"') == 7
-    assert rendered.count('class="contest-division-card contest-division-coming-soon"') == 15
+    assert rendered.count('data-division="open"') == 8
+    assert rendered.count('data-division="verified"') == 8
+    assert rendered.count('class="contest-division-card contest-division-coming-soon"') == 16
     assert "Open · Verified · Pristine 🚧 · MVP 🚧" not in rendered
     for category in (
         "weekly-points-leaders", "weekly-camp-points",
@@ -134,7 +134,7 @@ def test_live_contests_are_collapsible_categories_with_future_divisions() -> Non
         assert " open" not in opening.group(0)
     assert rendered.count("Pristine") >= 7
     assert rendered.count("MVP") >= 7
-    assert rendered.count("Under construction") == 15
+    assert rendered.count("Under construction") == 16
     division_layout = CSS[
         CSS.index(".contest-category-divisions {"):
         CSS.index(".contest-division-card,")

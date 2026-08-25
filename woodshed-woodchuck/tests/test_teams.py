@@ -78,6 +78,9 @@ def test_creator_can_create_once_and_public_payload_is_safe(session: Session) ->
         emblem_key="emoji:cat", now=NOW,
     )
     assert membership.team_id == team.id
+    assert team.visibility == "public"
+    assert team.director_led is False
+    assert team.join_code is None
     assert active_membership(session, profile_id=captain.id, season_id=active.id).team_id == team.id
     public = team_payload(team, captain)
     assert public["captain"]["accessible_label"] == "Team Captain"

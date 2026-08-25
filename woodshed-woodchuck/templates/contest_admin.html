@@ -115,6 +115,30 @@
       {% endif %}
     </section>
 
+    <section class="contest-admin-actions" aria-labelledby="director-capability-title">
+      <h2 id="director-capability-title">Band Director Capability</h2>
+      <p>Grant this additive capability only after independently verifying the director.</p>
+      <form method="post" action="/contests/admin/band-directors">
+        <label for="director-woodchuck-id">Woodchuck ID</label>
+        <input id="director-woodchuck-id" name="woodchuck_id" required autocomplete="off" />
+        <button class="btn btn-primary" type="submit">Grant Band Director</button>
+      </form>
+      {% if band_directors %}
+      <ul>
+        {% for director in band_directors %}
+        <li>
+          {{ director.display_name }} ({{ director.woodchuck_id }})
+          <form method="post" action="/contests/admin/band-directors/{{ director.profile_id }}/revoke">
+            <button class="btn btn-secondary" type="submit">Revoke</button>
+          </form>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p>No Band Director capabilities have been granted.</p>
+      {% endif %}
+    </section>
+
     <section class="contest-admin-actions" aria-labelledby="finalization-actions-title">
       <h2 id="finalization-actions-title">Finalization Actions</h2>
       <div class="contest-admin-button-row">

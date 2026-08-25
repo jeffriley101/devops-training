@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="director-team-shell" aria-labelledby="director-team-title">
+  <header>
+    <a class="btn btn-secondary" href="/home#shed-team-panel">Back to My Woodshed</a>
+    <h1 id="director-team-title">Director Team Management</h1>
+  </header>
+  <p id="director-team-feedback" role="status" aria-live="polite">Loading team…</p>
+
+  <form id="director-team-create-form" class="mentor-card" hidden>
+    <h2>Create a Private Team</h2>
+    <label for="director-team-name">Team name</label>
+    <input id="director-team-name" maxlength="30" required />
+    <label for="director-team-emblem">Team emblem</label>
+    <select id="director-team-emblem" required><option value="">Choose an emblem</option></select>
+    <button class="btn btn-green" type="submit">Create Private Team</button>
+  </form>
+
+  <div id="director-team-content" hidden>
+    <section class="mentor-card">
+      <h2 id="director-team-name-display">Private Team</h2>
+      <p>Join code: <strong id="director-team-code"></strong></p>
+      <div class="button-row">
+        <button id="director-team-regenerate" class="btn btn-secondary" type="button">Regenerate Code</button>
+        <button id="director-team-join-playing" class="btn btn-secondary" type="button">Join as Playing Member</button>
+      </div>
+    </section>
+
+    <section class="mentor-card" aria-labelledby="director-pending-title">
+      <h2 id="director-pending-title">Pending Requests</h2>
+      <div id="director-team-pending"></div>
+    </section>
+
+    <section class="mentor-card" aria-labelledby="director-members-title">
+      <h2 id="director-members-title">Team Members</h2>
+      <div id="director-team-members"></div>
+    </section>
+  </div>
+</section>
+{% endblock %}
+
+{% block page_scripts %}
+<script src="/static/js/director-team.js?v=1"></script>
+{% endblock %}

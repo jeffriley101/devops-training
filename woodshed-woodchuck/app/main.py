@@ -26,7 +26,7 @@ from .verifier_routes import (
 from .practice_chart_routes import router as practice_chart_router
 from .contests import router as contest_router
 from .contest_admin import router as contest_admin_router
-from .teams import router as team_router
+from .teams import has_band_director_capability, router as team_router
 from .xp_routes import router as xp_router
 from .store_routes import router as store_router
 from .arcade_routes import router as arcade_router
@@ -147,6 +147,23 @@ def login_page(request: Request):
         "login.html",
         title="Sign In",
         active_nav=None,
+    )
+
+
+@app.get("/teams/director/manage")
+def director_team_management_page(request: Request):
+    with SessionLocal() as session:
+        profile = current_profile(request, session)
+        if profile is None:
+            return RedirectResponse(url="/login", status_code=303)
+        if not has_band_director_capability(session, profile_id=profile.id):
+            return RedirectResponse(url="/home", status_code=303)
+    return _render(
+        request,
+        "director_team.html",
+        title="Director Team Management",
+        active_nav="home",
+        page_class="main-app-page director-team-page",
     )
 
 

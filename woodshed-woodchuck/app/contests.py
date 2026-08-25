@@ -36,6 +36,10 @@ from .models import (
     WoodchuckProfile,
     WoodchuckState,
 )
+from .team_practice_rating import (
+    ACTIVE_MINUTES_THRESHOLD,
+    calculate_team_practice_rating,
+)
 
 
 BAND_CAMP_KEY = "band-camp-2026"
@@ -870,7 +874,7 @@ def _charts_and_approved_ids(
 
 def _team_rankings(
     session: Session,
-    scores: dict[int, int],
+    scores: dict[int, int | float],
     member_counts: dict[int, int] | None = None,
 ) -> list[dict[str, object]]:
     teams = {
@@ -899,15 +903,46 @@ def _team_rankings(
             "emblem_key": public_team_emblem(team), "score": score,
             "active_member_count": (member_counts or {}).get(team_id, 0),
             "captain_name": (
-                None if team.moderation_status == "hidden" or team.creator_profile_id is None
+                None if (
+                    team.moderation_status == "hidden"
+                    or team.visibility == "private"
+                    or team.creator_profile_id is None
+                )
                 else public_woodchuck_name(captains.get(team.creator_profile_id))
             ),
             "captain_label": (
-                None if team.moderation_status == "hidden" or team.creator_profile_id is None
+                None if (
+                    team.moderation_status == "hidden"
+                    or team.visibility == "private"
+                    or team.creator_profile_id is None
+                )
                 else "Team Captain"
             ),
         })
     return rows
+
+
+def _eligible_weekly_team_rosters(
+    session: Session, contest_week: ContestWeek
+) -> dict[int, set[int]]:
+    start_at = datetime.combine(
+        contest_week.week_start, time.min, CENTRAL
+    ).astimezone(timezone.utc)
+    end_at = datetime.combine(
+        contest_week.week_end, time.min, CENTRAL
+    ).astimezone(timezone.utc)
+    memberships = session.scalars(select(TeamMembership).where(
+        TeamMembership.season_id == contest_week.season_id,
+        TeamMembership.started_at < end_at,
+        or_(
+            TeamMembership.ended_at.is_(None),
+            TeamMembership.ended_at > start_at,
+        ),
+    )).all()
+    rosters: dict[int, set[int]] = {}
+    for membership in memberships:
+        rosters.setdefault(membership.team_id, set()).add(membership.profile_id)
+    return rosters
 
 
 def _weekly_team_scores(
@@ -926,18 +961,41 @@ def _weekly_team_scores(
         for division in divisions:
             key = (chart.team_id, chart.profile_id)
             contributions[division][key] = contributions[division].get(key, 0) + chart.minutes
-    result: dict[str, dict[str, dict[int, int]]] = {}
+    eligible_rosters = _eligible_weekly_team_rosters(session, contest_week)
+    result: dict[str, dict[str, object]] = {}
     for division in ("open", "verified"):
         scores: dict[int, int] = {}
         members: dict[int, int] = {}
-        for (team_id, _profile_id), minutes in contributions[division].items():
+        meaningful: dict[tuple[int, int], int] = {}
+        for (team_id, profile_id), minutes in contributions[division].items():
             scores[team_id] = scores.get(team_id, 0) + min(minutes, 300)
+            if minutes < ACTIVE_MINUTES_THRESHOLD:
+                continue
+            meaningful[(team_id, profile_id)] = minutes
             members[team_id] = members.get(team_id, 0) + 1
         averages = {
-            team_id: round(scores[team_id] * 100 / members[team_id])
-            for team_id in scores
+            team_id: round(
+                sum(min(minutes, 300) for (row_team, _), minutes in meaningful.items()
+                    if row_team == team_id) * 100 / active_count
+            )
+            for team_id, active_count in members.items()
         }
-        result[division] = {"totals": scores, "members": members, "averages": averages}
+        tpr_scores: dict[int, float] = {}
+        for team_id in members:
+            team_minutes = [
+                minutes for (row_team_id, _), minutes in meaningful.items()
+                if row_team_id == team_id
+            ]
+            roster_count = len(eligible_rosters.get(team_id, set()))
+            tpr_scores[team_id] = calculate_team_practice_rating(
+                team_minutes, eligible_roster=roster_count
+            ).rating
+        result[division] = {
+            "totals": scores,
+            "members": members,
+            "averages": averages,
+            "tpr": tpr_scores,
+        }
     return result
 
 
@@ -1041,11 +1099,15 @@ def team_leaderboards(
     payload = {
         "team-weekly-practice": {}, "team-average-practice": {},
         "team-season-practice": {}, "team-seasonal-points": {},
+        "team-practice-rating": {},
     }
     for division in ("open", "verified"):
         counts = weekly[division]["members"]
         payload["team-weekly-practice"][division] = _team_rankings(session, weekly[division]["totals"], counts)
         payload["team-average-practice"][division] = _team_rankings(session, weekly[division]["averages"], counts)
+        payload["team-practice-rating"][division] = _team_rankings(
+            session, weekly[division]["tpr"], counts
+        )
         payload["team-season-practice"][division] = _team_rankings(session, seasonal_practice[division])
         payload["team-seasonal-points"][division] = _team_rankings(session, seasonal_points[division])
     return payload
@@ -1684,6 +1746,9 @@ def finalize_contest_week(
         session, season=season, contest_week=week, source_cutoff=source_cutoff
     )
     for contest_key, divisions in boards.items():
+        # TPR is a live BOARD quality indicator, not a medal/crown contest.
+        if contest_key == "team-practice-rating":
+            continue
         contest = contests[contest_key]
         for division, rows in divisions.items():
             for row in rows:

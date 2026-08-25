@@ -31,7 +31,14 @@ from .contests import (
     utc_iso,
 )
 from .db import SessionLocal
-from .models import ContestWeek, Season, Team, TeamReport
+from .models import (
+    ContestWeek,
+    ProfileCapability,
+    Season,
+    Team,
+    TeamReport,
+    WoodchuckProfile,
+)
 
 
 router = APIRouter(prefix="/contests/admin", tags=["contest-admin"])
@@ -161,6 +168,18 @@ def contest_admin_page(request: Request):
             .where(TeamReport.status == "unresolved")
             .group_by(TeamReport.team_id)
         ).all())
+        director_rows = session.execute(
+            select(ProfileCapability, WoodchuckProfile)
+            .join(
+                WoodchuckProfile,
+                WoodchuckProfile.id == ProfileCapability.profile_id,
+            )
+            .where(
+                ProfileCapability.capability == "band_director",
+                WoodchuckProfile.status == "active",
+            )
+            .order_by(WoodchuckProfile.display_name, WoodchuckProfile.id)
+        ).all()
     flash = request.session.pop("contest_admin_flash", None)
     return templates.TemplateResponse(
         request=request,
@@ -178,8 +197,61 @@ def contest_admin_page(request: Request):
                 }
                 for report, team in report_rows
             ],
+            "band_directors": [
+                {
+                    "profile_id": profile.id,
+                    "woodchuck_id": profile.woodchuck_id,
+                    "display_name": profile.display_name,
+                    "granted_at": capability.granted_at,
+                }
+                for capability, profile in director_rows
+            ],
         },
     )
+
+
+@router.post("/band-directors")
+def grant_band_director(
+    request: Request, woodchuck_id: str = Form(...)
+):
+    require_contest_admin(request)
+    identifier = woodchuck_id.strip().upper()
+    with SessionLocal() as session:
+        profile = session.scalar(select(WoodchuckProfile).where(
+            WoodchuckProfile.woodchuck_id == identifier,
+            WoodchuckProfile.status == "active",
+        ))
+        if profile is None:
+            raise HTTPException(status_code=404, detail="Woodchuck was not found.")
+        existing = session.scalar(select(ProfileCapability).where(
+            ProfileCapability.profile_id == profile.id,
+            ProfileCapability.capability == "band_director",
+        ))
+        if existing is None:
+            session.add(ProfileCapability(
+                profile_id=profile.id,
+                capability="band_director",
+                granted_by="contest-admin",
+                granted_at=datetime.now(timezone.utc),
+            ))
+            session.commit()
+    _flash(request, "success", "Band Director capability granted.")
+    return _redirect()
+
+
+@router.post("/band-directors/{profile_id}/revoke")
+def revoke_band_director(profile_id: int, request: Request):
+    require_contest_admin(request)
+    with SessionLocal() as session:
+        capability = session.scalar(select(ProfileCapability).where(
+            ProfileCapability.profile_id == profile_id,
+            ProfileCapability.capability == "band_director",
+        ))
+        if capability is not None:
+            session.delete(capability)
+            session.commit()
+    _flash(request, "success", "Band Director capability revoked.")
+    return _redirect()
 
 
 @router.post("/teams/{team_id}/moderation")

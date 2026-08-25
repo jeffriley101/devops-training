@@ -43,7 +43,7 @@ def test_board_contains_live_standings_markup() -> None:
     assert "Your Position" not in markup
 
 
-def test_live_competitions_use_requested_order_and_tpr_placeholder() -> None:
+def test_live_competitions_use_requested_order_and_live_tpr_board() -> None:
     markup = TestClient(app).get("/quest").text
     titles = (
         "Board Activity Points this Week",
@@ -62,8 +62,9 @@ def test_live_competitions_use_requested_order_and_tpr_placeholder() -> None:
         markup.index('data-contest-category="team-practice-rating"'):
         markup.index('data-contest-category="team-practice-rating"') + 900
     ]
-    assert "Under construction" in tpr
-    assert "data-team-board" not in tpr
+    assert 'data-team-board="team-practice-rating"' in tpr
+    assert 'id="team-practice-rating-open"' in tpr
+    assert 'id="team-practice-rating-verified"' in tpr
 
 
 def test_desktop_board_uses_centered_single_column_without_changing_mobile_flow() -> None:
