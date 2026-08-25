@@ -18,7 +18,7 @@ def test_tone_is_exactly_pinned_local_licensed_and_loaded_in_order():
     assert "MIT License" in license_file.read_text()
     assert "cdn" not in BASE.casefold()
     tone_pos = BASE.index('/static/vendor/tone/Tone.js?v=15.1.22')
-    audio_pos = BASE.index('/static/js/audio.js?v=11')
+    audio_pos = BASE.index('/static/js/audio.js?v=12')
     app_pos = BASE.index('/static/js/app.js?v=68')
     assert tone_pos < audio_pos < app_pos
 
@@ -63,6 +63,17 @@ def test_arcade_pickup_effect_uses_the_shared_sound_preference_graph():
     assert "arcadePickup: 45" in AUDIO
     assert 'name === "arcadePickup"' in AUDIO
     assert 'graph.chime.triggerAttackRelease("B5", 0.075, now, 0.2)' in AUDIO
+
+
+def test_scale_keyboard_pitch_uses_the_shared_muted_volume_graph():
+    assert "const piano = new Tone.PolySynth" in AUDIO
+    assert 'oscillator: { type: "triangle8" }' in AUDIO
+    assert "attack: 0.004, decay: 0.3, sustain: 0.025, release: 0.18" in AUDIO
+    assert "piano," in AUDIO
+    assert "function playPianoPitch(frequency)" in AUDIO
+    assert "if (!enabled || !Number.isFinite(pitch) || pitch <= 0) return false" in AUDIO
+    assert "current.piano.triggerAttackRelease(pitch, 0.42)" in AUDIO
+    assert "playPianoPitch, setEnabled, setVolume" in AUDIO
 
 
 def test_mobile_gestures_resume_a_context_that_suspends_again():

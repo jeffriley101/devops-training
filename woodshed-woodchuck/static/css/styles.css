@@ -5617,6 +5617,7 @@ select {
   margin: auto;
 }
 .wheel-spinner {
+  --wheel-content-counter-rotation: 0turn;
   position: absolute;
   inset: 0;
   border: 6px solid #fff7db;
@@ -5638,7 +5639,7 @@ select {
   width: 3.4rem;
   aspect-ratio: 1;
   place-items: center;
-  transform: translate(-50%, -50%);
+  transform: translate(-50%, -50%) rotate(var(--wheel-content-counter-rotation));
   border: 3px solid #fff7db;
   border-radius: 50%;
   background: #24243b;
@@ -5657,14 +5658,21 @@ select {
   text-align: center;
   text-shadow: 0 1px 2px #000;
 }
-.wheel-spinner span:nth-child(1) { transform: rotate(22.5deg) translateY(-5.1rem) rotate(-22.5deg); }
-.wheel-spinner span:nth-child(2) { transform: rotate(67.5deg) translateY(-5.1rem) rotate(-67.5deg); }
-.wheel-spinner span:nth-child(3) { transform: rotate(112.5deg) translateY(-5.1rem) rotate(-112.5deg); }
-.wheel-spinner span:nth-child(4) { transform: rotate(157.5deg) translateY(-5.1rem) rotate(-157.5deg); }
-.wheel-spinner span:nth-child(5) { transform: rotate(202.5deg) translateY(-5.1rem) rotate(-202.5deg); }
-.wheel-spinner span:nth-child(6) { transform: rotate(247.5deg) translateY(-5.1rem) rotate(-247.5deg); }
-.wheel-spinner span:nth-child(7) { transform: rotate(292.5deg) translateY(-5.1rem) rotate(-292.5deg); }
-.wheel-spinner span:nth-child(8) { transform: rotate(337.5deg) translateY(-5.1rem) rotate(-337.5deg); }
+.wheel-spinner span:nth-child(1) { --wheel-slice-angle: 22.5deg; --wheel-slice-counter: -22.5deg; }
+.wheel-spinner span:nth-child(2) { --wheel-slice-angle: 67.5deg; --wheel-slice-counter: -67.5deg; }
+.wheel-spinner span:nth-child(3) { --wheel-slice-angle: 112.5deg; --wheel-slice-counter: -112.5deg; }
+.wheel-spinner span:nth-child(4) { --wheel-slice-angle: 157.5deg; --wheel-slice-counter: -157.5deg; }
+.wheel-spinner span:nth-child(5) { --wheel-slice-angle: 202.5deg; --wheel-slice-counter: -202.5deg; }
+.wheel-spinner span:nth-child(6) { --wheel-slice-angle: 247.5deg; --wheel-slice-counter: -247.5deg; }
+.wheel-spinner span:nth-child(7) { --wheel-slice-angle: 292.5deg; --wheel-slice-counter: -292.5deg; }
+.wheel-spinner span:nth-child(8) { --wheel-slice-angle: 337.5deg; --wheel-slice-counter: -337.5deg; }
+.wheel-spinner span {
+  transform:
+    rotate(var(--wheel-slice-angle))
+    translateY(-5.1rem)
+    rotate(var(--wheel-slice-counter))
+    rotate(var(--wheel-content-counter-rotation));
+}
 .wheel-pointer {
   position: absolute;
   top: -0.35rem;

@@ -107,6 +107,14 @@
         volume: -18,
       },
     }).connect(filter);
+    const piano = new Tone.PolySynth(Tone.Synth, {
+      maxPolyphony: 10,
+      options: {
+        oscillator: { type: "triangle8" },
+        envelope: { attack: 0.004, decay: 0.3, sustain: 0.025, release: 0.18 },
+        volume: -17,
+      },
+    }).connect(filter);
     const doorFilter = new Tone.Filter({ frequency: 380, type: "bandpass", Q: 1.2 }).connect(master);
     const door = new Tone.NoiseSynth({
       noise: { type: "brown" },
@@ -123,7 +131,7 @@
     }).connect(crowdFilter);
     const goatGain = new Tone.Gain(0.35).connect(master);
     graph = {
-      master, filter, chime, warm, wood, click, flourish,
+      master, filter, chime, warm, wood, click, flourish, piano,
       doorFilter, door, crowdFilter, crowd, goatGain,
     };
     buildGoatPool(Tone, goatGain);
@@ -496,6 +504,20 @@
     if (!audioContextIsRunning()) unlocked = false;
   }
 
+  function playPianoPitch(frequency) {
+    const pitch = Number(frequency);
+    if (!enabled || !Number.isFinite(pitch) || pitch <= 0) return false;
+    function trigger() {
+      const current = buildGraph();
+      if (!current) return false;
+      current.piano.triggerAttackRelease(pitch, 0.42);
+      return true;
+    }
+    if (audioContextIsRunning()) return trigger();
+    unlock().then(trigger).catch(function () {});
+    return true;
+  }
+
   document.addEventListener("pointerdown", gestureUnlock, true);
   document.addEventListener("touchend", gestureUnlock, true);
   document.addEventListener("click", gestureUnlock, true);
@@ -505,7 +527,7 @@
   document.addEventListener("DOMContentLoaded", wireControls, { once: true });
 
   window.WoodshedAudio = {
-    unlock, play, playCampReward, setEnabled, setVolume,
+    unlock, play, playCampReward, playPianoPitch, setEnabled, setVolume,
     isEnabled: function () { return enabled; },
     getVolume: function () { return volume; },
     getContextState: function () {

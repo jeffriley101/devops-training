@@ -256,6 +256,11 @@
   let activePlayToken = null;
   let starting = false;
 
+  function setWheelRotation(turns) {
+    wheel.style.setProperty("--wheel-content-counter-rotation", `${-turns}turn`);
+    wheel.style.transform = `rotate(${turns}turn)`;
+  }
+
   function setMessage(value) { message.textContent = value; }
 
   function renderLeaderboard(payload) {
@@ -386,7 +391,7 @@
     const result = game.startSpin();
     if (!result) return;
     wheelTurns += 4 + WHEEL_SEGMENTS.indexOf(result.segment) / WHEEL_SEGMENTS.length;
-    wheel.style.transform = `rotate(${wheelTurns}turn)`;
+    setWheelRotation(wheelTurns);
     wheelResult.textContent = result.segment === "2x"
       ? "2x! One more spin…"
       : "Spinning…";
@@ -409,7 +414,7 @@
       }
       wheelTurns += 3 + NUMERIC_WHEEL_VALUES.indexOf(result.numericResult) /
         NUMERIC_WHEEL_VALUES.length;
-      wheel.style.transform = `rotate(${wheelTurns}turn)`;
+      setWheelRotation(wheelTurns);
       wheelResult.textContent = "2x bonus: spinning for the numeric value…";
       spinTimerId = window.setTimeout(finishSpin, 720);
     }, 720);

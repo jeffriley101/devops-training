@@ -7,6 +7,12 @@
   const WRONG_NOTE_PENALTY = 50;
   const BLACK_PITCH_CLASSES = new Set([1, 3, 6, 8, 10]);
 
+  function midiToFrequency(midi) {
+    const note = Number(midi);
+    if (!Number.isFinite(note)) return null;
+    return 440 * Math.pow(2, (note - 69) / 12);
+  }
+
   class ScaleKeyboardGame {
     constructor(options) {
       const settings = options || {};
@@ -89,10 +95,15 @@
     correctNotePoints: CORRECT_NOTE_POINTS,
     scaleBonus: SCALE_BONUS,
     wrongNotePenalty: WRONG_NOTE_PENALTY,
+    midiToFrequency: midiToFrequency,
   });
 
   if (typeof module !== "undefined" && module.exports) {
-    module.exports = { ScaleKeyboardGame, SCALE_KEYBOARD_RULES: root.SCALE_KEYBOARD_RULES };
+    module.exports = {
+      ScaleKeyboardGame,
+      SCALE_KEYBOARD_RULES: root.SCALE_KEYBOARD_RULES,
+      midiToFrequency,
+    };
   }
 
   if (typeof document === "undefined") return;
@@ -196,6 +207,11 @@
     if (betweenScales) return;
     const result = game.press(midi);
     if (!result.accepted) return;
+    try {
+      if (root.WoodshedAudio) {
+        root.WoodshedAudio.playPianoPitch(midiToFrequency(midi));
+      }
+    } catch (_error) { /* Pitch playback is supplemental to scoring. */ }
     key.classList.remove("is-correct", "is-wrong");
     key.classList.add(result.correct ? "is-correct" : "is-wrong");
     root.setTimeout(function () { key.classList.remove("is-correct", "is-wrong"); }, 180);

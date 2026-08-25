@@ -28,7 +28,8 @@ CSS = (ROOT / "static" / "css" / "styles.css").read_text(encoding="utf-8")
 def run_scale_node(body: str) -> dict[str, object]:
     source = f"""
 const assert = require("node:assert/strict");
-const {{ ScaleKeyboardGame, SCALE_KEYBOARD_RULES }} = require("./static/js/scale-keyboard.js");
+const {{ ScaleKeyboardGame, SCALE_KEYBOARD_RULES, midiToFrequency }} =
+  require("./static/js/scale-keyboard.js");
 const {{ SCALE_KEYBOARD_SCALES }} = require("./static/js/scale-keyboard-data.js");
 {body}
 """
@@ -123,6 +124,21 @@ console.log(JSON.stringify({ count: SCALE_KEYBOARD_SCALES.length }));
     assert result == {"count": 8}
 
 
+def test_displayed_midi_notes_map_to_concert_pitch_with_a4_440() -> None:
+    result = run_scale_node("""
+function close(actual, expected) {
+  assert.ok(Math.abs(actual - expected) < 0.001, `${actual} != ${expected}`);
+}
+close(midiToFrequency(60), 261.625565); // C4
+close(midiToFrequency(64), 329.627557); // E4
+close(midiToFrequency(69), 440);        // A4
+close(midiToFrequency(70), 466.163762); // B-flat4 / A-sharp4
+assert.equal(midiToFrequency("not-a-note"), null);
+console.log(JSON.stringify({ a4: midiToFrequency(69) }));
+""")
+    assert result == {"a4": 440}
+
+
 def test_thirty_second_run_correct_progress_wrong_penalty_and_completion() -> None:
     result = run_scale_node("""
 const game = new ScaleKeyboardGame({ scales: [SCALE_KEYBOARD_SCALES[0]], random: () => 0 });
@@ -181,6 +197,10 @@ def test_keyboard_markup_is_touch_friendly_and_feedback_uses_shared_audio() -> N
     assert 'root.WoodshedAudio.play(name)' in GAME_JS
     assert 'result.correct ? "correctTrivia" : "incorrectTrivia"' in GAME_JS
     assert 'playFeedback("arcadeCheer")' in GAME_JS
+    assert "root.WoodshedAudio.playPianoPitch(midiToFrequency(midi))" in GAME_JS
+    assert GAME_JS.index("if (!result.accepted) return") < GAME_JS.index(
+        "root.WoodshedAudio.playPianoPitch(midiToFrequency(midi))"
+    )
     assert "touch-action: manipulation" in CSS
 
 

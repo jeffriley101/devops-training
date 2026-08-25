@@ -29,6 +29,7 @@ TERMS_JS = (ROOT / "static" / "js" / "wheel-terms.js").read_text(
     encoding="utf-8"
 )
 AUDIO_JS = (ROOT / "static" / "js" / "audio.js").read_text(encoding="utf-8")
+CSS = (ROOT / "static" / "css" / "styles.css").read_text(encoding="utf-8")
 
 
 def run_wheel_node(body: str) -> dict[str, object]:
@@ -216,6 +217,21 @@ console.log(JSON.stringify(spin));
 """)
     assert result == {"segment": "2x", "numericResult": 250, "letterValue": 500}
     assert "2x bonus: spinning for the numeric value" in WHEEL_JS
+
+
+def test_pointer_stays_fixed_and_wheel_content_counter_rotates_upright() -> None:
+    spinner = WHEEL.index('id="wheel-spinner"')
+    spinner_close = WHEEL.index("</div>", spinner)
+    pointer = WHEEL.index('class="wheel-pointer"')
+    assert spinner_close < pointer
+    assert "function setWheelRotation(turns)" in WHEEL_JS
+    assert '`${-turns}turn`' in WHEEL_JS
+    assert "setWheelRotation(wheelTurns)" in WHEEL_JS
+    assert "--wheel-content-counter-rotation: 0turn" in CSS
+    assert CSS.count("rotate(var(--wheel-content-counter-rotation))") == 2
+    assert ".wheel-pointer {" in CSS
+    assert "WHEEL_SEGMENTS.indexOf(result.segment) / WHEEL_SEGMENTS.length" in WHEEL_JS
+    assert "NUMERIC_WHEEL_VALUES.indexOf(result.numericResult) /" in WHEEL_JS
 
 
 def test_spell_it_is_always_available_with_three_no_time_penalty_attempts() -> None:
