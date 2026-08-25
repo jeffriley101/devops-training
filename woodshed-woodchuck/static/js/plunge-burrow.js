@@ -8,9 +8,6 @@
   const SPEED_MILESTONE = 5;
   const MIN_INTERVAL = 105;
   const BEST_SCORE_KEY = "woodshed.plungeBurrow.bestScore";
-  const MUSIC_ENABLED_KEY = "woodshed.plungeBurrow.musicEnabled";
-  const MUSIC_VOLUME_KEY = "woodshed.plungeBurrow.musicVolume";
-  const SOUNDTRACK_URL = ""; // Configure a future approved local file here.
   const MAX_HEARTS = 3;
   const CARROT_MILESTONE = 5;
   const INSTRUMENT_START_SCORE = 3;
@@ -421,7 +418,7 @@
   const core = {
     PlungeBurrowGame, GRID_SIZE, START_HEARTS, START_INTERVAL,
     SPEED_STEP, SPEED_MILESTONE, MIN_INTERVAL, BEST_SCORE_KEY,
-    MUSIC_ENABLED_KEY, MUSIC_VOLUME_KEY, SOUNDTRACK_URL, MAX_HEARTS,
+    MAX_HEARTS,
     CARROT_MILESTONE, INSTRUMENT_START_SCORE, INSTRUMENT_RESPAWN_GAP,
     BAND_SET_TARGET, INSTRUMENTS,
   };
@@ -448,15 +445,11 @@
   const startButton = document.getElementById("plunge-start");
   const pauseButton = document.getElementById("plunge-pause");
   const restartButton = document.getElementById("plunge-restart");
-  const musicEnabled = document.getElementById("plunge-music-enabled");
-  const musicVolume = document.getElementById("plunge-music-volume");
-  const musicVolumeValue = document.getElementById("plunge-music-volume-value");
   let frameId = null;
   let lastFrame = 0;
   let accumulator = 0;
   let destroyed = false;
   let touchStart = null;
-  let soundtrack = null;
 
   function announce(message) { liveEl.textContent = ""; root.setTimeout(() => { liveEl.textContent = message; }, 0); }
   function playEffect(name) {
@@ -465,27 +458,6 @@
   function safeStorageGet(key, fallback) {
     try { const value = root.localStorage.getItem(key); return value === null ? fallback : value; } catch (_error) { return fallback; }
   }
-  function safeStorageSet(key, value) {
-    try { root.localStorage.setItem(key, String(value)); } catch (_error) { /* Preference remains page-local. */ }
-  }
-  function configureMusic() {
-    if (!SOUNDTRACK_URL) return;
-    soundtrack = new Audio(SOUNDTRACK_URL);
-    soundtrack.loop = true;
-    musicEnabled.disabled = false;
-    musicVolume.disabled = false;
-    musicEnabled.checked = safeStorageGet(MUSIC_ENABLED_KEY, "false") === "true";
-    musicVolume.value = safeStorageGet(MUSIC_VOLUME_KEY, "30");
-    soundtrack.volume = Number(musicVolume.value) / 100;
-  }
-  function startMusic() {
-    if (!soundtrack || !musicEnabled.checked) return;
-    const promise = soundtrack.play();
-    if (promise && promise.catch) promise.catch(function () {});
-  }
-  function pauseMusic() { if (soundtrack) soundtrack.pause(); }
-  function stopMusic() { if (soundtrack) { soundtrack.pause(); soundtrack.currentTime = 0; } }
-
   const plungeSessionKey = root.crypto && typeof root.crypto.randomUUID === "function"
     ? root.crypto.randomUUID()
     : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
@@ -562,7 +534,6 @@
       if (event === "resume") announce("Game resumed.");
       if (event === "gameover") {
         reportBestScore(detail.best);
-        stopMusic();
         announce(`Game over. Final score ${detail.score}.`);
       }
     },
@@ -691,12 +662,12 @@
   function cancelLoop() { if (frameId !== null) root.cancelAnimationFrame(frameId); frameId = null; lastFrame = 0; accumulator = 0; }
   function chooseDirection(direction) { game.setDirection(direction); canvas.focus({ preventScroll: true }); }
 
-  startButton.addEventListener("click", function () { if (game.start()) { startMusic(); ensureLoop(); canvas.focus({ preventScroll: true }); } });
+  startButton.addEventListener("click", function () { if (game.start()) { ensureLoop(); canvas.focus({ preventScroll: true }); } });
   pauseButton.addEventListener("click", function () {
-    if (game.status === "running" && game.pause()) { cancelLoop(); pauseMusic(); }
-    else if (game.resume()) { startMusic(); ensureLoop(); }
+    if (game.status === "running" && game.pause()) { cancelLoop(); }
+    else if (game.resume()) { ensureLoop(); }
   });
-  restartButton.addEventListener("click", function () { cancelLoop(); stopMusic(); game.reset(); announce("Game reset. Score, pickups, portals, and Band Set cleared. Ready to start."); canvas.focus({ preventScroll: true }); });
+  restartButton.addEventListener("click", function () { cancelLoop(); game.reset(); announce("Game reset. Score, pickups, portals, and Band Set cleared. Ready to start."); canvas.focus({ preventScroll: true }); });
   document.querySelectorAll("[data-direction]").forEach((button) => button.addEventListener("click", () => chooseDirection(button.dataset.direction)));
 
   const keyDirections = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right", w: "up", W: "up", a: "left", A: "left", s: "down", S: "down", d: "right", D: "right" };
@@ -716,13 +687,10 @@
     chooseDirection(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : (dy > 0 ? "down" : "up"));
   }, { passive: true });
   document.addEventListener("visibilitychange", function () {
-    if (document.hidden && game.pause()) { cancelLoop(); pauseMusic(); }
+    if (document.hidden && game.pause()) { cancelLoop(); }
   });
   root.addEventListener("resize", resizeCanvas);
-  root.addEventListener("pagehide", function () { destroyed = true; cancelLoop(); stopMusic(); });
-  musicEnabled.addEventListener("change", function () { safeStorageSet(MUSIC_ENABLED_KEY, musicEnabled.checked); if (!musicEnabled.checked) pauseMusic(); else if (game.status === "running") startMusic(); });
-  musicVolume.addEventListener("input", function () { const value = Number(musicVolume.value); musicVolumeValue.textContent = `${value}%`; musicVolume.setAttribute("aria-valuetext", `${value} percent`); if (soundtrack) soundtrack.volume = value / 100; safeStorageSet(MUSIC_VOLUME_KEY, value); });
+  root.addEventListener("pagehide", function () { destroyed = true; cancelLoop(); });
 
-  configureMusic();
   resizeCanvas();
 }(typeof window !== "undefined" ? window : globalThis));

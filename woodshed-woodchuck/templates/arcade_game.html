@@ -9,7 +9,10 @@
       <p>{{ arcade_game.description }}</p>
       {% endif %}
     </div>
-    <a class="btn btn-secondary" href="/arcade">Back to Arcade</a>
+    <div class="arcade-header-actions">
+      <button class="arcade-soundtrack-toggle" type="button" data-arcade-soundtrack-toggle aria-label="Mute Arcade soundtrack" title="Mute Arcade soundtrack">🔊</button>
+      <a class="btn btn-secondary" href="/arcade">Back to Arcade</a>
+    </div>
   </header>
 
   <div class="arcade-game-status" aria-label="Game status">
@@ -58,5 +61,6 @@
 {% endblock %}
 
 {% block page_scripts %}
-<script src="/static/js/arcade.js?v=4"></script>
+<script src="/static/js/arcade.js?v=5"></script>
+<script src="/static/js/arcade-soundtrack.js?v=1"></script>
 {% endblock %}

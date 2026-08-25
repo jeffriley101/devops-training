@@ -92,6 +92,53 @@ def test_shared_placement_keeps_page_content_and_accessibility_intact() -> None:
     assert ".sound-effects-button:focus-visible" in CSS
 
 
+def test_mobile_shed_columns_center_controls_without_changing_their_vertical_flow() -> None:
+    mobile_start = CSS.index("/* Mobile SHED: full-height left/right control columns */")
+    mobile = CSS[mobile_start:CSS.index("/* Mobile SHED fine-tuning */", mobile_start)]
+    assert mobile.count("align-items: center") == 2
+    assert ".woodshed-object-column-left > *," in mobile
+    assert "align-self: center" in mobile
+    assert "margin-left: 0" in mobile
+
+
+def test_staged_mobile_shed_controls_use_shared_centered_lanes() -> None:
+    start = CSS.index("/* === TEMP SHED 5X2 CONTROL GRID === */")
+    staged = CSS[start:]
+
+    assert ".ww-shed-control-column {" in staged
+    assert "width: 3.5rem" in staged
+    assert ".ww-shed-control-left {" in staged
+    assert "left: 0.65rem !important" in staged
+    assert ".ww-shed-control-right {" in staged
+    assert "right: 0.65rem !important" in staged
+
+    centered = staged[
+        staged.index(".woodshed-foreground.ww-shed-grid .ww-shed-control-column > * {"):
+        staged.index("#sound-effects-button {", staged.index(".woodshed-foreground.ww-shed-grid .ww-shed-control-column > * {"))
+    ]
+    assert "left: 50% !important" in centered
+    assert "right: auto !important" in centered
+    assert "transform: translate(-50%, -50%) !important" in centered
+
+    # The existing row positions remain the vertical layout source of truth.
+    rows = staged[staged.index("/* ROW 1 */"):staged.index(".woodshed-foreground.ww-shed-grid .ww-shed-control-column > * {")]
+    for selector, top in (
+        ("#woodchuck-name-value", "8%"),
+        ("#instrument-object", "28%"),
+        ("#xp-level-control", "48%"),
+        ("#shed-decorate-button", "68%"),
+        ("#mum-open-button", "88%"),
+        ("#shed-team-button", "8%"),
+        ("#level-value", "28%"),
+        ("#metronome-open-button", "48%"),
+        ("#tuner-open-button", "68%"),
+        (".shed-sound-effects-controls", "88%"),
+    ):
+        rule_start = rows.index(f"{selector} {{")
+        rule = rows[rule_start:rows.index("}", rule_start)]
+        assert f"top: {top} !important" in rule
+
+
 def test_utility_pages_do_not_receive_main_page_positioning() -> None:
     client = TestClient(app)
     for path in ("/", "/login", "/setup", "/plunge-burrow"):

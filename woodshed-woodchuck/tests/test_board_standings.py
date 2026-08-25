@@ -177,6 +177,19 @@ def test_past_winners_javascript_handles_medals_ties_and_failures() -> None:
     assert "Medal Board of Past Winners could not be loaded." in board_template() + javascript
 
 
+def test_team_board_renders_each_configured_emblem_key_instead_of_a_generic_icon() -> None:
+    javascript = (TEMPLATE_PATH.parents[1] / "static" / "js" / "app.js").read_text(
+        encoding="utf-8"
+    )
+    renderer = javascript[
+        javascript.index("function renderTeamBoards"):
+        javascript.index("function showError", javascript.index("function renderTeamBoards"))
+    ]
+    assert "renderTeamEmblem(emblem, row.emblem_key)" in renderer
+    assert "legacyEmoji" in javascript
+    assert 'return { kind: "emoji", value, key: `emoji:${value}` };' in javascript
+
+
 def test_board_contains_collapsed_seasonal_hall_states_and_nested_target() -> None:
     markup = board_template()
 

@@ -24,6 +24,7 @@ PLUNGE = (ROOT / "templates" / "plunge_burrow.html").read_text(encoding="utf-8")
 CSS = (ROOT / "static" / "css" / "styles.css").read_text(encoding="utf-8")
 ARCADE_JS = (ROOT / "static" / "js" / "arcade.js").read_text(encoding="utf-8")
 APP_JS = (ROOT / "static" / "js" / "app.js").read_text(encoding="utf-8")
+SOUNDTRACK_JS = (ROOT / "static" / "js" / "arcade-soundtrack.js").read_text(encoding="utf-8")
 
 
 @pytest.fixture()
@@ -84,7 +85,8 @@ def test_practice_room_destinations_are_preserved_as_three_doors() -> None:
     assert practice.count('class="practice-room-emoji-control practice-room-door"') == 3
     assert 'href="https://brassspectrogram.netlify.app/"' in practice
     assert 'target="_blank" rel="noopener noreferrer"' in practice
-    assert "Pristine P-Chart — Coming Soon" in practice
+    assert 'aria-label="Pristine P-Chart — Coming Soon"' in practice
+    assert "<small>Coming Soon</small>" not in practice
     assert 'href="/arcade" aria-label="Open Arcade Room"' in practice
     assert practice.count('class="practice-room-door-tag"') == 3
     assert practice.count('class="practice-room-door-window" aria-hidden="true"') == 3
@@ -93,12 +95,17 @@ def test_practice_room_destinations_are_preserved_as_three_doors() -> None:
     for retired_tag in ("A — Brass", "B — Pristine", "C — Arcade"):
         assert retired_tag not in practice
     door_css = CSS[CSS.index(".practice-room-door {"):CSS.index("/* Arcade Room")]
-    assert "min-height: 12rem" in door_css
-    assert "border: 6px solid" in door_css
+    assert "min-height: 14rem" in door_css
+    assert "grid-template-rows: auto 3.4rem auto" in door_css
+    assert "border: 4px solid" in door_css
     assert ".practice-room-door::after" in door_css
     assert ".practice-room-door-tag" in door_css
     assert ".practice-room-door-window" in door_css
-    assert "repeat(auto-fit, minmax(min(12rem, 100%), 1fr))" in CSS
+    assert "grid-template-columns: repeat(3, minmax(0, 1fr))" in CSS
+    nameplate = door_css[door_css.index(".practice-room-door strong {"):]
+    assert "margin-top: 0.3rem" in nameplate
+    tag = door_css[door_css.index(".practice-room-door-tag {"):door_css.index(".practice-room-door-window {")]
+    assert "position: static" in tag
 
 
 def test_arcade_room_renders_three_touch_friendly_cabinets() -> None:
@@ -107,12 +114,44 @@ def test_arcade_room_renders_three_touch_friendly_cabinets() -> None:
     assert 'href="/arcade/blue"' in ARCADE
     assert 'href="/arcade/radio-tuner"' in ARCADE
     assert ARCADE.count("<h2>Top 5</h2>") == 3
+    assert ARCADE.count('class="arcade-cabinet-marquee"') == 3
+    assert ARCADE.count('class="arcade-cabinet-control-panel" aria-hidden="true"') == 3
+    assert ARCADE.count('data-arcade-personal-best=') == 3
     assert 'href="/arcade">Back to Arcade</a>' in PLUNGE
     assert 'href="/store">Back to SHOP</a>' in ARCADE
-    assert "min-height: 15rem" in CSS[CSS.index(".arcade-cabinet-link {"):]
+    assert "min-height: 17rem" in CSS[CSS.index(".arcade-cabinet-link {"):]
     mobile = CSS[CSS.index("@media (max-width: 760px)"):]
     assert ".arcade-cabinet-grid { grid-template-columns: 1fr; }" in mobile
-    assert '/static/js/arcade.js?v=4' in ARCADE
+    assert '/static/js/arcade.js?v=5' in ARCADE
+
+
+def test_arcade_pages_load_the_shared_trouble_soundtrack() -> None:
+    for template in (ARCADE, GAME, PLUNGE):
+        assert '/static/js/arcade-soundtrack.js?v=1' in template
+    assert (ROOT / "static" / "audio" / "arcade" / "trouble.mp3").is_file()
+    assert 'const SOUNDTRACK_URL = "/static/audio/arcade/trouble.mp3?v=1"' in SOUNDTRACK_JS
+    assert "const RESTART_DELAY_MS = 6000" in SOUNDTRACK_JS
+    assert 'audio.addEventListener("ended", restartAfterPause)' in SOUNDTRACK_JS
+    assert "window.setTimeout(function ()" in SOUNDTRACK_JS
+    assert "window.WoodshedAudio" in SOUNDTRACK_JS
+    assert "localStorage" not in SOUNDTRACK_JS
+    assert "sessionStorage" not in SOUNDTRACK_JS
+
+
+def test_arcade_games_use_the_shared_soundtrack_toggle() -> None:
+    for template in (GAME, PLUNGE):
+        assert 'data-arcade-soundtrack-toggle' in template
+        assert 'class="arcade-soundtrack-toggle"' in template
+    assert "window.WoodshedAudio.setEnabled" in SOUNDTRACK_JS
+    assert "updateSoundtrackToggle" in SOUNDTRACK_JS
+    assert "syncSoundtrackPreference" in SOUNDTRACK_JS
+
+
+def test_arcade_landing_renders_personal_bests_from_existing_score_payload() -> None:
+    room = ARCADE_JS[ARCADE_JS.index("function wireArcadeRoom"):ARCADE_JS.index("function wireArcadeGame")]
+    assert "function renderPersonalBest" in ARCADE_JS
+    assert "data-arcade-personal-best" in ARCADE_JS
+    assert "renderPersonalBest(list.dataset.arcadeLeaderboard, payload.best_score)" in room
 
 
 def test_arcade_leaderboards_render_each_olympic_rank_once() -> None:

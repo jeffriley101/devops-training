@@ -77,7 +77,13 @@
       return { kind, value, key: `${kind}:${value}` };
     }
     if (emblem && emblem.kind && emblem.value) return emblem;
-    const [kind, value] = String(emblem?.key || emblem || "").split(":");
+    const raw = String(emblem?.key || emblem || "");
+    const legacyEmoji = Object.entries(TEAM_EMOJI).find(([, emoji]) => emoji === raw);
+    if (legacyEmoji) {
+      const [value] = legacyEmoji;
+      return { kind: "emoji", value, key: `emoji:${value}` };
+    }
+    const [kind, value] = raw.split(":");
     return { kind, value, key: `${kind}:${value}` };
   }
 

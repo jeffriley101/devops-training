@@ -2588,7 +2588,7 @@ select {
 
 /* Use the Woodshed artwork as the full room background */
 .woodshed-scene {
-  background-image: url("/static/img/woodchuck-home.png");
+  background-image: url("/static/img/shed-cabin-new.png");
   background-repeat: no-repeat;
   background-position: center;
   background-size: cover;
@@ -2656,7 +2656,7 @@ select {
     position: relative;
     min-height: 620px;
 
-    background-image: url("/static/img/woodchuck-home.png");
+    background-image: url("/static/img/shed-cabin-new.png");
     background-repeat: no-repeat;
     background-position: center center;
     background-size: contain;
@@ -2731,22 +2731,19 @@ select {
 
   .woodshed-object-column-left {
     left: 0.65rem;
-    align-items: flex-start;
+    align-items: center;
   }
 
   .woodshed-object-column-right {
     right: 0.65rem;
     left: auto;
-    align-items: flex-end;
+    align-items: center;
   }
 
-  .woodshed-object-column-left > * {
-    align-self: flex-start;
-  }
-
+  .woodshed-object-column-left > *,
   .woodshed-object-column-right > * {
-    align-self: flex-end;
-    margin-left: auto;
+    align-self: center;
+    margin-left: 0;
   }
 
   .woodshed-object-column-right .shed-readout {
@@ -4916,46 +4913,39 @@ select {
 .practice-room-emoji-control:disabled { opacity: 0.58; cursor: not-allowed; }
 
 .practice-tool-grid {
-  grid-template-columns: repeat(auto-fit, minmax(min(12rem, 100%), 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   align-items: stretch;
+  gap: 0.7rem;
 }
 
 .practice-room-door {
   position: relative;
+  display: grid;
   width: 100%;
   min-width: 0;
-  min-height: 12rem;
-  padding: 1.2rem 1rem 1rem;
-  grid-auto-rows: min-content;
-  align-content: center;
-  gap: 0.45rem;
-  border: 6px solid #5b371f;
+  min-height: 14rem;
+  padding: 0.65rem 0.55rem 1rem;
+  grid-template-rows: auto 3.4rem auto;
+  align-content: start;
+  justify-items: center;
+  gap: 0.7rem;
+  border: 4px solid #5b371f;
   border-radius: 0.35rem 0.35rem 0.1rem 0.1rem;
   color: #fff5d5;
-  background:
-    linear-gradient(90deg, transparent 48%, rgba(45, 24, 13, 0.3) 49% 51%, transparent 52%),
-    linear-gradient(#9a6238 0 13%, #6d4328 13% 17%, #9a6238 17% 48%, #6d4328 48% 52%, #9a6238 52% 83%, #6d4328 83% 87%, #9a6238 87%);
-  box-shadow:
-    inset 0 0 0 3px rgba(255, 226, 164, 0.22),
-    0 6px 0 #3f281a,
-    0 9px 14px rgba(42, 25, 14, 0.3);
-  font-size: 1.8rem;
+  background: #b77a4d;
+  box-shadow: inset 0 0 0 1px rgba(255, 226, 164, 0.32), 0 5px 0 #3f281a, 0 8px 12px rgba(42, 25, 14, 0.24);
   text-align: center;
-  text-shadow: 0 2px 2px rgba(38, 21, 11, 0.85);
 }
 
 .practice-room-door-tag {
-  position: absolute;
-  top: 0.75rem;
-  left: 50%;
+  position: static;
   min-width: 2.4rem;
   padding: 0.3rem 0.55rem;
-  transform: translateX(-50%);
-  border: 2px solid #3f281a;
+  border: 1px solid #3f281a;
   border-radius: 0.3rem;
   color: #3b2618;
   background: #f7dfa1;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55), 0 2px 3px rgba(38, 21, 11, 0.4);
+  box-shadow: 0 1px 2px rgba(38, 21, 11, 0.32);
   font-size: 0.78rem;
   font-weight: 950;
   letter-spacing: 0.04em;
@@ -4965,17 +4955,13 @@ select {
 
 .practice-room-door-window {
   display: grid;
-  width: min(5.25rem, calc(100% - 3.5rem));
-  min-height: 3.4rem;
+  width: min(4.6rem, calc(100% - 3.1rem));
+  min-height: 3.15rem;
   place-items: center;
-  border: 5px solid #4b2d1c;
+  border: 3px solid #4b2d1c;
   border-radius: 0.25rem;
-  background:
-    linear-gradient(90deg, transparent 47%, rgba(52, 86, 98, 0.34) 48% 52%, transparent 53%),
-    linear-gradient(180deg, #d9f4f5, #8ebbc2);
-  box-shadow:
-    inset 0 0 0 2px rgba(255, 255, 255, 0.42),
-    0 2px 3px rgba(38, 21, 11, 0.5);
+  background: linear-gradient(180deg, #d9f4f5, #8ebbc2);
+  box-shadow: 0 1px 2px rgba(38, 21, 11, 0.38);
   font-size: 1.65rem;
   line-height: 1;
 }
@@ -4983,20 +4969,31 @@ select {
 .practice-room-door::after {
   content: "";
   position: absolute;
-  right: 0.8rem;
-  top: 52%;
-  width: 0.85rem;
-  height: 0.85rem;
-  border: 2px solid #59400d;
+  right: 0.55rem;
+  top: 55%;
+  width: 0.72rem;
+  height: 0.72rem;
+  border: 1px solid #59400d;
   border-radius: 50%;
   background: #f4d35e;
   box-shadow: 0 1px 2px rgba(30, 18, 8, 0.65);
 }
 
-.practice-room-door strong,
-.practice-room-door small {
+.practice-room-door strong {
   font-size: 0.9rem;
   line-height: 1.15;
+}
+
+.practice-room-door strong {
+  width: min(100%, 8rem);
+  margin-top: 0.3rem;
+  padding: 0.28rem 0.42rem;
+  border: 1px solid #5a3821;
+  border-radius: 0.2rem;
+  color: #3a2516;
+  background: #ead29a;
+  box-shadow: 0 1px 2px rgba(38, 21, 11, 0.3);
+  text-shadow: none;
 }
 
 .practice-room-door:hover:not(:disabled),
@@ -5031,6 +5028,28 @@ select {
 
 .arcade-room-header h1,
 .arcade-room-header p { margin-block: 0 0.35rem; }
+.arcade-header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.55rem;
+}
+.arcade-soundtrack-toggle {
+  display: inline-grid;
+  width: 2.75rem;
+  min-width: 2.75rem;
+  height: 2.75rem;
+  place-items: center;
+  padding: 0;
+  border: 2px solid #f4d35e;
+  border-radius: 50%;
+  color: #fff7db;
+  background: #24243b;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.4);
+  font-size: 1.35rem;
+}
+.arcade-soundtrack-toggle:hover,
+.arcade-soundtrack-toggle:focus-visible { filter: brightness(1.16); }
 .arcade-kicker {
   color: #6ee7f2;
   font-weight: 950;
@@ -5046,23 +5065,25 @@ select {
 }
 
 .arcade-cabinet {
+  position: relative;
   min-width: 0;
-  padding: 0.75rem;
-  border: 4px solid #11101d;
-  border-radius: 1rem 1rem 0.35rem 0.35rem;
-  background: linear-gradient(145deg, #46515f, #232936 55%, #151823);
-  box-shadow: inset 0 0 0 2px #68788a, 0 8px 0 #0d0d14, 0 12px 18px rgba(0, 0, 0, 0.45);
+  padding: 0.8rem 0.65rem 0.7rem;
+  border: 5px solid #10111a;
+  border-radius: 1.2rem 1.2rem 0.45rem 0.45rem;
+  background: linear-gradient(145deg, #5d6a7b, #293140 58%, #151923);
+  box-shadow: inset 0 0 0 2px rgba(216, 240, 255, 0.35), 0 8px 0 #0d0d14, 0 13px 18px rgba(0, 0, 0, 0.42);
 }
 
 .arcade-cabinet-link {
   display: grid;
-  min-height: 15rem;
-  padding: 0.75rem;
+  min-height: 17rem;
+  padding: 0.65rem;
   place-items: center;
-  align-content: center;
-  gap: 0.6rem;
+  align-content: start;
+  grid-template-rows: auto minmax(6rem, 1fr) auto auto auto;
+  gap: 0.45rem;
   border: 3px solid #090910;
-  border-radius: 0.7rem;
+  border-radius: 0.75rem 0.75rem 0.4rem 0.4rem;
   color: #fff;
   background: linear-gradient(180deg, #2a2d45, #131422);
   text-align: center;
@@ -5070,10 +5091,7 @@ select {
 }
 
 .arcade-cabinet-link::after {
-  content: "●  ●";
-  color: #f4d35e;
-  font-size: 1.2rem;
-  letter-spacing: 0.45rem;
+  content: "";
 }
 
 .arcade-cabinet-link:hover,
@@ -5083,14 +5101,45 @@ select {
   width: min(100%, 9rem);
   aspect-ratio: 1.1 / 1;
   place-items: center;
-  border: 5px solid #090910;
+  border: 4px solid #090910;
   border-radius: 0.6rem;
   background: #071724;
-  box-shadow: inset 0 0 22px rgba(68, 214, 238, 0.28);
+  box-shadow: inset 0 0 18px rgba(68, 214, 238, 0.3), 0 2px 0 rgba(255, 255, 255, 0.12);
   font-size: 3.2rem;
 }
-.arcade-cabinet-link strong { font-size: 1.25rem; }
-.arcade-cabinet-link span:last-of-type { font-size: 0.85rem; }
+.arcade-cabinet-marquee {
+  width: 100%;
+  padding: 0.35rem 0.45rem;
+  border: 2px solid rgba(255, 244, 210, 0.72);
+  border-radius: 0.45rem;
+  color: #fff9df;
+  background: linear-gradient(180deg, #a54943, #61262d);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 2px 0 rgba(0, 0, 0, 0.38);
+  font-size: 1.1rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.arcade-cabinet-copy { min-height: 2.3em; font-size: 0.85rem; }
+.arcade-cabinet-control-panel {
+  display: flex;
+  width: min(100%, 8rem);
+  min-height: 1.45rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 0.2rem 0.5rem;
+  border: 2px solid #090910;
+  border-radius: 0.3rem 0.3rem 0.7rem 0.7rem;
+  background: #3b4350;
+}
+.arcade-cabinet-control-panel i { display: block; width: 0.55rem; height: 0.55rem; border-radius: 50%; background: #f4d35e; box-shadow: 0 1px 0 #4f3012; }
+.arcade-cabinet-control-panel i:first-child { width: 0.75rem; height: 0.75rem; border: 2px solid #111; background: #49c7d4; }
+.arcade-cabinet-best { font-size: 0.82rem; font-weight: 900; color: #f4d35e; }
+.arcade-cabinet-best output { color: #fff; font: inherit; }
+.arcade-cabinet-plunge .arcade-cabinet-screen { background: radial-gradient(circle at 50% 72%, #442815 0 20%, transparent 21%), radial-gradient(circle at 30% 20%, #f5df68 0 7%, transparent 8%), linear-gradient(#7c4b28, #301d15); }
+.arcade-cabinet-blue .arcade-cabinet-screen { background: radial-gradient(circle at 25% 24%, #ddfbff 0 5%, transparent 6%), radial-gradient(circle at 70% 38%, #6ee7f2 0 7%, transparent 8%), linear-gradient(#2588df 0 72%, #163f75 73%); }
+.arcade-cabinet-radio .arcade-cabinet-screen { background: repeating-linear-gradient(90deg, #0c0c11 0 10%, #383840 11% 12%), radial-gradient(circle at center, #f4d35e 0 15%, #352e1a 16% 30%, transparent 31%); }
+.arcade-cabinet:hover { transform: translateY(-2px); }
 
 .arcade-leaderboard,
 .arcade-game-leaderboard {
@@ -5258,10 +5307,10 @@ select {
 }
 
 @media (max-width: 760px) {
-  .practice-tool-grid,
   .arcade-cabinet-grid { grid-template-columns: 1fr; }
-  .practice-room-door { min-height: 9rem; }
+  .practice-room-door { min-height: 11rem; }
   .arcade-room-header { align-items: stretch; flex-direction: column; }
+  .arcade-header-actions { justify-content: space-between; }
   .arcade-room-header .btn { width: 100%; }
   .arcade-cabinet-link { min-height: 12rem; }
   .blue-game-touch-controls { position: sticky; bottom: 0; }
@@ -6109,7 +6158,7 @@ select {
 
 @media (max-width: 640px) {
   .woodshed-scene {
-    background-size: auto 86%;
+    background-size: cover;
     background-position: center;
     background-color: #9a7047;
   }
@@ -6161,7 +6210,22 @@ select {
   }
 
   .ww-shed-control-column {
-    display: contents !important;
+    position: absolute !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    width: 3.5rem;
+    display: block !important;
+    pointer-events: none;
+  }
+
+  .ww-shed-control-left {
+    left: 0.65rem !important;
+    right: auto !important;
+  }
+
+  .ww-shed-control-right {
+    right: 0.65rem !important;
+    left: auto !important;
   }
 
   .woodshed-foreground.ww-shed-grid
@@ -6252,6 +6316,12 @@ select {
     display: block !important;
     visibility: visible !important;
     opacity: 1 !important;
+  }
+
+  .woodshed-foreground.ww-shed-grid .ww-shed-control-column > * {
+    left: 50% !important;
+    right: auto !important;
+    transform: translate(-50%, -50%) !important;
   }
 
   #sound-effects-button {

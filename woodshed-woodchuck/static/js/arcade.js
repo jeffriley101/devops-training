@@ -32,6 +32,12 @@
     });
   }
 
+  function renderPersonalBest(gameKey, bestScore) {
+    document.querySelectorAll(`[data-arcade-personal-best="${gameKey}"]`).forEach((output) => {
+      output.textContent = String(bestScore || 0);
+    });
+  }
+
   async function loadScores(gameKey) {
     const endpoint = SCORE_ENDPOINTS[gameKey];
     if (!endpoint) throw new Error("That game is unavailable.");
@@ -65,6 +71,7 @@
       try {
         const payload = await loadScores(list.dataset.arcadeLeaderboard);
         renderLeaderboard(list, payload.leaderboard);
+        renderPersonalBest(list.dataset.arcadeLeaderboard, payload.best_score);
       } catch (_error) {
         renderLeaderboard(list, []);
       }

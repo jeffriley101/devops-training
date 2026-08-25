@@ -75,10 +75,39 @@ def test_team_practice_cap_average_verified_and_season_formulas() -> None:
     weekly_open = boards["team-weekly-practice"]["open"][0]
     weekly_verified = boards["team-weekly-practice"]["verified"][0]
     assert weekly_open["score"] == 400 and weekly_open["active_member_count"] == 2
+    assert weekly_open["emblem_key"] == "emoji:goat"
     assert weekly_verified["score"] == 300 and weekly_verified["active_member_count"] == 1
     assert boards["team-average-practice"]["open"][0]["score"] == 20000
     assert boards["team-average-practice"]["verified"][0]["score"] == 30000
     assert boards["team-season-practice"]["open"][0]["score"] == 400
+
+
+def test_team_leaderboards_keep_each_teams_configured_emblem() -> None:
+    session = database()
+    season, _, week = ensure_band_camp_data(session, now=NOW)
+    goat_player = add_profile(session, 11)
+    lion_player = add_profile(session, 12)
+    session.commit()
+    goat_team, _ = create_and_join_team(
+        session, profile=goat_player, season=season, name="Goat Team",
+        emblem_key="emoji:goat", now=NOW,
+    )
+    lion_team, _ = create_and_join_team(
+        session, profile=lion_player, season=season, name="Lion Team",
+        emblem_key="emoji:lion", now=NOW,
+    )
+    add_chart(session, goat_player, goat_team.id, 80)
+    add_chart(session, lion_player, lion_team.id, 60)
+    session.commit()
+
+    rows = team_leaderboards(
+        session, season=season, contest_week=week
+    )["team-weekly-practice"]["open"]
+
+    assert [(row["team_name"], row["emblem_key"]) for row in rows] == [
+        ("Goat Team", "emoji:goat"),
+        ("Lion Team", "emoji:lion"),
+    ]
 
 
 def test_finalization_snapshots_membership_and_rewards_every_team_board_once() -> None:

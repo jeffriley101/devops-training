@@ -6,10 +6,10 @@ from app.instruments import INSTRUMENT_OPTIONS, shed_artwork_url
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SAX_ART = "/static/img/woodchuck-home.png"
-TRUMPET_ART = "/static/img/woodchuck-trumpet.png"
-DRUM_ART = "/static/img/woodchuck-drum.png"
-GUITAR_ART = "/static/img/woodchuck-guitar.png"
+SAX_ART = "/static/img/shed-cabin-new.png"
+TRUMPET_ART = SAX_ART
+DRUM_ART = SAX_ART
+GUITAR_ART = SAX_ART
 
 
 @pytest.mark.parametrize(
@@ -63,10 +63,10 @@ def test_selected_artwork_is_wired_only_to_the_shed():
     assert "background-size: cover" in css
     assert "payload.shed_artwork_url" in account_js
     assert "scene.style.backgroundImage" in account_js
-    for artwork in (TRUMPET_ART, DRUM_ART, GUITAR_ART):
-        assert artwork not in account_js
-        assert artwork not in store
-        assert artwork not in welcome
+    assert "/static/img/shed-cabin-new.png" in css
+    assert "/static/img/woodchuck-home.png" not in css
+    assert "/static/img/shed-cabin-new.png" not in store
+    assert "/static/img/shed-cabin-new.png" not in welcome
 
 
 def test_all_shed_artwork_assets_exist():

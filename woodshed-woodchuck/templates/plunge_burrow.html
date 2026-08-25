@@ -8,7 +8,10 @@
       <h1 id="plunge-title">Plunge Burrow</h1>
       <p>Gather burrow snacks and band instruments, use paired tunnel holes, and protect all three hearts.</p>
     </div>
-    <a class="btn btn-secondary" href="/arcade">Back to Arcade</a>
+    <div class="arcade-header-actions">
+      <button class="arcade-soundtrack-toggle" type="button" data-arcade-soundtrack-toggle aria-label="Mute Arcade soundtrack" title="Mute Arcade soundtrack">🔊</button>
+      <a class="btn btn-secondary" href="/arcade">Back to Arcade</a>
+    </div>
   </header>
 
   <div class="plunge-status" aria-label="Game status">
@@ -51,13 +54,6 @@
         <button class="plunge-direction plunge-right" type="button" data-direction="right" aria-label="Move right">▶</button>
       </div>
 
-      <fieldset class="plunge-music">
-        <legend>Burrow Soundtrack</legend>
-        <p class="plunge-coming-soon">Soundtrack coming soon</p>
-        <label><input id="plunge-music-enabled" type="checkbox" disabled /> Music On</label>
-        <label for="plunge-music-volume">Music volume <output id="plunge-music-volume-value" for="plunge-music-volume">30%</output></label>
-        <input id="plunge-music-volume" type="range" min="0" max="100" value="30" disabled aria-label="Music volume" aria-valuetext="30 percent" />
-      </fieldset>
     </aside>
   </div>
 
@@ -74,4 +70,5 @@
 
 {% block page_scripts %}
 <script src="/static/js/plunge-burrow.js?v=5"></script>
+<script src="/static/js/arcade-soundtrack.js?v=1"></script>
 {% endblock %}

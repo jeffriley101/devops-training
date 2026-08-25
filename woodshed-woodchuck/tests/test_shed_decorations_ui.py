@@ -189,7 +189,7 @@ def test_mobile_artwork_zoom_and_decoration_layer_share_scene_geometry() -> None
     mobile = CSS[
         CSS.index("@media (max-width: 640px)", CSS.index(".shed-decoration-size-xlarge")):
     ]
-    assert "background-size: auto 86%" in mobile
+    assert "background-size: cover" in mobile
     assert "background-position: center" in mobile
     assert ".shed-decoration-layer" in mobile
     assert "inset: 7% 0" in mobile

@@ -62,12 +62,13 @@ def test_page_is_responsive_accessible_and_has_all_controls() -> None:
     assert "@media (prefers-reduced-motion: reduce)" in CSS
 
 
-def test_soundtrack_is_an_inert_local_placeholder() -> None:
-    assert 'const SOUNDTRACK_URL = ""' in GAME_JS
-    assert "Soundtrack coming soon" in TEMPLATE
-    assert 'id="plunge-music-enabled" type="checkbox" disabled' in TEMPLATE
-    assert 'id="plunge-music-volume" type="range"' in TEMPLATE
-    assert "disabled aria-label=\"Music volume\"" in TEMPLATE
+def test_plunge_uses_the_shared_arcade_soundtrack() -> None:
+    assert "Soundtrack coming soon" not in TEMPLATE
+    assert 'id="plunge-music-enabled"' not in TEMPLATE
+    assert 'id="plunge-music-volume"' not in TEMPLATE
+    assert '/static/js/arcade-soundtrack.js?v=1' in TEMPLATE
+    assert "SOUNDTRACK_URL" not in GAME_JS
+    assert "startMusic" not in GAME_JS
     assert "Tone.Transport" not in GAME_JS
     assert "http://" not in GAME_JS + TEMPLATE
     assert "https://" not in GAME_JS + TEMPLATE

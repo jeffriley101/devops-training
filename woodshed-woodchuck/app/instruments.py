@@ -54,7 +54,7 @@ INSTRUMENT_DEFINITIONS = (
     instrument("auxiliary-percussion", "Auxiliary Percussion", "🪇", team_label="The Auxiliary Percussion"),
 )
 
-_DEFAULT_SHED_ARTWORK_URL = "/static/img/woodchuck-home.png"
+_DEFAULT_SHED_ARTWORK_URL = "/static/img/shed-cabin-new.png"
 _SHED_ARTWORK_BY_INSTRUMENT_KEY = {
     "trumpet": "/static/img/woodchuck-trumpet.png",
     "trombone": "/static/img/woodchuck-trumpet.png",
@@ -73,14 +73,8 @@ _SHED_ARTWORK_BY_INSTRUMENT_KEY = {
 
 
 def shed_artwork_url(instrument_value: str | None) -> str:
-    """Return SHED artwork for a supported instrument, with a safe fallback."""
-    try:
-        instrument_key = canonical_instrument_key(instrument_value)
-    except ValueError:
-        return _DEFAULT_SHED_ARTWORK_URL
-    return _SHED_ARTWORK_BY_INSTRUMENT_KEY.get(
-        instrument_key, _DEFAULT_SHED_ARTWORK_URL
-    )
+    """Return the single production SHED artwork for every instrument."""
+    return _DEFAULT_SHED_ARTWORK_URL
 
 
 INSTRUMENT_OPTIONS = [item["label"] for item in INSTRUMENT_DEFINITIONS]

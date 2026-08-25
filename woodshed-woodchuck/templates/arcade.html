@@ -9,9 +9,11 @@
   <div class="arcade-cabinet-grid">
     <article class="arcade-cabinet arcade-cabinet-plunge">
       <a class="arcade-cabinet-link" href="/plunge-burrow" aria-label="Play Plunge Burrow">
+        <strong class="arcade-cabinet-marquee">Plunge Burrow</strong>
         <span class="arcade-cabinet-screen" aria-hidden="true">🕳️</span>
-        <strong>Plunge Burrow</strong>
-        <span>Burrow, collect, and build your band.</span>
+        <span class="arcade-cabinet-copy">Burrow, collect, and build your band.</span>
+        <span class="arcade-cabinet-control-panel" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span class="arcade-cabinet-best">Best <output data-arcade-personal-best="plunge-burrow">—</output></span>
       </a>
       <section class="arcade-leaderboard" aria-label="Plunge Burrow Top 5">
         <h2>Top 5</h2>
@@ -21,9 +23,11 @@
 
     <article class="arcade-cabinet arcade-cabinet-blue">
       <a class="arcade-cabinet-link" href="/arcade/blue" aria-label="Play Blue">
+        <strong class="arcade-cabinet-marquee">Blue</strong>
         <span class="arcade-cabinet-screen" aria-hidden="true">🟦</span>
-        <strong>Blue</strong>
-        <span>Run, jump, and collect blue sparks.</span>
+        <span class="arcade-cabinet-copy">Run, jump, and collect blue sparks.</span>
+        <span class="arcade-cabinet-control-panel" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span class="arcade-cabinet-best">Best <output data-arcade-personal-best="blue">—</output></span>
       </a>
       <section class="arcade-leaderboard" aria-label="Blue Top 5">
         <h2>Top 5</h2>
@@ -33,9 +37,11 @@
 
     <article class="arcade-cabinet arcade-cabinet-radio">
       <a class="arcade-cabinet-link" href="/arcade/radio-tuner" aria-label="Play Radio Tuner">
+        <strong class="arcade-cabinet-marquee">Radio Tuner</strong>
         <span class="arcade-cabinet-screen" aria-hidden="true">📻</span>
-        <strong>Radio Tuner</strong>
-        <span>Find the target signal before time runs out.</span>
+        <span class="arcade-cabinet-copy">Find the target signal before time runs out.</span>
+        <span class="arcade-cabinet-control-panel" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span class="arcade-cabinet-best">Best <output data-arcade-personal-best="radio-tuner">—</output></span>
       </a>
       <section class="arcade-leaderboard" aria-label="Radio Tuner Top 5">
         <h2>Top 5</h2>
@@ -47,5 +53,6 @@
 {% endblock %}
 
 {% block page_scripts %}
-<script src="/static/js/arcade.js?v=4"></script>
+<script src="/static/js/arcade.js?v=5"></script>
+<script src="/static/js/arcade-soundtrack.js?v=1"></script>
 {% endblock %}
