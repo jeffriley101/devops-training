@@ -34,7 +34,7 @@ def test_game_route_navigation_and_page_only_script() -> None:
     assert "<title>Plunge Burrow · Woodshed Woodchuck</title>" in response.text
     assert 'href="/arcade">Back to Arcade</a>' in response.text
     assert 'href="/plunge-burrow"' in BOARD
-    assert "/static/js/plunge-burrow.js?v=5" in TEMPLATE
+    assert "/static/js/plunge-burrow.js?v=6" in TEMPLATE
     assert "/static/js/plunge-burrow.js" not in BASE
     route_guard = (ROOT / "static/js/app.js").read_text(encoding="utf-8")
     route_guard = route_guard[
@@ -66,7 +66,8 @@ def test_plunge_uses_the_shared_arcade_soundtrack() -> None:
     assert "Soundtrack coming soon" not in TEMPLATE
     assert 'id="plunge-music-enabled"' not in TEMPLATE
     assert 'id="plunge-music-volume"' not in TEMPLATE
-    assert '/static/js/arcade-soundtrack.js?v=1' in TEMPLATE
+    assert '/static/js/arcade-soundtrack.js?v=2' in TEMPLATE
+    assert 'data-arcade-soundtrack="plunge-burrow"' in TEMPLATE
     assert "SOUNDTRACK_URL" not in GAME_JS
     assert "startMusic" not in GAME_JS
     assert "Tone.Transport" not in GAME_JS

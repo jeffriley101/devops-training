@@ -1,12 +1,10 @@
 {% extends "base.html" %}
 
 {% block content %}
-<section class="card plunge-burrow-page" aria-labelledby="plunge-title">
+<section class="card plunge-burrow-page" data-arcade-soundtrack="plunge-burrow" aria-labelledby="plunge-title">
   <header class="plunge-header">
     <div>
-      <p class="plunge-kicker">Underground practice break</p>
       <h1 id="plunge-title">Plunge Burrow</h1>
-      <p>Gather burrow snacks and band instruments, use paired tunnel holes, and protect all three hearts.</p>
     </div>
     <div class="arcade-header-actions">
       <button class="arcade-soundtrack-toggle" type="button" data-arcade-soundtrack-toggle aria-label="Mute Arcade soundtrack" title="Mute Arcade soundtrack">🔊</button>
@@ -33,7 +31,7 @@
 
   <div class="plunge-layout">
     <div class="plunge-board-wrap">
-      <canvas id="plunge-canvas" width="600" height="600" tabindex="0" aria-label="Plunge Burrow game board. Find dandelions, carrots, and band instruments, travel through matching lettered portals, and avoid walls, your trail, rocks, and roots." aria-describedby="plunge-instructions plunge-legend"></canvas>
+      <canvas id="plunge-canvas" width="600" height="600" tabindex="0" aria-label="Plunge Burrow game board. Find dandelions, carrots, and band instruments, travel through matching lettered portals, and avoid walls, your trail, rocks, and roots."></canvas>
       <div id="plunge-overlay" class="plunge-overlay" aria-hidden="true">
         <strong id="plunge-overlay-title">Ready to burrow?</strong>
         <span id="plunge-overlay-detail">Choose a direction, then press Start.</span>
@@ -57,18 +55,19 @@
     </aside>
   </div>
 
-  <div id="plunge-legend" class="plunge-legend" aria-label="Burrow legend">
-    <span><b aria-hidden="true">🌼</b> Dandelion: +1 score and segment</span>
-    <span><b aria-hidden="true">🥕</b> Carrot: +3 score, two segments, and a heart when needed</span>
-    <span><b aria-hidden="true">◉A</b> Matching holes teleport you</span>
-    <span><b aria-hidden="true">🎷</b> Instrument: +5 score; four different complete a Band Set</span>
-  </div>
-  <p id="plunge-instructions" class="plunge-instructions">Use Arrow keys or W, A, S, D. On touch screens, swipe the burrow or use the direction buttons. Direct reversals are blocked.</p>
+  <section class="plunge-scoreboard" aria-labelledby="plunge-scoreboard-title">
+    <h2 id="plunge-scoreboard-title">Top 5</h2>
+    <ol id="plunge-leaderboard" aria-label="Plunge Burrow Top 5 leaderboard">
+      {% for rank in range(1, 6) %}
+      <li><span class="plunge-scoreboard-rank">{{ rank }}</span><span class="plunge-scoreboard-name">---</span><span class="plunge-scoreboard-value">-</span></li>
+      {% endfor %}
+    </ol>
+  </section>
   <p id="plunge-live" class="sr-only" aria-live="polite" aria-atomic="true"></p>
 </section>
 {% endblock %}
 
 {% block page_scripts %}
-<script src="/static/js/plunge-burrow.js?v=5"></script>
-<script src="/static/js/arcade-soundtrack.js?v=1"></script>
+<script src="/static/js/plunge-burrow.js?v=6"></script>
+<script src="/static/js/arcade-soundtrack.js?v=2"></script>
 {% endblock %}

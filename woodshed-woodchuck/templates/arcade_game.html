@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block content %}
-<section class="arcade-game" data-arcade-game="{{ arcade_game.key }}" aria-labelledby="arcade-game-title">
+<section class="arcade-game" data-arcade-game="{{ arcade_game.key }}" data-arcade-soundtrack="{{ arcade_game.key }}" aria-labelledby="arcade-game-title">
   <header class="arcade-room-header">
     <div>
       <h1 id="arcade-game-title">{{ arcade_game.name }}</h1>
@@ -18,7 +18,7 @@
   <div class="arcade-game-status" aria-label="Game status">
     <p>Score <strong id="arcade-game-score">0</strong></p>
     <p>Best <strong id="arcade-game-best">0</strong></p>
-    <p>Time <strong id="arcade-game-time">30</strong></p>
+    <p>Time <strong id="arcade-game-time">{% if arcade_game.key == "blue" %}20{% else %}30{% endif %}</strong></p>
   </div>
 
   {% if arcade_game.key == "blue" %}
@@ -46,7 +46,7 @@
   {% endif %}
 
   <div class="arcade-game-actions">
-    <button id="arcade-game-start" class="btn btn-primary" type="button">Start 30-Second Game</button>
+    <button id="arcade-game-start" class="btn btn-primary" type="button">Start {% if arcade_game.key == "blue" %}20{% else %}30{% endif %}-Second Game</button>
     {% if arcade_game.key == "radio-tuner" %}
     <button id="radio-game-tap" class="btn btn-primary" type="button" disabled>Tap / Tune</button>
     {% endif %}
@@ -61,6 +61,6 @@
 {% endblock %}
 
 {% block page_scripts %}
-<script src="/static/js/arcade.js?v=5"></script>
-<script src="/static/js/arcade-soundtrack.js?v=1"></script>
+<script src="/static/js/arcade.js?v=8"></script>
+<script src="/static/js/arcade-soundtrack.js?v=2"></script>
 {% endblock %}

@@ -36,17 +36,7 @@ class OwnedItemAccessError(ValueError):
     pass
 
 
-class DecorationCollisionError(ValueError):
-    pass
-
-
 PLACEMENT_SIZES = ("medium", "large", "xlarge")
-PLACEMENT_HITBOX_NORMALIZED = {
-    "medium": 0.19,
-    "large": 0.33,
-    "xlarge": 0.47,
-}
-DECORATION_HITBOX_NORMALIZED = PLACEMENT_HITBOX_NORMALIZED["medium"]
 CROWN_EMOJI = "👑"
 CROWN_NAMES = {
     "weekly-points-leaders": "Practice Crown",
@@ -255,24 +245,6 @@ def _normalized_size(value: str) -> str:
     return value
 
 
-def _placements_overlap(
-    x: float,
-    y: float,
-    size: str,
-    other_x: float,
-    other_y: float,
-    other_size: str,
-) -> bool:
-    collision_distance = (
-        PLACEMENT_HITBOX_NORMALIZED[_normalized_size(size)]
-        + PLACEMENT_HITBOX_NORMALIZED[_normalized_size(other_size)]
-    ) / 2
-    return (
-        abs(other_x - x) < collision_distance
-        and abs(other_y - y) < collision_distance
-    )
-
-
 def _lock_placement_profile(session: Session, *, profile_id: int) -> None:
     locked_profile_id = session.scalar(
         select(WoodchuckProfile.id)
@@ -306,50 +278,6 @@ def place_owned_item_copy(
     )
     if owned is None:
         raise OwnedItemAccessError("That owned item is unavailable.")
-
-    placed_items = session.scalars(
-        select(OwnedItemCopy)
-        .where(
-            OwnedItemCopy.profile_id == profile_id,
-            OwnedItemCopy.id != owned_item_id,
-            OwnedItemCopy.placement_x.is_not(None),
-            OwnedItemCopy.placement_y.is_not(None),
-        )
-        .with_for_update()
-    ).all()
-    for other in placed_items:
-        if _placements_overlap(
-            x,
-            y,
-            size,
-            float(other.placement_x),
-            float(other.placement_y),
-            other.placement_size or "medium",
-        ):
-            raise DecorationCollisionError(
-                "That spot overlaps another decoration. Choose another spot."
-            )
-    reward_placements = session.scalars(
-        select(RewardInventoryPlacement)
-        .where(
-            RewardInventoryPlacement.profile_id == profile_id,
-            RewardInventoryPlacement.placement_x.is_not(None),
-            RewardInventoryPlacement.placement_y.is_not(None),
-        )
-        .with_for_update()
-    ).all()
-    for other in reward_placements:
-        if _placements_overlap(
-            x,
-            y,
-            size,
-            float(other.placement_x),
-            float(other.placement_y),
-            other.placement_size or "medium",
-        ):
-            raise DecorationCollisionError(
-                "That spot overlaps another decoration. Choose another spot."
-            )
 
     owned.placement_x = x
     owned.placement_y = y
@@ -400,61 +328,6 @@ def _earned_crown_for_key(
     return award
 
 
-def _placement_collides(
-    session: Session,
-    *,
-    profile_id: int,
-    x: float,
-    y: float,
-    size: str,
-    ignored_owned_item_id: int | None = None,
-    ignored_placement_id: int | None = None,
-) -> bool:
-    owned = session.scalars(
-        select(OwnedItemCopy)
-        .where(
-            OwnedItemCopy.profile_id == profile_id,
-            OwnedItemCopy.placement_x.is_not(None),
-            OwnedItemCopy.placement_y.is_not(None),
-        )
-        .with_for_update()
-    ).all()
-    for other in owned:
-        if other.id == ignored_owned_item_id:
-            continue
-        if _placements_overlap(
-            x,
-            y,
-            size,
-            float(other.placement_x),
-            float(other.placement_y),
-            other.placement_size or "medium",
-        ):
-            return True
-    rewards = session.scalars(
-        select(RewardInventoryPlacement)
-        .where(
-            RewardInventoryPlacement.profile_id == profile_id,
-            RewardInventoryPlacement.placement_x.is_not(None),
-            RewardInventoryPlacement.placement_y.is_not(None),
-        )
-        .with_for_update()
-    ).all()
-    for other in rewards:
-        if other.id == ignored_placement_id:
-            continue
-        if _placements_overlap(
-            x,
-            y,
-            size,
-            float(other.placement_x),
-            float(other.placement_y),
-            other.placement_size or "medium",
-        ):
-            return True
-    return False
-
-
 def place_crown_inventory_item(
     session: Session,
     *,
@@ -476,17 +349,6 @@ def place_crown_inventory_item(
         .where(RewardInventoryPlacement.crown_award_id == award.id)
         .with_for_update()
     )
-    if _placement_collides(
-        session,
-        profile_id=profile_id,
-        x=x,
-        y=y,
-        size=size,
-        ignored_placement_id=placement.id if placement else None,
-    ):
-        raise DecorationCollisionError(
-            "That spot overlaps another decoration. Choose another spot."
-        )
     if placement is None:
         placement = RewardInventoryPlacement(
             profile_id=profile_id,
@@ -571,17 +433,6 @@ def place_earned_reward_inventory_item(
         )
         .with_for_update()
     )
-    if _placement_collides(
-        session,
-        profile_id=profile_id,
-        x=x,
-        y=y,
-        size=size,
-        ignored_placement_id=placement.id if placement else None,
-    ):
-        raise DecorationCollisionError(
-            "That spot overlaps another decoration. Choose another spot."
-        )
     if placement is None:
         placement = RewardInventoryPlacement(
             profile_id=profile_id,

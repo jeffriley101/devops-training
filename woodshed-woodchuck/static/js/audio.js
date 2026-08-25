@@ -10,7 +10,7 @@
     "secretReward", "goatTracker", "questCompleted", "bandCampBonus",
     "marchingCompleted", "practiceRoomOpen", "medalEarned",
     "burrowPortal", "carrotCollected", "instrumentCollected",
-    "bandSetCompleted",
+    "bandSetCompleted", "arcadePickup", "arcadeCheer",
   ];
   const GOAT_CLIP_URLS = [
     "/static/audio/goats/goat-01.mp3",
@@ -113,8 +113,19 @@
       envelope: { attack: 0.08, decay: 0.38, sustain: 0, release: 0.18 },
       volume: -28,
     }).connect(doorFilter);
+    const crowdFilter = new Tone.Filter({
+      frequency: 1100, type: "bandpass", Q: 0.7,
+    }).connect(master);
+    const crowd = new Tone.NoiseSynth({
+      noise: { type: "pink" },
+      envelope: { attack: 0.04, decay: 0.62, sustain: 0, release: 0.16 },
+      volume: -27,
+    }).connect(crowdFilter);
     const goatGain = new Tone.Gain(0.35).connect(master);
-    graph = { master, filter, chime, warm, wood, click, flourish, doorFilter, door, goatGain };
+    graph = {
+      master, filter, chime, warm, wood, click, flourish,
+      doorFilter, door, crowdFilter, crowd, goatGain,
+    };
     buildGoatPool(Tone, goatGain);
     return graph;
   }
@@ -289,7 +300,7 @@
       bandCampBonus: 600, marchingCompleted: 600,
       practiceRoomOpen: 700, medalEarned: 1000,
       burrowPortal: 300, carrotCollected: 350,
-      instrumentCollected: 350, bandSetCompleted: 900,
+      instrumentCollected: 350, bandSetCompleted: 900, arcadePickup: 45,
     };
     const quietPeriod = quietPeriods[name] || 120;
     if (nowMs - (lastPlayed.get(name) || 0) < quietPeriod) return false;
@@ -383,6 +394,15 @@
           graph.flourish.triggerAttackRelease(step[0], 0.24, now + step[1], 0.3);
         });
         graph.chime.triggerAttackRelease(["E5", "G5"], 0.3, now + 0.55, 0.24);
+      } else if (name === "arcadePickup") {
+        graph.chime.triggerAttackRelease("B5", 0.075, now, 0.2);
+      } else if (name === "arcadeCheer") {
+        graph.crowdFilter.frequency.setValueAtTime(850, now);
+        graph.crowdFilter.frequency.exponentialRampToValueAtTime(2400, now + 0.62);
+        graph.crowd.triggerAttackRelease(0.72, now, 0.3);
+        [["C5", 0.08], ["E5", 0.2], ["G5", 0.34]].forEach(function (step) {
+          graph.chime.triggerAttackRelease(step[0], 0.18, now + step[1], 0.2);
+        });
       }
       return true;
     } catch (_error) {

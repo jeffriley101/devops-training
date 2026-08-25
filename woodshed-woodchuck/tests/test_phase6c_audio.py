@@ -18,8 +18,8 @@ def test_tone_is_exactly_pinned_local_licensed_and_loaded_in_order():
     assert "MIT License" in license_file.read_text()
     assert "cdn" not in BASE.casefold()
     tone_pos = BASE.index('/static/vendor/tone/Tone.js?v=15.1.22')
-    audio_pos = BASE.index('/static/js/audio.js?v=9')
-    app_pos = BASE.index('/static/js/app.js?v=65')
+    audio_pos = BASE.index('/static/js/audio.js?v=11')
+    app_pos = BASE.index('/static/js/app.js?v=66')
     assert tone_pos < audio_pos < app_pos
 
 
@@ -56,6 +56,13 @@ def test_audio_unlock_is_gesture_only_lazy_and_reuses_graph():
     assert "return markAudioReady();" in AUDIO
     assert "!unlocked || !audioContextIsRunning() || !graph" in AUDIO
     assert "Transport" not in AUDIO
+
+
+def test_arcade_pickup_effect_uses_the_shared_sound_preference_graph():
+    assert '"arcadePickup"' in AUDIO
+    assert "arcadePickup: 45" in AUDIO
+    assert 'name === "arcadePickup"' in AUDIO
+    assert 'graph.chime.triggerAttackRelease("B5", 0.075, now, 0.2)' in AUDIO
 
 
 def test_mobile_gestures_resume_a_context_that_suspends_again():

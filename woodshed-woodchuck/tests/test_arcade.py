@@ -108,29 +108,43 @@ def test_practice_room_destinations_are_preserved_as_three_doors() -> None:
     assert "position: static" in tag
 
 
-def test_arcade_room_renders_three_touch_friendly_cabinets() -> None:
-    assert ARCADE.count('class="arcade-cabinet ') == 3
+def test_arcade_room_renders_four_touch_friendly_cabinets() -> None:
+    assert ARCADE.count('class="arcade-cabinet ') == 4
     assert 'href="/plunge-burrow"' in ARCADE
     assert 'href="/arcade/blue"' in ARCADE
     assert 'href="/arcade/radio-tuner"' in ARCADE
-    assert ARCADE.count("<h2>Top 5</h2>") == 3
-    assert ARCADE.count('class="arcade-cabinet-marquee"') == 3
-    assert ARCADE.count('class="arcade-cabinet-control-panel" aria-hidden="true"') == 3
-    assert ARCADE.count('data-arcade-personal-best=') == 3
+    assert 'href="/arcade/wheel-of-woodchuck"' in ARCADE
+    assert ARCADE.count("<h2>Top 5</h2>") == 4
+    assert ARCADE.count('class="arcade-cabinet-marquee"') == 4
+    assert ARCADE.count('class="arcade-cabinet-control-panel" aria-hidden="true"') == 4
+    assert ARCADE.count('data-arcade-personal-best=') == 4
     assert 'href="/arcade">Back to Arcade</a>' in PLUNGE
     assert 'href="/store">Back to SHOP</a>' in ARCADE
     assert "min-height: 17rem" in CSS[CSS.index(".arcade-cabinet-link {"):]
     mobile = CSS[CSS.index("@media (max-width: 760px)"):]
     assert ".arcade-cabinet-grid { grid-template-columns: 1fr; }" in mobile
-    assert '/static/js/arcade.js?v=5' in ARCADE
+    assert '/static/js/arcade.js?v=8' in ARCADE
 
 
-def test_arcade_pages_load_the_shared_trouble_soundtrack() -> None:
-    for template in (ARCADE, GAME, PLUNGE):
-        assert '/static/js/arcade-soundtrack.js?v=1' in template
+def test_arcade_pages_route_game_specific_soundtracks() -> None:
+    assert '/static/js/arcade-soundtrack.js' not in ARCADE
+    for template in (GAME, PLUNGE):
+        assert '/static/js/arcade-soundtrack.js?v=2' in template
+    assert 'data-arcade-soundtrack="{{ arcade_game.key }}"' in GAME
+    assert 'data-arcade-soundtrack="plunge-burrow"' in PLUNGE
+    assert (ROOT / "static" / "audio" / "arcade" / "jeremy-9.mp3").is_file()
+    assert (ROOT / "static" / "audio" / "arcade" / "gerry-3.mp3").is_file()
     assert (ROOT / "static" / "audio" / "arcade" / "trouble.mp3").is_file()
-    assert 'const SOUNDTRACK_URL = "/static/audio/arcade/trouble.mp3?v=1"' in SOUNDTRACK_JS
+    assert '"plunge-burrow": {' in SOUNDTRACK_JS
+    assert 'url: "/static/audio/arcade/jeremy-9.mp3?v=1"' in SOUNDTRACK_JS
+    assert 'blue: {' in SOUNDTRACK_JS
+    assert 'url: "/static/audio/arcade/gerry-3.mp3?v=1"' in SOUNDTRACK_JS
+    assert 'loop: true' in SOUNDTRACK_JS
+    assert '"radio-tuner": {' in SOUNDTRACK_JS
+    assert 'url: "/static/audio/arcade/trouble.mp3?v=1"' in SOUNDTRACK_JS
     assert "const RESTART_DELAY_MS = 6000" in SOUNDTRACK_JS
+    assert "audio.loop = soundtrack.loop === true" in SOUNDTRACK_JS
+    assert 'if (!audio.loop) audio.addEventListener("ended", restartAfterPause)' in SOUNDTRACK_JS
     assert 'audio.addEventListener("ended", restartAfterPause)' in SOUNDTRACK_JS
     assert "window.setTimeout(function ()" in SOUNDTRACK_JS
     assert "window.WoodshedAudio" in SOUNDTRACK_JS
@@ -162,7 +176,7 @@ def test_arcade_leaderboards_render_each_olympic_rank_once() -> None:
     assert "item.value = Number(row.rank)" in renderer
     assert "item.textContent = `${name} — ${row.score}`" in renderer
     assert "${row.rank}." not in renderer
-    assert ARCADE.count("<ol data-arcade-leaderboard=") == 3
+    assert ARCADE.count("<ol data-arcade-leaderboard=") == 4
 
 
 def test_arcade_removes_unnecessary_copy() -> None:
@@ -192,10 +206,56 @@ def test_blue_is_a_timed_side_scrolling_platform_game() -> None:
     assert ".blue-game-field.is-playing * { touch-action: none; }" in CSS
 
 
+def test_blue_collectibles_play_the_shared_short_pickup_effect() -> None:
+    update = ARCADE_JS[
+        ARCADE_JS.index("function updateBlueGame"):
+        ARCADE_JS.index("function drawBlueGame")
+    ]
+    pickup = ARCADE_JS[
+        ARCADE_JS.index("function playBluePickupSound"):
+        ARCADE_JS.index("function playerFellThroughBlueFinalHole")
+    ]
+    assert 'window.WoodshedAudio.play("arcadePickup")' in pickup
+    assert "try {" in pickup and "catch (_error)" in pickup
+    assert "updateScore(10);\n          playBluePickupSound();" in update
+
+
+def test_blue_final_hole_enters_one_red_stage_without_changing_geometry() -> None:
+    transition = ARCADE_JS[
+        ARCADE_JS.index("function playerFellThroughBlueFinalHole"):
+        ARCADE_JS.index("function updateBlueGame")
+    ]
+    assert 'const BLUE_FINAL_HOLE = Object.freeze({ left: 2360, right: 2450 })' in ARCADE_JS
+    assert 'if (blueStage === "red" || !blueFinalHoleFallInProgress) return false;' in transition
+    assert "function trackBlueFinalHoleFall()" in transition
+    assert 'blueStage = "red"' in transition
+    assert "resetBlueStage();" in transition
+    assert "grantBlueRedStageBonus();" in transition
+    assert "const bluePlatforms = [" in ARCADE_JS
+    assert "const redStage = blueStage === \"red\"" in ARCADE_JS
+
+
+def test_blue_red_transition_keeps_score_resets_collectibles_and_other_holes_reset() -> None:
+    stage_reset = ARCADE_JS[
+        ARCADE_JS.index("function resetBlueStage"):
+        ARCADE_JS.index("function resetBlueGame")
+    ]
+    update = ARCADE_JS[
+        ARCADE_JS.index("function updateBlueGame"):
+        ARCADE_JS.index("function drawBlueGame")
+    ]
+    assert "blueCollectibles = blueCollectibleSeeds.map" in stage_reset
+    assert "score = 0" not in stage_reset
+    assert 'if (blueStage === "blue" && enterBlueRedStage()) return;' in update
+    assert "bluePlayer.x = Math.max(0, bluePlayer.checkpointX - 35);" in update
+
+
 def test_blue_timer_ends_game_and_submits_score() -> None:
-    assert 'id="arcade-game-time">30' in GAME
-    assert "const GAME_SECONDS = 30" in ARCADE_JS
-    assert "endTime = performance.now() + GAME_SECONDS * 1000" in ARCADE_JS
+    assert 'id="arcade-game-time">{% if arcade_game.key == "blue" %}20{% else %}30{% endif %}' in GAME
+    assert "Start {% if arcade_game.key == \"blue\" %}20{% else %}30{% endif %}-Second Game" in GAME
+    assert "const BLUE_GAME_SECONDS = 20" in ARCADE_JS
+    assert "const RADIO_GAME_SECONDS = 30" in ARCADE_JS
+    assert "endTime = performance.now() + BLUE_GAME_SECONDS * 1000" in ARCADE_JS
     assert "if (remaining <= 0) void finishGame()" in ARCADE_JS
     assert "timeEl.textContent = \"0\"" in ARCADE_JS
     assert 'fetch(`/arcade/scores/${gameKey}`' in ARCADE_JS
@@ -204,6 +264,31 @@ def test_blue_timer_ends_game_and_submits_score() -> None:
     assert finish.index('message.textContent = `Time! You scored') < finish.index("submitScore(gameKey, score)")
     assert 'window.addEventListener("woodshed:celebrate"' in APP_JS
     assert "celebrateSuccess(document.body)" in APP_JS
+
+
+def test_blue_red_stage_bonus_adds_ten_seconds_once_without_resetting_timer() -> None:
+    bonus = ARCADE_JS[
+        ARCADE_JS.index("function grantBlueRedStageBonus"):
+        ARCADE_JS.index("function setBlueAction")
+    ]
+    assert "const BLUE_RED_STAGE_BONUS_SECONDS = 10" in ARCADE_JS
+    assert "blueRedStageBonusApplied" in bonus
+    assert "endTime += BLUE_RED_STAGE_BONUS_SECONDS * 1000" in bonus
+    assert "endTime = BLUE_RED_STAGE_BONUS_SECONDS" not in bonus
+    assert "return false" in bonus
+
+
+def test_red_timeout_saves_once_then_returns_to_book_without_changing_normal_blue_timeout() -> None:
+    finish = ARCADE_JS[
+        ARCADE_JS.index("async function finishGame"):
+        ARCADE_JS.index("function updateTimer")
+    ]
+    assert "if (!running) return;" in finish
+    assert "running = false;" in finish
+    assert "submitScore(gameKey, score)" in finish
+    assert 'gameKey === "blue" && blueStage === "red"' in finish
+    assert 'window.location.assign("/p-book")' in finish
+    assert "blueRedBookRedirectScheduled" in finish
 
 
 def test_radio_ports_the_khjw_moving_needle_gameplay() -> None:
@@ -237,7 +322,7 @@ def test_radio_ports_khjw_scoring_feedback_and_30_second_timer() -> None:
         assert message in tuner
     assert 'radioTapButton.addEventListener("click", tuneRadioSignal)' in ARCADE_JS
     assert "radioTapButton.focus()" in ARCADE_JS
-    assert "elapsedMs >= GAME_SECONDS * 1000" in ARCADE_JS
+    assert "elapsedMs >= RADIO_GAME_SECONDS * 1000" in ARCADE_JS
     assert "window.setInterval(tickRadioGame, RADIO_TICK_MS)" in ARCADE_JS
     assert "AudioContext" not in ARCADE_JS
     assert "createOscillator" not in ARCADE_JS

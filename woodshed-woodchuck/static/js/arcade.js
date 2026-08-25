@@ -5,10 +5,14 @@
     "plunge-burrow": "/xp/plunge-best",
     blue: "/arcade/scores/blue",
     "radio-tuner": "/arcade/scores/radio-tuner",
+    "wheel-of-woodchuck": "/arcade/scores/wheel-of-woodchuck",
   };
-  const GAME_SECONDS = 30;
+  const BLUE_GAME_SECONDS = 20;
+  const RADIO_GAME_SECONDS = 30;
+  const BLUE_RED_STAGE_BONUS_SECONDS = 10;
   const BLUE_WORLD_WIDTH = 3200;
   const BLUE_GROUND_Y = 315;
+  const BLUE_FINAL_HOLE = Object.freeze({ left: 2360, right: 2450 });
   const RADIO_TICK_MS = 40;
   const RADIO_CENTER = 50;
   const RADIO_GOLD_ZONE = 8;
@@ -104,6 +108,10 @@
     let blueFrame = null;
     let bluePreviousTime = 0;
     let blueCameraX = 0;
+    let blueStage = "blue";
+    let blueRedStageBonusApplied = false;
+    let blueRedBookRedirectScheduled = false;
+    let blueFinalHoleFallInProgress = false;
     const blueInput = { left: false, right: false, jumpQueued: false };
     const bluePlayer = {
       x: 60, y: 80, width: 34, height: 46,
@@ -150,7 +158,7 @@
       if (blueField) blueField.classList.toggle("is-playing", enabled);
     }
 
-    function resetBlueGame() {
+    function resetBlueStage() {
       bluePlayer.x = 60;
       bluePlayer.y = 80;
       bluePlayer.velocityX = 0;
@@ -158,15 +166,58 @@
       bluePlayer.onGround = false;
       bluePlayer.checkpointX = 60;
       blueCameraX = 0;
+      blueFinalHoleFallInProgress = false;
       blueInput.left = false;
       blueInput.right = false;
       blueInput.jumpQueued = false;
       blueCollectibles = blueCollectibleSeeds.map(([x, y]) => ({ x, y, collected: false }));
     }
 
+    function resetBlueGame() {
+      blueStage = "blue";
+      blueRedStageBonusApplied = false;
+      blueRedBookRedirectScheduled = false;
+      if (blueField) blueField.dataset.blueStage = blueStage;
+      resetBlueStage();
+    }
+
     function rectanglesOverlap(a, b) {
       return a.x < b.x + b.width && a.x + a.width > b.x &&
         a.y < b.y + b.height && a.y + a.height > b.y;
+    }
+
+    function playBluePickupSound() {
+      try {
+        if (window.WoodshedAudio && typeof window.WoodshedAudio.play === "function") {
+          window.WoodshedAudio.play("arcadePickup");
+        }
+      } catch (_error) {
+        // A pickup must never interrupt game play when browser audio is unavailable.
+      }
+    }
+
+    function playerFellThroughBlueFinalHole() {
+      const center = bluePlayer.x + bluePlayer.width / 2;
+      return center >= BLUE_FINAL_HOLE.left && center <= BLUE_FINAL_HOLE.right;
+    }
+
+    function trackBlueFinalHoleFall() {
+      if (
+        blueStage === "blue" && bluePlayer.velocityY > 0 &&
+        bluePlayer.y >= BLUE_GROUND_Y && playerFellThroughBlueFinalHole()
+      ) {
+        blueFinalHoleFallInProgress = true;
+      }
+    }
+
+    function enterBlueRedStage() {
+      if (blueStage === "red" || !blueFinalHoleFallInProgress) return false;
+      blueStage = "red";
+      if (blueField) blueField.dataset.blueStage = blueStage;
+      resetBlueStage();
+      grantBlueRedStageBonus();
+      message.textContent = "Red stage! +10 seconds.";
+      return true;
     }
 
     function updateBlueGame(deltaSeconds) {
@@ -200,7 +251,10 @@
         }
       }
 
+      trackBlueFinalHoleFall();
+
       if (bluePlayer.y > (blueCanvas ? blueCanvas.height : 360) + 80) {
+        if (blueStage === "blue" && enterBlueRedStage()) return;
         bluePlayer.x = Math.max(0, bluePlayer.checkpointX - 35);
         bluePlayer.y = 80;
         bluePlayer.velocityX = 0;
@@ -213,6 +267,7 @@
         if (rectanglesOverlap(bluePlayer, hitbox)) {
           collectible.collected = true;
           updateScore(10);
+          playBluePickupSound();
         }
       }
 
@@ -228,10 +283,14 @@
       if (!blueCanvas || !blueContext) return;
       const width = blueCanvas.width;
       const height = blueCanvas.height;
+      const redStage = blueStage === "red";
+      const palette = redStage
+        ? { sky: "#ffd0ce", middle: "#d95a54", ground: "#8d2026", platform: "#5b1820", trim: "#ff8178", player: "#c5262f", outline: "#7b1420" }
+        : { sky: "#bcecff", middle: "#5aa9df", ground: "#2467a3", platform: "#143b67", trim: "#5dd5e8", player: "#075ed1", outline: "#073b83" };
       const gradient = blueContext.createLinearGradient(0, 0, 0, height);
-      gradient.addColorStop(0, "#bcecff");
-      gradient.addColorStop(0.72, "#5aa9df");
-      gradient.addColorStop(1, "#2467a3");
+      gradient.addColorStop(0, palette.sky);
+      gradient.addColorStop(0.72, palette.middle);
+      gradient.addColorStop(1, palette.ground);
       blueContext.fillStyle = gradient;
       blueContext.fillRect(0, 0, width, height);
 
@@ -245,12 +304,12 @@
         blueContext.fill();
       }
 
-      blueContext.fillStyle = "#143b67";
+      blueContext.fillStyle = palette.platform;
       for (const platform of bluePlatforms) {
         blueContext.fillRect(platform.x - blueCameraX, platform.y, platform.width, platform.height);
-        blueContext.fillStyle = "#5dd5e8";
+        blueContext.fillStyle = palette.trim;
         blueContext.fillRect(platform.x - blueCameraX, platform.y, platform.width, 7);
-        blueContext.fillStyle = "#143b67";
+        blueContext.fillStyle = palette.platform;
       }
 
       for (const collectible of blueCollectibles) {
@@ -260,18 +319,18 @@
         blueContext.beginPath();
         blueContext.arc(x, collectible.y, 11, 0, Math.PI * 2);
         blueContext.fill();
-        blueContext.strokeStyle = "#0571e3";
+        blueContext.strokeStyle = redStage ? "#d3343c" : "#0571e3";
         blueContext.lineWidth = 5;
         blueContext.stroke();
       }
 
       const playerX = bluePlayer.x - blueCameraX;
-      blueContext.fillStyle = "#075ed1";
+      blueContext.fillStyle = palette.player;
       blueContext.fillRect(playerX, bluePlayer.y, bluePlayer.width, bluePlayer.height);
       blueContext.fillStyle = "#e9fbff";
       blueContext.fillRect(playerX + 8, bluePlayer.y + 9, 6, 7);
       blueContext.fillRect(playerX + 22, bluePlayer.y + 9, 6, 7);
-      blueContext.fillStyle = "#073b83";
+      blueContext.fillStyle = palette.outline;
       blueContext.fillRect(playerX + 8, bluePlayer.y + 31, 20, 5);
     }
 
@@ -282,6 +341,16 @@
       updateBlueGame(delta);
       drawBlueGame();
       blueFrame = window.requestAnimationFrame(blueLoop);
+    }
+
+    // The Red-stage transition will call this once when that stage is added.
+    // It extends the active timer instead of replacing the time remaining.
+    function grantBlueRedStageBonus() {
+      if (!running || gameKey !== "blue" || blueRedStageBonusApplied) return false;
+      blueRedStageBonusApplied = true;
+      endTime += BLUE_RED_STAGE_BONUS_SECONDS * 1000;
+      updateTimer();
+      return true;
     }
 
     function setBlueAction(action, pressed) {
@@ -326,13 +395,13 @@
       if (radioNeedle) radioNeedle.style.left = `${radioNeedlePosition}%`;
       if (gameKey === "radio-tuner" && running) {
         const elapsed = Math.floor((Date.now() - radioStartedAt) / 1000);
-        timeEl.textContent = String(Math.max(0, GAME_SECONDS - elapsed));
+        timeEl.textContent = String(Math.max(0, RADIO_GAME_SECONDS - elapsed));
       }
     }
 
     function tickRadioGame() {
       const elapsedMs = Date.now() - radioStartedAt;
-      if (elapsedMs >= GAME_SECONDS * 1000) {
+      if (elapsedMs >= RADIO_GAME_SECONDS * 1000) {
         void finishGame();
         renderRadioState();
         return;
@@ -401,6 +470,11 @@
           : `Score saved. Personal best: ${payload.best_score}.`;
       } catch (error) {
         message.textContent = error.message || "Your score could not be saved.";
+      } finally {
+        if (gameKey === "blue" && blueStage === "red" && !blueRedBookRedirectScheduled) {
+          blueRedBookRedirectScheduled = true;
+          window.setTimeout(function () { window.location.assign("/p-book"); }, 700);
+        }
       }
     }
 
@@ -416,12 +490,12 @@
       running = true;
       score = 0;
       scoreEl.textContent = "0";
-      timeEl.textContent = String(GAME_SECONDS);
+      timeEl.textContent = String(gameKey === "blue" ? BLUE_GAME_SECONDS : RADIO_GAME_SECONDS);
       message.textContent = "Go!";
       startButton.disabled = true;
       setControlsEnabled(true);
       if (gameKey === "blue") {
-        endTime = performance.now() + GAME_SECONDS * 1000;
+        endTime = performance.now() + BLUE_GAME_SECONDS * 1000;
         resetBlueGame();
         bluePreviousTime = 0;
         blueFrame = window.requestAnimationFrame(blueLoop);

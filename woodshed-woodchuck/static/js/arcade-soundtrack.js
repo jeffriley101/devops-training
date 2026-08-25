@@ -1,13 +1,31 @@
 (function () {
   "use strict";
 
-  const SOUNDTRACK_URL = "/static/audio/arcade/trouble.mp3?v=1";
+  const SOUNDTRACKS = Object.freeze({
+    "plunge-burrow": {
+      url: "/static/audio/arcade/jeremy-9.mp3?v=1",
+      restartDelayMs: 6000,
+    },
+    blue: {
+      url: "/static/audio/arcade/gerry-3.mp3?v=1",
+      loop: true,
+    },
+    "radio-tuner": {
+      url: "/static/audio/arcade/trouble.mp3?v=1",
+      restartDelayMs: 6000,
+    },
+  });
   const RESTART_DELAY_MS = 6000;
-  const audio = new Audio(SOUNDTRACK_URL);
+  const soundtrackRoot = document.querySelector("[data-arcade-soundtrack]");
+  const soundtrack = soundtrackRoot && SOUNDTRACKS[soundtrackRoot.dataset.arcadeSoundtrack];
+  if (!soundtrack) return;
+
+  const audio = new Audio(soundtrack.url);
   let restartTimer = null;
   let stopped = false;
 
   audio.preload = "auto";
+  audio.loop = soundtrack.loop === true;
 
   function preferences() {
     const sound = window.WoodshedAudio;
@@ -76,7 +94,7 @@
     if (audio.paused && !audio.ended) playSoundtrack();
   }
 
-  audio.addEventListener("ended", restartAfterPause);
+  if (!audio.loop) audio.addEventListener("ended", restartAfterPause);
   document.addEventListener("pointerdown", activateFromGesture, true);
   document.addEventListener("keydown", activateFromGesture, true);
   window.addEventListener("pagehide", stopSoundtrack, { once: true });

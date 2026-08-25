@@ -137,7 +137,7 @@ console.log(JSON.stringify({unique:new Set(keys).size===keys.length,carrotCount:
     assert result == {"unique": True, "carrotCount": 1, "instrumentCount": 1, "approved": True, "occupiedHasAll": True}
 
 
-def test_restart_and_gameover_clear_run_local_pickups_growth_and_band_set() -> None:
+def test_gameover_retains_run_state_until_new_game_clears_it() -> None:
     result = run_core(
         r"""
 const {PlungeBurrowGame}=require('./static/js/plunge-burrow.js');const game=new PlungeBurrowGame({random:()=>0.26});
@@ -147,8 +147,15 @@ game.reset();const reset=game.snapshot();
 console.log(JSON.stringify({over:{status:over.status,set:over.bandSet,carrot:over.carrot,instrument:over.instrument,growth:over.pendingGrowth,count:over.dandelionsCollected},reset:{status:reset.status,score:reset.score,hearts:reset.hearts,set:reset.bandSet,carrot:reset.carrot,instrument:reset.instrument,growth:reset.pendingGrowth,count:reset.dandelionsCollected,portals:reset.portals.length}}));
 """
     )
+    retained = {
+        "set": ["Flute", "Tuba"],
+        "carrot": {"x": 1, "y": 1},
+        "instrument": {"x": 2, "y": 2, "name": "Horn", "icon": "📯"},
+        "growth": 2,
+        "count": 4,
+    }
     cleared = {"set": [], "carrot": None, "instrument": None, "growth": 0, "count": 0}
-    assert result["over"] == {"status": "gameover", **cleared}
+    assert result["over"] == {"status": "gameover", **retained}
     assert result["reset"] == {"status": "ready", "score": 0, "hearts": 3, "portals": 4, **cleared}
 
 
@@ -165,11 +172,28 @@ console.log(JSON.stringify({paused,resumed}));
 
 
 def test_second_pass_ui_accessibility_audio_and_persistence_boundaries() -> None:
-    for text in ("Dandelion", "Carrot", "Matching holes", "Instrument", "Band Set"):
-        assert text in PAGE
+    for retired_copy in (
+        "Underground practice break",
+        "Gather burrow snacks and band instruments",
+        "Dandelion: +1 score and segment",
+        "Carrot: +3 score, two segments",
+        "Matching holes teleport you",
+        "Instrument: +5 score",
+        "Use Arrow keys or W, A, S, D.",
+    ):
+        assert retired_copy not in PAGE
     assert 'id="plunge-dandelions"' in PAGE
     assert 'id="plunge-band-progress"' in PAGE
     assert 'aria-label="Instruments in the active Band Set"' in PAGE
+    assert 'id="plunge-leaderboard"' in PAGE
+    assert 'id="plunge-scoreboard-title">Top 5' in PAGE
+    assert "for (let index = 0; index < 5; index += 1)" in GAME
+    assert 'root.fetch("/xp/plunge-best", { credentials: "same-origin", cache: "no-store" })' in GAME
+    assert "renderLeaderboard(payload.leaderboard);" in GAME
+    scoreboard_start = CSS.index(".plunge-scoreboard {")
+    scoreboard = CSS[scoreboard_start:CSS.index("@media (max-width: 760px)", scoreboard_start)]
+    assert "grid-template-columns: 2rem minmax(0, 1fr) auto" in scoreboard
+    assert "font-variant-numeric: tabular-nums" in scoreboard
     assert "flex-wrap: wrap" in CSS[CSS.index(".plunge-band-set"):]
     for effect in ("burrowPortal", "carrotCollected", "instrumentCollected", "bandSetCompleted"):
         assert f'"{effect}"' in AUDIO

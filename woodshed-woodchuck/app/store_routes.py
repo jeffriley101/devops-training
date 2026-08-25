@@ -9,7 +9,6 @@ from .account_routes import current_profile
 from .db import SessionLocal
 from .store_catalog import catalog_payload
 from .store_inventory import (
-    DecorationCollisionError,
     InsufficientDandelionsError,
     OwnedItemAccessError,
     StoreItemUnavailableError,
@@ -89,9 +88,6 @@ def update_store_item_placement(
         except OwnedItemAccessError as error:
             session.rollback()
             raise HTTPException(status_code=404, detail=str(error)) from error
-        except DecorationCollisionError as error:
-            session.rollback()
-            raise HTTPException(status_code=409, detail=str(error)) from error
         except Exception:
             session.rollback()
             raise

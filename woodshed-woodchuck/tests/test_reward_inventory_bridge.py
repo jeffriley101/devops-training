@@ -279,7 +279,7 @@ def test_another_profile_cannot_place_a_permanent_reward(bridge_database) -> Non
     assert response.status_code == 404
 
 
-def test_crown_and_owned_copy_share_collision_protection(bridge_database) -> None:
+def test_crown_and_owned_copy_can_share_the_same_placement(bridge_database) -> None:
     client, profile_id = signed_client(bridge_database)
     award_id = earn_crown(bridge_database, profile_id)
     purchase = client.post("/store/purchases", json={"item_key": "candle"})
@@ -289,11 +289,14 @@ def test_crown_and_owned_copy_share_collision_protection(bridge_database) -> Non
         f"/store/inventory/{copy_id}/placement", json={"x": 0.4, "y": 0.4}
     ).status_code == 200
 
-    collision = client.put(
-        f"/store/inventory/crown:{award_id}/placement", json={"x": 0.45, "y": 0.4}
+    overlapping = client.put(
+        f"/store/inventory/crown:{award_id}/placement",
+        json={"x": 0.4, "y": 0.4, "size": "large"},
     )
-    assert collision.status_code == 409
-    assert "overlaps another decoration" in collision.json()["detail"]
+    assert overlapping.status_code == 200
+    assert overlapping.json()["item"]["placement_x"] == 0.4
+    assert overlapping.json()["item"]["placement_y"] == 0.4
+    assert overlapping.json()["item"]["placement_size"] == "large"
 
 
 def test_crown_and_snack_cannot_be_placed_by_another_profile(bridge_database) -> None:

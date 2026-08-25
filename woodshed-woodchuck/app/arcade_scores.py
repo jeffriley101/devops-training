@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from .models import ArcadeHighScore, WoodchuckProfile
 
 
-ARCADE_GAME_KEYS = frozenset({"blue", "radio-tuner"})
+ARCADE_GAME_KEYS = frozenset({"blue", "radio-tuner", "wheel-of-woodchuck"})
 MAX_ARCADE_SCORE = 2_147_483_647
 
 

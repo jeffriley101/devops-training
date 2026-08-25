@@ -178,7 +178,7 @@ def test_page_initialization_and_server_hydration_do_not_request_state_put() -> 
     assert "/store/inventory/${item.id}/placement" in placement
     size_preference = javascript[
         javascript.index("async function savePreferredSize"):
-        javascript.index("function overlapsPlaced")
+        javascript.index("function nextOpenPlacement")
     ]
     assert 'method: "PUT"' in size_preference
     assert "/store/inventory/${item.id}/size" in size_preference

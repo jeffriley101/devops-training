@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="wheel-game" data-wheel-of-woodchuck aria-labelledby="wheel-game-title">
+  <header class="arcade-room-header">
+    <h1 id="wheel-game-title">Wheel of Woodchuck</h1>
+    <a class="btn btn-secondary" href="/arcade">Back to Arcade</a>
+  </header>
+
+  <div class="wheel-game-status" aria-label="Game status">
+    <p>Score <strong id="wheel-score">0</strong></p>
+    <p>Best <strong id="wheel-best">0</strong></p>
+    <p>Time <strong id="wheel-time">30</strong></p>
+    <p>Spells <strong id="wheel-spell-attempts">3</strong></p>
+  </div>
+
+  <section class="wheel-puzzle" aria-label="Music term puzzle">
+    <h2 id="wheel-clue">Press New Game to begin.</h2>
+    <p id="wheel-answer" class="wheel-masked-answer" aria-live="polite"></p>
+
+    <div class="wheel-play-area">
+      <div class="wheel-spinner-wrap" aria-hidden="true">
+        <div id="wheel-spinner" class="wheel-spinner">
+          <span>100</span><span>150</span><span>200</span><span>250</span>
+          <span>300</span><span>400</span><span>500</span><span>2x</span>
+        </div>
+        <i class="wheel-pointer"></i>
+      </div>
+      <div class="wheel-spin-actions">
+        <button id="wheel-spin" class="btn btn-primary" type="button" disabled>Spin</button>
+        <p id="wheel-spin-result">Spin for a letter value</p>
+      </div>
+    </div>
+
+    <div id="wheel-letters" class="wheel-letter-grid" aria-label="Choose a letter"></div>
+
+    <div class="wheel-spell-area">
+      <button id="wheel-spell-open" class="btn btn-secondary" type="button" disabled>Spell It</button>
+      <form id="wheel-spell-form" class="wheel-spell-form" hidden>
+        <label for="wheel-spell-input">Music term</label>
+        <div>
+          <input id="wheel-spell-input" name="spelling" type="text" inputmode="text" autocomplete="off" autocapitalize="characters" spellcheck="false" required>
+          <button class="btn btn-primary" type="submit">Check</button>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <div class="wheel-game-actions">
+    <button id="wheel-start" class="btn btn-primary" type="button">New Game</button>
+    <p id="wheel-message" role="status" aria-live="polite">Ready</p>
+  </div>
+
+  <section class="arcade-game-leaderboard" aria-labelledby="wheel-leaderboard-title">
+    <h2 id="wheel-leaderboard-title">Top 5</h2>
+    <ol data-arcade-leaderboard="wheel-of-woodchuck"><li>Loading…</li></ol>
+  </section>
+</section>
+{% endblock %}
+
+{% block page_scripts %}
+<script src="/static/js/wheel-terms.js?v=1"></script>
+<script src="/static/js/wheel-of-woodchuck.js?v=1"></script>
+{% endblock %}

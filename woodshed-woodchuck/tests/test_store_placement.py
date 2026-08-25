@@ -11,10 +11,7 @@ from app.db import Base
 from app.main import app
 from app.models import OwnedItemCopy, WoodchuckProfile
 from app.security import hash_pin
-from app.store_inventory import (
-    DECORATION_HITBOX_NORMALIZED,
-    PLACEMENT_HITBOX_NORMALIZED,
-)
+from app.store_inventory import PLACEMENT_SIZES
 
 
 @pytest.fixture()
@@ -236,13 +233,8 @@ def test_unknown_decoration_size_is_rejected(placement_database) -> None:
         assert owned.placement_size == "medium"
 
 
-def test_collision_hitboxes_follow_rendered_decoration_scale() -> None:
-    assert PLACEMENT_HITBOX_NORMALIZED == {
-        "medium": 0.19,
-        "large": 0.33,
-        "xlarge": 0.47,
-    }
-    assert DECORATION_HITBOX_NORMALIZED == PLACEMENT_HITBOX_NORMALIZED["medium"]
+def test_supported_placement_sizes_remain_medium_large_and_extra_large() -> None:
+    assert PLACEMENT_SIZES == ("medium", "large", "xlarge")
 
 
 def test_removing_clears_placement_without_deleting_ownership(placement_database) -> None:
@@ -305,20 +297,51 @@ def test_coordinates_outside_normalized_range_are_rejected(placement_database, p
         assert owned.placement_x is owned.placement_y is None
 
 
-def test_decoration_overlap_is_rejected_and_prior_position_is_preserved(placement_database) -> None:
+def test_identical_and_nearby_owned_decoration_positions_are_permitted(
+    placement_database,
+) -> None:
     client, profile_id = signed_in_client(placement_database)
     fixed_id = add_copy(placement_database, profile_id, x=0.4, y=0.4)
-    moving_id = add_copy(placement_database, profile_id, x=0.8, y=0.8)
-    response = client.put(
-        f"/store/inventory/{moving_id}/placement",
-        json={"x": 0.4 + DECORATION_HITBOX_NORMALIZED / 2, "y": 0.4},
+    identical_id = add_copy(placement_database, profile_id, x=0.8, y=0.8)
+    nearby_id = add_copy(placement_database, profile_id)
+    identical = client.put(
+        f"/store/inventory/{identical_id}/placement",
+        json={"x": 0.4, "y": 0.4, "size": "xlarge"},
     )
-    assert response.status_code == 409
-    assert "overlaps another decoration" in response.json()["detail"]
+    nearby = client.put(
+        f"/store/inventory/{nearby_id}/placement",
+        json={"x": 0.401, "y": 0.399, "size": "large"},
+    )
+    assert identical.status_code == nearby.status_code == 200
     with placement_database() as session:
-        assert (session.get(OwnedItemCopy, fixed_id).placement_x, session.get(OwnedItemCopy, fixed_id).placement_y) == (0.4, 0.4)
+        fixed = session.get(OwnedItemCopy, fixed_id)
+        matching = session.get(OwnedItemCopy, identical_id)
+        close = session.get(OwnedItemCopy, nearby_id)
+        assert (fixed.placement_x, fixed.placement_y) == (0.4, 0.4)
+        assert (matching.placement_x, matching.placement_y) == (0.4, 0.4)
+        assert matching.placement_size == "xlarge"
+        assert (close.placement_x, close.placement_y) == (0.401, 0.399)
+        assert close.placement_size == "large"
+
+
+def test_overlap_does_not_loosen_outer_coordinate_bounds(placement_database) -> None:
+    client, profile_id = signed_in_client(placement_database, suffix="OVERLAPBOUNDS")
+    fixed_id = add_copy(placement_database, profile_id, x=1.0, y=1.0)
+    moving_id = add_copy(placement_database, profile_id)
+    assert client.put(
+        f"/store/inventory/{moving_id}/placement",
+        json={"x": 1.0, "y": 1.0, "size": "xlarge"},
+    ).status_code == 200
+    rejected = client.put(
+        f"/store/inventory/{moving_id}/placement",
+        json={"x": 1.001, "y": 1.0, "size": "xlarge"},
+    )
+    assert rejected.status_code == 422
+    with placement_database() as session:
+        assert session.get(OwnedItemCopy, fixed_id).placement_x == 1.0
         moving = session.get(OwnedItemCopy, moving_id)
-        assert (moving.placement_x, moving.placement_y) == (0.8, 0.8)
+        assert (moving.placement_x, moving.placement_y) == (1.0, 1.0)
+        assert moving.placement_size == "xlarge"
 
 
 def test_normal_shed_controls_are_not_collision_participants(placement_database) -> None:

@@ -883,7 +883,7 @@ class ArcadeHighScore(Base):
             name="uq_arcade_high_score_profile_game",
         ),
         CheckConstraint(
-            "game_key IN ('blue', 'radio-tuner')",
+            "game_key IN ('blue', 'radio-tuner', 'wheel-of-woodchuck')",
             name="ck_arcade_high_score_game_key",
         ),
         CheckConstraint(

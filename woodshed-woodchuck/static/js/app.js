@@ -526,7 +526,6 @@
       large: {short: "L", title: "Large"},
       xlarge: {short: "XL", title: "Extra Large"},
     };
-    const COLLISION_SIZES = {medium: 0.19, large: 0.33, xlarge: 0.47};
     const placementRequests = new Set();
     const itemId = (item) => String(item.id);
     let ownedItems = [];
@@ -745,33 +744,18 @@
       }
     }
 
-    function overlapsPlaced(x, y, ignoredId = null, size = "medium") {
-      return ownedItems.some((item) => (
-        itemId(item) !== String(ignoredId)
-        && isPlaced(item)
-        && Math.abs(item.placement_x - x) <
-          ((COLLISION_SIZES[size] + COLLISION_SIZES[itemSize(item)]) / 2)
-        && Math.abs(item.placement_y - y) <
-          ((COLLISION_SIZES[size] + COLLISION_SIZES[itemSize(item)]) / 2)
-      ));
-    }
-
-    function nextOpenPlacement(item) {
+    function nextOpenPlacement() {
       const positions = [0.28, 0.42, 0.56, 0.70];
-      for (const y of positions) {
-        for (const x of positions) {
-          if (!overlapsPlaced(x, y, null, itemSize(item))) return { x, y };
-        }
-      }
-      return null;
+      const placedCount = ownedItems.filter(isPlaced).length;
+      const index = placedCount % (positions.length * positions.length);
+      return {
+        x: positions[index % positions.length],
+        y: positions[Math.floor(index / positions.length)],
+      };
     }
 
     async function placeFromInventory(item) {
-      const position = nextOpenPlacement(item);
-      if (!position) {
-        setFeedback("The middle of the SHED is full. Move or return a decoration first.", true);
-        return;
-      }
+      const position = nextOpenPlacement();
       await savePlacement(item, position.x, position.y);
     }
 

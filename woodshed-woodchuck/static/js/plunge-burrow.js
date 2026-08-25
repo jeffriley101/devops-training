@@ -203,7 +203,6 @@
         this.relocatePickupsFromTrail();
         this.ensureDandelion();
       }
-      if (this.status === "gameover") this.clearRunCollections();
       this.hitLocked = false;
       this.onChange(this.snapshot());
       return false;
@@ -438,6 +437,7 @@
   const bandProgressEl = document.getElementById("plunge-band-progress");
   const bandListEl = document.getElementById("plunge-band-list");
   const bandCompleteEl = document.getElementById("plunge-band-complete");
+  const leaderboardEl = document.getElementById("plunge-leaderboard");
   const liveEl = document.getElementById("plunge-live");
   const overlay = document.getElementById("plunge-overlay");
   const overlayTitle = document.getElementById("plunge-overlay-title");
@@ -484,6 +484,46 @@
     }
   }
 
+  function renderLeaderboard(rows) {
+    if (!leaderboardEl) return;
+    leaderboardEl.replaceChildren();
+    for (let index = 0; index < 5; index += 1) {
+      const row = Array.isArray(rows) ? rows[index] : null;
+      const item = document.createElement("li");
+      const rank = document.createElement("span");
+      const name = document.createElement("span");
+      const value = document.createElement("span");
+      rank.className = "plunge-scoreboard-rank";
+      name.className = "plunge-scoreboard-name";
+      value.className = "plunge-scoreboard-value";
+      rank.textContent = String(row && Number.isInteger(row.rank) ? row.rank : index + 1);
+      name.textContent = row ? `${row.display_name}${row.is_current_user ? " (You)" : ""}` : "---";
+      value.textContent = row ? String(row.score) : "-";
+      item.append(rank, name, value);
+      leaderboardEl.appendChild(item);
+    }
+  }
+
+  function syncBestScore(payload) {
+    if (!payload || typeof payload !== "object") return;
+    if (Number.isInteger(payload.best_score)) bestEl.textContent = String(payload.best_score);
+    renderLeaderboard(payload.leaderboard);
+  }
+
+  function loadBestScore() {
+    if (typeof root.fetch !== "function") return;
+    try {
+      const request = root.fetch("/xp/plunge-best", { credentials: "same-origin", cache: "no-store" });
+      if (request && typeof request.then === "function") {
+        request.then(function (response) {
+          return response.ok ? response.json() : null;
+        }).then(syncBestScore).catch(function () {});
+      }
+    } catch (_error) {
+      // The local game remains usable when the leaderboard is unavailable.
+    }
+  }
+
   function reportBestScore(score) {
     if (typeof root.fetch !== "function" || !Number.isInteger(score) || score < 0) return;
     try {
@@ -493,7 +533,11 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ score }),
       });
-      if (request && typeof request.catch === "function") request.catch(function () {});
+      if (request && typeof request.then === "function") {
+        request.then(function (response) {
+          return response.ok ? response.json() : null;
+        }).then(syncBestScore).catch(function () {});
+      }
     } catch (_error) {
       // Best-score reporting is supplemental and must never interrupt the game.
     }
@@ -565,6 +609,7 @@
     pauseButton.disabled = state.status === "ready" || state.status === "gameover";
     pauseButton.textContent = state.status === "paused" ? "Resume" : "Pause";
     startButton.disabled = state.status === "running" || state.status === "paused" || state.status === "gameover";
+    restartButton.textContent = state.status === "gameover" ? "New Game" : "Restart";
     overlay.hidden = state.status === "running";
     if (state.status === "gameover") {
       overlayTitle.textContent = "Game Over";
@@ -693,4 +738,5 @@
   root.addEventListener("pagehide", function () { destroyed = true; cancelLoop(); });
 
   resizeCanvas();
+  loadBestScore();
 }(typeof window !== "undefined" ? window : globalThis));

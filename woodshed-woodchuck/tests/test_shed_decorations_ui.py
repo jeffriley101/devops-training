@@ -75,7 +75,7 @@ def test_owned_inventory_and_placed_items_render_from_server_copies() -> None:
 def test_tapping_inventory_places_and_dragging_moves_normalized_coordinates() -> None:
     assert "data-decoration-action" in DECORATIONS
     assert "placeFromInventory(item)" in DECORATIONS
-    assert "nextOpenPlacement(item)" in DECORATIONS
+    assert "nextOpenPlacement()" in DECORATIONS
     assert "body: JSON.stringify({ x, y, size })" in DECORATIONS
     assert "method: \"PUT\"" in DECORATIONS
     assert "left / maxLeft" in DECORATIONS
@@ -92,7 +92,7 @@ def test_tapping_inventory_places_and_dragging_moves_normalized_coordinates() ->
 def test_unplaced_size_choice_is_saved_and_used_when_placed() -> None:
     preference = DECORATIONS[
         DECORATIONS.index("async function savePreferredSize"):
-        DECORATIONS.index("function overlapsPlaced")
+        DECORATIONS.index("function nextOpenPlacement")
     ]
     assert "/store/inventory/${item.id}/size" in preference
     assert 'body: JSON.stringify({ size })' in preference
@@ -103,22 +103,26 @@ def test_unplaced_size_choice_is_saved_and_used_when_placed() -> None:
     ]
     assert "if (isPlaced(item))" in handler
     assert "savePreferredSize(item, size)" in handler
-    assert "nextOpenPlacement(item)" in DECORATIONS
+    assert "nextOpenPlacement()" in DECORATIONS
 
 
 def test_remove_clears_only_server_placement_and_preserves_copy_ui() -> None:
-    remove = DECORATIONS[DECORATIONS.index("async function removePlacement"):DECORATIONS.index("function overlapsPlaced")]
+    remove = DECORATIONS[DECORATIONS.index("async function removePlacement"):DECORATIONS.index("function nextOpenPlacement")]
     assert "method: \"DELETE\"" in remove
     assert "/store/inventory/${item.id}/placement" in remove
     assert "updateOwnedItem(payload.item)" in remove
 
 
-def test_collision_uses_only_other_owned_decorations_and_restores_on_rejection() -> None:
-    collision = DECORATIONS[DECORATIONS.index("function overlapsPlaced"):DECORATIONS.index("function nextOpenPlacement")]
-    assert "ownedItems.some" in collision
-    assert "itemId(item) !== String(ignoredId)" in collision
-    assert "COLLISION_SIZES[size] + COLLISION_SIZES[itemSize(item)]" in collision
-    assert "room-object" not in collision
+def test_client_does_not_reject_overlapping_decorations() -> None:
+    placement = DECORATIONS[
+        DECORATIONS.index("function nextOpenPlacement"):
+        DECORATIONS.index("async function refreshInventory")
+    ]
+    assert "function overlapsPlaced" not in DECORATIONS
+    assert "COLLISION_SIZES" not in DECORATIONS
+    assert "ownedItems.filter(isPlaced).length" in placement
+    assert "placedCount % (positions.length * positions.length)" in placement
+    assert "The middle of the SHED is full" not in DECORATIONS
     save = DECORATIONS[DECORATIONS.index("async function savePlacement"):DECORATIONS.index("async function removePlacement")]
     assert "updateOwnedItem(payload.item)" in save
     assert "catch (error)" in save
