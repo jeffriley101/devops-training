@@ -450,6 +450,9 @@
   let accumulator = 0;
   let destroyed = false;
   let touchStart = null;
+  let activePlayToken = null;
+  let playCompletion = null;
+  let startingPlay = false;
 
   function announce(message) { liveEl.textContent = ""; root.setTimeout(() => { liveEl.textContent = message; }, 0); }
   function playEffect(name) {
@@ -524,23 +527,11 @@
     }
   }
 
-  function reportBestScore(score) {
-    if (typeof root.fetch !== "function" || !Number.isInteger(score) || score < 0) return;
-    try {
-      const request = root.fetch("/xp/plunge-best", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ score }),
-      });
-      if (request && typeof request.then === "function") {
-        request.then(function (response) {
-          return response.ok ? response.json() : null;
-        }).then(syncBestScore).catch(function () {});
-      }
-    } catch (_error) {
-      // Best-score reporting is supplemental and must never interrupt the game.
-    }
+  function completePlay(score) {
+    if (playCompletion || !activePlayToken || !root.WoodshedArcadeEconomy) return;
+    playCompletion = root.WoodshedArcadeEconomy.completePlay(activePlayToken, score)
+      .then(syncBestScore)
+      .catch(function () {});
   }
 
   const game = new PlungeBurrowGame({
@@ -577,7 +568,7 @@
       if (event === "pause") announce("Game paused.");
       if (event === "resume") announce("Game resumed.");
       if (event === "gameover") {
-        reportBestScore(detail.best);
+        completePlay(detail.score);
         announce(`Game over. Final score ${detail.score}.`);
       }
     },
@@ -707,12 +698,28 @@
   function cancelLoop() { if (frameId !== null) root.cancelAnimationFrame(frameId); frameId = null; lastFrame = 0; accumulator = 0; }
   function chooseDirection(direction) { game.setDirection(direction); canvas.focus({ preventScroll: true }); }
 
-  startButton.addEventListener("click", function () { if (game.start()) { ensureLoop(); canvas.focus({ preventScroll: true }); } });
+  startButton.addEventListener("click", async function () {
+    if (game.status !== "ready" || startingPlay) return;
+    startingPlay = true;
+    startButton.disabled = true;
+    try {
+      const play = await root.WoodshedArcadeEconomy.startPlay("plunge-burrow");
+      activePlayToken = play.play_token;
+      playCompletion = null;
+    } catch (error) {
+      announce(error.message || "That game could not start.");
+      startButton.disabled = false;
+      startingPlay = false;
+      return;
+    }
+    startingPlay = false;
+    if (game.start()) { ensureLoop(); canvas.focus({ preventScroll: true }); }
+  });
   pauseButton.addEventListener("click", function () {
     if (game.status === "running" && game.pause()) { cancelLoop(); }
     else if (game.resume()) { ensureLoop(); }
   });
-  restartButton.addEventListener("click", function () { cancelLoop(); game.reset(); announce("Game reset. Score, pickups, portals, and Band Set cleared. Ready to start."); canvas.focus({ preventScroll: true }); });
+  restartButton.addEventListener("click", function () { cancelLoop(); game.reset(); activePlayToken = null; playCompletion = null; announce("Game reset. Score, pickups, portals, and Band Set cleared. Ready to start."); canvas.focus({ preventScroll: true }); });
   document.querySelectorAll("[data-direction]").forEach((button) => button.addEventListener("click", () => chooseDirection(button.dataset.direction)));
 
   const keyDirections = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right", w: "up", W: "up", a: "left", A: "left", s: "down", S: "down", d: "right", D: "right" };
@@ -738,5 +745,8 @@
   root.addEventListener("pagehide", function () { destroyed = true; cancelLoop(); });
 
   resizeCanvas();
+  if (root.WoodshedArcadeEconomy) {
+    root.WoodshedArcadeEconomy.loadStatus("plunge-burrow").catch(function () {});
+  }
   loadBestScore();
 }(typeof window !== "undefined" ? window : globalThis));

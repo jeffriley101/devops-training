@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="scale-keyboard-game" data-scale-keyboard aria-labelledby="scale-keyboard-title">
+  <header class="arcade-room-header">
+    <h1 id="scale-keyboard-title">Scale Keyboard</h1>
+    <a class="btn btn-secondary" href="/arcade">Back to Arcade</a>
+  </header>
+
+  <div class="arcade-economy-status" aria-label="Arcade cost and balance">
+    <span>Balance 🌼 <output data-arcade-balance>—</output></span>
+    <span>🌼 1 PLAY · WIN UP TO 🌼5</span>
+  </div>
+  <p class="arcade-economy-message" data-arcade-economy-message role="status" aria-live="polite"></p>
+
+  <div class="scale-keyboard-status" aria-label="Game status">
+    <p>Score <strong id="scale-keyboard-score">0</strong></p>
+    <p>Best <strong id="scale-keyboard-best">0</strong></p>
+    <p>Time <strong id="scale-keyboard-time">30</strong></p>
+  </div>
+
+  <section class="scale-keyboard-challenge" aria-label="Scale challenge">
+    <h2 id="scale-keyboard-prompt">Press New Game to begin.</h2>
+    <p id="scale-keyboard-progress" class="scale-keyboard-progress" aria-live="polite"></p>
+    <div id="scale-keyboard-keys" class="scale-piano" aria-label="Piano keyboard"></div>
+  </section>
+
+  <div class="scale-keyboard-actions">
+    <button id="scale-keyboard-start" class="btn btn-primary" type="button">New Game</button>
+    <p id="scale-keyboard-message" role="status" aria-live="polite">Ready</p>
+  </div>
+
+  <section class="arcade-game-leaderboard" aria-labelledby="scale-keyboard-leaderboard-title">
+    <h2 id="scale-keyboard-leaderboard-title">Top 5</h2>
+    <ol data-arcade-leaderboard="scale-keyboard"><li>Loading…</li></ol>
+  </section>
+</section>
+{% endblock %}
+
+{% block page_scripts %}
+<script src="/static/js/arcade-economy.js?v=1"></script>
+<script src="/static/js/scale-keyboard-data.js?v=1"></script>
+<script src="/static/js/scale-keyboard.js?v=1"></script>
+{% endblock %}

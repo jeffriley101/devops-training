@@ -883,7 +883,7 @@ class ArcadeHighScore(Base):
             name="uq_arcade_high_score_profile_game",
         ),
         CheckConstraint(
-            "game_key IN ('blue', 'radio-tuner', 'wheel-of-woodchuck')",
+            "game_key IN ('blue', 'radio-tuner', 'wheel-of-woodchuck', 'scale-keyboard')",
             name="ck_arcade_high_score_game_key",
         ),
         CheckConstraint(
@@ -912,6 +912,58 @@ class ArcadeHighScore(Base):
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+    )
+
+
+class ArcadePlaySession(Base):
+    __tablename__ = "arcade_play_sessions"
+    __table_args__ = (
+        UniqueConstraint("play_token", name="uq_arcade_play_session_token"),
+        CheckConstraint(
+            "game_key IN ('plunge-burrow', 'blue', 'radio-tuner', "
+            "'wheel-of-woodchuck', 'scale-keyboard')",
+            name="ck_arcade_play_session_game_key",
+        ),
+        CheckConstraint(
+            "entry_cost = 1", name="ck_arcade_play_session_entry_cost"
+        ),
+        CheckConstraint(
+            "submitted_score IS NULL OR submitted_score >= 0",
+            name="ck_arcade_play_session_score_nonnegative",
+        ),
+        CheckConstraint(
+            "payout IS NULL OR payout IN (0, 1, 2, 3, 5)",
+            name="ck_arcade_play_session_payout",
+        ),
+        Index(
+            "ix_arcade_play_sessions_profile_game_completed",
+            "profile_id",
+            "game_key",
+            "completed_at",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    profile_id: Mapped[int] = mapped_column(
+        ForeignKey("woodchuck_profiles.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    game_key: Mapped[str] = mapped_column(String(30), nullable=False)
+    play_token: Mapped[str] = mapped_column(String(64), nullable=False)
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
+    entry_cost: Mapped[int] = mapped_column(
+        Integer, default=1, server_default="1", nullable=False
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    submitted_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    payout: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    reward_granted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )
 
 

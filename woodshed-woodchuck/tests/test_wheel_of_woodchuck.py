@@ -13,7 +13,7 @@ from sqlalchemy.pool import StaticPool
 from app import account_routes, arcade_routes, main
 from app.db import Base
 from app.main import app
-from app.models import WoodchuckProfile
+from app.models import WoodchuckProfile, WoodchuckState
 from app.security import hash_pin
 
 
@@ -78,6 +78,12 @@ def signed_wheel_client(factory, suffix: str, name: str = "Wheel Player"):
             status="active",
         )
         session.add(profile)
+        session.flush()
+        session.add(WoodchuckState(
+            profile_id=profile.id,
+            state_json={"progress": {"credits": 20}},
+            revision=0,
+        ))
         session.commit()
     client = TestClient(app)
     assert client.post(
@@ -85,6 +91,15 @@ def signed_wheel_client(factory, suffix: str, name: str = "Wheel Player"):
         data={"woodchuck_id": profile.woodchuck_id, "pin": "2468"},
     ).status_code == 200
     return client, profile
+
+
+def submit_paid_score(client: TestClient, game_key: str, score: int):
+    started = client.post("/arcade/plays", json={"game_key": game_key})
+    assert started.status_code == 200
+    return client.post(
+        f"/arcade/scores/{game_key}",
+        json={"score": score, "play_token": started.json()["play_token"]},
+    )
 
 
 def test_fourth_cabinet_and_authenticated_game_route(wheel_database) -> None:
@@ -257,7 +272,8 @@ def test_cheer_uses_shared_audio_and_final_score_submission_is_guarded() -> None
     assert "const crowdFilter = new Tone.Filter" in AUDIO_JS
     assert "function submitFinalScoreOnce()" in WHEEL_JS
     assert "if (finishPromise) return finishPromise" in WHEEL_JS
-    assert WHEEL_JS.count('method: "POST"') == 1
+    assert "WoodshedArcadeEconomy.completePlay" in WHEEL_JS
+    assert "activePlayToken" in WHEEL_JS
     assert 'data-arcade-soundtrack' not in WHEEL
     assert "/static/js/arcade-soundtrack.js" not in WHEEL
 
@@ -269,18 +285,10 @@ def test_wheel_scores_persist_only_higher_and_keep_ties_private_safe(
     alpha, _ = signed_wheel_client(wheel_database, "ALPHA", "Alpha")
     zulu, _ = signed_wheel_client(wheel_database, "ZULU", "Zulu")
 
-    assert current.post(
-        "/arcade/scores/wheel-of-woodchuck", json={"score": 1200}
-    ).json()["updated"] is True
-    assert current.post(
-        "/arcade/scores/wheel-of-woodchuck", json={"score": 800}
-    ).json()["updated"] is False
-    assert alpha.post(
-        "/arcade/scores/wheel-of-woodchuck", json={"score": 1500}
-    ).status_code == 200
-    assert zulu.post(
-        "/arcade/scores/wheel-of-woodchuck", json={"score": 1500}
-    ).status_code == 200
+    assert submit_paid_score(current, "wheel-of-woodchuck", 1200).json()["updated"] is True
+    assert submit_paid_score(current, "wheel-of-woodchuck", 800).json()["updated"] is False
+    assert submit_paid_score(alpha, "wheel-of-woodchuck", 1500).status_code == 200
+    assert submit_paid_score(zulu, "wheel-of-woodchuck", 1500).status_code == 200
 
     payload = current.get("/arcade/scores/wheel-of-woodchuck").json()
     assert payload["best_score"] == 1200
@@ -299,7 +307,7 @@ def test_wheel_scores_persist_only_higher_and_keep_ties_private_safe(
 def test_existing_blue_and_radio_game_keys_remain_available(wheel_database) -> None:
     client, _profile = signed_wheel_client(wheel_database, "OLDKEYS")
     for key in ("blue", "radio-tuner"):
-        response = client.post(f"/arcade/scores/{key}", json={"score": 25})
+        response = submit_paid_score(client, key, 25)
         assert response.status_code == 200
         assert response.json()["best_score"] == 25
 

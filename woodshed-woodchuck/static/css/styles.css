@@ -5005,7 +5005,8 @@ select {
 /* Arcade Room and short-session games */
 .arcade-room,
 .arcade-game,
-.wheel-game {
+.wheel-game,
+.scale-keyboard-game {
   width: min(100%, 72rem);
   min-width: 0;
   margin: 0 auto;
@@ -5121,6 +5122,12 @@ select {
   text-transform: uppercase;
 }
 .arcade-cabinet-copy { min-height: 2.3em; font-size: 0.85rem; }
+.arcade-cabinet-economy {
+  color: #f4d35e;
+  font-size: 0.72rem;
+  font-weight: 950;
+  letter-spacing: 0.02em;
+}
 .arcade-cabinet-control-panel {
   display: flex;
   width: min(100%, 8rem);
@@ -5147,6 +5154,30 @@ select {
     #4a77c7 37.5% 50%, #a04ab2 50% 62.5%, #e67838 62.5% 75%,
     #2f8c99 75% 87.5%, #d35f8d 87.5% 100%
   );
+}
+.arcade-cabinet-scale .arcade-cabinet-screen {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 0.18rem;
+  padding: 1.2rem 0.7rem;
+  background: linear-gradient(150deg, #f7f0d8, #b9c9df);
+}
+.arcade-scale-screen i {
+  display: grid;
+  flex: 1;
+  place-items: end center;
+  border: 2px solid #1a1a23;
+  border-radius: 0.15rem 0.15rem 0.35rem 0.35rem;
+  color: #172033;
+  background: #fffdf4;
+  font-size: 1rem;
+  font-style: normal;
+}
+.arcade-scale-screen i:last-child {
+  height: 62%;
+  color: #fff;
+  background: #20222a;
 }
 .arcade-wheel-screen i {
   display: grid;
@@ -5184,6 +5215,21 @@ select {
   gap: 0.65rem;
   margin-bottom: 1rem;
 }
+.arcade-economy-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.45rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid rgba(244, 211, 94, 0.55);
+  border-radius: 0.55rem;
+  color: #f4d35e;
+  background: rgba(5, 12, 20, 0.64);
+  font-size: 0.88rem;
+  font-weight: 900;
+}
+.arcade-economy-message { min-height: 1.35em; margin: 0 0 0.6rem; color: #f4d35e; font-weight: 850; }
 .arcade-game-status p {
   margin: 0;
   padding: 0.65rem;
@@ -5484,6 +5530,87 @@ select {
 }
 .wheel-game-actions p { margin: 0; }
 
+/* Scale Keyboard */
+.scale-keyboard-status {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+}
+.scale-keyboard-status p {
+  margin: 0;
+  padding: 0.65rem;
+  border-radius: 0.6rem;
+  background: rgba(5, 12, 20, 0.72);
+  text-align: center;
+}
+.scale-keyboard-challenge {
+  padding: clamp(0.8rem, 2.5vw, 1.4rem);
+  border: 3px solid #10111d;
+  border-radius: 0.85rem;
+  background: linear-gradient(155deg, #493b58, #20213b 60%, #182b37);
+}
+.scale-keyboard-challenge h2 { margin: 0; text-align: center; }
+.scale-keyboard-progress {
+  min-height: 1.8em;
+  margin: 0.65rem 0 1rem;
+  color: #f4d35e;
+  font-size: clamp(1rem, 4vw, 1.45rem);
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-align: center;
+}
+.scale-piano {
+  position: relative;
+  display: flex;
+  width: min(100%, 58rem);
+  height: clamp(9rem, 28vw, 17rem);
+  margin: 0 auto;
+  overflow: hidden;
+  border: 4px solid #0d0e13;
+  border-radius: 0.45rem;
+  background: #11131a;
+  touch-action: manipulation;
+}
+.scale-piano-key {
+  min-width: 0;
+  padding: 0;
+  border-radius: 0 0 0.3rem 0.3rem;
+  transition: filter 90ms ease, transform 90ms ease;
+}
+.scale-piano-key.is-white {
+  position: relative;
+  flex: 1;
+  height: 100%;
+  border: 1px solid #353640;
+  background: linear-gradient(90deg, #e5e2d9, #fffdf4 24% 72%, #d6d2c8);
+  box-shadow: inset 0 -6px 0 #c7c2b6;
+}
+.scale-piano-key.is-black {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  width: clamp(1rem, 4.6%, 2.4rem);
+  height: 62%;
+  transform: translateX(-50%);
+  border: 1px solid #030306;
+  background: linear-gradient(90deg, #090a0f, #383b47 55%, #08090d);
+  box-shadow: inset 0 -5px 0 #050508, 0 4px 5px rgba(0, 0, 0, 0.45);
+}
+.scale-piano-key:disabled { cursor: default; }
+.scale-piano-key.is-correct { filter: drop-shadow(0 0 0.65rem #65e6a7) brightness(1.22); }
+.scale-piano-key.is-wrong { filter: drop-shadow(0 0 0.65rem #ff6262) brightness(0.82); }
+.scale-piano-key:active:not(:disabled) { transform: translateY(3px); }
+.scale-piano-key.is-black:active:not(:disabled) { transform: translate(-50%, 3px); }
+.scale-keyboard-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1rem;
+  flex-wrap: wrap;
+}
+.scale-keyboard-actions p { margin: 0; }
+
 @media (max-width: 760px) {
   .arcade-cabinet-grid { grid-template-columns: 1fr; }
   .practice-room-door { min-height: 11rem; }
@@ -5499,7 +5626,8 @@ select {
 @media (max-width: 430px) {
   .arcade-room,
   .arcade-game,
-  .wheel-game { padding: 0.75rem; }
+  .wheel-game,
+  .scale-keyboard-game { padding: 0.75rem; }
   .arcade-game-status { gap: 0.35rem; }
   .arcade-game-status p { padding: 0.5rem 0.25rem; font-size: 0.88rem; }
   .arcade-game-actions .btn { width: 100%; }
@@ -5507,6 +5635,8 @@ select {
   .wheel-game-status p { padding: 0.5rem 0.2rem; font-size: 0.82rem; }
   .wheel-letter-grid { grid-template-columns: repeat(6, minmax(2.55rem, 1fr)); }
   .wheel-game-actions .btn { width: 100%; }
+  .scale-keyboard-actions .btn { width: 100%; }
+  .arcade-economy-status { align-items: flex-start; flex-direction: column; }
 }
 
 @media (max-width: 640px) {

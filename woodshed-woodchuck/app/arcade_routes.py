@@ -7,7 +7,14 @@ from .account_routes import current_profile
 from .arcade_scores import (
     MAX_ARCADE_SCORE,
     arcade_score_payload,
-    record_arcade_high_score,
+)
+from .arcade_rewards import (
+    DAILY_REWARDED_PLAY_LIMIT,
+    ArcadePlayConflictError,
+    InsufficientArcadeBalanceError,
+    arcade_play_status,
+    complete_arcade_play,
+    start_arcade_play,
 )
 from .db import SessionLocal
 
@@ -19,6 +26,89 @@ class ArcadeScoreSubmission(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     score: StrictInt = Field(ge=0, le=MAX_ARCADE_SCORE)
+    play_token: str = Field(min_length=20, max_length=64)
+
+
+class ArcadePlayStart(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    game_key: str = Field(min_length=1, max_length=30)
+
+
+class ArcadePlayCompletion(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    score: StrictInt = Field(ge=0, le=MAX_ARCADE_SCORE)
+
+
+@router.get("/plays/status/{game_key}")
+def get_arcade_play_status(game_key: str, request: Request):
+    with SessionLocal() as session:
+        profile = current_profile(request, session)
+        if profile is None:
+            raise HTTPException(status_code=401, detail="Student sign-in is required.")
+        try:
+            return arcade_play_status(
+                session, profile_id=profile.id, game_key=game_key
+            )
+        except ValueError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@router.post("/plays")
+def create_arcade_play(submitted: ArcadePlayStart, request: Request):
+    with SessionLocal() as session:
+        profile = current_profile(request, session)
+        if profile is None:
+            raise HTTPException(status_code=401, detail="Student sign-in is required.")
+        try:
+            result = start_arcade_play(
+                session, profile_id=profile.id, game_key=submitted.game_key
+            )
+            session.commit()
+            return {
+                "play_token": result.play.play_token,
+                "game_key": result.play.game_key,
+                "entry_cost": result.play.entry_cost,
+                "balance": result.balance,
+                "reward_eligible": result.reward_eligible,
+                "completed_reward_plays": result.completed_reward_plays,
+                "daily_reward_limit": DAILY_REWARDED_PLAY_LIMIT,
+                "state_revision": result.state_revision,
+            }
+        except InsufficientArcadeBalanceError as error:
+            session.rollback()
+            raise HTTPException(status_code=409, detail=str(error)) from error
+        except ValueError as error:
+            session.rollback()
+            raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@router.post("/plays/{play_token}/complete")
+def finish_arcade_play(
+    play_token: str,
+    submitted: ArcadePlayCompletion,
+    request: Request,
+):
+    with SessionLocal() as session:
+        profile = current_profile(request, session)
+        if profile is None:
+            raise HTTPException(status_code=401, detail="Student sign-in is required.")
+        try:
+            payload = complete_arcade_play(
+                session,
+                profile_id=profile.id,
+                play_token=play_token,
+                score=submitted.score,
+            )
+            session.commit()
+            return payload
+        except ArcadePlayConflictError as error:
+            session.rollback()
+            raise HTTPException(status_code=409, detail=str(error)) from error
+        except ValueError as error:
+            session.rollback()
+            raise HTTPException(status_code=404, detail=str(error)) from error
 
 
 @router.get("/scores/{game_key}")
@@ -46,19 +136,21 @@ def update_arcade_scores(
         if profile is None:
             raise HTTPException(status_code=401, detail="Student sign-in is required.")
         try:
-            _best_score, updated = record_arcade_high_score(
+            payload = complete_arcade_play(
                 session,
                 profile_id=profile.id,
-                game_key=game_key,
+                play_token=submitted.play_token,
                 score=submitted.score,
             )
+            if payload["game_key"] != game_key:
+                raise ArcadePlayConflictError(
+                    "That play belongs to a different Arcade game."
+                )
             session.commit()
-            return {
-                **arcade_score_payload(
-                    session, profile_id=profile.id, game_key=game_key
-                ),
-                "updated": updated,
-            }
+            return payload
+        except ArcadePlayConflictError as error:
+            session.rollback()
+            raise HTTPException(status_code=409, detail=str(error)) from error
         except ValueError as error:
             session.rollback()
             raise HTTPException(status_code=404, detail=str(error)) from error

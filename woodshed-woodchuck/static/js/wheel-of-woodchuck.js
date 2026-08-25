@@ -253,6 +253,8 @@
   let spinTimerId = null;
   let wheelTurns = 0;
   let finishPromise = null;
+  let activePlayToken = null;
+  let starting = false;
 
   function setMessage(value) { message.textContent = value; }
 
@@ -288,14 +290,9 @@
 
   async function submitFinalScoreOnce() {
     if (finishPromise) return finishPromise;
-    finishPromise = fetch("/arcade/scores/wheel-of-woodchuck", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ score: Math.max(0, Math.round(game.score)) }),
-    }).then(async function (response) {
-      if (!response.ok) throw new Error("score rejected");
-      const payload = await response.json();
+    finishPromise = root.WoodshedArcadeEconomy.completePlay(
+      activePlayToken, Math.max(0, Math.round(game.score))
+    ).then(function (payload) {
       renderLeaderboard(payload);
       return payload;
     }).catch(function () {
@@ -439,7 +436,21 @@
     }
   });
 
-  startButton.addEventListener("click", function () {
+  startButton.addEventListener("click", async function () {
+    if (game.status === "running" || starting) return;
+    starting = true;
+    startButton.disabled = true;
+    setMessage("Starting…");
+    try {
+      const play = await root.WoodshedArcadeEconomy.startPlay("wheel-of-woodchuck");
+      activePlayToken = play.play_token;
+    } catch (error) {
+      setMessage(error.message || "That game could not start.");
+      startButton.disabled = false;
+      starting = false;
+      return;
+    }
+    starting = false;
     if (root.WoodshedAudio) root.WoodshedAudio.unlock();
     if (timerId !== null) window.clearInterval(timerId);
     if (puzzleTimerId !== null) window.clearTimeout(puzzleTimerId);
@@ -464,5 +475,6 @@
   });
 
   render();
+  root.WoodshedArcadeEconomy.loadStatus("wheel-of-woodchuck").catch(function () {});
   loadScores();
 }(typeof globalThis !== "undefined" ? globalThis : this));

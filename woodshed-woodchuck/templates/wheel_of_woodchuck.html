@@ -7,6 +7,12 @@
     <a class="btn btn-secondary" href="/arcade">Back to Arcade</a>
   </header>
 
+  <div class="arcade-economy-status" aria-label="Arcade cost and balance">
+    <span>Balance 🌼 <output data-arcade-balance>—</output></span>
+    <span>🌼 1 PLAY · WIN UP TO 🌼5</span>
+  </div>
+  <p class="arcade-economy-message" data-arcade-economy-message role="status" aria-live="polite"></p>
+
   <div class="wheel-game-status" aria-label="Game status">
     <p>Score <strong id="wheel-score">0</strong></p>
     <p>Best <strong id="wheel-best">0</strong></p>
@@ -59,6 +65,7 @@
 {% endblock %}
 
 {% block page_scripts %}
+<script src="/static/js/arcade-economy.js?v=1"></script>
 <script src="/static/js/wheel-terms.js?v=1"></script>
-<script src="/static/js/wheel-of-woodchuck.js?v=1"></script>
+<script src="/static/js/wheel-of-woodchuck.js?v=2"></script>
 {% endblock %}

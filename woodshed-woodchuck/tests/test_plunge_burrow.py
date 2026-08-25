@@ -34,7 +34,7 @@ def test_game_route_navigation_and_page_only_script() -> None:
     assert "<title>Plunge Burrow · Woodshed Woodchuck</title>" in response.text
     assert 'href="/arcade">Back to Arcade</a>' in response.text
     assert 'href="/plunge-burrow"' in BOARD
-    assert "/static/js/plunge-burrow.js?v=6" in TEMPLATE
+    assert "/static/js/plunge-burrow.js?v=7" in TEMPLATE
     assert "/static/js/plunge-burrow.js" not in BASE
     route_guard = (ROOT / "static/js/app.js").read_text(encoding="utf-8")
     route_guard = route_guard[
@@ -170,7 +170,9 @@ console.log(JSON.stringify({best:game.best,dandelionEmpty:!occupied.has(`${game.
     assert "try { if (root.WoodshedAudio)" in GAME_JS
     assert 'playEffect("dandelionEarned")' in GAME_JS
     assert 'playEffect("incorrectTrivia")' in GAME_JS
-    assert "await" not in GAME_JS
+    reporter = GAME_JS[GAME_JS.index("function reportScoringEvent"):GAME_JS.index("function renderLeaderboard")]
+    assert "await" not in reporter
+    assert "supplemental and must never interrupt the game" in reporter
     assert 'playEffect("' not in GAME_JS[: GAME_JS.index("const game = new PlungeBurrowGame")]
 
 

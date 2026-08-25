@@ -6,6 +6,7 @@
     blue: "/arcade/scores/blue",
     "radio-tuner": "/arcade/scores/radio-tuner",
     "wheel-of-woodchuck": "/arcade/scores/wheel-of-woodchuck",
+    "scale-keyboard": "/arcade/scores/scale-keyboard",
   };
   const BLUE_GAME_SECONDS = 20;
   const RADIO_GAME_SECONDS = 30;
@@ -55,19 +56,6 @@
     return payload;
   }
 
-  async function submitScore(gameKey, score) {
-    const response = await fetch(`/arcade/scores/${gameKey}`, {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ score }),
-    });
-    let payload = {};
-    try { payload = await response.json(); } catch (_error) { payload = {}; }
-    if (!response.ok) throw new Error(payload.detail || "That score could not be saved.");
-    return payload;
-  }
-
   function wireArcadeRoom() {
     const lists = Array.from(document.querySelectorAll("[data-arcade-leaderboard]"));
     if (!lists.length || document.querySelector("[data-arcade-game]")) return;
@@ -99,7 +87,9 @@
     let score = 0;
     let timer = null;
     let running = false;
+    let starting = false;
     let endTime = 0;
+    let activePlayToken = null;
 
     const blueField = document.getElementById("blue-game-field");
     const blueCanvas = document.getElementById("blue-game-canvas");
@@ -462,7 +452,9 @@
         }));
       }
       try {
-        const payload = await submitScore(gameKey, score);
+        const payload = await window.WoodshedArcadeEconomy.completePlay(
+          activePlayToken, score
+        );
         bestEl.textContent = String(payload.best_score);
         renderLeaderboard(leaderboard, payload.leaderboard);
         message.textContent = payload.updated
@@ -485,8 +477,21 @@
       if (remaining <= 0) void finishGame();
     }
 
-    function startGame() {
-      if (running) return;
+    async function startGame() {
+      if (running || starting) return;
+      starting = true;
+      startButton.disabled = true;
+      message.textContent = "Starting…";
+      try {
+        const play = await window.WoodshedArcadeEconomy.startPlay(gameKey);
+        activePlayToken = play.play_token;
+      } catch (error) {
+        message.textContent = error.message || "That game could not start.";
+        startButton.disabled = false;
+        starting = false;
+        return;
+      }
+      starting = false;
       running = true;
       score = 0;
       scoreEl.textContent = "0";
@@ -512,7 +517,7 @@
       }
     }
 
-    startButton.addEventListener("click", startGame);
+    startButton.addEventListener("click", function () { void startGame(); });
     window.addEventListener("pagehide", () => {
       running = false;
       if (timer) window.clearInterval(timer);
@@ -524,6 +529,9 @@
     resetBlueGame();
     drawBlueGame();
     renderRadioState();
+    if (window.WoodshedArcadeEconomy) {
+      window.WoodshedArcadeEconomy.loadStatus(gameKey).catch(function () {});
+    }
     loadScores(gameKey).then((payload) => {
       bestEl.textContent = String(payload.best_score);
       renderLeaderboard(leaderboard, payload.leaderboard);

@@ -12,6 +12,12 @@
     </div>
   </header>
 
+  <div class="arcade-economy-status" aria-label="Arcade cost and balance">
+    <span>Balance 🌼 <output data-arcade-balance>—</output></span>
+    <span>🌼 1 PLAY · WIN UP TO 🌼5</span>
+  </div>
+  <p class="arcade-economy-message" data-arcade-economy-message role="status" aria-live="polite"></p>
+
   <div class="plunge-status" aria-label="Game status">
     <p>Score <strong id="plunge-score">0</strong></p>
     <p>Best <strong id="plunge-best">0</strong></p>
@@ -68,6 +74,7 @@
 {% endblock %}
 
 {% block page_scripts %}
-<script src="/static/js/plunge-burrow.js?v=6"></script>
+<script src="/static/js/arcade-economy.js?v=1"></script>
+<script src="/static/js/plunge-burrow.js?v=7"></script>
 <script src="/static/js/arcade-soundtrack.js?v=2"></script>
 {% endblock %}

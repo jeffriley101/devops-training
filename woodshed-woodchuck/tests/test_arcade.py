@@ -12,7 +12,7 @@ from app import account_routes, arcade_routes, main
 from app.arcade_scores import arcade_score_payload, record_arcade_high_score
 from app.db import Base
 from app.main import app
-from app.models import ArcadeHighScore, WoodchuckProfile
+from app.models import ArcadeHighScore, WoodchuckProfile, WoodchuckState
 from app.security import hash_pin
 
 
@@ -62,6 +62,12 @@ def add_profile(
             status=status,
         )
         session.add(profile)
+        session.flush()
+        session.add(WoodchuckState(
+            profile_id=profile.id,
+            state_json={"progress": {"credits": 20}},
+            revision=0,
+        ))
         session.commit()
         return profile
 
@@ -75,6 +81,15 @@ def signed_client(factory, suffix: str) -> tuple[TestClient, WoodchuckProfile]:
     )
     assert response.status_code == 200
     return client, profile
+
+
+def submit_paid_score(client: TestClient, game_key: str, score: int):
+    started = client.post("/arcade/plays", json={"game_key": game_key})
+    assert started.status_code == 200
+    return client.post(
+        f"/arcade/scores/{game_key}",
+        json={"score": score, "play_token": started.json()["play_token"]},
+    )
 
 
 def test_practice_room_destinations_are_preserved_as_three_doors() -> None:
@@ -108,22 +123,24 @@ def test_practice_room_destinations_are_preserved_as_three_doors() -> None:
     assert "position: static" in tag
 
 
-def test_arcade_room_renders_four_touch_friendly_cabinets() -> None:
-    assert ARCADE.count('class="arcade-cabinet ') == 4
+def test_arcade_room_renders_five_touch_friendly_cabinets() -> None:
+    assert ARCADE.count('class="arcade-cabinet ') == 5
     assert 'href="/plunge-burrow"' in ARCADE
     assert 'href="/arcade/blue"' in ARCADE
     assert 'href="/arcade/radio-tuner"' in ARCADE
     assert 'href="/arcade/wheel-of-woodchuck"' in ARCADE
-    assert ARCADE.count("<h2>Top 5</h2>") == 4
-    assert ARCADE.count('class="arcade-cabinet-marquee"') == 4
-    assert ARCADE.count('class="arcade-cabinet-control-panel" aria-hidden="true"') == 4
-    assert ARCADE.count('data-arcade-personal-best=') == 4
+    assert 'href="/arcade/scale-keyboard"' in ARCADE
+    assert ARCADE.count("<h2>Top 5</h2>") == 5
+    assert ARCADE.count('class="arcade-cabinet-marquee"') == 5
+    assert ARCADE.count('class="arcade-cabinet-control-panel" aria-hidden="true"') == 5
+    assert ARCADE.count('data-arcade-personal-best=') == 5
+    assert ARCADE.count("🌼 1 PLAY · WIN UP TO 🌼5") == 5
     assert 'href="/arcade">Back to Arcade</a>' in PLUNGE
     assert 'href="/store">Back to SHOP</a>' in ARCADE
     assert "min-height: 17rem" in CSS[CSS.index(".arcade-cabinet-link {"):]
     mobile = CSS[CSS.index("@media (max-width: 760px)"):]
     assert ".arcade-cabinet-grid { grid-template-columns: 1fr; }" in mobile
-    assert '/static/js/arcade.js?v=8' in ARCADE
+    assert '/static/js/arcade.js?v=9' in ARCADE
 
 
 def test_arcade_pages_route_game_specific_soundtracks() -> None:
@@ -176,7 +193,7 @@ def test_arcade_leaderboards_render_each_olympic_rank_once() -> None:
     assert "item.value = Number(row.rank)" in renderer
     assert "item.textContent = `${name} — ${row.score}`" in renderer
     assert "${row.rank}." not in renderer
-    assert ARCADE.count("<ol data-arcade-leaderboard=") == 4
+    assert ARCADE.count("<ol data-arcade-leaderboard=") == 5
 
 
 def test_arcade_removes_unnecessary_copy() -> None:
@@ -258,10 +275,10 @@ def test_blue_timer_ends_game_and_submits_score() -> None:
     assert "endTime = performance.now() + BLUE_GAME_SECONDS * 1000" in ARCADE_JS
     assert "if (remaining <= 0) void finishGame()" in ARCADE_JS
     assert "timeEl.textContent = \"0\"" in ARCADE_JS
-    assert 'fetch(`/arcade/scores/${gameKey}`' in ARCADE_JS
+    assert "WoodshedArcadeEconomy.completePlay" in ARCADE_JS
     finish = ARCADE_JS[ARCADE_JS.index("async function finishGame"):ARCADE_JS.index("function updateTimer")]
     assert 'new CustomEvent("woodshed:celebrate"' in finish
-    assert finish.index('message.textContent = `Time! You scored') < finish.index("submitScore(gameKey, score)")
+    assert finish.index('message.textContent = `Time! You scored') < finish.index("WoodshedArcadeEconomy.completePlay")
     assert 'window.addEventListener("woodshed:celebrate"' in APP_JS
     assert "celebrateSuccess(document.body)" in APP_JS
 
@@ -285,7 +302,7 @@ def test_red_timeout_saves_once_then_returns_to_book_without_changing_normal_blu
     ]
     assert "if (!running) return;" in finish
     assert "running = false;" in finish
-    assert "submitScore(gameKey, score)" in finish
+    assert "WoodshedArcadeEconomy.completePlay" in finish
     assert 'gameKey === "blue" && blueStage === "red"' in finish
     assert 'window.location.assign("/p-book")' in finish
     assert "blueRedBookRedirectScheduled" in finish
@@ -341,8 +358,8 @@ def test_blue_and_radio_score_posts_persist_and_refresh_leaderboards(
     arcade_database,
 ) -> None:
     client, profile = signed_client(arcade_database, "POSTS")
-    blue = client.post("/arcade/scores/blue", json={"score": 70})
-    radio = client.post("/arcade/scores/radio-tuner", json={"score": 85})
+    blue = submit_paid_score(client, "blue", 70)
+    radio = submit_paid_score(client, "radio-tuner", 85)
 
     assert blue.status_code == radio.status_code == 200
     assert blue.json()["best_score"] == 70
@@ -387,15 +404,9 @@ def test_higher_and_duplicate_submissions_are_safe_across_sessions(
         data={"woodchuck_id": profile.woodchuck_id, "pin": "2468"},
     ).status_code == 200
 
-    assert first_device.post(
-        "/arcade/scores/radio-tuner", json={"score": 30}
-    ).json()["updated"] is True
-    assert first_device.post(
-        "/arcade/scores/radio-tuner", json={"score": 30}
-    ).json()["updated"] is False
-    higher = second_device.post(
-        "/arcade/scores/radio-tuner", json={"score": 55}
-    )
+    assert submit_paid_score(first_device, "radio-tuner", 30).json()["updated"] is True
+    assert submit_paid_score(first_device, "radio-tuner", 30).json()["updated"] is False
+    higher = submit_paid_score(second_device, "radio-tuner", 55)
     reloaded = first_device.get("/arcade/scores/radio-tuner")
 
     assert higher.status_code == reloaded.status_code == 200
@@ -450,15 +461,17 @@ def test_score_api_requires_authentication_and_rejects_unknown_games(
 ) -> None:
     anonymous = TestClient(app)
     assert anonymous.get("/arcade/scores/blue").status_code == 401
-    assert anonymous.post("/arcade/scores/blue", json={"score": 5}).status_code == 401
+    assert anonymous.post(
+        "/arcade/scores/blue", json={"score": 5, "play_token": "x" * 20}
+    ).status_code == 401
 
     client, _profile = signed_client(arcade_database, "AUTH")
     assert client.get("/arcade/scores/not-a-game").status_code == 404
     assert client.post(
-        "/arcade/scores/not-a-game", json={"score": 5}
+        "/arcade/scores/not-a-game", json={"score": 5, "play_token": "x" * 20}
     ).status_code == 404
     assert client.post(
-        "/arcade/scores/blue", json={"score": -1}
+        "/arcade/scores/blue", json={"score": -1, "play_token": "x" * 20}
     ).status_code == 422
 
 

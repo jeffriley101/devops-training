@@ -223,6 +223,6 @@ def test_board_keeps_burrow_standings_outside_board_and_preserves_launcher() -> 
 
 def test_game_reports_its_best_without_using_local_storage_as_server_evidence() -> None:
     assert 'root.fetch("/xp/plunge-best"' in GAME_JS
-    assert "body: JSON.stringify({ score })" in GAME_JS
+    assert "WoodshedArcadeEconomy.completePlay(activePlayToken, score)" in GAME_JS
     gameover = GAME_JS[GAME_JS.index('if (event === "gameover")'):]
-    assert "reportBestScore(detail.best)" in gameover
+    assert "completePlay(detail.score)" in gameover

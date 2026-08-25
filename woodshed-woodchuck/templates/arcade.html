@@ -12,6 +12,7 @@
         <strong class="arcade-cabinet-marquee">Plunge Burrow</strong>
         <span class="arcade-cabinet-screen" aria-hidden="true">🕳️</span>
         <span class="arcade-cabinet-copy">Burrow, collect, and build your band.</span>
+        <span class="arcade-cabinet-economy">🌼 1 PLAY · WIN UP TO 🌼5</span>
         <span class="arcade-cabinet-control-panel" aria-hidden="true"><i></i><i></i><i></i></span>
         <span class="arcade-cabinet-best">Best <output data-arcade-personal-best="plunge-burrow">—</output></span>
       </a>
@@ -26,6 +27,7 @@
         <strong class="arcade-cabinet-marquee">Blue</strong>
         <span class="arcade-cabinet-screen" aria-hidden="true">🟦</span>
         <span class="arcade-cabinet-copy">Run, jump, and collect blue sparks.</span>
+        <span class="arcade-cabinet-economy">🌼 1 PLAY · WIN UP TO 🌼5</span>
         <span class="arcade-cabinet-control-panel" aria-hidden="true"><i></i><i></i><i></i></span>
         <span class="arcade-cabinet-best">Best <output data-arcade-personal-best="blue">—</output></span>
       </a>
@@ -40,6 +42,7 @@
         <strong class="arcade-cabinet-marquee">Radio Tuner</strong>
         <span class="arcade-cabinet-screen" aria-hidden="true">📻</span>
         <span class="arcade-cabinet-copy">Find the target signal before time runs out.</span>
+        <span class="arcade-cabinet-economy">🌼 1 PLAY · WIN UP TO 🌼5</span>
         <span class="arcade-cabinet-control-panel" aria-hidden="true"><i></i><i></i><i></i></span>
         <span class="arcade-cabinet-best">Best <output data-arcade-personal-best="radio-tuner">—</output></span>
       </a>
@@ -54,6 +57,7 @@
         <strong class="arcade-cabinet-marquee">Wheel of Woodchuck</strong>
         <span class="arcade-cabinet-screen arcade-wheel-screen" aria-hidden="true"><i>♫</i></span>
         <span class="arcade-cabinet-copy">Spin, spell, and solve music terms.</span>
+        <span class="arcade-cabinet-economy">🌼 1 PLAY · WIN UP TO 🌼5</span>
         <span class="arcade-cabinet-control-panel" aria-hidden="true"><i></i><i></i><i></i></span>
         <span class="arcade-cabinet-best">Best <output data-arcade-personal-best="wheel-of-woodchuck">—</output></span>
       </a>
@@ -62,10 +66,25 @@
         <ol data-arcade-leaderboard="wheel-of-woodchuck"><li>Loading…</li></ol>
       </section>
     </article>
+
+    <article class="arcade-cabinet arcade-cabinet-scale">
+      <a class="arcade-cabinet-link" href="/arcade/scale-keyboard" aria-label="Play Scale Keyboard">
+        <strong class="arcade-cabinet-marquee">Scale Keyboard</strong>
+        <span class="arcade-cabinet-screen arcade-scale-screen" aria-hidden="true"><i>♯</i><i>♭</i></span>
+        <span class="arcade-cabinet-copy">Play the notes of each scale in order.</span>
+        <span class="arcade-cabinet-economy">🌼 1 PLAY · WIN UP TO 🌼5</span>
+        <span class="arcade-cabinet-control-panel" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span class="arcade-cabinet-best">Best <output data-arcade-personal-best="scale-keyboard">—</output></span>
+      </a>
+      <section class="arcade-leaderboard" aria-label="Scale Keyboard Top 5">
+        <h2>Top 5</h2>
+        <ol data-arcade-leaderboard="scale-keyboard"><li>Loading…</li></ol>
+      </section>
+    </article>
   </div>
 </section>
 {% endblock %}
 
 {% block page_scripts %}
-<script src="/static/js/arcade.js?v=8"></script>
+<script src="/static/js/arcade.js?v=9"></script>
 {% endblock %}
