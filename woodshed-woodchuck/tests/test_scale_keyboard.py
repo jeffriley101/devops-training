@@ -46,7 +46,7 @@ const {{ SCALE_KEYBOARD_SCALES }} = require("./static/js/scale-keyboard-data.js"
 def test_black_keys_use_one_small_shared_rightward_offset() -> None:
     keyboard = CSS[CSS.index(".scale-piano {"):CSS.index(".scale-keyboard-actions {")]
 
-    assert "--scale-black-key-shift: 0.12rem" in keyboard
+    assert "--scale-black-key-shift: 0.22rem" in keyboard
     assert "translateX(calc(-50% + var(--scale-black-key-shift)))" in keyboard
     assert "translate(calc(-50% + var(--scale-black-key-shift)), 3px)" in keyboard
     assert "transform: translateX(-50%)" not in keyboard
@@ -111,17 +111,31 @@ def test_fifth_cabinet_and_authenticated_route(scale_database) -> None:
 
 def test_scale_pool_has_correct_common_major_pitch_sequences() -> None:
     result = run_scale_node("""
-assert.equal(SCALE_KEYBOARD_SCALES.length, 8);
+assert.equal(SCALE_KEYBOARD_SCALES.length, 7);
 const expected = [0, 2, 4, 5, 7, 9, 11, 12];
 for (const scale of SCALE_KEYBOARD_SCALES) {
   assert.deepEqual(scale.notes.map((note) => note[0]), expected);
   assert.equal(scale.notes.length, 8);
+  assert.match(scale.notes[0][1], /^[A-G]$/);
 }
-assert.deepEqual(SCALE_KEYBOARD_SCALES.map((scale) => scale.name),
-  ["C Major", "F Major", "B♭ Major", "E♭ Major", "G Major", "D Major", "A Major", "E Major"]);
-console.log(JSON.stringify({ count: SCALE_KEYBOARD_SCALES.length }));
+assert.deepEqual(
+  SCALE_KEYBOARD_SCALES.map((scale) => scale.notes[0][1]).sort(),
+  ["A", "B", "C", "D", "E", "F", "G"]
+);
+const spellings = Object.fromEntries(
+  SCALE_KEYBOARD_SCALES.map((scale) => [scale.name, scale.notes.map((note) => note[1])])
+);
+assert.deepEqual(spellings["C Major"], ["C", "D", "E", "F", "G", "A", "B", "C"]);
+assert.deepEqual(spellings["G Major"], ["G", "A", "B", "C", "D", "E", "F♯", "G"]);
+assert.deepEqual(spellings["D Major"], ["D", "E", "F♯", "G", "A", "B", "C♯", "D"]);
+assert.deepEqual(spellings["A Major"], ["A", "B", "C♯", "D", "E", "F♯", "G♯", "A"]);
+assert.deepEqual(spellings["E Major"], ["E", "F♯", "G♯", "A", "B", "C♯", "D♯", "E"]);
+assert.deepEqual(spellings["B Major"], ["B", "C♯", "D♯", "E", "F♯", "G♯", "A♯", "B"]);
+assert.deepEqual(spellings["F Major"], ["F", "G", "A", "B♭", "C", "D", "E", "F"]);
+console.log(JSON.stringify({ count: SCALE_KEYBOARD_SCALES.length, tonics:
+  SCALE_KEYBOARD_SCALES.map((scale) => scale.notes[0][1]).sort() }));
 """)
-    assert result == {"count": 8}
+    assert result == {"count": 7, "tonics": ["A", "B", "C", "D", "E", "F", "G"]}
 
 
 def test_displayed_midi_notes_map_to_concert_pitch_with_a4_440() -> None:
@@ -175,25 +189,28 @@ console.log(JSON.stringify({ score: game.score, progress: game.noteIndex }));
 
 def test_enharmonic_keys_compare_by_midi_and_remain_octave_sensitive() -> None:
     result = run_scale_node("""
-const eFlat = SCALE_KEYBOARD_SCALES.find((scale) => scale.key === "e-flat-major");
-const eFlatGame = new ScaleKeyboardGame({ scales: [eFlat], random: () => 0 });
-eFlatGame.start();
-assert.equal(eFlatGame.expectedMidi(), 51); // E-flat3 and D-sharp3 are physical MIDI key 51.
-assert.equal(eFlatGame.press("51").correct, true); // DOM dataset values normalize to MIDI.
+const fMajor = SCALE_KEYBOARD_SCALES.find((scale) => scale.key === "f-major");
+const fGame = new ScaleKeyboardGame({ scales: [fMajor], random: () => 0 });
+fGame.start();
+for (const midi of [53, 55, 57]) assert.equal(fGame.press(midi).correct, true);
+assert.equal(fGame.expectedMidi(), 58); // B-flat3 and A-sharp3 are physical MIDI key 58.
+assert.equal(fGame.press("58").correct, true); // DOM dataset values normalize to MIDI.
 
-const bFlat = SCALE_KEYBOARD_SCALES.find((scale) => scale.key === "b-flat-major");
-const bFlatGame = new ScaleKeyboardGame({ scales: [bFlat], random: () => 0 });
-bFlatGame.start();
-assert.equal(bFlatGame.expectedMidi(), 58); // B-flat3 and A-sharp3 are physical MIDI key 58.
-assert.equal(bFlatGame.press(58).correct, true);
+const bMajor = SCALE_KEYBOARD_SCALES.find((scale) => scale.key === "b-major");
+const bGame = new ScaleKeyboardGame({ scales: [bMajor], random: () => 0 });
+bGame.start();
+for (const midi of [59, 61, 63, 64, 66, 68]) assert.equal(bGame.press(midi).correct, true);
+assert.equal(bGame.expectedMidi(), 70); // A-sharp4 and B-flat4 are physical MIDI key 70.
+assert.equal(bGame.press(70).correct, true);
 
-const octaveGame = new ScaleKeyboardGame({ scales: [eFlat], random: () => 0 });
+const cMajor = SCALE_KEYBOARD_SCALES.find((scale) => scale.key === "c-major");
+const octaveGame = new ScaleKeyboardGame({ scales: [cMajor], random: () => 0 });
 octaveGame.start();
-assert.equal(octaveGame.press(63).correct, false); // E-flat4 is not E-flat3.
+assert.equal(octaveGame.press(72).correct, false); // C5 is not the requested C4.
 assert.equal(octaveGame.noteIndex, 0);
-console.log(JSON.stringify({ eFlat: 51, bFlat: 58, octaveProgress: octaveGame.noteIndex }));
+console.log(JSON.stringify({ bFlat: 58, aSharp: 70, octaveProgress: octaveGame.noteIndex }));
 """)
-    assert result == {"eFlat": 51, "bFlat": 58, "octaveProgress": 0}
+    assert result == {"bFlat": 58, "aSharp": 70, "octaveProgress": 0}
 
 
 def test_all_starter_scales_complete_from_their_midi_sequences() -> None:
@@ -210,7 +227,7 @@ for (const scale of SCALE_KEYBOARD_SCALES) {
 }
 console.log(JSON.stringify({ completed: SCALE_KEYBOARD_SCALES.length }));
 """)
-    assert result == {"completed": 8}
+    assert result == {"completed": 7}
 
 
 def test_multiple_scales_do_not_immediately_repeat_and_clock_is_run_wide() -> None:

@@ -5761,7 +5761,7 @@ select {
   text-align: center;
 }
 .scale-piano {
-  --scale-black-key-shift: 0.12rem;
+  --scale-black-key-shift: 0.22rem;
   position: relative;
   display: flex;
   width: min(100%, 58rem);
