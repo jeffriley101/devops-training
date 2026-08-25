@@ -1745,7 +1745,9 @@ def test_hall_empty_authentication_and_privacy(
     session.commit()
     monkeypatch.setattr(contest_module, "SessionLocal", factory)
 
-    assert hall_of_champions_payload(session) == {"students": [], "instruments": []}
+    assert hall_of_champions_payload(session) == {
+        "students": [], "instruments": [], "director_team_contests": [],
+    }
     with pytest.raises(HTTPException) as unauthorized:
         contest_module.hall_of_champions(request_with_session())
     assert unauthorized.value.status_code == 401

@@ -42,6 +42,15 @@ const {{ SCALE_KEYBOARD_SCALES }} = require("./static/js/scale-keyboard-data.js"
     return json.loads(result.stdout or "{}")
 
 
+def test_black_keys_use_one_small_shared_rightward_offset() -> None:
+    keyboard = CSS[CSS.index(".scale-piano {"):CSS.index(".scale-keyboard-actions {")]
+
+    assert "--scale-black-key-shift: 0.12rem" in keyboard
+    assert "translateX(calc(-50% + var(--scale-black-key-shift)))" in keyboard
+    assert "translate(calc(-50% + var(--scale-black-key-shift)), 3px)" in keyboard
+    assert "transform: translateX(-50%)" not in keyboard
+
+
 @pytest.fixture()
 def scale_database(monkeypatch: pytest.MonkeyPatch):
     engine = create_engine(

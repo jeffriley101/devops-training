@@ -772,18 +772,43 @@ select {
   line-height: 1;
 }
 
-.room-object {
+.room-object,
+.shed-icon-object,
+.xp-level-control,
+.shed-readout-level,
+.shed-sound-effects-controls .sound-effects-button,
+.shop-scene-control {
   transition:
-    transform 150ms ease,
+    scale 150ms ease,
     filter 150ms ease;
+  transform-origin: center;
+  scale: 1;
 }
 
-.room-object:hover,
-.room-object:focus-visible {
-  transform: scale(1.1);
+:is(
+  .room-object,
+  .shed-icon-object,
+  .xp-level-control,
+  .shed-readout-level,
+  .shed-sound-effects-controls .sound-effects-button,
+  .shop-scene-control
+):is(:hover, :focus-visible):not(:disabled) {
+  scale: 1.1;
   filter:
     brightness(1.08)
     drop-shadow(0 5px 6px rgba(35, 24, 16, 0.9));
+}
+
+:is(
+  .room-object,
+  .shed-icon-object,
+  .xp-level-control,
+  .shed-readout-level,
+  .shed-sound-effects-controls .sound-effects-button,
+  .shop-scene-control
+):active:not(:disabled) {
+  scale: 1.16;
+  transition-duration: 60ms;
 }
 
 .room-object:focus-visible {
@@ -2130,6 +2155,173 @@ select {
 
 @media (prefers-reduced-motion: reduce) {
   .success-confetti { display: none; }
+}
+
+/* Band Director Dashboard */
+.director-dashboard {
+  width: min(72rem, 100%);
+  margin: 0 auto;
+  display: grid;
+  gap: 1rem;
+}
+
+.director-dashboard-header,
+.director-team-selector-row,
+.director-inline-form,
+.director-contest-form {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.director-dashboard-header {
+  justify-content: space-between;
+}
+
+.director-dashboard-header h1,
+.director-dashboard-header p {
+  margin: 0;
+}
+
+.director-team-toolbar h2 {
+  margin-top: 0;
+}
+
+.director-team-selector-row select {
+  min-width: min(18rem, 100%);
+}
+
+.director-inline-form,
+.director-contest-form {
+  align-items: end;
+  margin-top: 1rem;
+}
+
+.director-contest-form label,
+.director-contest-form fieldset {
+  flex: 1 1 13rem;
+}
+
+.director-contest-form label {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.director-contest-form fieldset {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 100%;
+}
+
+.director-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+.director-metric-card {
+  min-width: 0;
+  padding: 1rem;
+  border: 2px solid var(--green, #377449);
+  border-radius: 0.8rem;
+  background: rgba(255, 255, 246, 0.94);
+  display: grid;
+  align-content: start;
+  gap: 0.3rem;
+}
+
+.director-metric-card h2 {
+  margin: 0;
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.director-metric-card strong {
+  color: #224d31;
+  font-size: clamp(1.65rem, 4vw, 2.5rem);
+  line-height: 1;
+}
+
+.director-chart-grid,
+.director-management-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.director-management-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.director-bar-chart {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.director-bar-row {
+  display: grid;
+  grid-template-columns: minmax(3.5rem, auto) minmax(5rem, 1fr) 3rem;
+  align-items: center;
+  gap: 0.5rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.director-bar-track {
+  height: 0.75rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #dfdac6;
+}
+
+.director-bar-fill {
+  display: block;
+  height: 100%;
+  min-width: 0.15rem;
+  border-radius: inherit;
+  background: #3d8b57;
+}
+
+.director-contest-section {
+  margin-top: 1rem;
+}
+
+.director-contest-list {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.director-contest-card {
+  padding: 0.8rem;
+  border: 1px solid rgba(67, 91, 56, 0.35);
+  border-radius: 0.65rem;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.director-contest-card h3,
+.director-contest-card p {
+  margin: 0 0 0.4rem;
+}
+
+@media (max-width: 760px) {
+  .director-metric-grid,
+  .director-chart-grid,
+  .director-management-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .director-dashboard-header {
+    align-items: flex-start;
+  }
+
+  .director-team-selector-row > *,
+  .director-inline-form > *,
+  .director-contest-form > * {
+    width: 100%;
+  }
 }
 
 @media (max-width: 420px) {
@@ -5561,6 +5753,7 @@ select {
   text-align: center;
 }
 .scale-piano {
+  --scale-black-key-shift: 0.12rem;
   position: relative;
   display: flex;
   width: min(100%, 58rem);
@@ -5592,7 +5785,7 @@ select {
   top: 0;
   width: clamp(1rem, 4.6%, 2.4rem);
   height: 62%;
-  transform: translateX(-50%);
+  transform: translateX(calc(-50% + var(--scale-black-key-shift)));
   border: 1px solid #030306;
   background: linear-gradient(90deg, #090a0f, #383b47 55%, #08090d);
   box-shadow: inset 0 -5px 0 #050508, 0 4px 5px rgba(0, 0, 0, 0.45);
@@ -5601,7 +5794,7 @@ select {
 .scale-piano-key.is-correct { filter: drop-shadow(0 0 0.65rem #65e6a7) brightness(1.22); }
 .scale-piano-key.is-wrong { filter: drop-shadow(0 0 0.65rem #ff6262) brightness(0.82); }
 .scale-piano-key:active:not(:disabled) { transform: translateY(3px); }
-.scale-piano-key.is-black:active:not(:disabled) { transform: translate(-50%, 3px); }
+.scale-piano-key.is-black:active:not(:disabled) { transform: translate(calc(-50% + var(--scale-black-key-shift)), 3px); }
 .scale-keyboard-actions {
   display: flex;
   align-items: center;
@@ -5712,7 +5905,6 @@ select {
 
 .xp-level-control:hover,
 .xp-level-control:focus-visible {
-  transform: scale(1.06);
   filter: brightness(1.06);
 }
 

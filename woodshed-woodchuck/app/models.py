@@ -1057,7 +1057,12 @@ class Team(Base):
     __table_args__ = (
         UniqueConstraint("season_id", "normalized_name", name="uq_team_season_name"),
         UniqueConstraint("season_id", "emblem_key", name="uq_team_season_emblem"),
-        UniqueConstraint("season_id", "creator_profile_id", name="uq_team_season_creator"),
+        Index(
+            "uq_team_public_season_creator",
+            "season_id", "creator_profile_id", unique=True,
+            sqlite_where=text("visibility = 'public' AND creator_profile_id IS NOT NULL"),
+            postgresql_where=text("visibility = 'public' AND creator_profile_id IS NOT NULL"),
+        ),
         CheckConstraint(
             "moderation_status IN ('active', 'under_review', 'hidden')",
             name="ck_team_moderation_status",
@@ -1379,6 +1384,92 @@ class ContestResult(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
     )
+
+
+class DirectorTeamContest(Base):
+    """A director-managed team event with an exact, immutable score window."""
+
+    __tablename__ = "director_team_contests"
+    __table_args__ = (
+        CheckConstraint(
+            "metric IN ('total_minutes', 'average_minutes', 'team_practice_rating')",
+            name="ck_director_team_contest_metric",
+        ),
+        CheckConstraint(
+            "status IN ('scheduled', 'open', 'finalized')",
+            name="ck_director_team_contest_status",
+        ),
+        CheckConstraint("ends_at > starts_at", name="ck_director_team_contest_window"),
+        CheckConstraint(
+            "finalizes_at >= ends_at",
+            name="ck_director_team_contest_finalization_window",
+        ),
+        Index("ix_director_team_contest_owner_status", "owner_profile_id", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    season_id: Mapped[int] = mapped_column(
+        ForeignKey("seasons.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    owner_profile_id: Mapped[int] = mapped_column(
+        ForeignKey("woodchuck_profiles.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    title: Mapped[str] = mapped_column(String(100), nullable=False)
+    description: Mapped[str] = mapped_column(String(300), default="", nullable=False)
+    metric: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    finalizes_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(
+        String(20), default="scheduled", server_default="scheduled", nullable=False, index=True
+    )
+    finalized_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+    )
+
+
+class DirectorTeamContestEntry(Base):
+    __tablename__ = "director_team_contest_entries"
+    __table_args__ = (
+        UniqueConstraint("contest_id", "team_id", name="uq_director_contest_team"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    contest_id: Mapped[int] = mapped_column(
+        ForeignKey("director_team_contests.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    team_id: Mapped[int] = mapped_column(
+        ForeignKey("teams.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+
+class DirectorTeamContestResult(Base):
+    __tablename__ = "director_team_contest_results"
+    __table_args__ = (
+        UniqueConstraint("contest_id", "team_id", name="uq_director_contest_result_team"),
+        CheckConstraint("rank > 0", name="ck_director_contest_result_rank"),
+        CheckConstraint("score >= 0", name="ck_director_contest_result_score"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    contest_id: Mapped[int] = mapped_column(
+        ForeignKey("director_team_contests.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    team_id: Mapped[int | None] = mapped_column(
+        ForeignKey("teams.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    team_name_snapshot: Mapped[str] = mapped_column(String(100), nullable=False)
+    emblem_key_snapshot: Mapped[str] = mapped_column(String(50), nullable=False)
+    score: Mapped[float] = mapped_column(Float, nullable=False)
+    rank: Mapped[int] = mapped_column(Integer, nullable=False)
+    active_participant_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    eligible_roster_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
 
 
 class RewardGrant(Base):

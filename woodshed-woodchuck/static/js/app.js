@@ -3553,7 +3553,7 @@
       root.querySelectorAll("[data-champions-division]")
     );
     const stateEls = [loadingEl, authEl, emptyEl, errorEl, contentEl];
-    let champions = { students: [], instruments: [] };
+    let champions = { students: [], instruments: [], directorTeamContests: [] };
     let division = "all";
     const expanded = { students: false, instruments: false };
 
@@ -3723,7 +3723,8 @@
     function renderSeasonalHall() {
       if (!seasonalList) return;
       const categories = new Map();
-      Object.entries(champions).forEach(([type, entries]) => {
+      ["students", "instruments"].forEach((type) => {
+        const entries = champions[type];
         entries.forEach((champion, championIndex) => {
           champion.achievements.forEach((achievement) => {
             const categoryKey = achievement.contest.key;
@@ -3816,6 +3817,44 @@
           categoryDetails.appendChild(divisions);
           seasonalList.appendChild(categoryDetails);
         });
+
+      if (champions.directorTeamContests.length) {
+        const eventDetails = document.createElement("details");
+        eventDetails.className = "hall-category-card";
+        eventDetails.dataset.hallCategory = "director-team-contests";
+        const summary = document.createElement("summary");
+        summary.textContent = "Director Team Contests";
+        eventDetails.appendChild(summary);
+        const eventList = document.createElement("div");
+        eventList.className = "hall-category-divisions";
+        const eventSection = document.createElement("section");
+        eventSection.className = "hall-division-card";
+        const heading = document.createElement("h4");
+        heading.textContent = "Team Events";
+        eventSection.appendChild(heading);
+        champions.directorTeamContests.forEach((event) => {
+          const card = document.createElement("article");
+          card.className = "champion-card";
+          const title = document.createElement("strong");
+          title.textContent = `${event.title} · ${event.metric_label}`;
+          const period = document.createElement("p");
+          period.textContent = `${event.season.name} · ${new Date(event.starts_at).toLocaleDateString()} – ${new Date(event.ends_at).toLocaleDateString()}`;
+          const winners = document.createElement("ul");
+          winners.className = "champion-achievements";
+          event.winners.forEach((winner) => {
+            const item = document.createElement("li");
+            const emblem = document.createElement("span");
+            renderTeamEmblem(emblem, winner.emblem_key);
+            item.append(emblem, document.createTextNode(` ${winner.team_name} — ${winner.score}`));
+            winners.appendChild(item);
+          });
+          card.append(title, period, winners);
+          eventSection.appendChild(card);
+        });
+        eventList.appendChild(eventSection);
+        eventDetails.appendChild(eventList);
+        seasonalList.appendChild(eventDetails);
+      }
     }
 
     async function loadChampions() {
@@ -3835,8 +3874,21 @@
           instruments: payload && Array.isArray(payload.instruments)
             ? payload.instruments.filter((item) => validChampion(item, "instruments"))
             : [],
+          directorTeamContests: payload && Array.isArray(payload.director_team_contests)
+            ? payload.director_team_contests.filter((event) => event &&
+                typeof event.title === "string" &&
+                typeof event.metric_label === "string" &&
+                event.season && typeof event.season.name === "string" &&
+                typeof event.starts_at === "string" &&
+                typeof event.ends_at === "string" &&
+                Array.isArray(event.winners) && event.winners.every((winner) =>
+                  winner && typeof winner.team_name === "string" &&
+                  typeof winner.emblem_key === "string" &&
+                  typeof winner.score === "number"))
+            : [],
         };
-        if (!champions.students.length && !champions.instruments.length) {
+        if (!champions.students.length && !champions.instruments.length &&
+            !champions.directorTeamContests.length) {
           return showState(emptyEl);
         }
         renderSeasonalHall();

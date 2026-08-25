@@ -20,6 +20,8 @@ from .instruments import INSTRUMENTS_BY_LABEL, canonical_instrument_key
 from .models import (
     CampPointAward,
     DailyTriviaAttempt,
+    DirectorTeamContest,
+    DirectorTeamContestResult,
     Contest,
     ContestResult,
     ContestWeek,
@@ -2071,7 +2073,55 @@ def hall_of_champions_payload(session: Session) -> dict[str, object]:
         _finalize_champion_achievements(champion)
     students.sort(key=_champion_sort_key)
     instruments.sort(key=_champion_sort_key)
-    return {"students": students, "instruments": instruments}
+    director_rows = session.execute(
+        select(DirectorTeamContestResult, DirectorTeamContest, Team, Season)
+        .join(
+            DirectorTeamContest,
+            DirectorTeamContest.id == DirectorTeamContestResult.contest_id,
+        )
+        .outerjoin(Team, Team.id == DirectorTeamContestResult.team_id)
+        .join(Season, Season.id == DirectorTeamContest.season_id)
+        .where(
+            DirectorTeamContest.status == "finalized",
+            DirectorTeamContestResult.rank == 1,
+        )
+        .order_by(
+            DirectorTeamContest.ends_at.desc(),
+            DirectorTeamContest.id.desc(),
+            DirectorTeamContestResult.team_name_snapshot,
+        )
+    ).all()
+    director_events: dict[int, dict[str, object]] = {}
+    metric_labels = {
+        "total_minutes": "Total Practice Minutes",
+        "average_minutes": "Average Practice Minutes",
+        "team_practice_rating": "Team Practice Rating",
+    }
+    for result, event, team, season in director_rows:
+        event_payload = director_events.setdefault(event.id, {
+            "id": event.id,
+            "title": event.title,
+            "metric": event.metric,
+            "metric_label": metric_labels[event.metric],
+            "season": {"key": season.key, "name": season.name},
+            "starts_at": utc_iso(event.starts_at),
+            "ends_at": utc_iso(event.ends_at),
+            "winners": [],
+        })
+        event_payload["winners"].append({
+            "team_name": public_team_name(team, result.team_name_snapshot),
+            "emblem_key": (
+                public_team_emblem(team)
+                if team is not None else result.emblem_key_snapshot
+            ),
+            "score": result.score,
+        })
+
+    return {
+        "students": students,
+        "instruments": instruments,
+        "director_team_contests": list(director_events.values()),
+    }
 
 
 def crown_progress_payload(

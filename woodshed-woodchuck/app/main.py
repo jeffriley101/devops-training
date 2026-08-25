@@ -26,6 +26,7 @@ from .verifier_routes import (
 from .practice_chart_routes import router as practice_chart_router
 from .contests import router as contest_router
 from .contest_admin import router as contest_admin_router
+from .director_dashboard import router as director_router
 from .teams import has_band_director_capability, router as team_router
 from .xp_routes import router as xp_router
 from .store_routes import router as store_router
@@ -71,6 +72,7 @@ app.include_router(practice_chart_router)
 app.include_router(contest_router)
 app.include_router(contest_admin_router)
 app.include_router(team_router)
+app.include_router(director_router)
 app.include_router(xp_router)
 app.include_router(store_router)
 app.include_router(arcade_router)
@@ -95,6 +97,9 @@ def _render(request: Request, template_name: str, **context: object):
             authenticated_profile = {
                 "display_name": profile.display_name,
                 "woodchuck_id": profile.woodchuck_id,
+                "band_director": has_band_director_capability(
+                    session, profile_id=profile.id
+                ),
             }
             saved_state = session.get(WoodchuckState, profile.id)
             account_state_bootstrap = {
@@ -158,12 +163,23 @@ def director_team_management_page(request: Request):
             return RedirectResponse(url="/login", status_code=303)
         if not has_band_director_capability(session, profile_id=profile.id):
             return RedirectResponse(url="/home", status_code=303)
+    return RedirectResponse(url="/director", status_code=303)
+
+
+@app.get("/director")
+def director_dashboard_page(request: Request):
+    with SessionLocal() as session:
+        profile = current_profile(request, session)
+        if profile is None:
+            return RedirectResponse(url="/login", status_code=303)
+        if not has_band_director_capability(session, profile_id=profile.id):
+            return RedirectResponse(url="/home", status_code=303)
     return _render(
         request,
-        "director_team.html",
-        title="Director Team Management",
-        active_nav="home",
-        page_class="main-app-page director-team-page",
+        "director_dashboard.html",
+        title="Director Dashboard",
+        active_nav="director",
+        page_class="main-app-page director-dashboard-page",
     )
 
 

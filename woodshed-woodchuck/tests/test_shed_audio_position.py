@@ -139,6 +139,25 @@ def test_staged_mobile_shed_controls_use_shared_centered_lanes() -> None:
         assert f"top: {top} !important" in rule
 
 
+def test_shed_and_shop_interactive_emojis_share_layout_safe_pop_feedback() -> None:
+    pop = CSS[CSS.index(".room-object,"):CSS.index(".room-object:focus-visible")]
+
+    for selector in (
+        ".room-object",
+        ".shed-icon-object",
+        ".xp-level-control",
+        ".shed-readout-level",
+        ".shed-sound-effects-controls .sound-effects-button",
+        ".shop-scene-control",
+    ):
+        assert selector in pop
+    assert "transition:" in pop and "scale 150ms ease" in pop
+    assert "scale: 1.1" in pop
+    assert "scale: 1.16" in pop
+    assert "):active:not(:disabled)" in pop
+    assert ".shed-decoration" not in pop
+
+
 def test_utility_pages_do_not_receive_main_page_positioning() -> None:
     client = TestClient(app)
     for path in ("/", "/login", "/setup", "/plunge-burrow"):

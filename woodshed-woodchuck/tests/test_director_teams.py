@@ -82,8 +82,8 @@ def test_director_capability_is_admin_controlled_and_not_self_service(director_d
     assert granted.status_code == 303
     page = client.get("/teams/director/manage")
     assert page.status_code == 200
-    assert "Director Team Management" in page.text
-    assert "/static/js/director-team.js?v=1" in page.text
+    assert "Director Dashboard" in page.text
+    assert "/static/js/director-dashboard.js?v=1" in page.text
     with director_database() as session:
         assert session.scalar(select(func.count()).select_from(ProfileCapability)) == 1
 

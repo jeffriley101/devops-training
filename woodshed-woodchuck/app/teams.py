@@ -176,7 +176,11 @@ def create_and_join_team(session: Session, *, profile: WoodchuckProfile,
         display, normalized = normalized_team_name(name)
     except InvalidTeamName as error:
         raise ValueError(str(error)) from error
-    if session.scalar(select(Team.id).where(Team.season_id == season.id, Team.creator_profile_id == profile.id)):
+    if session.scalar(select(Team.id).where(
+        Team.season_id == season.id,
+        Team.creator_profile_id == profile.id,
+        Team.visibility == "public",
+    )):
         raise ValueError("You may create only one team per season.")
     team = Team(
         season_id=season.id, display_name=display, normalized_name=normalized,
@@ -214,11 +218,6 @@ def create_director_team(
         display, normalized = normalized_team_name(name)
     except InvalidTeamName as error:
         raise ValueError(str(error)) from error
-    if session.scalar(select(Team.id).where(
-        Team.season_id == season.id,
-        Team.creator_profile_id == profile.id,
-    )):
-        raise ValueError("You may create only one team per season.")
     team = Team(
         season_id=season.id,
         display_name=display,
@@ -333,19 +332,26 @@ def _owned_director_team(
 
 
 def director_team_payload(
-    session: Session, *, profile: WoodchuckProfile, season: Season
+    session: Session, *, profile: WoodchuckProfile, season: Season,
+    team_id: int | None = None,
 ) -> dict[str, object]:
     authorized = has_band_director_capability(session, profile_id=profile.id)
     if not authorized:
         raise PermissionError("Band Director authorization is required.")
-    team = session.scalar(select(Team).where(
+    teams = list(session.scalars(select(Team).where(
         Team.season_id == season.id,
         Team.creator_profile_id == profile.id,
         Team.director_led.is_(True),
-    ))
+        Team.visibility == "private",
+    ).order_by(Team.display_name, Team.id)).all())
+    team = next((row for row in teams if row.id == team_id), None) if team_id else (
+        teams[0] if teams else None
+    )
+    if team_id is not None and team is None:
+        raise LookupError("Director-led team was not found.")
     if team is None:
         return {
-            "authorized": True, "team": None,
+            "authorized": True, "team": None, "teams": [],
             "approved_emblems": [emblem_payload(key) for key in APPROVED_EMBLEMS],
         }
     membership_rows = session.execute(
@@ -369,6 +375,15 @@ def director_team_payload(
     name, emblem = public_team_identity(team)
     return {
         "authorized": True,
+        "teams": [
+            {
+                "id": row.id,
+                "name": public_team_name,
+                "emblem": emblem_payload(row.emblem_key),
+            }
+            for row in teams
+            for public_team_name in [public_team_identity(row)[0]]
+        ],
         "team": {
             "id": team.id, "name": name, "emblem": emblem,
             "visibility": team.visibility, "director_led": True,
@@ -498,13 +513,17 @@ def request_private_team_membership(
 
 
 @router.get("/director")
-def get_director_team(request: Request):
+def get_director_team(request: Request, team_id: int | None = None):
     with SessionLocal() as session:
         profile, season, _ = authenticated_context(request, session)
         try:
-            return director_team_payload(session, profile=profile, season=season)
+            return director_team_payload(
+                session, profile=profile, season=season, team_id=team_id
+            )
         except PermissionError as error:
             raise HTTPException(status_code=403, detail=str(error)) from error
+        except LookupError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
 
 
 @router.post("/director", status_code=201)
@@ -522,7 +541,9 @@ def create_private_director_team(request: Request, submitted: TeamCreate):
             raise HTTPException(status_code=400, detail=str(error)) from error
         return {
             "created": True,
-            **director_team_payload(session, profile=profile, season=season),
+            **director_team_payload(
+                session, profile=profile, season=season, team_id=team.id
+            ),
         }
 
 

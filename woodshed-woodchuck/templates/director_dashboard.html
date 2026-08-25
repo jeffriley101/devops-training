@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="director-dashboard" aria-labelledby="director-dashboard-title">
+  <header class="director-dashboard-header">
+    <div>
+      <p class="scoreboard-kicker">Band program</p>
+      <h1 id="director-dashboard-title">Director Dashboard</h1>
+    </div>
+    <a class="btn btn-secondary" href="/home">My Woodshed</a>
+  </header>
+
+  <p id="director-dashboard-feedback" role="status" aria-live="polite">Loading dashboard…</p>
+
+  <section class="director-team-toolbar mentor-card" aria-labelledby="director-team-selector-title">
+    <h2 id="director-team-selector-title">Team</h2>
+    <div class="director-team-selector-row">
+      <label for="director-team-selector">Team to manage</label>
+      <select id="director-team-selector"></select>
+      <button id="director-new-team-toggle" class="btn btn-secondary" type="button">Create Team</button>
+    </div>
+    <form id="director-team-create-form" class="director-inline-form" hidden>
+      <label for="director-team-name">Team name</label>
+      <input id="director-team-name" maxlength="30" required />
+      <label for="director-team-emblem">Team emblem</label>
+      <select id="director-team-emblem" required><option value="">Choose an emblem</option></select>
+      <button class="btn btn-green" type="submit">Create Private Team</button>
+    </form>
+  </section>
+
+  <div id="director-dashboard-content" hidden>
+    <section class="director-metric-grid" aria-label="Current team metrics">
+      <article class="director-metric-card"><h2>Total Practice Minutes</h2><strong id="director-total-minutes">0</strong><span>this week</span></article>
+      <article class="director-metric-card"><h2>Average Minutes</h2><strong id="director-average-minutes">0</strong><span>meaningful active players</span></article>
+      <article class="director-metric-card"><h2>Participation</h2><strong id="director-participation">0 / 0</strong><span id="director-participation-percent">0%</span></article>
+      <article class="director-metric-card"><h2>P-Charts</h2><strong id="director-pcharts">0</strong><span id="director-pchart-breakdown">0 verified · 0 pending</span><a id="director-verifier-link" href="/trusted-verifiers/dashboard" hidden>Open verifier queue</a></article>
+      <article class="director-metric-card"><h2>Consistency</h2><strong id="director-consistency">0 / 0 days</strong><span id="director-consistency-percent">0%</span></article>
+      <article class="director-metric-card"><h2>Team Practice Rating</h2><strong id="director-tpr">0.0</strong><span>current week</span></article>
+    </section>
+
+    <section class="director-chart-grid" aria-label="Team practice charts">
+      <article class="mentor-card">
+        <h2>Daily Practice Trend</h2>
+        <div id="director-daily-chart" class="director-bar-chart" role="img" aria-label="Daily practice minutes"></div>
+      </article>
+      <article class="mentor-card">
+        <h2>Practice by Instrument / Section</h2>
+        <div id="director-instrument-chart" class="director-bar-chart" role="img" aria-label="Practice minutes by instrument or section"></div>
+      </article>
+    </section>
+
+    <section class="director-management-grid">
+      <article class="mentor-card">
+        <h2>Team Access</h2>
+        <p>Join code: <strong id="director-team-code"></strong></p>
+        <div class="button-row">
+          <button id="director-team-regenerate" class="btn btn-secondary" type="button">Regenerate Code</button>
+          <button id="director-team-join-playing" class="btn btn-secondary" type="button">Join as Playing Member</button>
+        </div>
+      </article>
+      <article class="mentor-card" aria-labelledby="director-pending-title">
+        <h2 id="director-pending-title">Pending Requests</h2>
+        <div id="director-team-pending"></div>
+      </article>
+      <article class="mentor-card" aria-labelledby="director-members-title">
+        <h2 id="director-members-title">Current Members</h2>
+        <div id="director-team-members"></div>
+      </article>
+    </section>
+
+    <section class="mentor-card director-contest-section" aria-labelledby="director-contests-title">
+      <h2 id="director-contests-title">Team Contests</h2>
+      <details>
+        <summary>Create a Team Contest</summary>
+        <form id="director-contest-form" class="director-contest-form">
+          <label for="director-contest-title">Title</label>
+          <input id="director-contest-title" maxlength="100" required />
+          <label for="director-contest-description">Short description</label>
+          <input id="director-contest-description" maxlength="300" />
+          <label for="director-contest-metric">Metric</label>
+          <select id="director-contest-metric" required></select>
+          <label for="director-contest-start">Starts (Central time)</label>
+          <input id="director-contest-start" type="datetime-local" required />
+          <label for="director-contest-end">Ends (Central time)</label>
+          <input id="director-contest-end" type="datetime-local" required />
+          <label for="director-contest-finalizes">Finalizes (Central time)</label>
+          <input id="director-contest-finalizes" type="datetime-local" required />
+          <fieldset id="director-contest-teams"><legend>Participating teams you manage</legend></fieldset>
+          <button class="btn btn-green" type="submit">Create Contest</button>
+        </form>
+      </details>
+      <div id="director-contest-list" class="director-contest-list"></div>
+    </section>
+  </div>
+</section>
+{% endblock %}
+
+{% block page_scripts %}
+<script src="/static/js/director-dashboard.js?v=1"></script>
+{% endblock %}
