@@ -55,7 +55,11 @@
 
     press(midi) {
       if (this.status !== "running") return { accepted: false, reason: "not-running" };
-      if (midi !== this.expectedMidi()) {
+      const pressedMidi = Number(midi);
+      if (!Number.isInteger(pressedMidi)) {
+        return { accepted: false, reason: "invalid-note" };
+      }
+      if (pressedMidi !== this.expectedMidi()) {
         this.score = Math.max(0, this.score - WRONG_NOTE_PENALTY);
         return { accepted: true, correct: false, score: this.score };
       }
@@ -215,7 +219,6 @@
     key.classList.remove("is-correct", "is-wrong");
     key.classList.add(result.correct ? "is-correct" : "is-wrong");
     root.setTimeout(function () { key.classList.remove("is-correct", "is-wrong"); }, 180);
-    playFeedback(result.correct ? "correctTrivia" : "incorrectTrivia");
     if (result.completed) {
       betweenScales = true;
       playFeedback("arcadeCheer");

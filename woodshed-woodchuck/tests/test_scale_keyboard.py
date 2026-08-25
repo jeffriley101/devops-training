@@ -173,6 +173,46 @@ console.log(JSON.stringify({ score: game.score, progress: game.noteIndex }));
     assert result == {"score": 50, "progress": 1}
 
 
+def test_enharmonic_keys_compare_by_midi_and_remain_octave_sensitive() -> None:
+    result = run_scale_node("""
+const eFlat = SCALE_KEYBOARD_SCALES.find((scale) => scale.key === "e-flat-major");
+const eFlatGame = new ScaleKeyboardGame({ scales: [eFlat], random: () => 0 });
+eFlatGame.start();
+assert.equal(eFlatGame.expectedMidi(), 51); // E-flat3 and D-sharp3 are physical MIDI key 51.
+assert.equal(eFlatGame.press("51").correct, true); // DOM dataset values normalize to MIDI.
+
+const bFlat = SCALE_KEYBOARD_SCALES.find((scale) => scale.key === "b-flat-major");
+const bFlatGame = new ScaleKeyboardGame({ scales: [bFlat], random: () => 0 });
+bFlatGame.start();
+assert.equal(bFlatGame.expectedMidi(), 58); // B-flat3 and A-sharp3 are physical MIDI key 58.
+assert.equal(bFlatGame.press(58).correct, true);
+
+const octaveGame = new ScaleKeyboardGame({ scales: [eFlat], random: () => 0 });
+octaveGame.start();
+assert.equal(octaveGame.press(63).correct, false); // E-flat4 is not E-flat3.
+assert.equal(octaveGame.noteIndex, 0);
+console.log(JSON.stringify({ eFlat: 51, bFlat: 58, octaveProgress: octaveGame.noteIndex }));
+""")
+    assert result == {"eFlat": 51, "bFlat": 58, "octaveProgress": 0}
+
+
+def test_all_starter_scales_complete_from_their_midi_sequences() -> None:
+    result = run_scale_node("""
+for (const scale of SCALE_KEYBOARD_SCALES) {
+  const game = new ScaleKeyboardGame({ scales: [scale], random: () => 0 });
+  game.start();
+  for (const [offset] of scale.notes) {
+    const result = game.press(scale.rootMidi + offset);
+    assert.equal(result.correct, true, `${scale.name} failed at MIDI ${scale.rootMidi + offset}`);
+  }
+  assert.equal(game.noteIndex, scale.notes.length);
+  assert.equal(game.score, 1300);
+}
+console.log(JSON.stringify({ completed: SCALE_KEYBOARD_SCALES.length }));
+""")
+    assert result == {"completed": 8}
+
+
 def test_multiple_scales_do_not_immediately_repeat_and_clock_is_run_wide() -> None:
     result = run_scale_node("""
 const game = new ScaleKeyboardGame({ scales: SCALE_KEYBOARD_SCALES.slice(0, 2), random: () => 0 });
@@ -195,9 +235,10 @@ def test_keyboard_markup_is_touch_friendly_and_feedback_uses_shared_audio() -> N
     assert 'className = "scale-piano-key is-white"' in GAME_JS
     assert 'className = "scale-piano-key is-black"' in GAME_JS
     assert 'root.WoodshedAudio.play(name)' in GAME_JS
-    assert 'result.correct ? "correctTrivia" : "incorrectTrivia"' in GAME_JS
     assert 'playFeedback("arcadeCheer")' in GAME_JS
     assert "root.WoodshedAudio.playPianoPitch(midiToFrequency(midi))" in GAME_JS
+    assert 'playFeedback(result.correct ? "correctTrivia" : "incorrectTrivia")' not in GAME_JS
+    assert GAME_JS.count("root.WoodshedAudio.playPianoPitch(midiToFrequency(midi))") == 1
     assert GAME_JS.index("if (!result.accepted) return") < GAME_JS.index(
         "root.WoodshedAudio.playPianoPitch(midiToFrequency(midi))"
     )
