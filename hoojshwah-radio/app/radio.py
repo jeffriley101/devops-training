@@ -6,6 +6,7 @@ from pathlib import Path
 TRACKS_PATH = Path("data/tracks.json")
 STATION_PATH = Path("data/station.json")
 PLAYLISTS_DIR = Path("data/playlists")
+ALBUM5_PREVIEW_PATH = Path("data/album5-preview.json")
 
 
 def load_json(path):
@@ -25,8 +26,22 @@ def load_playlist(playlist_id):
     return load_json(PLAYLISTS_DIR / f"{playlist_id}.json")
 
 
+def load_album5_preview():
+    return load_json(ALBUM5_PREVIEW_PATH)
+
+
 def build_audio_url(media_base_url, audio_path):
     return f"{media_base_url.rstrip('/')}/{audio_path.lstrip('/')}"
+
+
+def build_album5_preview_tracks(preview, media_base_url):
+    tracks = copy.deepcopy(preview["tracks"])
+
+    for track in tracks:
+        track["audio_url"] = build_audio_url(media_base_url, track["audio_path"])
+        track.setdefault("duration_seconds", 0)
+
+    return tracks
 
 
 def build_playlist_tracks(tracks, playlist, media_base_url):

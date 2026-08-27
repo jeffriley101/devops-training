@@ -33,6 +33,8 @@ const transmissionCodeForm = document.querySelector("#transmission-code-form");
 const transmissionCodeInput = document.querySelector("#transmission-code");
 const transmissionCodeStatus = document.querySelector("#transmission-code-status");
 const transmissionCodeClose = document.querySelector("#transmission-code-close");
+const album5PreviewStatus = document.querySelector("#album5-preview-status");
+const album5PreviewExit = document.querySelector("#album5-preview-exit");
 const masterSecretTrigger = document.querySelector("#master-secret-trigger");
 const masterSecretDialog = document.querySelector("#master-secret-dialog");
 const masterSecretForm = document.querySelector("#master-secret-form");
@@ -54,6 +56,7 @@ let androidLiveClockInterval = null;
 let androidBackstagePickStartedAt = 0;
 let androidBackstagePickEndsAt = 0;
 let stationQrCopyStatusTimeout = null;
+let album5Preview = new Album5Preview.PreviewState([]);
 
 if (androidAppMode) {
   resyncButton.hidden = true;
@@ -72,6 +75,32 @@ if (androidAppMode) {
 }
 
 function renderNativePlaybackState(state) {
+  if (state === "album5-preview-queued") {
+    setAlbum5PreviewStatus("Queued. The preview will begin after the current track.");
+    return;
+  }
+
+  if (state === "album5-preview-unavailable") {
+    album5Preview.exit();
+    setAlbum5PreviewStatus("Album 5 Preview is unavailable in this app version.", false);
+    return;
+  }
+
+  if (state === "album5-preview-exited") {
+    finishAlbum5PreviewUi();
+    tuneStation();
+    return;
+  }
+
+  if (typeof state === "string" && state.startsWith("album5-preview-track:")) {
+    const trackId = state.slice("album5-preview-track:".length);
+    if (!album5Preview.active) album5Preview.begin();
+    const index = album5Preview.tracks.findIndex((track) => track.id === trackId);
+    if (index >= 0) album5Preview.index = index;
+    renderAlbum5PreviewTrack();
+    return;
+  }
+
   if (state === "backstage-unavailable") {
     backstagePickActive = false;
     androidBackstagePickStartedAt = 0;
@@ -117,7 +146,7 @@ function setMediaSessionPlaybackState(state) {
   }
 }
 
-function updateMediaSession(track) {
+function updateMediaSession(track, album = "Hoojshwah Radio") {
   if (androidAppMode || !("mediaSession" in navigator) || typeof MediaMetadata === "undefined" || !track) {
     return;
   }
@@ -125,7 +154,7 @@ function updateMediaSession(track) {
   navigator.mediaSession.metadata = new MediaMetadata({
     title: track.title,
     artist: track.artist,
-    album: "Hoojshwah Radio"
+    album
   });
   setMediaSessionPlaybackState(userWantsPlayback ? "playing" : "paused");
 
@@ -256,7 +285,7 @@ function renderTrackProgress(track = null, currentSecondsOverride = null) {
     return;
   }
 
-  const currentTrack = track || station?.tracks?.[currentTrackIndex];
+  const currentTrack = track || album5Preview.current() || station?.tracks?.[currentTrackIndex];
   const fullSeconds = androidAppMode
     ? currentTrack?.duration_seconds || 0
     : Number.isFinite(audio.duration) && audio.duration > 0
@@ -305,7 +334,12 @@ function findCurrentTrack(tracks, loopPositionSeconds) {
 }
 
 function renderAndroidLiveClock() {
-  if (!androidAppMode || !station?.tracks?.length || !station.total_duration_seconds) {
+  if (
+    !androidAppMode ||
+    album5Preview.active ||
+    !station?.tracks?.length ||
+    !station.total_duration_seconds
+  ) {
     return;
   }
 
@@ -504,6 +538,10 @@ function renderTrackInfo(result) {
 }
 
 function tuneStation() {
+  if (album5Preview.active) {
+    return;
+  }
+
   if (!station || !station.tracks || station.tracks.length === 0) {
     return;
   }
@@ -566,7 +604,14 @@ function playTrackByIndex(index) {
 }
 
 async function playBackstageTrack(index) {
-  if (!backstageUnlocked || !station || !station.tracks || station.tracks.length === 0) {
+  if (
+    album5Preview.queued ||
+    album5Preview.active ||
+    !backstageUnlocked ||
+    !station ||
+    !station.tracks ||
+    station.tracks.length === 0
+  ) {
     return;
   }
 
@@ -684,6 +729,74 @@ function toggleSecretDialog(dialog, input) {
   }
 }
 
+function setAlbum5PreviewStatus(message, canExit = true) {
+  if (album5PreviewStatus) album5PreviewStatus.textContent = message;
+  if (album5PreviewExit) album5PreviewExit.hidden = !canExit;
+}
+
+function renderAlbum5PreviewTrack() {
+  const track = album5Preview.current();
+  if (!track) return;
+
+  document.body.classList.add("album5-preview-active");
+  const nextTrack = album5Preview.tracks[album5Preview.index + 1];
+  nowTitle.textContent = track.title;
+  nowArtist.textContent = track.artist;
+  upNext.textContent = nextTrack ? nextTrack.title : "normal KHJW programming";
+  if (trackRecordingInfo) trackRecordingInfo.textContent = "Album 5 Preview";
+  if (reactionPanel) reactionPanel.hidden = true;
+  renderTrackProgress(track, 0);
+  updateMediaSession(track, "Album 5 Preview");
+  setAlbum5PreviewStatus(
+    `Playing ${album5Preview.index + 1} of ${album5Preview.tracks.length}: ${track.title}`,
+  );
+
+  if (!androidAppMode) {
+    audio.src = track.audio_url;
+    audio.currentTime = 0;
+  }
+}
+
+function beginAlbum5Preview() {
+  if (!album5Preview.begin()) return false;
+  backstagePickActive = false;
+  renderAlbum5PreviewTrack();
+  return true;
+}
+
+function finishAlbum5PreviewUi() {
+  album5Preview.exit();
+  document.body.classList.remove("album5-preview-active");
+  if (reactionPanel) reactionPanel.hidden = false;
+  setAlbum5PreviewStatus("Preview ended. Normal KHJW programming is restored.", false);
+}
+
+async function exitAlbum5Preview(resumePlayback = true) {
+  if (!album5Preview.queued && !album5Preview.active) return;
+
+  if (androidAppMode) {
+    androidNativePlayer?.postMessage("album5-preview:exit");
+    return;
+  }
+
+  finishAlbum5PreviewUi();
+  tuneStation();
+  if (resumePlayback && userWantsPlayback) await audio.play();
+}
+
+function queueAlbum5Preview() {
+  if (!album5Preview.queue()) {
+    setAlbum5PreviewStatus(
+      album5Preview.active ? "Album 5 Preview is already playing." : "Album 5 Preview is unavailable.",
+      album5Preview.active,
+    );
+    return;
+  }
+
+  setAlbum5PreviewStatus("Queued. The preview will begin after the current track.");
+  if (androidAppMode) androidNativePlayer?.postMessage("album5-preview:queue");
+}
+
 
 async function loadStation() {
   try {
@@ -694,6 +807,7 @@ async function loadStation() {
     }
 
     station = await response.json();
+    album5Preview = new Album5Preview.PreviewState(station.album5_preview_tracks || []);
 
     renderTrackList(station.tracks);
     renderLoopLength(station.total_duration_seconds);
@@ -770,8 +884,12 @@ resyncButton.addEventListener("click", () => {
     return;
   }
 
-  tuneStation();
-  resyncButton.textContent = "Signal Resynced";
+  if (album5Preview.active) {
+    resyncButton.textContent = "Preview Active";
+  } else {
+    tuneStation();
+    resyncButton.textContent = "Signal Resynced";
+  }
 
   window.setTimeout(() => {
     resyncButton.textContent = "Resync Signal";
@@ -793,7 +911,7 @@ playButton.addEventListener("click", async () => {
     return;
   }
 
-  tuneStation();
+  if (!album5Preview.active) tuneStation();
 
   try {
     userWantsPlayback = true;
@@ -832,7 +950,17 @@ audio.addEventListener("ended", async () => {
     return;
   }
 
-  if (backstagePickActive) {
+  if (album5Preview.active) {
+    const result = album5Preview.next();
+    if (result.action === "track") {
+      renderAlbum5PreviewTrack();
+    } else {
+      finishAlbum5PreviewUi();
+      tuneStation();
+    }
+  } else if (album5Preview.queued) {
+    beginAlbum5Preview();
+  } else if (backstagePickActive) {
     backstagePickActive = false;
 
     if (trackProgress) {
@@ -1163,10 +1291,19 @@ if (transmissionSecretForm && transmissionSecretPass && transmissionCodePanel) {
       closeOtherSecretSurfaces(transmissionCodePanel);
       transmissionCodePanel.hidden = false;
       transmissionSecretPass.value = "";
+      queueAlbum5Preview();
       focusSecretInput(transmissionCodeInput);
     } else {
       transmissionSecretPass.value = "";
     }
+  });
+}
+
+if (album5PreviewExit) {
+  album5PreviewExit.addEventListener("click", () => {
+    exitAlbum5Preview(true).catch((error) => {
+      console.error("Could not exit Album 5 Preview:", error);
+    });
   });
 }
 

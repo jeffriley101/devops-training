@@ -39,6 +39,7 @@ class MainActivity : AppCompatActivity() {
 
     private var controllerFuture: ListenableFuture<MediaController>? = null
     private var controller: MediaController? = null
+    private var album5PreviewMediaId: String? = null
 
     private val notificationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
@@ -124,10 +125,27 @@ class MainActivity : AppCompatActivity() {
         override fun onEvents(player: Player, events: Player.Events) {
             renderControllerState()
         }
+
+        override fun onMediaItemTransition(mediaItem: androidx.media3.common.MediaItem?, reason: Int) {
+            renderAlbum5PreviewState(mediaItem?.mediaId.orEmpty())
+        }
     }
 
     private fun renderControllerState() {
         postNativePlaybackState(controller?.isPlaying == true)
+        renderAlbum5PreviewState(controller?.currentMediaItem?.mediaId.orEmpty())
+    }
+
+    private fun renderAlbum5PreviewState(mediaId: String) {
+        if (mediaId.startsWith(ALBUM5_PREVIEW_TRACK_PREFIX)) {
+            if (album5PreviewMediaId != mediaId) {
+                album5PreviewMediaId = mediaId
+                postWebState("$ALBUM5_PREVIEW_TRACK_STATE_PREFIX$mediaId")
+            }
+        } else if (album5PreviewMediaId != null) {
+            album5PreviewMediaId = null
+            postWebState(ALBUM5_PREVIEW_EXITED_STATE)
+        }
     }
 
     private fun configureWebView() {
@@ -157,6 +175,44 @@ class MainActivity : AppCompatActivity() {
                 when (messageData) {
                     "play" -> controller?.play()
                     "pause" -> controller?.pause()
+                    NativePlaybackCommands.WEB_ALBUM5_PREVIEW_QUEUE,
+                    NativePlaybackCommands.WEB_ALBUM5_PREVIEW_EXIT,
+                    -> {
+                        val action = NativePlaybackCommands.parseAlbum5PreviewAction(messageData)
+                            ?: return@addWebMessageListener
+                        val connectedController = controller
+                        if (connectedController == null) {
+                            replyProxy.postMessage(ALBUM5_PREVIEW_UNAVAILABLE_STATE)
+                            return@addWebMessageListener
+                        }
+                        val command = when (action) {
+                            NativePlaybackCommands.Album5PreviewAction.QUEUE ->
+                                NativePlaybackCommands.queueAlbum5Preview
+                            NativePlaybackCommands.Album5PreviewAction.EXIT ->
+                                NativePlaybackCommands.exitAlbum5Preview
+                        }
+                        val result = connectedController.sendCustomCommand(command, Bundle.EMPTY)
+                        result.addListener(
+                            {
+                                val state = runCatching { result.get() }
+                                    .map { commandResult ->
+                                        if (commandResult.resultCode == SessionResult.RESULT_SUCCESS) {
+                                            if (action == NativePlaybackCommands.Album5PreviewAction.QUEUE) {
+                                                ALBUM5_PREVIEW_QUEUED_STATE
+                                            } else {
+                                                ALBUM5_PREVIEW_EXITED_STATE
+                                            }
+                                        } else {
+                                            ALBUM5_PREVIEW_UNAVAILABLE_STATE
+                                        }
+                                    }
+                                    .getOrDefault(ALBUM5_PREVIEW_UNAVAILABLE_STATE)
+                                replyProxy.postMessage(state)
+                            },
+                            ContextCompat.getMainExecutor(this),
+                        )
+                        return@addWebMessageListener
+                    }
                     else -> {
                         val trackId = NativePlaybackCommands.parseBackstageTrackId(messageData)
                             ?: return@addWebMessageListener
@@ -232,12 +288,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun postNativePlaybackState(isPlaying: Boolean = controller?.isPlaying == true) {
+        postWebState(if (isPlaying) PLAYING_STATE else PAUSED_STATE)
+    }
+
+    private fun postWebState(state: String) {
         if (!::webView.isInitialized || !isProductionOrigin((webView.url ?: return).toUri())) return
         if (!WebViewFeature.isFeatureSupported(WebViewFeature.POST_WEB_MESSAGE)) return
 
         WebViewCompat.postWebMessage(
             webView,
-            WebMessageCompat(if (isPlaying) PLAYING_STATE else PAUSED_STATE),
+            WebMessageCompat(state),
             KHJW_ORIGIN.toUri(),
         )
     }
@@ -270,5 +330,10 @@ class MainActivity : AppCompatActivity() {
         private const val PAUSED_STATE = "paused"
         private const val BACKSTAGE_ACCEPTED_STATE = "backstage-accepted"
         private const val BACKSTAGE_UNAVAILABLE_STATE = "backstage-unavailable"
+        private const val ALBUM5_PREVIEW_TRACK_PREFIX = "album5-preview-"
+        private const val ALBUM5_PREVIEW_TRACK_STATE_PREFIX = "album5-preview-track:"
+        private const val ALBUM5_PREVIEW_QUEUED_STATE = "album5-preview-queued"
+        private const val ALBUM5_PREVIEW_EXITED_STATE = "album5-preview-exited"
+        private const val ALBUM5_PREVIEW_UNAVAILABLE_STATE = "album5-preview-unavailable"
     }
 }

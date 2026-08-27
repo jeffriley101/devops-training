@@ -9,7 +9,14 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 
-from app.radio import build_station_tracks, load_playlist, load_station_config, load_tracks
+from app.radio import (
+    build_album5_preview_tracks,
+    build_station_tracks,
+    load_album5_preview,
+    load_playlist,
+    load_station_config,
+    load_tracks,
+)
 
 app = FastAPI(title="Hoojshwah Radio")
 
@@ -97,6 +104,10 @@ def station():
         media_base_url=station_config["media_base_url"],
         playlist=playlist,
     )
+    album5_preview_tracks = build_album5_preview_tracks(
+        load_album5_preview(),
+        station_config["media_base_url"],
+    )
     total_duration = sum(track["duration_seconds"] for track in station_tracks)
 
     track_catalog = [
@@ -113,6 +124,7 @@ def station():
         "active_playlist_title": playlist.get("title"),
         "total_duration_seconds": total_duration,
         "tracks": station_tracks,
+        "album5_preview_tracks": album5_preview_tracks,
         "track_catalog": track_catalog,
     }
 
