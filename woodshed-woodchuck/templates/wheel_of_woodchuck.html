@@ -9,39 +9,40 @@
 
   <div class="arcade-economy-status" aria-label="Arcade cost and balance">
     <span>Balance 🌼 <output data-arcade-balance>—</output></span>
-    <span>🌼 1 PLAY · WIN UP TO 🌼5</span>
+    <span>1🌼 TO PLAY · WIN UP TO 5🌼</span>
   </div>
   <p class="arcade-economy-message" data-arcade-economy-message role="status" aria-live="polite"></p>
 
-  <div class="wheel-game-status" aria-label="Game status">
-    <p>Score <strong id="wheel-score">0</strong></p>
-    <p>Best <strong id="wheel-best">0</strong></p>
-    <p>Time <strong id="wheel-time">30</strong></p>
-    <p>Spells <strong id="wheel-spell-attempts">3</strong></p>
-  </div>
+  <section id="wheel-active-area" class="wheel-active-area" aria-label="Wheel of Woodchuck active game">
+    <div class="wheel-game-summary">
+      <h2 id="wheel-clue">Press New Game to begin.</h2>
+      <p id="wheel-answer" class="wheel-masked-answer" aria-live="polite"></p>
+      <div class="wheel-game-status" aria-label="Game status">
+        <p>Score <strong id="wheel-score">0</strong></p>
+        <p>Best <strong id="wheel-best">0</strong></p>
+        <p>Time <strong id="wheel-time">45</strong></p>
+        <p>Misses <strong id="wheel-misses">0/3</strong></p>
+      </div>
+    </div>
 
-  <section class="wheel-puzzle" aria-label="Music term puzzle">
-    <h2 id="wheel-clue">Press New Game to begin.</h2>
-    <p id="wheel-answer" class="wheel-masked-answer" aria-live="polite"></p>
-
-    <div class="wheel-play-area">
-      <div class="wheel-spinner-wrap" aria-hidden="true">
+    <div class="wheel-visual" aria-hidden="true">
+      <div class="wheel-spinner-wrap">
         <div id="wheel-spinner" class="wheel-spinner">
-          <span>100</span><span>150</span><span>200</span><span>250</span>
-          <span>300</span><span>400</span><span>500</span><span>2x</span>
+          <span>MISS</span><span>1000</span><span>50</span><span>350</span>
+          <span>500</span><span>100</span><span>3X</span><span>200</span>
         </div>
         <i class="wheel-pointer"></i>
-      </div>
-      <div class="wheel-spin-actions">
-        <button id="wheel-spin" class="btn btn-primary" type="button" disabled>Spin</button>
-        <p id="wheel-spin-result">Spin for a letter value</p>
       </div>
     </div>
 
     <div id="wheel-letters" class="wheel-letter-grid" aria-label="Choose a letter"></div>
 
-    <div class="wheel-spell-area">
-      <button id="wheel-spell-open" class="btn btn-secondary" type="button" disabled>Spell It</button>
+    <div class="wheel-control-panel">
+      <div class="wheel-action-stack">
+        <button id="wheel-spin" class="btn btn-primary" type="button" disabled>Spin</button>
+        <button id="wheel-spell-open" class="btn btn-secondary" type="button" disabled>Spell It</button>
+        <button id="wheel-start" class="btn btn-primary" type="button">New Game</button>
+      </div>
       <form id="wheel-spell-form" class="wheel-spell-form" hidden>
         <label for="wheel-spell-input">Music term</label>
         <div>
@@ -49,13 +50,10 @@
           <button class="btn btn-primary" type="submit">Check</button>
         </div>
       </form>
+      <p id="wheel-spin-result">Spin for a letter value</p>
+      <p id="wheel-message" role="status" aria-live="polite">Ready</p>
     </div>
   </section>
-
-  <div class="wheel-game-actions">
-    <button id="wheel-start" class="btn btn-primary" type="button">New Game</button>
-    <p id="wheel-message" role="status" aria-live="polite">Ready</p>
-  </div>
 
   <section class="arcade-game-leaderboard" aria-labelledby="wheel-leaderboard-title">
     <h2 id="wheel-leaderboard-title">Top 5</h2>
@@ -67,5 +65,5 @@
 {% block page_scripts %}
 <script src="/static/js/arcade-economy.js?v=1"></script>
 <script src="/static/js/wheel-terms.js?v=1"></script>
-<script src="/static/js/wheel-of-woodchuck.js?v=3"></script>
+<script src="/static/js/wheel-of-woodchuck.js?v=4"></script>
 {% endblock %}

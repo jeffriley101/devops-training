@@ -97,10 +97,10 @@ def signed_client(factory):
 
 
 def test_fifth_cabinet_and_authenticated_route(scale_database) -> None:
-    assert ARCADE.count('class="arcade-cabinet ') == 5
+    assert ARCADE.count('class="arcade-cabinet ') == 6
     assert 'href="/arcade/scale-keyboard"' in ARCADE
     assert 'data-arcade-personal-best="scale-keyboard"' in ARCADE
-    assert "🌼 1 PLAY · WIN UP TO 🌼5" in ARCADE
+    assert "1🌼 TO PLAY · WIN UP TO 5🌼" in ARCADE
     anonymous = TestClient(app).get("/arcade/scale-keyboard", follow_redirects=False)
     authenticated = signed_client(scale_database).get("/arcade/scale-keyboard")
     assert anonymous.status_code == 303

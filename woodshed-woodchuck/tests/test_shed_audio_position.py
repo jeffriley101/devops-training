@@ -127,10 +127,26 @@ def test_staged_mobile_shed_controls_use_shared_centered_lanes() -> None:
     assert '"grid-template-rows", "repeat(5, 1fr)"' in layout
     assert 'imp(column, "justify-items", "center")' in layout
     assert 'imp(child, "justify-self", "center")' in layout
+    assert 'imp(column, "width", "3.5rem")' in layout
+    assert 'imp(column, "width", "42%")' not in layout
+    assert 'imp(column, side, "0.65rem")' in layout
+    assert 'if (column === left)' in layout
+    assert 'imp(column, "grid-template-columns", "minmax(0, 1fr)")' in layout
     assert '"justify-items", "start"' not in layout
     assert '"justify-items", "end"' not in layout
     assert '"justify-self", "start"' not in layout
     assert '"justify-self", "end"' not in layout
+
+    audio_panel = staged[staged.index(
+        ".shed-sound-effects-controls .sound-effects-panel {"
+    ):]
+    assert "right: calc(100% + 0.5rem) !important" in audio_panel
+    assert "bottom: 0 !important" in audio_panel
+    assert "z-index: 7 !important" in audio_panel
+    trigger = staged[staged.index("#sound-effects-button {"):staged.index(
+        ".shed-sound-effects-controls .sound-effects-panel {"
+    )]
+    assert "z-index: 8 !important" in trigger
 
 
 def test_shed_audio_control_uses_headphones_while_preserving_settings_behavior() -> None:
@@ -141,6 +157,10 @@ def test_shed_audio_control_uses_headphones_while_preserving_settings_behavior()
     assert ">🎧</button>" in home
     assert 'button.textContent = "🎧"' in audio
     assert 'Sound Effects ${enabled ? "On" : "Off"}' in audio
+    assert "const opening = panel.hidden" in audio
+    assert "panel.hidden = !opening" in audio
+    assert 'button.setAttribute("aria-expanded", String(opening))' in audio
+    assert 'event.key === "Escape" && !panel.hidden' in audio
 
 
 def test_shed_and_shop_interactive_emojis_share_layout_safe_pop_feedback() -> None:

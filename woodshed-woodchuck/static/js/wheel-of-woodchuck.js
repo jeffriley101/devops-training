@@ -1,12 +1,11 @@
 (function (root) {
   "use strict";
 
-  const RUN_DURATION_MS = 30000;
-  const WRONG_LETTER_PENALTY_MS = 8000;
+  const RUN_DURATION_MS = 45000;
   const SOLVE_BONUS = 1000;
-  const SPELL_ATTEMPTS = 3;
-  const NUMERIC_WHEEL_VALUES = Object.freeze([100, 150, 200, 250, 300, 400, 500]);
-  const WHEEL_SEGMENTS = Object.freeze(NUMERIC_WHEEL_VALUES.concat("2x"));
+  const MAX_MISSES = 3;
+  const NUMERIC_WHEEL_VALUES = Object.freeze([1000, 50, 350, 500, 100, 200]);
+  const WHEEL_SEGMENTS = Object.freeze(["MISS", 1000, 50, 350, 500, 100, "3X", 200]);
   const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
   function normalizeAnswer(value) {
@@ -38,7 +37,7 @@
       this.spinPending = false;
       this.letterValue = 0;
       this.spinResult = null;
-      this.spellingAttempts = SPELL_ATTEMPTS;
+      this.misses = 0;
       this.puzzleState = "idle";
     }
 
@@ -70,7 +69,7 @@
       this.spinPending = false;
       this.letterValue = 0;
       this.spinResult = null;
-      this.spellingAttempts = SPELL_ATTEMPTS;
+      this.misses = 0;
       this.puzzleState = "active";
       return selected;
     }
@@ -81,8 +80,9 @@
         this.spinPending || this.canGuessLetter
       ) return null;
       const segment = this.choose(WHEEL_SEGMENTS);
-      const numericResult = segment === "2x" ? this.choose(NUMERIC_WHEEL_VALUES) : segment;
-      const value = segment === "2x" ? numericResult * 2 : numericResult;
+      const numericResult = segment === "3X" ? this.choose(NUMERIC_WHEEL_VALUES) :
+        (typeof segment === "number" ? segment : null);
+      const value = segment === "3X" ? numericResult * 3 : (numericResult || 0);
       this.spinPending = true;
       this.spinResult = { segment: segment, numericResult: numericResult, letterValue: value };
       return this.spinResult;
@@ -93,9 +93,30 @@
         return null;
       }
       this.spinPending = false;
+      if (this.spinResult.segment === "MISS") {
+        const miss = this.recordMiss();
+        Object.assign(this.spinResult, miss);
+        this.canGuessLetter = false;
+        this.letterValue = 0;
+        return this.spinResult;
+      }
       this.canGuessLetter = true;
       this.letterValue = this.spinResult.letterValue;
       return this.spinResult;
+    }
+
+    recordMiss() {
+      if (this.status !== "running" || this.puzzleState !== "active") {
+        return { accepted: false, reason: "unavailable" };
+      }
+      this.misses = Math.min(MAX_MISSES, this.misses + 1);
+      const exhausted = this.misses >= MAX_MISSES;
+      if (exhausted) {
+        this.puzzleState = "failed";
+        this.canGuessLetter = false;
+        this.spinPending = false;
+      }
+      return { accepted: true, misses: this.misses, exhausted: exhausted };
     }
 
     maskedAnswer() {
@@ -139,9 +160,8 @@
       this.canGuessLetter = false;
       const occurrences = countOccurrences(normalizeAnswer(this.currentTerm.answer), letter);
       if (!occurrences) {
-        this.remainingMs = Math.max(0, this.remainingMs - WRONG_LETTER_PENALTY_MS);
-        if (this.remainingMs === 0) this.finish();
-        return { accepted: true, correct: false, penaltyMs: WRONG_LETTER_PENALTY_MS };
+        const miss = this.recordMiss();
+        return Object.assign({ accepted: true, correct: false }, miss);
       }
 
       const gained = this.letterValue * occurrences;
@@ -160,17 +180,12 @@
         this.solveCurrentTerm();
         return { accepted: true, correct: true, solved: true };
       }
-      this.spellingAttempts -= 1;
-      if (this.spellingAttempts === 0) {
-        this.puzzleState = "failed";
-        this.canGuessLetter = false;
-        this.spinPending = false;
-      }
+      const miss = this.recordMiss();
       return {
         accepted: true,
         correct: false,
-        attemptsRemaining: this.spellingAttempts,
-        exhausted: this.spellingAttempts === 0,
+        misses: miss.misses,
+        exhausted: miss.exhausted,
       };
     }
 
@@ -200,7 +215,7 @@
         guessedLetters: Array.from(this.guessedLetters),
         canGuessLetter: this.canGuessLetter,
         letterValue: this.letterValue,
-        spellingAttempts: this.spellingAttempts,
+        misses: this.misses,
         puzzleState: this.puzzleState,
         maskedAnswer: this.maskedAnswer(),
       };
@@ -210,9 +225,8 @@
   root.WheelOfWoodchuckGame = WheelOfWoodchuckGame;
   root.WHEEL_OF_WOODCHUCK_RULES = Object.freeze({
     runDurationMs: RUN_DURATION_MS,
-    wrongLetterPenaltyMs: WRONG_LETTER_PENALTY_MS,
     solveBonus: SOLVE_BONUS,
-    spellingAttempts: SPELL_ATTEMPTS,
+    maxMisses: MAX_MISSES,
     numericWheelValues: NUMERIC_WHEEL_VALUES,
     wheelSegments: WHEEL_SEGMENTS,
     normalizeAnswer: normalizeAnswer,
@@ -229,12 +243,13 @@
   const page = document.querySelector("[data-wheel-of-woodchuck]");
   if (!page) return;
 
+  const activeArea = document.getElementById("wheel-active-area");
   const terms = root.WHEEL_OF_WOODCHUCK_TERMS || [];
   const game = new WheelOfWoodchuckGame({ terms: terms });
   const scoreOutput = document.getElementById("wheel-score");
   const bestOutput = document.getElementById("wheel-best");
   const timeOutput = document.getElementById("wheel-time");
-  const attemptsOutput = document.getElementById("wheel-spell-attempts");
+  const missesOutput = document.getElementById("wheel-misses");
   const clue = document.getElementById("wheel-clue");
   const answer = document.getElementById("wheel-answer");
   const spinButton = document.getElementById("wheel-spin");
@@ -311,7 +326,7 @@
     const state = game.snapshot();
     scoreOutput.textContent = String(state.score);
     timeOutput.textContent = String(Math.ceil(state.remainingMs / 1000));
-    attemptsOutput.textContent = String(state.spellingAttempts);
+    missesOutput.textContent = `${state.misses}/${MAX_MISSES}`;
     clue.textContent = state.currentTerm ? state.currentTerm.definition : "Press New Game to begin.";
     answer.textContent = state.maskedAnswer;
     const active = state.status === "running" && state.puzzleState === "active";
@@ -367,8 +382,11 @@
     const result = game.guessLetter(letter);
     if (!result.accepted) return;
     if (!result.correct) {
-      setMessage("Not in this term: 8 seconds lost.");
-      if (game.status === "ended") finishRun();
+      if (result.exhausted) {
+        advanceAfterPuzzle(`The term was ${normalizeAnswer(game.currentTerm.answer)}.`, false);
+      } else {
+        setMessage(`Not in this term. Miss ${result.misses}/${MAX_MISSES}.`);
+      }
     } else if (result.solved) {
       advanceAfterPuzzle(`${normalizeAnswer(game.currentTerm.answer)} — ${game.currentTerm.definition}`, true);
     } else {
@@ -392,30 +410,40 @@
     if (!result) return;
     wheelTurns += 4 + WHEEL_SEGMENTS.indexOf(result.segment) / WHEEL_SEGMENTS.length;
     setWheelRotation(wheelTurns);
-    wheelResult.textContent = result.segment === "2x"
-      ? "2x! One more spin…"
+    wheelResult.textContent = result.segment === "3X"
+      ? "3X! One more spin…"
       : "Spinning…";
     render();
 
     function finishSpin() {
       spinTimerId = null;
-      game.completeSpin();
-      wheelResult.textContent = result.segment === "2x"
-        ? `2x × ${result.numericResult} = ${result.letterValue} per letter`
+      const completed = game.completeSpin();
+      if (completed.segment === "MISS") {
+        wheelResult.textContent = "MISS";
+        if (completed.exhausted) {
+          advanceAfterPuzzle(`The term was ${normalizeAnswer(game.currentTerm.answer)}.`, false);
+        } else {
+          setMessage(`Miss ${completed.misses}/${MAX_MISSES}. Spin again.`);
+          render();
+        }
+        return;
+      }
+      wheelResult.textContent = result.segment === "3X"
+        ? `3X × ${result.numericResult} = ${result.letterValue} per letter`
         : `${result.letterValue} per letter`;
       setMessage("Choose one letter.");
       render();
     }
 
     spinTimerId = window.setTimeout(function () {
-      if (result.segment !== "2x") {
+      if (result.segment !== "3X") {
         finishSpin();
         return;
       }
-      wheelTurns += 3 + NUMERIC_WHEEL_VALUES.indexOf(result.numericResult) /
-        NUMERIC_WHEEL_VALUES.length;
+      wheelTurns += 3 + WHEEL_SEGMENTS.indexOf(result.numericResult) /
+        WHEEL_SEGMENTS.length;
       setWheelRotation(wheelTurns);
-      wheelResult.textContent = "2x bonus: spinning for the numeric value…";
+      wheelResult.textContent = "3X bonus: spinning for the numeric value…";
       spinTimerId = window.setTimeout(finishSpin, 720);
     }, 720);
   });
@@ -436,7 +464,7 @@
     } else if (result.exhausted) {
       advanceAfterPuzzle(`The term was ${normalizeAnswer(game.currentTerm.answer)}.`, false);
     } else {
-      setMessage(`Try again. ${result.attemptsRemaining} spelling attempts remain.`);
+      setMessage(`Try again. Miss ${result.misses}/${MAX_MISSES}.`);
       render();
     }
   });
@@ -468,6 +496,7 @@
     timerId = window.setInterval(tick, 100);
     setMessage("Spin, then choose one letter — or spell it now.");
     render();
+    activeArea?.scrollIntoView({ block: "nearest" });
   });
 
   document.addEventListener("keydown", function (event) {

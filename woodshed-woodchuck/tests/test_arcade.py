@@ -125,24 +125,37 @@ def test_practice_room_destinations_are_preserved_as_three_doors() -> None:
     assert "position: static" in tag
 
 
-def test_arcade_room_renders_five_touch_friendly_cabinets() -> None:
-    assert ARCADE.count('class="arcade-cabinet ') == 5
+def test_arcade_room_renders_six_touch_friendly_cabinets() -> None:
+    assert ARCADE.count('class="arcade-cabinet ') == 6
     assert 'href="/plunge-burrow"' in ARCADE
     assert 'href="/arcade/blue"' in ARCADE
     assert 'href="/arcade/radio-tuner"' in ARCADE
     assert 'href="/arcade/wheel-of-woodchuck"' in ARCADE
     assert 'href="/arcade/scale-keyboard"' in ARCADE
-    assert ARCADE.count("<h2>Top 5</h2>") == 5
-    assert ARCADE.count('class="arcade-cabinet-marquee"') == 5
-    assert ARCADE.count('class="arcade-cabinet-control-panel" aria-hidden="true"') == 5
-    assert ARCADE.count('data-arcade-personal-best=') == 5
-    assert ARCADE.count("🌼 1 PLAY · WIN UP TO 🌼5") == 5
+    assert 'href="/arcade/thirds"' in ARCADE
+    assert ARCADE.count("<h2>Top 5</h2>") == 6
+    assert ARCADE.count('class="arcade-cabinet-marquee"') == 6
+    assert ARCADE.count('class="arcade-cabinet-control-panel" aria-hidden="true"') == 6
+    assert ARCADE.count('data-arcade-personal-best=') == 6
+    assert ARCADE.count("1🌼 TO PLAY · WIN UP TO 5🌼") == 6
+    assert "arcade-cabinet-copy" not in ARCADE
+    for retired_copy in (
+        "Burrow, collect, and build your band.",
+        "Run, jump, and collect blue sparks.",
+        "Find the target signal before time runs out.",
+        "Spin, spell, and solve music terms.",
+        "Play the notes of each scale in order.",
+    ):
+        assert retired_copy not in ARCADE
+    plunge_style = CSS[CSS.index(".arcade-cabinet-plunge .arcade-cabinet-screen"):]
+    plunge_style = plunge_style[:plunge_style.index("}")]
+    assert "#f5df68" not in plunge_style
     assert 'href="/arcade">Back to Arcade</a>' in PLUNGE
     assert 'href="/store">Back to SHOP</a>' in ARCADE
     assert "min-height: 17rem" in CSS[CSS.index(".arcade-cabinet-link {"):]
     mobile = CSS[CSS.index("@media (max-width: 760px)"):]
     assert ".arcade-cabinet-grid { grid-template-columns: 1fr; }" in mobile
-    assert '/static/js/arcade.js?v=9' in ARCADE
+    assert '/static/js/arcade.js?v=10' in ARCADE
 
 
 def test_arcade_pages_route_game_specific_soundtracks() -> None:
@@ -195,7 +208,7 @@ def test_arcade_leaderboards_render_each_olympic_rank_once() -> None:
     assert "item.value = Number(row.rank)" in renderer
     assert "item.textContent = `${name} — ${row.score}`" in renderer
     assert "${row.rank}." not in renderer
-    assert ARCADE.count("<ol data-arcade-leaderboard=") == 5
+    assert ARCADE.count("<ol data-arcade-leaderboard=") == 6
 
 
 def test_arcade_removes_unnecessary_copy() -> None:

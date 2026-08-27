@@ -2913,7 +2913,7 @@ select {
     position: absolute;
     top: 1rem;
     bottom: 1.25rem;
-    width: 42%;
+    width: 3.5rem;
 
     display: flex !important;
     flex-direction: column;
@@ -4965,18 +4965,18 @@ select {
 .shed-readout-name {
   position: relative;
   min-width: 10rem;
-  padding: 0.65rem 1rem;
-  border: 3px ridge #8b6728;
-  border-radius: 5px;
-  color: #2d210f;
-  background: linear-gradient(145deg, #e9cf75, #a87b25 55%, #e5c565);
+  padding: calc(0.65rem + 3px) calc(1rem + 3px);
+  border: 0;
+  border-radius: 0;
+  color: #fff8e8;
+  background: transparent;
+  font-family: "Courier New", Courier, monospace;
   font-size: clamp(1rem, 2.2vw, 1.45rem);
-  box-shadow: inset 0 0 0 2px rgba(255,245,174,.45), 0 4px 7px rgba(44,28,12,.45);
+  box-shadow: none;
+  text-shadow: 0 2px 3px rgba(20, 12, 8, 0.95), 0 0 7px rgba(20, 12, 8, 0.8);
 }
 .shed-readout-name::before,
-.shed-readout-name::after { content: ""; position: absolute; top: 0.35rem; width: 0.3rem; height: 0.3rem; border-radius: 50%; background: #5f491f; }
-.shed-readout-name::before { left: 0.35rem; }
-.shed-readout-name::after { right: 0.35rem; }
+.shed-readout-name::after { content: none; }
 .shed-readout-level {
   width: 3.5rem;
   min-width: 3.5rem;
@@ -5199,7 +5199,8 @@ select {
 .arcade-room,
 .arcade-game,
 .wheel-game,
-.scale-keyboard-game {
+.scale-keyboard-game,
+.thirds-game {
   width: min(100%, 72rem);
   min-width: 0;
   margin: 0 auto;
@@ -5254,19 +5255,65 @@ select {
 
 .arcade-cabinet-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1rem;
   align-items: start;
 }
 
 .arcade-cabinet {
+  --arcade-cabinet-frame-start: #5d6a7b;
+  --arcade-cabinet-frame-middle: #293140;
+  --arcade-cabinet-frame-end: #151923;
+  --arcade-cabinet-border: #10111a;
   position: relative;
   min-width: 0;
   padding: 0.8rem 0.65rem 0.7rem;
-  border: 5px solid #10111a;
+  border: 5px solid var(--arcade-cabinet-border);
   border-radius: 1.2rem 1.2rem 0.45rem 0.45rem;
-  background: linear-gradient(145deg, #5d6a7b, #293140 58%, #151923);
+  background: linear-gradient(
+    145deg,
+    var(--arcade-cabinet-frame-start),
+    var(--arcade-cabinet-frame-middle) 58%,
+    var(--arcade-cabinet-frame-end)
+  );
   box-shadow: inset 0 0 0 2px rgba(216, 240, 255, 0.35), 0 8px 0 #0d0d14, 0 13px 18px rgba(0, 0, 0, 0.42);
+}
+
+.arcade-cabinet-plunge {
+  --arcade-cabinet-frame-start: #a46a38;
+  --arcade-cabinet-frame-middle: #69401f;
+  --arcade-cabinet-frame-end: #392112;
+  --arcade-cabinet-border: #4b2c16;
+}
+.arcade-cabinet-blue {
+  --arcade-cabinet-frame-start: #4298e4;
+  --arcade-cabinet-frame-middle: #1760ad;
+  --arcade-cabinet-frame-end: #0b315f;
+  --arcade-cabinet-border: #0a4383;
+}
+.arcade-cabinet-radio {
+  --arcade-cabinet-frame-start: #eef2f5;
+  --arcade-cabinet-frame-middle: #aab1b8;
+  --arcade-cabinet-frame-end: #555e68;
+  --arcade-cabinet-border: #c4ccd2;
+}
+.arcade-cabinet-wheel {
+  --arcade-cabinet-frame-start: #55a86d;
+  --arcade-cabinet-frame-middle: #287542;
+  --arcade-cabinet-frame-end: #123d24;
+  --arcade-cabinet-border: #1f6036;
+}
+.arcade-cabinet-scale {
+  --arcade-cabinet-frame-start: #fffdf4;
+  --arcade-cabinet-frame-middle: #e8e5db;
+  --arcade-cabinet-frame-end: #a8adb3;
+  --arcade-cabinet-border: #f8f5eb;
+}
+.arcade-cabinet-thirds {
+  --arcade-cabinet-frame-start: #e55858;
+  --arcade-cabinet-frame-middle: #a82e38;
+  --arcade-cabinet-frame-end: #5d1720;
+  --arcade-cabinet-border: #8d202b;
 }
 
 .arcade-cabinet-link {
@@ -5337,7 +5384,7 @@ select {
 .arcade-cabinet-control-panel i:first-child { width: 0.75rem; height: 0.75rem; border: 2px solid #111; background: #49c7d4; }
 .arcade-cabinet-best { font-size: 0.82rem; font-weight: 900; color: #f4d35e; }
 .arcade-cabinet-best output { color: #fff; font: inherit; }
-.arcade-cabinet-plunge .arcade-cabinet-screen { background: radial-gradient(circle at 50% 72%, #442815 0 20%, transparent 21%), radial-gradient(circle at 30% 20%, #f5df68 0 7%, transparent 8%), linear-gradient(#7c4b28, #301d15); }
+.arcade-cabinet-plunge .arcade-cabinet-screen { background: radial-gradient(circle at 50% 72%, #442815 0 20%, transparent 21%), linear-gradient(#7c4b28, #301d15); }
 .arcade-cabinet-blue .arcade-cabinet-screen { background: radial-gradient(circle at 25% 24%, #ddfbff 0 5%, transparent 6%), radial-gradient(circle at 70% 38%, #6ee7f2 0 7%, transparent 8%), linear-gradient(#2588df 0 72%, #163f75 73%); }
 .arcade-cabinet-radio .arcade-cabinet-screen { background: repeating-linear-gradient(90deg, #0c0c11 0 10%, #383840 11% 12%), radial-gradient(circle at center, #f4d35e 0 15%, #352e1a 16% 30%, transparent 31%); }
 .arcade-cabinet-wheel .arcade-cabinet-screen {
@@ -5349,28 +5396,105 @@ select {
   );
 }
 .arcade-cabinet-scale .arcade-cabinet-screen {
-  display: flex;
-  align-items: stretch;
-  justify-content: center;
-  gap: 0.18rem;
-  padding: 1.2rem 0.7rem;
+  position: relative;
+  overflow: hidden;
+  padding: 0.25rem;
   background: linear-gradient(150deg, #f7f0d8, #b9c9df);
 }
-.arcade-scale-screen i {
-  display: grid;
-  flex: 1;
-  place-items: end center;
-  border: 2px solid #1a1a23;
-  border-radius: 0.15rem 0.15rem 0.35rem 0.35rem;
-  color: #172033;
-  background: #fffdf4;
-  font-size: 1rem;
-  font-style: normal;
+.keyboard-tie-person {
+  position: relative;
+  display: block;
+  width: 5.2rem;
+  height: 5.3rem;
 }
-.arcade-scale-screen i:last-child {
-  height: 62%;
+.keyboard-tie-hair,
+.keyboard-tie-head,
+.keyboard-tie-shirt,
+.keyboard-necktie { position: absolute; display: block; }
+.keyboard-tie-hair {
+  top: 0.1rem;
+  left: 1.25rem;
+  z-index: 2;
+  width: 2.8rem;
+  height: 1rem;
+  border-radius: 70% 45% 25% 20%;
+  background: #56341e;
+  transform: rotate(-7deg);
+}
+.keyboard-tie-head {
+  top: 0.45rem;
+  left: 1.45rem;
+  z-index: 1;
+  width: 2.45rem;
+  height: 2.25rem;
+  border: 2px solid #724729;
+  border-radius: 48% 48% 44% 44%;
+  background: #f0b784;
+}
+.keyboard-tie-head b {
+  position: absolute;
+  top: 0.75rem;
+  width: 0.28rem;
+  height: 0.36rem;
+  border-radius: 50%;
+  background: #18212d;
+}
+.keyboard-tie-head b:first-child { left: 0.48rem; }
+.keyboard-tie-head b:nth-child(2) { right: 0.48rem; }
+.keyboard-tie-head em {
+  position: absolute;
+  left: 0.72rem;
+  bottom: 0.35rem;
+  width: 0.8rem;
+  height: 0.35rem;
+  border-bottom: 3px solid #8c3d3d;
+  border-radius: 50%;
+  transform: rotate(8deg);
+}
+.keyboard-tie-shirt {
+  left: 0.55rem;
+  bottom: 0;
+  width: 4.2rem;
+  height: 2.9rem;
+  border-radius: 48% 48% 0 0;
+  background: linear-gradient(90deg, #243e75 0 40%, #f5f0df 41% 59%, #243e75 60%);
+}
+.keyboard-necktie {
+  left: 2.15rem;
+  bottom: 0.1rem;
+  z-index: 3;
+  width: 1rem;
+  height: 2.85rem;
+  clip-path: polygon(25% 0, 75% 0, 90% 80%, 50% 100%, 10% 80%);
+  background: repeating-linear-gradient(180deg, #fff 0 0.43rem, #222 0.44rem 0.51rem);
+  box-shadow: inset 0 0 0 1px #171923;
+}
+.keyboard-necktie b {
+  position: absolute;
+  left: 0.45rem;
+  width: 0.34rem;
+  height: 0.28rem;
+  background: #171923;
+}
+.keyboard-necktie b:nth-child(1) { top: 0.24rem; }
+.keyboard-necktie b:nth-child(2) { top: 0.76rem; }
+.keyboard-necktie b:nth-child(3) { top: 1.28rem; }
+.keyboard-necktie b:nth-child(4) { top: 1.8rem; }
+.arcade-thirds-screen {
+  grid-template-columns: 1fr auto 1fr;
+  gap: 0.3rem;
   color: #fff;
-  background: #20222a;
+  background: linear-gradient(145deg, #40151a, #17090d);
+}
+.arcade-thirds-screen i,
+.arcade-thirds-screen b { font-style: normal; }
+.arcade-thirds-screen i { font-size: 2.2rem; font-weight: 950; }
+.arcade-thirds-screen b {
+  padding: 0.3rem;
+  border: 2px solid #f4d35e;
+  border-radius: 50%;
+  color: #f4d35e;
+  font-size: 0.85rem;
 }
 .arcade-wheel-screen i {
   display: grid;
@@ -5567,15 +5691,63 @@ select {
 }
 
 /* Wheel of Woodchuck */
+.wheel-active-area {
+  display: grid;
+  grid-template-columns: minmax(14rem, 0.9fr) minmax(16rem, 1.1fr);
+  grid-template-areas:
+    "wheel summary"
+    "wheel controls"
+    "letters letters";
+  gap: 0.7rem 0.9rem;
+  padding: 0.8rem;
+  border: 3px solid #10111d;
+  border-radius: 0.85rem;
+  color: #fff7db;
+  background: linear-gradient(155deg, #28324c, #17182a 62%, #35203b);
+}
+.wheel-game-summary { grid-area: summary; min-width: 0; }
+.wheel-game-summary h2 {
+  min-height: 1.35em;
+  margin: 0;
+  font-size: clamp(1rem, 2.5vw, 1.35rem);
+  text-align: center;
+}
+.wheel-visual {
+  grid-area: wheel;
+  display: grid;
+  place-items: center;
+  min-width: 0;
+}
+.wheel-control-panel {
+  grid-area: controls;
+  display: grid;
+  align-content: start;
+  justify-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+}
+.wheel-action-stack {
+  display: grid;
+  width: min(100%, 14rem);
+  gap: 0.45rem;
+}
+.wheel-action-stack .btn { width: 100%; }
+.wheel-control-panel #wheel-spin-result,
+.wheel-control-panel #wheel-message {
+  min-height: 1.35em;
+  margin: 0;
+  font-weight: 800;
+  text-align: center;
+}
 .wheel-game-status {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.65rem;
-  margin-bottom: 1rem;
+  gap: 0.4rem;
+  margin: 0;
 }
 .wheel-game-status p {
   margin: 0;
-  padding: 0.65rem;
+  padding: 0.45rem 0.25rem;
   border-radius: 0.6rem;
   background: rgba(5, 12, 20, 0.72);
   text-align: center;
@@ -5593,8 +5765,8 @@ select {
   text-align: center;
 }
 .wheel-masked-answer {
-  min-height: 2.2em;
-  margin: 0.75rem 0 1rem;
+  min-height: 1.8em;
+  margin: 0.35rem 0 0.5rem;
   overflow-wrap: anywhere;
   color: #f4d35e;
   font-size: clamp(1.35rem, 5vw, 2.3rem);
@@ -5694,10 +5866,12 @@ select {
 }
 .wheel-spin-actions p { min-height: 2.8em; margin: 0; font-weight: 800; }
 .wheel-letter-grid {
+  grid-area: letters;
   display: grid;
   grid-template-columns: repeat(13, minmax(2.55rem, 1fr));
   gap: 0.35rem;
-  margin: 1rem 0;
+  align-self: start;
+  margin: 0;
 }
 .wheel-letter-grid button {
   min-width: 0;
@@ -5718,7 +5892,7 @@ select {
   justify-items: center;
   gap: 0.75rem;
 }
-.wheel-spell-form { width: min(100%, 28rem); }
+.wheel-spell-form { width: min(100%, 14rem); }
 .wheel-spell-form label { display: block; margin-bottom: 0.35rem; font-weight: 850; }
 .wheel-spell-form > div { display: flex; gap: 0.5rem; }
 .wheel-spell-form input { min-width: 0; flex: 1; text-transform: uppercase; }
@@ -5813,6 +5987,66 @@ select {
 }
 .scale-keyboard-actions p { margin: 0; }
 
+.thirds-game {
+  width: min(100%, 48rem);
+}
+.thirds-active-area {
+  display: grid;
+  width: min(100%, 32rem);
+  margin: 0 auto;
+  gap: 0.7rem;
+  padding: clamp(0.75rem, 2vw, 1rem);
+  border: 3px solid #751f29;
+  border-radius: 0.9rem;
+  background: rgba(5, 12, 20, 0.72);
+}
+.thirds-status {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.45rem;
+}
+.thirds-status p {
+  margin: 0;
+  padding: 0.45rem 0.2rem;
+  border-radius: 0.45rem;
+  background: #24243b;
+  text-align: center;
+}
+.thirds-card {
+  display: grid;
+  min-height: 7.5rem;
+  place-content: center;
+  gap: 0.45rem;
+  padding: 0.75rem;
+  border: 4px double #f4d35e;
+  border-radius: 0.65rem;
+  color: #291512;
+  background: #fff4d4;
+  text-align: center;
+  text-transform: uppercase;
+}
+.thirds-card strong { font-size: clamp(1.8rem, 7vw, 3rem); }
+.thirds-card span { font-weight: 950; letter-spacing: 0.1em; }
+.thirds-answer-form {
+  display: grid;
+  grid-template-columns: auto minmax(4rem, 1fr) auto;
+  align-items: center;
+  gap: 0.55rem;
+}
+.thirds-answer-form label { font-weight: 900; }
+.thirds-answer-form input {
+  min-width: 0;
+  min-height: 3rem;
+  border: 3px solid #f4d35e;
+  border-radius: 0.5rem;
+  font-size: 1.6rem;
+  font-weight: 950;
+  text-align: center;
+  text-transform: uppercase;
+}
+.thirds-start { width: 100%; }
+.thirds-message { min-height: 1.4em; margin: 0; text-align: center; }
+
 @media (max-width: 760px) {
   .arcade-cabinet-grid { grid-template-columns: 1fr; }
   .practice-room-door { min-height: 11rem; }
@@ -5821,23 +6055,34 @@ select {
   .arcade-room-header .btn { width: 100%; }
   .arcade-cabinet-link { min-height: 12rem; }
   .blue-game-touch-controls { position: sticky; bottom: 0; }
-  .wheel-play-area { grid-template-columns: 1fr; }
-  .wheel-letter-grid { grid-template-columns: repeat(7, minmax(2.55rem, 1fr)); }
+  .wheel-active-area {
+    grid-template-columns: minmax(10.5rem, 1fr) minmax(7.25rem, 0.68fr);
+    grid-template-areas:
+      "summary summary"
+      "wheel controls"
+      "letters letters";
+    gap: 0.55rem;
+    padding: 0.6rem;
+  }
+  .wheel-spinner-wrap { width: min(100%, 12rem); }
+  .wheel-letter-grid { grid-template-columns: repeat(9, minmax(2rem, 1fr)); gap: 0.25rem; }
+  .wheel-letter-grid button { min-height: 2.5rem; }
 }
 
 @media (max-width: 430px) {
   .arcade-room,
   .arcade-game,
   .wheel-game,
-  .scale-keyboard-game { padding: 0.75rem; }
+  .scale-keyboard-game,
+  .thirds-game { padding: 0.75rem; }
   .arcade-game-status { gap: 0.35rem; }
   .arcade-game-status p { padding: 0.5rem 0.25rem; font-size: 0.88rem; }
   .arcade-game-actions .btn { width: 100%; }
-  .wheel-game-status { gap: 0.35rem; }
-  .wheel-game-status p { padding: 0.5rem 0.2rem; font-size: 0.82rem; }
-  .wheel-letter-grid { grid-template-columns: repeat(6, minmax(2.55rem, 1fr)); }
-  .wheel-game-actions .btn { width: 100%; }
+  .wheel-game-status { gap: 0.25rem; }
+  .wheel-game-status p { padding: 0.35rem 0.15rem; font-size: 0.76rem; }
   .scale-keyboard-actions .btn { width: 100%; }
+  .thirds-answer-form { grid-template-columns: 1fr 1fr; }
+  .thirds-answer-form label { grid-column: 1 / -1; }
   .arcade-economy-status { align-items: flex-start; flex-direction: column; }
 }
 
@@ -6700,8 +6945,8 @@ select {
    * Exact mirrored SHED control positions.
    *
    * LEFT             RIGHT
-   * Name             XP
-   * Instrument       Level
+   * Name             Level
+   * Instrument       XP
    * Team             Metronome
    * Stickerbook      Tuner
    * Mum              Audio
@@ -6853,6 +7098,23 @@ select {
 
     font-size: 2rem !important;
   }
+
+}
+
+.woodshed-foreground.ww-shed-grid
+  .shed-sound-effects-controls #sound-effects-button {
+  position: relative !important;
+  z-index: 8 !important;
+}
+
+.woodshed-foreground.ww-shed-grid
+  .shed-sound-effects-controls .sound-effects-panel {
+  top: auto !important;
+  right: calc(100% + 0.5rem) !important;
+  bottom: 0 !important;
+  z-index: 7 !important;
+  width: min(14rem, calc(100vw - 5.5rem));
+  max-height: min(18rem, calc(100dvh - 1.5rem));
 }
 
 

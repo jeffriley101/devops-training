@@ -24,21 +24,21 @@ def test_shed_controls_use_requested_left_and_right_columns() -> None:
     stickerbook = HOME.index("id=\"shed-decorate-button\"", team)
     mum = HOME.index("id=\"mum-open-button\"", stickerbook)
     right_column = HOME.index("woodshed-object-column-right", center_column)
-    xp_control = HOME.index("id=\"xp-level-control\"", right_column)
-    profile_level = HOME.index("id=\"level-value\"", xp_control)
-    metronome = HOME.index("id=\"metronome-open-button\"", profile_level)
+    profile_level = HOME.index("id=\"level-value\"", right_column)
+    xp_control = HOME.index("id=\"xp-level-control\"", profile_level)
+    metronome = HOME.index("id=\"metronome-open-button\"", xp_control)
     tuner = HOME.index("id=\"tuner-open-button\"", metronome)
     audio = HOME.index("id=\"sound-effects-button\"", tuner)
 
     assert left_column < instrument < team < stickerbook < mum < center_column < right_column
-    assert right_column < xp_control < profile_level < metronome < tuner < audio
-    assert "aria-controls=\"xp-panel\"" in HOME[xp_control:profile_level]
+    assert right_column < profile_level < xp_control < metronome < tuner < audio
+    assert "aria-controls=\"xp-panel\"" in HOME[xp_control:metronome]
     assert HOME.count("id=\"xp-level-control\"") == 1
     assert HOME.count("id=\"level-value\"") == 1
-    xp_markup = HOME[xp_control:profile_level]
+    xp_markup = HOME[xp_control:metronome]
     assert '<span class="xp-level-symbol" aria-hidden="true">⭐</span>' in xp_markup
     assert 'id="xp-level-number" class="sr-only"' in xp_markup
-    level_markup = HOME[profile_level:metronome]
+    level_markup = HOME[profile_level:xp_control]
     assert '<span class="room-object-icon" aria-hidden="true">🏅</span>' in level_markup
 
 
@@ -105,8 +105,9 @@ def test_mobile_shed_controls_keep_requested_rows_after_side_swap() -> None:
     stage_end = APP.index("function stageShopDandelion", stage_start)
     stage = APP[stage_start:stage_end]
     assert stage.index('"#shed-team-button"') < stage.index('"#shed-decorate-button"')
-    assert stage.index('"#xp-level-control"') < stage.index('"#level-value"')
+    assert stage.index('"#level-value"') < stage.index('"#xp-level-control"')
     assert '"grid-template-rows", "repeat(5, 1fr)"' in APP
+    assert 'imp(column, "width", "3.5rem")' in APP
 
 def test_xp_level_uses_an_emoji_token_without_the_old_coin_treatment() -> None:
     badge = CSS[CSS.index(".xp-level-control {"):CSS.index(".xp-panel {")]

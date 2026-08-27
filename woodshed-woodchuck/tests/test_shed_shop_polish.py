@@ -94,7 +94,8 @@ def test_shed_uses_server_member_date_board_clipboard_and_compact_level() -> Non
     assert 'datetime="{{ member_since.timestamp }}"' in board
     assert ">📋<" not in home
     assert ">📔<" not in home
-    assert "profileLevel.charAt(0).toUpperCase()" in app_js
+    assert "profileLevel.charAt(0).toUpperCase()" not in app_js
+    assert 'id="level-value"' in home and "🏅" in home
     assert 'Level: ${profileLevel}. Change level.' in app_js
     assert 'kind === "level"' in account_js
 

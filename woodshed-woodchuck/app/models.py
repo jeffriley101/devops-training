@@ -883,7 +883,8 @@ class ArcadeHighScore(Base):
             name="uq_arcade_high_score_profile_game",
         ),
         CheckConstraint(
-            "game_key IN ('blue', 'radio-tuner', 'wheel-of-woodchuck', 'scale-keyboard')",
+            "game_key IN ('blue', 'radio-tuner', 'wheel-of-woodchuck', "
+            "'scale-keyboard', 'thirds')",
             name="ck_arcade_high_score_game_key",
         ),
         CheckConstraint(
@@ -921,7 +922,7 @@ class ArcadePlaySession(Base):
         UniqueConstraint("play_token", name="uq_arcade_play_session_token"),
         CheckConstraint(
             "game_key IN ('plunge-burrow', 'blue', 'radio-tuner', "
-            "'wheel-of-woodchuck', 'scale-keyboard')",
+            "'wheel-of-woodchuck', 'scale-keyboard', 'thirds')",
             name="ck_arcade_play_session_game_key",
         ),
         CheckConstraint(

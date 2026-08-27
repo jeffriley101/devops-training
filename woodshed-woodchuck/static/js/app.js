@@ -5454,8 +5454,8 @@
     ];
 
     const rightSelectors = [
-      "#xp-level-control",
       "#level-value",
+      "#xp-level-control",
       "#metronome-open-button",
       "#tuner-open-button",
       ".shed-sound-effects-controls",
@@ -5575,12 +5575,19 @@
       imp(column, "top", "4%");
       imp(column, "bottom", "4%");
       imp(column, side, "0.65rem");
-      imp(column, "width", "42%");
+      imp(column, "width", "3.5rem");
       imp(column, "height", "auto");
 
       imp(column, "display", "grid");
       imp(column, "grid-template-rows", "repeat(5, 1fr)");
       imp(column, "align-items", "center");
+
+      // The Name has a wider readable minimum than the emoji controls. Keep
+      // that overflow from widening the left grid track and pulling the whole
+      // left stack inward; the right stack already fits its fixed lane.
+      if (column === left) {
+        imp(column, "grid-template-columns", "minmax(0, 1fr)");
+      }
 
       imp(column, "justify-items", "center");
 

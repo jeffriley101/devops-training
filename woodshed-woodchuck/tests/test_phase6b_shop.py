@@ -33,8 +33,9 @@ def test_shop_is_one_viking_scene_with_balanced_control_columns() -> None:
 
 def test_left_controls_preserve_rewards_and_community_actions() -> None:
     markup = shop_markup()
-    controls = ["🌼", "👑", "🐐", "📬", "💝"]
-    assert [markup.index(item) for item in controls] == sorted(markup.index(item) for item in controls)
+    left = markup[markup.index("shop-object-column-left"):markup.index("shop-object-column-right")]
+    controls = ["🌼", "👑", "🐐", "📬", "🚪"]
+    assert [left.index(item) for item in controls] == sorted(left.index(item) for item in controls)
     assert 'id="credits-value"' in markup
     assert 'data-shop-panel="crown"' in markup
     assert 'data-shop-panel="goat"' in markup
@@ -48,8 +49,10 @@ def test_left_controls_preserve_rewards_and_community_actions() -> None:
 
 def test_right_controls_and_donation_link_are_unique() -> None:
     markup = shop_markup()
-    controls = ["🎒", "🐛", "🔗", "🚪", "🗿"]
-    assert [markup.index(item) for item in controls] == sorted(markup.index(item) for item in controls)
+    right_start = markup.index("shop-object-column-right")
+    right = markup[right_start:markup.index("</div>\n  </div>", right_start)]
+    controls = ["🎒", "🐛", "🔗", "💝", "🗿"]
+    assert [right.index(item) for item in controls] == sorted(right.index(item) for item in controls)
     assert "Open Spectrogram" in markup
     assert "Pristine P-Chart — Coming Soon" in markup
     assert "Clothing Shelf, coming soon" not in markup
@@ -143,9 +146,9 @@ def test_mobile_shop_keeps_both_vertical_columns_over_the_scene() -> None:
     right = markup[
         right_start:markup.index("</div>\n  </div>", right_start)
     ]
-    for control in ("🌼", "👑", "🐐", "📬", "💝"):
+    for control in ("🌼", "👑", "🐐", "📬", "🚪"):
         assert control in left
-    for control in ("🎒", "🐛", "🔗", "🚪", "🗿"):
+    for control in ("🎒", "🐛", "🔗", "💝", "🗿"):
         assert control in right
     assert 'class="shop-dandelion-count"' in left
     assert 'aria-label="Shop rewards and community"' in markup

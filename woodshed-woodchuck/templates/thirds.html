@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="thirds-game" data-thirds-game aria-labelledby="thirds-title">
+  <header class="arcade-room-header">
+    <h1 id="thirds-title">Thirds</h1>
+    <a class="btn btn-secondary" href="/arcade">Back to Arcade</a>
+  </header>
+
+  <div class="arcade-economy-status" aria-label="Arcade cost and balance">
+    <span>Balance 🌼 <output data-arcade-balance>—</output></span>
+    <span>1🌼 TO PLAY · WIN UP TO 5🌼</span>
+  </div>
+  <p class="arcade-economy-message" data-arcade-economy-message role="status" aria-live="polite"></p>
+
+  <div class="thirds-active-area">
+    <div class="thirds-status" aria-label="Game status">
+      <p>Score <strong id="thirds-score">0</strong></p>
+      <p>Best <strong id="thirds-best">0</strong></p>
+      <p>Time <strong id="thirds-time">30</strong></p>
+    </div>
+
+    <section class="thirds-card" aria-label="Current chord">
+      <strong id="thirds-chord">Ready</strong>
+      <span>Type the third</span>
+    </section>
+
+    <form id="thirds-answer-form" class="thirds-answer-form" autocomplete="off">
+      <label for="thirds-answer">Note</label>
+      <input id="thirds-answer" name="answer" type="text" inputmode="text" maxlength="1"
+             pattern="[A-Ga-g]" autocapitalize="characters" required disabled>
+      <button id="thirds-submit" class="btn btn-primary" type="submit" disabled>Submit</button>
+    </form>
+    <button id="thirds-start" class="btn btn-primary thirds-start" type="button">New Game</button>
+    <p id="thirds-message" class="thirds-message" role="status" aria-live="polite">Ready</p>
+  </div>
+
+  <section class="arcade-game-leaderboard" aria-labelledby="thirds-leaderboard-title">
+    <h2 id="thirds-leaderboard-title">Top 5</h2>
+    <ol data-arcade-leaderboard="thirds"><li>Loading…</li></ol>
+  </section>
+</section>
+{% endblock %}
+
+{% block page_scripts %}
+<script src="/static/js/arcade-economy.js?v=1"></script>
+<script src="/static/js/thirds.js?v=1"></script>
+{% endblock %}

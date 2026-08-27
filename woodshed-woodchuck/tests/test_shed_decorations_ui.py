@@ -17,12 +17,14 @@ def test_decorate_mode_has_a_dedicated_scene_layer_and_inventory_panel() -> None
     assert "aria-controls=\"shed-decorate-panel\"" in scene
     assert "id=\"shed-decoration-inventory\"" in HOME
     assert "id=\"shed-decoration-placed-list\"" not in HOME
-    right_column = scene[scene.index("woodshed-object-column-right"):]
-    chair = right_column.index('id="mum-open-button"')
-    decorate = right_column.index('id="shed-decorate-button"')
-    decorate_end = right_column.index("</button>", decorate)
-    decorate_button = right_column[decorate:decorate_end]
-    assert chair < decorate
+    left_start = scene.index("woodshed-object-column-left")
+    left_column = scene[left_start:scene.index("woodshed-object-column-center", left_start)]
+    team = left_column.index('id="shed-team-button"')
+    decorate = left_column.index('id="shed-decorate-button"')
+    chair = left_column.index('id="mum-open-button"')
+    decorate_end = left_column.index("</button>", decorate)
+    decorate_button = left_column[decorate:decorate_end]
+    assert team < decorate < chair
     assert 'class="room-object shed-decorate-button"' in decorate_button
     assert 'aria-label="Open Stickerbook"' in decorate_button
     assert '<span class="room-object-icon" aria-hidden="true">🎨</span>' in decorate_button

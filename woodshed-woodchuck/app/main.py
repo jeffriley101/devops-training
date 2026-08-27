@@ -424,6 +424,20 @@ def arcade_scale_keyboard(request: Request):
     )
 
 
+@app.get("/arcade/thirds")
+def arcade_thirds(request: Request):
+    with SessionLocal() as session:
+        if current_profile(request, session) is None:
+            return RedirectResponse(url="/login", status_code=303)
+    return _render(
+        request,
+        "thirds.html",
+        title="Thirds",
+        active_nav="store",
+        page_class="main-app-page arcade-screen",
+    )
+
+
 @app.get("/store")
 def store(request: Request):
     site_url = public_site_url(request)

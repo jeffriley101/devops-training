@@ -108,6 +108,10 @@ def test_fourth_cabinet_and_authenticated_game_route(wheel_database) -> None:
     assert 'href="/arcade/wheel-of-woodchuck"' in ARCADE
     assert "WHEEL OF WOODCHUCK" in ARCADE.upper()
     assert 'data-arcade-personal-best="wheel-of-woodchuck"' in ARCADE
+    assert '<p>Time <strong id="wheel-time">45</strong></p>' in WHEEL
+    assert '<p>Misses <strong id="wheel-misses">0/3</strong></p>' in WHEEL
+    assert '/static/js/wheel-of-woodchuck.js?v=4' in WHEEL
+    assert "const RUN_DURATION_MS = 45000" in WHEEL_JS
 
     anonymous = TestClient(app).get(
         "/arcade/wheel-of-woodchuck", follow_redirects=False
@@ -142,81 +146,85 @@ console.log(JSON.stringify({ count: WHEEL_OF_WOODCHUCK_TERMS.length }));
 
 def test_spin_is_required_for_each_letter_and_used_letters_are_safe() -> None:
     result = run_wheel_node("""
+const values = [0, 0.13, 0.13];
 const game = new WheelOfWoodchuckGame({
-  terms: [{ answer: "tempo", definition: "Speed" }], random: () => 0,
+  terms: [{ answer: "tempo", definition: "Speed" }],
+  random: () => values.shift() ?? 0.13,
 });
 game.start();
-assert.equal(game.remainingMs, 30000);
+assert.equal(game.remainingMs, 45000);
 assert.equal(game.guessLetter("Z").reason, "spin-required");
 game.startSpin(); game.completeSpin();
-assert.equal(game.guessLetter("Z").penaltyMs, 8000);
-assert.equal(game.remainingMs, 22000);
+assert.equal(game.guessLetter("Z").misses, 1);
+assert.equal(game.remainingMs, 45000);
 assert.equal(game.guessLetter("Z").reason, "already-guessed");
-assert.equal(game.remainingMs, 22000);
+assert.equal(game.misses, 1);
 game.startSpin(); game.completeSpin();
 game.guessLetter("T");
 assert.equal(game.canGuessLetter, false);
 assert.equal(game.guessLetter("E").reason, "spin-required");
-console.log(JSON.stringify({ remaining: game.remainingMs }));
+console.log(JSON.stringify({ remaining: game.remainingMs, misses: game.misses }));
 """)
-    assert result == {"remaining": 22000}
+    assert result == {"remaining": 45000, "misses": 1}
 
 
 def test_numeric_spin_scores_each_repeated_letter_occurrence() -> None:
     result = run_wheel_node("""
-const values = [0, 0.52];
+const values = [0, 0.4];
 const game = new WheelOfWoodchuckGame({
   terms: [{ answer: "fermata", definition: "Hold" }],
   random: () => values.shift() ?? 0,
 });
 game.start();
 const spin = game.startSpin();
-assert.equal(spin.letterValue, 300);
+assert.equal(spin.letterValue, 350);
 game.completeSpin();
 const guess = game.guessLetter("A");
 assert.equal(guess.occurrences, 2);
-assert.equal(guess.gained, 600);
-assert.equal(game.score, 600);
+assert.equal(guess.gained, 700);
+assert.equal(game.score, 700);
 console.log(JSON.stringify({ score: game.score }));
 """)
-    assert result == {"score": 600}
+    assert result == {"score": 700}
 
 
 def test_revealing_every_letter_awards_the_fixed_solve_bonus() -> None:
     result = run_wheel_node("""
+let calls = 0;
 const game = new WheelOfWoodchuckGame({
-  terms: [{ answer: "tempo", definition: "Speed" }], random: () => 0,
+  terms: [{ answer: "tempo", definition: "Speed" }],
+  random: () => calls++ === 0 ? 0 : 0.13,
 });
 game.start();
 for (const letter of ["T", "E", "M", "P", "O"]) {
   game.startSpin(); game.completeSpin(); game.guessLetter(letter);
 }
 assert.equal(game.puzzleState, "solved");
-assert.equal(game.score, 1500);
+assert.equal(game.score, 6000);
 console.log(JSON.stringify({ score: game.score }));
 """)
-    assert result == {"score": 1500}
+    assert result == {"score": 6000}
 
 
-def test_two_times_segment_performs_numeric_result_and_doubles_letter_value() -> None:
+def test_three_times_segment_resolves_numeric_result_and_triples_letter_value() -> None:
     result = run_wheel_node("""
-const values = [0, 0.99, 0.45];
+const values = [0, 0.8, 0.4];
 const game = new WheelOfWoodchuckGame({
   terms: [{ answer: "tempo", definition: "Speed" }],
   random: () => values.shift() ?? 0,
 });
 game.start();
 const spin = game.startSpin();
-assert.equal(spin.segment, "2x");
-assert.equal(spin.numericResult, 250);
-assert.equal(spin.letterValue, 500);
+assert.equal(spin.segment, "3X");
+assert.equal(spin.numericResult, 350);
+assert.equal(spin.letterValue, 1050);
 game.completeSpin();
-assert.equal(game.guessLetter("O").gained, 500);
-assert.equal(game.score, 500);
+assert.equal(game.guessLetter("O").gained, 1050);
+assert.equal(game.score, 1050);
 console.log(JSON.stringify(spin));
 """)
-    assert result == {"segment": "2x", "numericResult": 250, "letterValue": 500}
-    assert "2x bonus: spinning for the numeric value" in WHEEL_JS
+    assert result == {"segment": "3X", "numericResult": 350, "letterValue": 1050}
+    assert "3X bonus: spinning for the numeric value" in WHEEL_JS
 
 
 def test_pointer_stays_fixed_and_wheel_content_counter_rotates_upright() -> None:
@@ -231,21 +239,57 @@ def test_pointer_stays_fixed_and_wheel_content_counter_rotates_upright() -> None
     assert CSS.count("rotate(var(--wheel-content-counter-rotation))") == 2
     assert ".wheel-pointer {" in CSS
     assert "WHEEL_SEGMENTS.indexOf(result.segment) / WHEEL_SEGMENTS.length" in WHEEL_JS
-    assert "NUMERIC_WHEEL_VALUES.indexOf(result.numericResult) /" in WHEEL_JS
+    assert "WHEEL_SEGMENTS.indexOf(result.numericResult) /" in WHEEL_JS
 
 
-def test_spell_it_is_always_available_with_three_no_time_penalty_attempts() -> None:
+def test_active_game_area_keeps_locked_actions_together_and_leaderboard_below() -> None:
+    active_start = WHEEL.index('id="wheel-active-area"')
+    active_end = WHEEL.index("</section>", active_start)
+    active = WHEEL[active_start:active_end]
+    spin = active.index('id="wheel-spin"')
+    spell = active.index('id="wheel-spell-open"')
+    new_game = active.index('id="wheel-start"')
+
+    assert spin < spell < new_game
+    assert 'class="wheel-action-stack"' in active
+    assert 'class="wheel-game-summary"' in active
+    assert 'class="wheel-visual"' in active
+    assert 'class="wheel-control-panel"' in active
+    assert 'id="wheel-spell-form"' in active
+    assert active_end < WHEEL.index('class="arcade-game-leaderboard"')
+    assert 'grid-template-areas:\n    "wheel summary"\n    "wheel controls"\n    "letters letters"' in CSS
+    assert '"summary summary"\n      "wheel controls"\n      "letters letters"' in CSS
+    assert 'activeArea?.scrollIntoView({ block: "nearest" })' in WHEEL_JS
+
+
+def test_exact_slice_order_and_misses_replace_spelling_attempts_and_time_penalty() -> None:
+    slice_labels = ["MISS", "1000", "50", "350", "500", "100", "3X", "200"]
+    spinner_start = WHEEL.index('id="wheel-spinner"')
+    spinner_end = WHEEL.index("</div>", spinner_start)
+    spinner = WHEEL[spinner_start:spinner_end]
+    assert [spinner.index(f"<span>{label}</span>") for label in slice_labels] == sorted(
+        spinner.index(f"<span>{label}</span>") for label in slice_labels
+    )
     result = run_wheel_node("""
+assert.deepEqual(WHEEL_OF_WOODCHUCK_RULES.wheelSegments,
+  ["MISS", 1000, 50, 350, 500, 100, "3X", 200]);
+const values = [0, 0.13, 0];
 const game = new WheelOfWoodchuckGame({
-  terms: [{ answer: "crescendo", definition: "Louder" }], random: () => 0,
+  terms: [{ answer: "crescendo", definition: "Louder" }],
+  random: () => values.shift() ?? 0,
 });
 game.start();
 assert.equal(game.canGuessLetter, false);
-for (let count = 2; count >= 0; count -= 1) {
-  const result = game.spell("nope");
-  assert.equal(result.attemptsRemaining, count);
-  assert.equal(game.remainingMs, 30000);
-}
+game.startSpin(); game.completeSpin();
+assert.equal(game.guessLetter("Z").misses, 1);
+assert.equal(game.remainingMs, 45000);
+assert.equal(game.spell("nope").misses, 2);
+assert.equal(game.remainingMs, 45000);
+const missSpin = game.startSpin();
+assert.equal(missSpin.segment, "MISS");
+const missResult = game.completeSpin();
+assert.equal(missResult.misses, 3);
+assert.equal(missResult.exhausted, true);
 assert.equal(game.puzzleState, "failed");
 
 const solved = new WheelOfWoodchuckGame({
@@ -254,9 +298,38 @@ const solved = new WheelOfWoodchuckGame({
 solved.start();
 assert.equal(solved.spell("  CrEsCeNdO  ").correct, true);
 assert.equal(solved.score, 1000);
-console.log(JSON.stringify({ attempts: game.spellingAttempts, score: solved.score }));
+console.log(JSON.stringify({ misses: game.misses, remaining: game.remainingMs, score: solved.score }));
 """)
-    assert result == {"attempts": 0, "score": 1000}
+    assert result == {"misses": 3, "remaining": 45000, "score": 1000}
+    assert "WRONG_LETTER_PENALTY_MS" not in WHEEL_JS
+    assert "spellingAttempts" not in WHEEL_JS
+
+
+def test_three_misses_advance_to_a_new_term_and_reset_term_misses() -> None:
+    result = run_wheel_node("""
+const values = [0, 0.9];
+const game = new WheelOfWoodchuckGame({
+  terms: [
+    { answer: "tempo", definition: "Speed" },
+    { answer: "legato", definition: "Connected" },
+  ],
+  random: () => values.shift() ?? 0,
+});
+game.start();
+const first = game.currentTerm.answer;
+game.spell("wrong"); game.spell("wrong"); game.spell("wrong");
+assert.equal(game.puzzleState, "failed");
+assert.equal(game.status, "running");
+assert.equal(game.score, 0);
+game.loadNextTerm();
+assert.notEqual(game.currentTerm.answer, first);
+assert.equal(game.misses, 0);
+assert.equal(game.remainingMs, 45000);
+console.log(JSON.stringify({ misses: game.misses, remaining: game.remainingMs }));
+""")
+    assert result == {"misses": 0, "remaining": 45000}
+    assert "if (result.exhausted)" in WHEEL_JS
+    assert "advanceAfterPuzzle" in WHEEL_JS
 
 
 def test_solve_bonus_next_term_and_timer_are_run_wide() -> None:
@@ -274,10 +347,10 @@ game.spell(first);
 assert.equal(game.score, 1000);
 game.loadNextTerm();
 assert.notEqual(game.currentTerm.answer, first);
-assert.equal(game.remainingMs, 22750);
+assert.equal(game.remainingMs, 37750);
 console.log(JSON.stringify({ next: game.currentTerm.answer, remaining: game.remainingMs }));
 """)
-    assert result["remaining"] == 22750
+    assert result["remaining"] == 37750
 
 
 def test_cheer_uses_shared_audio_and_final_score_submission_is_guarded() -> None:
