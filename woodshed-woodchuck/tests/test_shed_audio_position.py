@@ -82,12 +82,14 @@ def test_shared_placement_keeps_page_content_and_accessibility_intact() -> None:
     assert 'aria-label="Open Bulletin Board"' not in templates["SHED"]
     assert 'class="sound-effects-controls shed-sound-effects-controls"' in templates["SHED"]
     right = templates["SHED"][templates["SHED"].index("woodshed-object-column-right"):templates["SHED"].index("id=\"shed-decorate-panel\"")]
-    assert right.index('id="shed-decorate-button"') < right.index('id="sound-effects-button"')
+    assert right.index('id="xp-level-control"') < right.index('id="sound-effects-button"')
+    assert 'aria-label="Audio settings. Sound Effects On."' in templates["SHED"]
+    assert 'title="Audio settings. Sound Effects On."' in templates["SHED"]
     assert "practice-timer" in templates["BOOK"] and "Submit" in templates["BOOK"]
     assert "Bonus Challenge" in templates["BOARD"] and "plunge-burrow-button" in templates["BOARD"]
     assert 'data-shop-panel-content="gear"' in templates["SHOP"]
     assert 'data-shop-panel-content="little-buddy"' in templates["SHOP"]
-    assert 'aria-label="Sound Effects On. Open settings."' in BASE
+    assert 'aria-label="Audio settings. Sound Effects On."' in BASE
     assert 'aria-controls="sound-effects-panel"' in BASE
     assert ".sound-effects-button:focus-visible" in CSS
 
@@ -120,23 +122,25 @@ def test_staged_mobile_shed_controls_use_shared_centered_lanes() -> None:
     assert "right: auto !important" in centered
     assert "transform: translate(-50%, -50%) !important" in centered
 
-    # The existing row positions remain the vertical layout source of truth.
-    rows = staged[staged.index("/* ROW 1 */"):staged.index(".woodshed-foreground.ww-shed-grid .ww-shed-control-column > * {")]
-    for selector, top in (
-        ("#woodchuck-name-value", "8%"),
-        ("#instrument-object", "28%"),
-        ("#xp-level-control", "48%"),
-        ("#shed-decorate-button", "68%"),
-        ("#mum-open-button", "88%"),
-        ("#shed-team-button", "8%"),
-        ("#level-value", "28%"),
-        ("#metronome-open-button", "48%"),
-        ("#tuner-open-button", "68%"),
-        (".shed-sound-effects-controls", "88%"),
-    ):
-        rule_start = rows.index(f"{selector} {{")
-        rule = rows[rule_start:rows.index("}", rule_start)]
-        assert f"top: {top} !important" in rule
+    app = (ROOT / "static/js/app.js").read_text(encoding="utf-8")
+    layout = app[app.index("function forceShedPositions"):app.index("function run()", app.index("function forceShedPositions"))]
+    assert '"grid-template-rows", "repeat(5, 1fr)"' in layout
+    assert 'imp(column, "justify-items", "center")' in layout
+    assert 'imp(child, "justify-self", "center")' in layout
+    assert '"justify-items", "start"' not in layout
+    assert '"justify-items", "end"' not in layout
+    assert '"justify-self", "start"' not in layout
+    assert '"justify-self", "end"' not in layout
+
+
+def test_shed_audio_control_uses_headphones_while_preserving_settings_behavior() -> None:
+    home = (ROOT / "templates/home.html").read_text(encoding="utf-8")
+    audio = (ROOT / "static/js/audio.js").read_text(encoding="utf-8")
+
+    assert 'id="sound-effects-button"' in home
+    assert ">🎧</button>" in home
+    assert 'button.textContent = "🎧"' in audio
+    assert 'Sound Effects ${enabled ? "On" : "Off"}' in audio
 
 
 def test_shed_and_shop_interactive_emojis_share_layout_safe_pop_feedback() -> None:

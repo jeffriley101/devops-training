@@ -16,21 +16,30 @@ def xp_javascript() -> str:
     return APP[start:end]
 
 
-def test_xp_control_and_team_are_ordered_in_the_left_column() -> None:
+def test_shed_controls_use_requested_left_and_right_columns() -> None:
     left_column = HOME.index("woodshed-object-column-left")
     center_column = HOME.index("woodshed-object-column-center", left_column)
     instrument = HOME.index("id=\"instrument-object\"", left_column)
-    xp_control = HOME.index("id=\"xp-level-control\"", instrument)
-    team = HOME.index("id=\"shed-team-button\"", xp_control)
-    profile_level = HOME.index("id=\"level-value\"", team)
+    team = HOME.index("id=\"shed-team-button\"", instrument)
+    stickerbook = HOME.index("id=\"shed-decorate-button\"", team)
+    mum = HOME.index("id=\"mum-open-button\"", stickerbook)
+    right_column = HOME.index("woodshed-object-column-right", center_column)
+    xp_control = HOME.index("id=\"xp-level-control\"", right_column)
+    profile_level = HOME.index("id=\"level-value\"", xp_control)
+    metronome = HOME.index("id=\"metronome-open-button\"", profile_level)
+    tuner = HOME.index("id=\"tuner-open-button\"", metronome)
+    audio = HOME.index("id=\"sound-effects-button\"", tuner)
 
-    assert left_column < instrument < xp_control < team < profile_level < center_column
-    assert "aria-controls=\"xp-panel\"" in HOME[xp_control:team]
+    assert left_column < instrument < team < stickerbook < mum < center_column < right_column
+    assert right_column < xp_control < profile_level < metronome < tuner < audio
+    assert "aria-controls=\"xp-panel\"" in HOME[xp_control:profile_level]
     assert HOME.count("id=\"xp-level-control\"") == 1
     assert HOME.count("id=\"level-value\"") == 1
-    xp_markup = HOME[xp_control:team]
+    xp_markup = HOME[xp_control:profile_level]
     assert '<span class="xp-level-symbol" aria-hidden="true">⭐</span>' in xp_markup
-    assert 'id="xp-level-number" class="xp-level-number"' in xp_markup
+    assert 'id="xp-level-number" class="sr-only"' in xp_markup
+    level_markup = HOME[profile_level:metronome]
+    assert '<span class="room-object-icon" aria-hidden="true">🏅</span>' in level_markup
 
 
 def test_xp_panel_lists_every_lifetime_source() -> None:
@@ -86,30 +95,18 @@ def test_profile_skill_level_editor_remains_separate() -> None:
     hydrate = APP[hydrate_start:hydrate_end]
     assert "const levelEl = document.getElementById(\"level-value\");" in hydrate
     assert "const profileLevel = state.profile.level || \"Level not set\";" in hydrate
-    assert "levelEl.textContent = profileLevel === \"Level not set\"" in hydrate
+    assert "levelEl.textContent" not in hydrate
+    assert "`Level: ${profileLevel}. Change level.`" in hydrate
     assert "const control = document.getElementById(\"xp-level-control\");" in xp_javascript()
 
 
-def test_mobile_left_and_right_controls_use_intentional_rows() -> None:
-    start = CSS.index("/* Keep mobile SHED controls")
-    end = CSS.index("/* SHED lifetime XP badge", start)
-    mobile = CSS[start:end]
-
-    for selector, position in (
-        ("#instrument-object", "12%"),
-        ("#xp-level-control", "34%"),
-        (".woodshed-object-column-left .dandelion-object", "55%"),
-        ("#level-value", "76%"),
-        (".metronome-object", "10%"),
-        (".tuner-object", "29%"),
-        (".chair-object", "48%"),
-        (".shed-decorate-button", "67%"),
-        (".woodshed-object-column-right > .shed-sound-effects-controls", "86%"),
-    ):
-        rule_start = mobile.index(selector)
-        assert f"top: {position} !important" in mobile[rule_start:rule_start + 220]
-    assert "left: 0" in mobile
-    assert "right: 0" in mobile
+def test_mobile_shed_controls_keep_requested_rows_after_side_swap() -> None:
+    stage_start = APP.index("function stageShedGrid")
+    stage_end = APP.index("function stageShopDandelion", stage_start)
+    stage = APP[stage_start:stage_end]
+    assert stage.index('"#shed-team-button"') < stage.index('"#shed-decorate-button"')
+    assert stage.index('"#xp-level-control"') < stage.index('"#level-value"')
+    assert '"grid-template-rows", "repeat(5, 1fr)"' in APP
 
 def test_xp_level_uses_an_emoji_token_without_the_old_coin_treatment() -> None:
     badge = CSS[CSS.index(".xp-level-control {"):CSS.index(".xp-panel {")]
@@ -117,16 +114,23 @@ def test_xp_level_uses_an_emoji_token_without_the_old_coin_treatment() -> None:
     assert "border: 0" in badge
     assert "drop-shadow" in badge
     assert ".xp-level-symbol" in badge
-    assert ".xp-level-number" in badge
     assert "radial-gradient" not in badge
 
 
-def test_profile_level_uses_the_gold_medallion_separately_from_xp() -> None:
-    start = CSS.rindex(".shed-readout-level {")
-    profile_badge = CSS[start:CSS.index(".board-page", start)]
-    assert "radial-gradient(circle at 35% 28%" in profile_badge
-    assert "border: 3px ridge #8b5c1d" in profile_badge
-    assert "border-radius: 50%" in profile_badge
+def test_profile_level_uses_the_gold_medal_emoji_separately_from_xp() -> None:
     control_start = HOME.index('id="level-value"')
     control = HOME[control_start:HOME.index("</button>", control_start)]
     assert 'aria-controls="change-level-panel"' in control
+    assert "🏅" in control
+
+
+def test_shed_team_control_uses_the_configured_emblem_with_the_safe_fallback() -> None:
+    button_start = HOME.index('id="shed-team-button"')
+    button = HOME[button_start:HOME.index("</button>", button_start)]
+    team_wiring_start = APP.index("function wireShedTeamBadge")
+    team_wiring_end = APP.index("function wireLoginStreak", team_wiring_start)
+    team_wiring = APP[team_wiring_start:team_wiring_end]
+
+    assert 'id="shed-team-emblem"' in button
+    assert "renderTeamEmblem(emblem, current?.emblem || \"\")" in team_wiring
+    assert "No team" in team_wiring

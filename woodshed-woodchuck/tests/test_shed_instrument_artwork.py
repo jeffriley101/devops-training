@@ -2,46 +2,25 @@ from pathlib import Path
 
 import pytest
 
-from app.instruments import INSTRUMENT_OPTIONS, shed_artwork_url
+from app.instruments import (
+    INSTRUMENT_OPTIONS,
+    SHED_ARTWORK_BY_INSTRUMENT_KEY,
+    canonical_instrument_key,
+    shed_artwork_url,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
 SAX_ART = "/static/img/shed-cabin-new.png"
-TRUMPET_ART = SAX_ART
-DRUM_ART = SAX_ART
-GUITAR_ART = SAX_ART
-
-
-@pytest.mark.parametrize(
-    ("instrument", "expected_url"),
-    [
-        ("Flute", SAX_ART),
-        ("Clarinet", SAX_ART),
-        ("Saxophone", SAX_ART),
-        ("Accordion", SAX_ART),
-        ("Trumpet", TRUMPET_ART),
-        ("Trombone", TRUMPET_ART),
-        ("Tuba", TRUMPET_ART),
-        ("Percussion", DRUM_ART),
-        ("Hand Percussion", DRUM_ART),
-        ("Auxiliary Percussion", DRUM_ART),
-        ("Color Guard", DRUM_ART),
-        ("Drum Major", DRUM_ART),
-        ("Harp", GUITAR_ART),
-        ("Piano / Keyboard", GUITAR_ART),
-        ("Banjo", GUITAR_ART),
-        ("Guitar", GUITAR_ART),
-        ("Violin", GUITAR_ART),
-    ],
-)
-def test_every_canonical_instrument_selects_its_artwork(instrument, expected_url):
+@pytest.mark.parametrize("instrument", INSTRUMENT_OPTIONS)
+def test_every_current_instrument_uses_the_safe_shared_artwork(instrument):
     assert instrument in INSTRUMENT_OPTIONS
-    assert shed_artwork_url(instrument) == expected_url
+    assert shed_artwork_url(instrument) == SAX_ART
 
 
 def test_shed_artwork_matching_is_case_insensitive_and_has_safe_fallback():
-    assert shed_artwork_url("  tRuMpEt  ") == TRUMPET_ART
-    assert shed_artwork_url("PIANO / KEYBOARD") == GUITAR_ART
+    assert shed_artwork_url("  tRuMpEt  ") == SAX_ART
+    assert shed_artwork_url("PIANO / KEYBOARD") == SAX_ART
     assert shed_artwork_url(None) == SAX_ART
     assert shed_artwork_url("") == SAX_ART
     assert shed_artwork_url("Unknown Instrument") == SAX_ART
@@ -69,8 +48,30 @@ def test_selected_artwork_is_wired_only_to_the_shed():
     assert "/static/img/shed-cabin-new.png" not in welcome
 
 
-def test_all_shed_artwork_assets_exist():
-    for artwork in (SAX_ART, TRUMPET_ART, DRUM_ART, GUITAR_ART):
-        asset = ROOT / "static" / artwork.removeprefix("/static/")
-        assert asset.is_file()
-        assert asset.stat().st_size > 0
+def test_future_artwork_mapping_has_one_authoritative_canonical_key_path():
+    assert SHED_ARTWORK_BY_INSTRUMENT_KEY == {}
+    assert {canonical_instrument_key(instrument) for instrument in INSTRUMENT_OPTIONS} == {
+        "flute",
+        "clarinet",
+        "saxophone",
+        "trumpet",
+        "trombone",
+        "tuba",
+        "percussion",
+        "drum-major",
+        "color-guard",
+        "violin",
+        "guitar",
+        "banjo",
+        "piano-keyboard",
+        "accordion",
+        "harp",
+        "hand-percussion",
+        "auxiliary-percussion",
+    }
+    source = (ROOT / "app/instruments.py").read_text(encoding="utf-8")
+    assert "woodchuck-trumpet.png" not in source
+    assert "woodchuck-drum.png" not in source
+    assert "woodchuck-guitar.png" not in source
+    asset = ROOT / "static" / SAX_ART.removeprefix("/static/")
+    assert asset.is_file() and asset.stat().st_size > 0

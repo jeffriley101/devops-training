@@ -5117,10 +5117,10 @@ select {
   min-width: 0;
   min-height: 14rem;
   padding: 0.65rem 0.55rem 1rem;
-  grid-template-rows: auto 3.4rem auto;
+  grid-template-rows: 2rem 3.4rem 2.25rem;
   align-content: start;
   justify-items: center;
-  gap: 0.7rem;
+  gap: 0.55rem;
   border: 4px solid #5b371f;
   border-radius: 0.35rem 0.35rem 0.1rem 0.1rem;
   color: #fff5d5;
@@ -5162,7 +5162,7 @@ select {
   content: "";
   position: absolute;
   right: 0.55rem;
-  top: 55%;
+  top: 5.45rem;
   width: 0.72rem;
   height: 0.72rem;
   border: 1px solid #59400d;
@@ -5172,19 +5172,20 @@ select {
 }
 
 .practice-room-door strong {
-  font-size: 0.9rem;
-  line-height: 1.15;
-}
-
-.practice-room-door strong {
+  display: grid;
+  box-sizing: border-box;
   width: min(100%, 8rem);
-  margin-top: 0.3rem;
-  padding: 0.28rem 0.42rem;
+  min-height: 2.25rem;
+  place-items: center;
+  margin: 0;
+  padding: 0.25rem 0.42rem;
   border: 1px solid #5a3821;
   border-radius: 0.2rem;
   color: #3a2516;
   background: #ead29a;
   box-shadow: 0 1px 2px rgba(38, 21, 11, 0.3);
+  font-size: clamp(0.72rem, 1.8vw, 0.9rem);
+  line-height: 1.15;
   text-shadow: none;
 }
 
@@ -6699,11 +6700,11 @@ select {
    * Exact mirrored SHED control positions.
    *
    * LEFT             RIGHT
-   * Name             Team
+   * Name             XP
    * Instrument       Level
-   * XP               Metronome
-   * Inventory        Tuner
-   * Chair            Audio
+   * Team             Metronome
+   * Stickerbook      Tuner
+   * Mum              Audio
    */
 
   .woodshed-foreground.ww-shed-grid {

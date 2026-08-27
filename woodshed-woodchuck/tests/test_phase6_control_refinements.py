@@ -57,14 +57,16 @@ def test_level_control_is_centered_with_full_accessible_dynamic_label() -> None:
     css = source("static/css/styles.css")
     javascript = source("static/js/app.js")
     home = source("templates/home.html")
-    block = css[css.index(".shed-readout-level {"):css.index(".shed-secret-button {")]
     assert 'id="level-value"' in home
     assert 'aria-label="Change student level"' in home
     assert 'aria-controls="change-level-panel"' in home
-    assert "display: flex" in block and "justify-content: center" in block
-    assert "width: 3.5rem" in block and "padding: 0" in block
+    control_start = home.index('id="level-value"')
+    control = home[control_start:home.index("</button>", control_start)]
+    assert "🏅" in control
+    assert 'class="room-object shed-profile-field"' in control
     assert "`Level: ${profileLevel}. Change level.`" in javascript
-    assert 'textContent = profileLevel === "Level not set"' in javascript
+    hydrate = javascript[javascript.index("function hydrateHome"):javascript.index("function wireXpPanel")]
+    assert "levelEl.textContent" not in hydrate
 
 
 def test_shop_dandelion_count_is_visible_unboxed_and_uses_shared_hydration() -> None:

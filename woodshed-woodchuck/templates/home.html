@@ -40,6 +40,41 @@
           ♪
         </button>
 
+        <button id="shed-team-button" class="room-object dandelion-object" type="button" aria-controls="shed-team-panel" aria-expanded="false" aria-label="Choose a team" title="Choose a team">
+          <span id="shed-team-emblem" class="room-object-icon" aria-hidden="true">⬡</span>
+        </button>
+
+        <button
+          id="shed-decorate-button"
+          class="room-object shed-decorate-button"
+          type="button"
+          aria-controls="shed-decorate-panel"
+          aria-expanded="false"
+          aria-label="Open Stickerbook"
+          title="Stickerbook"
+        >
+          <span class="room-object-icon" aria-hidden="true">🎨</span>
+        </button>
+
+        <button
+          id="mum-open-button"
+          class="room-object chair-object"
+          type="button"
+          aria-label="Visit Mum's chair"
+          aria-controls="mum-panel"
+          aria-expanded="false"
+          title="Mum's Chair"
+        >
+          <span class="room-object-icon" aria-hidden="true">🪑</span>
+        </button>
+      </div>
+
+      <div
+        class="woodshed-object-column woodshed-object-column-center"
+        aria-hidden="true"
+      ></div>
+
+      <div class="woodshed-object-column woodshed-object-column-right">
         <button
           id="xp-level-control"
           class="xp-level-control"
@@ -50,35 +85,20 @@
           title="XP Level"
         >
           <span class="xp-level-symbol" aria-hidden="true">⭐</span>
-          <span id="xp-level-number" class="xp-level-number">1</span>
-        </button>
-
-        <button id="shed-team-button" class="room-object dandelion-object" type="button" aria-controls="shed-team-panel" aria-expanded="false" aria-label="Choose a team" title="Choose a team">
-          <span id="shed-team-emblem" class="room-object-icon" aria-hidden="true">⬡</span>
+          <span id="xp-level-number" class="sr-only">1</span>
         </button>
 
         <button
           id="level-value"
-          class="shed-readout shed-readout-level shed-profile-field"
+          class="room-object shed-profile-field"
           type="button"
           aria-controls="change-level-panel"
           aria-expanded="false"
           aria-label="Change student level"
           title="Change student level"
         >
-          B
+          <span class="room-object-icon" aria-hidden="true">🏅</span>
         </button>
-
-
-
-      </div>
-
-      <div
-        class="woodshed-object-column woodshed-object-column-center"
-        aria-hidden="true"
-      ></div>
-
-      <div class="woodshed-object-column woodshed-object-column-right">
 
 
         <button
@@ -105,33 +125,8 @@
           <span class="room-object-icon" aria-hidden="true">🔱</span>
         </button>
 
-        <button
-          id="mum-open-button"
-          class="room-object chair-object"
-          type="button"
-          aria-label="Visit Mum's chair"
-          aria-controls="mum-panel"
-          aria-expanded="false"
-          title="Mum's Chair"
-        >
-          <span class="room-object-icon" aria-hidden="true">🪑</span>
-        </button>
-
-
-        <button
-          id="shed-decorate-button"
-          class="room-object shed-decorate-button"
-          type="button"
-          aria-controls="shed-decorate-panel"
-          aria-expanded="false"
-          aria-label="Open Stickerbook"
-          title="Stickerbook"
-        >
-          <span class="room-object-icon" aria-hidden="true">🎨</span>
-        </button>
-
         <div class="sound-effects-controls shed-sound-effects-controls">
-          <button id="sound-effects-button" class="sound-effects-button" type="button" aria-label="Sound Effects On. Open settings." aria-controls="sound-effects-panel" aria-expanded="false">🔊</button>
+          <button id="sound-effects-button" class="sound-effects-button" type="button" aria-label="Audio settings. Sound Effects On." title="Audio settings. Sound Effects On." aria-controls="sound-effects-panel" aria-expanded="false">🎧</button>
           <div id="sound-effects-panel" class="sound-effects-panel" hidden>
             <label class="sound-effects-toggle" for="sound-effects-enabled">
               <span>Sound Effects</span>

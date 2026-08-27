@@ -55,26 +55,18 @@ INSTRUMENT_DEFINITIONS = (
 )
 
 _DEFAULT_SHED_ARTWORK_URL = "/static/img/shed-cabin-new.png"
-_SHED_ARTWORK_BY_INSTRUMENT_KEY = {
-    "trumpet": "/static/img/woodchuck-trumpet.png",
-    "trombone": "/static/img/woodchuck-trumpet.png",
-    "tuba": "/static/img/woodchuck-trumpet.png",
-    "percussion": "/static/img/woodchuck-drum.png",
-    "hand-percussion": "/static/img/woodchuck-drum.png",
-    "auxiliary-percussion": "/static/img/woodchuck-drum.png",
-    "color-guard": "/static/img/woodchuck-drum.png",
-    "drum-major": "/static/img/woodchuck-drum.png",
-    "harp": "/static/img/woodchuck-guitar.png",
-    "piano-keyboard": "/static/img/woodchuck-guitar.png",
-    "banjo": "/static/img/woodchuck-guitar.png",
-    "guitar": "/static/img/woodchuck-guitar.png",
-    "violin": "/static/img/woodchuck-guitar.png",
-}
+# Add a supported-instrument key here only when its production cabin artwork
+# exists. Until then every instrument intentionally uses the approved cabin.
+SHED_ARTWORK_BY_INSTRUMENT_KEY: dict[str, str] = {}
 
 
 def shed_artwork_url(instrument_value: str | None) -> str:
-    """Return the single production SHED artwork for every instrument."""
-    return _DEFAULT_SHED_ARTWORK_URL
+    """Resolve one optional cabin asset from a canonical instrument key."""
+    try:
+        key = canonical_instrument_key(instrument_value or "")
+    except ValueError:
+        return _DEFAULT_SHED_ARTWORK_URL
+    return SHED_ARTWORK_BY_INSTRUMENT_KEY.get(key, _DEFAULT_SHED_ARTWORK_URL)
 
 
 INSTRUMENT_OPTIONS = [item["label"] for item in INSTRUMENT_DEFINITIONS]

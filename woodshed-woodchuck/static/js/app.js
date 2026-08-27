@@ -400,9 +400,6 @@
 
     if (levelEl) {
       const profileLevel = state.profile.level || "Level not set";
-      levelEl.textContent = profileLevel === "Level not set"
-        ? "—"
-        : profileLevel.charAt(0).toUpperCase();
       levelEl.setAttribute(
         "aria-label",
         `Level: ${profileLevel}. Change level.`
@@ -5451,13 +5448,13 @@
     const leftSelectors = [
       "#woodchuck-name-value",
       "#instrument-object",
-      "#xp-level-control",
+      "#shed-team-button",
       "#shed-decorate-button",
       "#mum-open-button",
     ];
 
     const rightSelectors = [
-      "#shed-team-button",
+      "#xp-level-control",
       "#level-value",
       "#metronome-open-button",
       "#tuner-open-button",
@@ -5585,11 +5582,7 @@
       imp(column, "grid-template-rows", "repeat(5, 1fr)");
       imp(column, "align-items", "center");
 
-      if (side === "left") {
-        imp(column, "justify-items", "start");
-      } else {
-        imp(column, "justify-items", "end");
-      }
+      imp(column, "justify-items", "center");
 
       for (const child of column.children) {
         imp(child, "position", "static");
@@ -5603,11 +5596,7 @@
         imp(child, "align-self", "center");
         imp(child, "pointer-events", "auto");
 
-        if (side === "left") {
-          imp(child, "justify-self", "start");
-        } else {
-          imp(child, "justify-self", "end");
-        }
+        imp(child, "justify-self", "center");
       }
     }
 

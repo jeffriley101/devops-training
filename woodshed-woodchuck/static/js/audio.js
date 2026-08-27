@@ -446,8 +446,9 @@
     const slider = document.getElementById("sound-effects-volume");
     const value = document.getElementById("sound-effects-volume-value");
     if (button) {
-      button.textContent = enabled ? "🔊" : "🔇";
-      button.setAttribute("aria-label", `Sound Effects ${enabled ? "On" : "Off"}. Open settings.`);
+      button.textContent = "🎧";
+      button.setAttribute("aria-label", `Audio settings. Sound Effects ${enabled ? "On" : "Off"}.`);
+      button.title = `Audio settings. Sound Effects ${enabled ? "On" : "Off"}.`;
     }
     if (toggle) {
       toggle.checked = enabled;

@@ -111,14 +111,16 @@ def test_practice_room_destinations_are_preserved_as_three_doors() -> None:
         assert retired_tag not in practice
     door_css = CSS[CSS.index(".practice-room-door {"):CSS.index("/* Arcade Room")]
     assert "min-height: 14rem" in door_css
-    assert "grid-template-rows: auto 3.4rem auto" in door_css
+    assert "grid-template-rows: 2rem 3.4rem 2.25rem" in door_css
     assert "border: 4px solid" in door_css
     assert ".practice-room-door::after" in door_css
     assert ".practice-room-door-tag" in door_css
     assert ".practice-room-door-window" in door_css
     assert "grid-template-columns: repeat(3, minmax(0, 1fr))" in CSS
     nameplate = door_css[door_css.index(".practice-room-door strong {"):]
-    assert "margin-top: 0.3rem" in nameplate
+    assert "min-height: 2.25rem" in nameplate
+    assert "box-sizing: border-box" in nameplate
+    assert "place-items: center" in nameplate
     tag = door_css[door_css.index(".practice-room-door-tag {"):door_css.index(".practice-room-door-window {")]
     assert "position: static" in tag
 
