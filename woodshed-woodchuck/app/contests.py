@@ -481,6 +481,17 @@ def public_team_emblem(team: Team | None) -> str:
     return team.emblem_key if team is not None else "shield:silver"
 
 
+def lifetime_team_identity(result: ContestResult, team: Team | None) -> str:
+    """Identify the same season-scoped team safely across its later seasons."""
+    if team is not None and team.moderation_status != "hidden":
+        if team.creator_profile_id is not None:
+            return f"owner:{team.creator_profile_id}:name:{team.normalized_name}"
+        return f"name:{team.normalized_name}"
+    # Keep a moderated or deleted historical team separate rather than
+    # collapsing unrelated private identities into one public Hall row.
+    return f"historical:{result.team_id or result.subject_key}"
+
+
 def student_score_rows(
     scores: dict[int, int],
     profiles: dict[int, WoodchuckProfile],
@@ -1950,7 +1961,10 @@ def _increment_medal(counts: dict[str, int], medal: str) -> None:
 
 def _champion_sort_key(champion: dict[str, object]) -> tuple[object, ...]:
     medals = champion["medals"]
-    name = champion.get("display_name", champion.get("instrument_label", ""))
+    name = champion.get(
+        "display_name",
+        champion.get("team_name", champion.get("instrument_label", "")),
+    )
     return (
         -medals["gold"],
         -medals["silver"],
@@ -1958,6 +1972,21 @@ def _champion_sort_key(champion: dict[str, object]) -> tuple[object, ...]:
         str(name).casefold(),
         str(name),
     )
+
+
+def _rank_champions(champions: list[dict[str, object]]) -> list[dict[str, object]]:
+    """Return deterministic medal standings with Olympic ranks for exact ties."""
+    ordered = sorted(champions, key=_champion_sort_key)
+    previous_medals: tuple[int, int, int] | None = None
+    rank = 0
+    for position, champion in enumerate(ordered, start=1):
+        medals = champion["medals"]
+        medal_key = (medals["gold"], medals["silver"], medals["bronze"])
+        if medal_key != previous_medals:
+            rank = position
+            previous_medals = medal_key
+        champion["rank"] = rank
+    return ordered
 
 
 def _record_champion_achievement(
@@ -2011,7 +2040,17 @@ def hall_of_champions_payload(session: Session) -> dict[str, object]:
         .order_by(ContestWeek.week_start.desc(), ContestResult.id.desc())
     ).all()
 
+    team_ids = {
+        result.team_id for result, _contest, _season in rows
+        if result.subject_type == "team" and result.team_id is not None
+    }
+    teams = {
+        team.id: team
+        for team in session.scalars(select(Team).where(Team.id.in_(team_ids))).all()
+    } if team_ids else {}
+
     students_by_profile: dict[int, dict[str, object]] = {}
+    teams_by_subject: dict[str, dict[str, object]] = {}
     instruments_by_key: dict[str, dict[str, object]] = {}
     for result, contest, season in rows:
         if result.subject_type == "student" and result.profile_id is not None:
@@ -2028,6 +2067,26 @@ def hall_of_champions_payload(session: Session) -> dict[str, object]:
                     "_achievement_groups": {},
                 }
                 students_by_profile[result.profile_id] = champion
+        elif result.subject_type == "team":
+            team = teams.get(result.team_id)
+            team_key = lifetime_team_identity(result, team)
+            champion = teams_by_subject.get(team_key)
+            if champion is None:
+                champion = {
+                    "team_id": result.team_id,
+                    "team_name": public_team_name(
+                        team, result.display_name_snapshot
+                    ),
+                    "emblem_key": public_team_emblem(team),
+                    "medals": _empty_medal_counts(),
+                    "by_division": {
+                        "open": _empty_medal_counts(),
+                        "verified": _empty_medal_counts(),
+                    },
+                    "divisions": set(),
+                    "_achievement_groups": {},
+                }
+                teams_by_subject[team_key] = champion
         elif result.subject_type == "instrument":
             champion = instruments_by_key.get(result.subject_key)
             if champion is None:
@@ -2105,12 +2164,20 @@ def hall_of_champions_payload(session: Session) -> dict[str, object]:
         }
         students.append(champion)
 
+    teams_payload = list(teams_by_subject.values())
+    for champion in teams_payload:
+        champion["divisions"] = sorted(champion["divisions"])
+        _finalize_champion_achievements(champion)
+
     instruments = list(instruments_by_key.values())
     for champion in instruments:
         champion["divisions"] = sorted(champion["divisions"])
         _finalize_champion_achievements(champion)
-    students.sort(key=_champion_sort_key)
-    instruments.sort(key=_champion_sort_key)
+    students = _rank_champions(students)
+    teams_payload = _rank_champions(teams_payload)
+    # Retain this existing API field for consumers of historical instrument
+    # results. Instruments are intentionally not a primary Hall category.
+    instruments = _rank_champions(instruments)
     director_rows = session.execute(
         select(DirectorTeamContestResult, DirectorTeamContest, Team, Season)
         .join(
@@ -2157,6 +2224,7 @@ def hall_of_champions_payload(session: Session) -> dict[str, object]:
 
     return {
         "students": students,
+        "teams": teams_payload,
         "instruments": instruments,
         "director_team_contests": list(director_events.values()),
     }

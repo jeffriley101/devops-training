@@ -1725,14 +1725,35 @@ def test_hall_aggregates_students_instruments_divisions_and_prior_seasons(
         *, week: ContestWeek, contest: Contest, division: str, medal: str,
         rank: int, subject_key: str, snapshot: str,
         profile: WoodchuckProfile | None = None, instrument: str | None = None,
+        team: Team | None = None,
     ) -> ContestResult:
         return ContestResult(
             contest_week_id=week.id, contest_id=contest.id, division=division,
-            subject_type="student" if profile else "instrument",
+            subject_type="student" if profile else "team" if team else "instrument",
             subject_key=subject_key, profile_id=profile.id if profile else None,
-            instrument=instrument, display_name_snapshot=snapshot,
+            instrument=instrument, team_id=team.id if team else None,
+            display_name_snapshot=snapshot,
             score=10, rank=rank, medal=medal,
         )
+
+    team_contest = next(c for c in contests if c.key == "team-weekly-practice")
+    old_team = Team(
+        season_id=prior_season.id, display_name="Lifetime Leaders",
+        normalized_name="lifetime leaders", emblem_key="shield:gold",
+        creator_profile_id=students[0].id,
+    )
+    current_team = Team(
+        season_id=current_season.id, display_name="Lifetime Leaders",
+        normalized_name="lifetime leaders", emblem_key="shield:gold",
+        creator_profile_id=students[0].id,
+    )
+    other_team = Team(
+        season_id=current_season.id, display_name="Newcomers",
+        normalized_name="newcomers", emblem_key="shield:silver",
+        creator_profile_id=students[1].id,
+    )
+    session.add_all([old_team, current_team, other_team])
+    session.flush()
 
     session.add_all([
         result(week=prior_week, contest=points, division="open", medal="gold",
@@ -1751,6 +1772,12 @@ def test_hall_aggregates_students_instruments_divisions_and_prior_seasons(
                rank=2, subject_key="flute", snapshot="Flute", instrument="Flute"),
         result(week=current_week, contest=instruments, division="open", medal="bronze",
                rank=3, subject_key="saxophone", snapshot="Saxophone", instrument="Saxophone"),
+        result(week=prior_week, contest=team_contest, division="open", medal="gold",
+               rank=1, subject_key=str(old_team.id), snapshot="Lifetime Leaders", team=old_team),
+        result(week=current_week, contest=team_contest, division="verified", medal="silver",
+               rank=2, subject_key=str(current_team.id), snapshot="Lifetime Leaders", team=current_team),
+        result(week=current_week, contest=team_contest, division="open", medal="bronze",
+               rank=3, subject_key=str(other_team.id), snapshot="Newcomers", team=other_team),
     ])
     session.add_all([
         CrownProgress(
@@ -1781,6 +1808,7 @@ def test_hall_aggregates_students_instruments_divisions_and_prior_seasons(
     assert [student["display_name"] for student in payload["students"]] == [
         "Alpha", "Shared Name", "Shared Name"
     ]
+    assert [student["rank"] for student in payload["students"]] == [1, 2, 3]
     renamed = payload["students"][1]
     assert renamed["medals"]["total"] == 2
     assert renamed["medals"] == {"gold": 1, "silver": 1, "bronze": 0, "total": 2}
@@ -1797,6 +1825,10 @@ def test_hall_aggregates_students_instruments_divisions_and_prior_seasons(
         "qualifying_wins": 0, "target_wins": 10,
         "earned": True, "earned_count": 1,
     }
+    assert [(team["rank"], team["team_name"], team["medals"]) for team in payload["teams"]] == [
+        (1, "Lifetime Leaders", {"gold": 1, "silver": 1, "bronze": 0, "total": 2}),
+        (2, "Newcomers", {"gold": 0, "silver": 0, "bronze": 1, "total": 1}),
+    ]
     flute = payload["instruments"][0]
     achievements = flute.pop("achievements")
     assert flute == {
@@ -1809,6 +1841,7 @@ def test_hall_aggregates_students_instruments_divisions_and_prior_seasons(
             "verified": {"gold": 0, "silver": 1, "bronze": 0, "total": 1},
         },
         "divisions": ["open", "verified"],
+        "rank": 1,
     }
     assert [
         (
@@ -1861,7 +1894,8 @@ def test_hall_empty_authentication_and_privacy(
     monkeypatch.setattr(contest_module, "SessionLocal", factory)
 
     assert hall_of_champions_payload(session) == {
-        "students": [], "instruments": [], "director_team_contests": [],
+        "students": [], "teams": [], "instruments": [],
+        "director_team_contests": [],
     }
     with pytest.raises(HTTPException) as unauthorized:
         contest_module.hall_of_champions(request_with_session())
@@ -1887,6 +1921,18 @@ def test_hall_ranking_uses_gold_silver_bronze_then_public_name() -> None:
 
     assert [champion["display_name"] for champion in ordered] == [
         "Gold", "Bravo", "Alpha", "Zulu"
+    ]
+
+
+def test_hall_lifetime_ranks_exact_medal_ties_olympically() -> None:
+    leaders = contest_module._rank_champions([
+        {"display_name": "Bravo", "medals": {"gold": 5, "silver": 2, "bronze": 1}},
+        {"display_name": "Alpha", "medals": {"gold": 5, "silver": 2, "bronze": 1}},
+        {"display_name": "Charlie", "medals": {"gold": 4, "silver": 10, "bronze": 10}},
+    ])
+
+    assert [(row["rank"], row["display_name"]) for row in leaders] == [
+        (1, "Alpha"), (1, "Bravo"), (3, "Charlie"),
     ]
 
 

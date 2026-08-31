@@ -236,14 +236,14 @@ def test_team_board_renders_each_configured_emblem_key_instead_of_a_generic_icon
     assert 'return { kind: "emoji", value, key: `emoji:${value}` };' in javascript
 
 
-def test_board_contains_collapsed_seasonal_hall_states_and_nested_target() -> None:
+def test_board_contains_collapsed_lifetime_hall_states_and_target() -> None:
     markup = board_template()
 
     for element_id in (
         "past-winners", "hall-of-champions", "champions-loading", "champions-auth",
         "champions-empty", "champions-error", "champions-retry",
-        "champions-content", "seasonal-champions-title",
-        "seasonal-champions-list",
+        "champions-content", "lifetime-champions-title",
+        "lifetime-champions-list",
     ):
         assert f'id="{element_id}"' in markup
     medal_opening = markup[markup.index('<details\n        id="past-winners"'):]
@@ -256,7 +256,8 @@ def test_board_contains_collapsed_seasonal_hall_states_and_nested_target() -> No
     assert markup.index('id="past-winners"') < markup.index('id="hall-of-champions"')
     assert markup.count('class="board-panel medal-board history-disclosure"') == 1
     assert markup.count('class="board-panel hall-of-champions history-disclosure"') == 1
-    assert "Seasonal" in markup
+    assert "All-Time Medal Leaders" in markup
+    assert "Seasonal" not in markup
     assert "No finalized champions yet." in markup
 
     css = (TEMPLATE_PATH.parents[1] / "static" / "css" / "styles.css").read_text(encoding="utf-8")
@@ -270,19 +271,20 @@ def test_board_contains_collapsed_seasonal_hall_states_and_nested_target() -> No
     ]
 
 
-def test_hall_javascript_groups_category_division_identity_and_season() -> None:
+def test_hall_javascript_renders_lifetime_woodchuck_team_and_special_sections() -> None:
     javascript = (
         Path(__file__).resolve().parents[1] / "static" / "js" / "app.js"
     ).read_text(encoding="utf-8")
 
     assert 'fetch("/contests/hall-of-champions"' in javascript
     hall = javascript[javascript.index("function wireHallOfChampions"):javascript.index("function wirePersonalCrownProgress")]
-    assert 'function renderSeasonalHall()' in hall
-    assert 'const championKey = `${type}:${championIndex}`' in hall
-    assert 'categoryDetails.dataset.hallCategory = categoryKey' in hall
-    assert '["open", "verified"].forEach' in hall
-    assert 'item.textContent = `${history.season}' in hall
-    assert 'entry.crownEarned ? " 👑"' in hall
+    assert 'function renderLifetimeHall()' in hall
+    assert 'renderLifetimeLeaders("Woodchucks", "students")' in hall
+    assert 'renderLifetimeLeaders("Teams", "teams")' in hall
+    assert 'renderSpecialChampionships()' in hall
+    assert 'function medalSummary(medals)' in hall
+    assert 'champion.rank' in hall
+    assert 'renderLifetimeLeaders("Instruments"' not in hall
     assert "Pristine" not in hall and "MVP" not in hall
     assert 'retryButton.addEventListener("click", loadChampions)' in javascript
 
@@ -404,7 +406,11 @@ def test_instrument_standings_use_collective_team_labels() -> None:
 
     assert "WWInstruments.teamLabel(row.instrument)" in javascript
     assert "WWInstruments.teamLabel(subject)" in javascript
-    assert "WWInstruments.teamLabel(champion.instrument_label)" in javascript
+    hall = javascript[
+        javascript.index("function wireHallOfChampions"):
+        javascript.index("function wirePersonalCrownProgress")
+    ]
+    assert 'renderLifetimeLeaders("Instruments"' not in hall
     for team_label in (
         "The Clarinets", "The Tubas", "The Percussion",
         "The Drum Majors", "The Color Guard",
