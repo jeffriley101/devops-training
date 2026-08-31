@@ -23,6 +23,7 @@ from app.contests import (
     contest_results_payload,
     finalized_weeks_payload,
     hall_of_champions_payload,
+    traveling_cup_entitlements,
     crown_progress_payload,
     weekly_practice_by_instrument,
     weekly_student_points,
@@ -45,6 +46,7 @@ from app.models import (
     RewardGrant,
     Season,
     Team,
+    TeamMembership,
     WoodchuckProfile,
     WoodchuckState,
 )
@@ -1829,6 +1831,12 @@ def test_hall_aggregates_students_instruments_divisions_and_prior_seasons(
         (1, "Lifetime Leaders", {"gold": 1, "silver": 1, "bronze": 0, "total": 2}),
         (2, "Newcomers", {"gold": 0, "silver": 0, "bronze": 1, "total": 1}),
     ]
+    assert [holder["display_name"] for holder in payload["traveling_cups"]["punxsutawney"]["holders"]] == [
+        "Alpha"
+    ]
+    assert [holder["team_name"] for holder in payload["traveling_cups"]["coterie"]["teams"]] == [
+        "Lifetime Leaders"
+    ]
     flute = payload["instruments"][0]
     achievements = flute.pop("achievements")
     assert flute == {
@@ -1896,6 +1904,10 @@ def test_hall_empty_authentication_and_privacy(
     assert hall_of_champions_payload(session) == {
         "students": [], "teams": [], "instruments": [],
         "director_team_contests": [],
+        "traveling_cups": {
+            "punxsutawney": {"holders": []},
+            "coterie": {"teams": []},
+        },
     }
     with pytest.raises(HTTPException) as unauthorized:
         contest_module.hall_of_champions(request_with_session())
@@ -1907,6 +1919,31 @@ def test_hall_empty_authentication_and_privacy(
         "legal_name", "email", "pin", "verifier", "note", "p-chart",
     ):
         assert private_field not in serialized
+
+
+def test_instrument_medals_never_create_traveling_cup_holders(
+    database: tuple[Session, sessionmaker[Session]],
+) -> None:
+    session, _ = database
+    _season, contests, week = ensure_band_camp_data(session, now=NOW)
+    instrument_contest = next(
+        contest for contest in contests
+        if contest.key == "weekly-practice-by-instrument"
+    )
+    week.status = "finalized"
+    week.finalized_at = FINAL_NOW
+    session.add(ContestResult(
+        contest_week_id=week.id, contest_id=instrument_contest.id, division="open",
+        subject_type="instrument", subject_key="flute", instrument="Flute",
+        display_name_snapshot="Flute", score=100, rank=1, medal="gold",
+    ))
+    session.commit()
+
+    cups = hall_of_champions_payload(session, now=NOW)["traveling_cups"]
+    assert cups == {
+        "punxsutawney": {"holders": []},
+        "coterie": {"teams": []},
+    }
 
 
 def test_hall_ranking_uses_gold_silver_bronze_then_public_name() -> None:
@@ -1934,6 +1971,188 @@ def test_hall_lifetime_ranks_exact_medal_ties_olympically() -> None:
     assert [(row["rank"], row["display_name"]) for row in leaders] == [
         (1, "Alpha"), (1, "Bravo"), (3, "Charlie"),
     ]
+
+
+def test_punxsutawney_cup_is_dynamic_and_uses_student_medals_only(
+    database: tuple[Session, sessionmaker[Session]],
+) -> None:
+    session, _ = database
+    _season, contests, week = ensure_band_camp_data(session, now=NOW)
+    points = next(contest for contest in contests if contest.key == "weekly-points-leaders")
+    instruments = next(
+        contest for contest in contests
+        if contest.key == "weekly-practice-by-instrument"
+    )
+    alpha = add_student(session, woodchuck_id="WC-CUP-ALPHA", instrument="Flute")
+    bravo = add_student(session, woodchuck_id="WC-CUP-BRAVO", instrument="Trumpet")
+    charlie = add_student(session, woodchuck_id="WC-CUP-CHARLIE", instrument="Tuba")
+    week.status = "finalized"
+    week.finalized_at = FINAL_NOW
+    session.add_all([
+        ContestResult(
+            contest_week_id=week.id, contest_id=points.id, division="open",
+            subject_type="student", subject_key=str(alpha.id), profile_id=alpha.id,
+            display_name_snapshot="Alpha", score=10, rank=1, medal="gold",
+        ),
+        # Instrument results never affect either traveling cup.
+        ContestResult(
+            contest_week_id=week.id, contest_id=instruments.id, division="open",
+            subject_type="instrument", subject_key="flute", instrument="Flute",
+            display_name_snapshot="Flute", score=10, rank=1, medal="gold",
+        ),
+    ])
+    session.commit()
+
+    before = (
+        session.scalar(select(func.count()).select_from(RewardGrant)),
+        session.scalar(select(func.count()).select_from(CrownProgress)),
+        session.scalar(select(func.count()).select_from(CrownAward)),
+    )
+    hall = hall_of_champions_payload(session, now=NOW)
+    assert [row["display_name"] for row in hall["traveling_cups"]["punxsutawney"]["holders"]] == ["Alpha"]
+    assert traveling_cup_entitlements(session, profile_id=alpha.id, now=NOW) == {
+        "punxsutawney": True, "coterie": False,
+    }
+    assert traveling_cup_entitlements(session, profile_id=charlie.id, now=NOW) == {
+        "punxsutawney": False, "coterie": False,
+    }
+
+    # A later silver breaks the one-gold tie in Bravo's favor without any
+    # permanent grant/revoke operation.
+    session.add(ContestResult(
+        contest_week_id=week.id, contest_id=points.id, division="verified",
+        subject_type="student", subject_key=str(bravo.id), profile_id=bravo.id,
+        display_name_snapshot="Bravo", score=9, rank=2, medal="gold",
+    ))
+    session.add(ContestResult(
+        contest_week_id=week.id, contest_id=points.id, division="open",
+        subject_type="student", subject_key=f"{bravo.id}:silver", profile_id=bravo.id,
+        display_name_snapshot="Bravo", score=8, rank=2, medal="silver",
+    ))
+    session.commit()
+    hall = hall_of_champions_payload(session, now=NOW)
+    assert [row["display_name"] for row in hall["traveling_cups"]["punxsutawney"]["holders"]] == ["Bravo"]
+    assert traveling_cup_entitlements(session, profile_id=alpha.id, now=NOW)["punxsutawney"] is False
+    assert traveling_cup_entitlements(session, profile_id=bravo.id, now=NOW)["punxsutawney"] is True
+
+    # Exact medal-count ties are co-holders and use the Hall's Olympic rank 1.
+    session.add(ContestResult(
+        contest_week_id=week.id, contest_id=points.id, division="verified",
+        subject_type="student", subject_key=f"{alpha.id}:silver", profile_id=alpha.id,
+        display_name_snapshot="Alpha", score=8, rank=2, medal="silver",
+    ))
+    session.commit()
+    hall = hall_of_champions_payload(session, now=NOW)
+    holders = hall["traveling_cups"]["punxsutawney"]["holders"]
+    assert [(row["rank"], row["display_name"]) for row in holders] == [
+        (1, "Alpha"), (1, "Bravo"),
+    ]
+    assert traveling_cup_entitlements(session, profile_id=alpha.id, now=NOW)["punxsutawney"] is True
+    assert traveling_cup_entitlements(session, profile_id=bravo.id, now=NOW)["punxsutawney"] is True
+    assert before == (
+        session.scalar(select(func.count()).select_from(RewardGrant)),
+        session.scalar(select(func.count()).select_from(CrownProgress)),
+        session.scalar(select(func.count()).select_from(CrownAward)),
+    )
+
+
+def test_coterie_cup_is_dynamic_team_only_and_uses_current_membership(
+    database: tuple[Session, sessionmaker[Session]],
+) -> None:
+    session, _ = database
+    season, contests, week = ensure_band_camp_data(session, now=NOW)
+    team_contest = next(contest for contest in contests if contest.key == "team-weekly-practice")
+    owner = add_student(session, woodchuck_id="WC-CUP-OWNER", instrument="Flute")
+    member = add_student(session, woodchuck_id="WC-CUP-MEMBER", instrument="Trumpet")
+    runner_member = add_student(session, woodchuck_id="WC-CUP-RUNNER", instrument="Tuba")
+    former_member = add_student(session, woodchuck_id="WC-CUP-FORMER", instrument="Oboe")
+    outsider = add_student(session, woodchuck_id="WC-CUP-OUTSIDER", instrument="Horn")
+    leader = Team(
+        season_id=season.id, display_name="Cup Leaders", normalized_name="cup leaders",
+        emblem_key="shield:gold", creator_profile_id=owner.id,
+    )
+    runner = Team(
+        season_id=season.id, display_name="Cup Runners", normalized_name="cup runners",
+        emblem_key="shield:silver", creator_profile_id=runner_member.id,
+    )
+    session.add_all([leader, runner])
+    session.flush()
+    session.add_all([
+        TeamMembership(
+            season_id=season.id, team_id=leader.id, profile_id=owner.id,
+            selected_week_start=week.week_start, started_at=NOW - timedelta(days=1),
+        ),
+        TeamMembership(
+            season_id=season.id, team_id=leader.id, profile_id=member.id,
+            selected_week_start=week.week_start, started_at=NOW - timedelta(days=1),
+        ),
+        TeamMembership(
+            season_id=season.id, team_id=runner.id, profile_id=runner_member.id,
+            selected_week_start=week.week_start, started_at=NOW - timedelta(days=1),
+        ),
+        TeamMembership(
+            season_id=season.id, team_id=leader.id, profile_id=former_member.id,
+            selected_week_start=week.week_start, started_at=NOW - timedelta(days=3),
+            ended_at=NOW - timedelta(days=1),
+        ),
+    ])
+    week.status = "finalized"
+    week.finalized_at = FINAL_NOW
+    session.add_all([
+        ContestResult(
+            contest_week_id=week.id, contest_id=team_contest.id, division="open",
+            subject_type="team", subject_key=str(leader.id), team_id=leader.id,
+            display_name_snapshot=leader.display_name, score=100, rank=1, medal="gold",
+        ),
+        ContestResult(
+            contest_week_id=week.id, contest_id=team_contest.id, division="verified",
+            subject_type="team", subject_key=str(runner.id), team_id=runner.id,
+            display_name_snapshot=runner.display_name, score=90, rank=2, medal="silver",
+        ),
+    ])
+    session.commit()
+
+    hall = hall_of_champions_payload(session, now=NOW)
+    coterie = hall["traveling_cups"]["coterie"]
+    assert [(row["rank"], row["team_name"], row["emblem_key"]) for row in coterie["teams"]] == [
+        (1, "Cup Leaders", "shield:gold"),
+    ]
+    assert "eligible_members" not in repr(coterie)
+    assert "profile_id" not in repr(coterie)
+    assert "WC-CUP-OWNER" not in repr(coterie)
+    assert hall["students"] == []  # Team medals never become personal medals.
+    assert traveling_cup_entitlements(session, profile_id=owner.id, now=NOW) == {
+        "punxsutawney": False, "coterie": True,
+    }
+    assert traveling_cup_entitlements(session, profile_id=member.id, now=NOW)["coterie"] is True
+    assert traveling_cup_entitlements(session, profile_id=former_member.id, now=NOW)["coterie"] is False
+    assert traveling_cup_entitlements(session, profile_id=outsider.id, now=NOW)["coterie"] is False
+
+    # A new gold puts the runner ahead (gold, then silver), and dynamic
+    # membership entitlement follows the new holder immediately.
+    session.add(ContestResult(
+        contest_week_id=week.id, contest_id=team_contest.id, division="open",
+        subject_type="team", subject_key=f"{runner.id}:gold", team_id=runner.id,
+        display_name_snapshot=runner.display_name, score=100, rank=1, medal="gold",
+    ))
+    session.commit()
+    assert [row["team_name"] for row in hall_of_champions_payload(session, now=NOW)["traveling_cups"]["coterie"]["teams"]] == ["Cup Runners"]
+    assert traveling_cup_entitlements(session, profile_id=owner.id, now=NOW)["coterie"] is False
+    assert traveling_cup_entitlements(session, profile_id=runner_member.id, now=NOW)["coterie"] is True
+
+    # Matching the runner's silver creates co-holder teams, not personal medals.
+    session.add(ContestResult(
+        contest_week_id=week.id, contest_id=team_contest.id, division="verified",
+        subject_type="team", subject_key=f"{leader.id}:silver", team_id=leader.id,
+        display_name_snapshot=leader.display_name, score=90, rank=2, medal="silver",
+    ))
+    session.commit()
+    holders = hall_of_champions_payload(session, now=NOW)["traveling_cups"]["coterie"]["teams"]
+    assert [(row["rank"], row["team_name"]) for row in holders] == [
+        (1, "Cup Leaders"), (1, "Cup Runners"),
+    ]
+    assert traveling_cup_entitlements(session, profile_id=owner.id, now=NOW)["coterie"] is True
+    assert traveling_cup_entitlements(session, profile_id=runner_member.id, now=NOW)["coterie"] is True
 
 
 def test_hall_static_route_requires_authentication() -> None:

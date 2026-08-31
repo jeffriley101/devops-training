@@ -1989,6 +1989,105 @@ def _rank_champions(champions: list[dict[str, object]]) -> list[dict[str, object
     return ordered
 
 
+def _rank_one(champions: list[dict[str, object]]) -> list[dict[str, object]]:
+    return [champion for champion in champions if champion["rank"] == 1]
+
+
+def _current_team_member_ids(
+    session: Session, champion: dict[str, object], *, now: datetime
+) -> set[int]:
+    """Return current active members for one lifetime team identity."""
+    normalized_name = champion.get("_normalized_name")
+    owner_profile_id = champion.get("_owner_profile_id")
+    if not isinstance(normalized_name, str) or not normalized_name:
+        return set()
+    now_utc = aware_utc(now)
+    # Match the existing team-membership authority: a temporary display
+    # entitlement follows the active current season, not the season in which
+    # a lifetime medal was earned.
+    active_season = session.scalar(select(Season).where(
+        Season.status == "active",
+        Season.starts_on <= now_utc.astimezone(CENTRAL).date(),
+    ).order_by(Season.starts_on.desc()))
+    if active_season is None:
+        return set()
+    team_query = select(Team.id).where(
+        Team.season_id == active_season.id,
+        Team.normalized_name == normalized_name,
+        Team.moderation_status != "hidden",
+    )
+    if isinstance(owner_profile_id, int):
+        team_query = team_query.where(Team.creator_profile_id == owner_profile_id)
+    else:
+        team_query = team_query.where(Team.creator_profile_id.is_(None))
+    current_team_id = session.scalar(team_query)
+    if current_team_id is None:
+        return set()
+    return set(session.scalars(select(TeamMembership.profile_id).join(
+        WoodchuckProfile, WoodchuckProfile.id == TeamMembership.profile_id
+    ).where(
+        TeamMembership.team_id == current_team_id,
+        TeamMembership.season_id == active_season.id,
+        TeamMembership.started_at <= now_utc,
+        or_(TeamMembership.ended_at.is_(None), TeamMembership.ended_at > now_utc),
+        WoodchuckProfile.status == "active",
+    )).all())
+
+
+def _traveling_cup_state(
+    session: Session,
+    *,
+    students: list[dict[str, object]],
+    teams: list[dict[str, object]],
+    now: datetime,
+) -> tuple[dict[str, object], dict[str, set[int]]]:
+    """Build public current-holder data and private temporary entitlements."""
+    student_holders = _rank_one(students)
+    team_holders = _rank_one(teams)
+    coterie_member_ids: set[int] = set()
+    for team in team_holders:
+        coterie_member_ids.update(_current_team_member_ids(session, team, now=now))
+    public = {
+        "punxsutawney": {
+            "holders": [{
+                "display_name": holder["display_name"],
+                "rank": holder["rank"],
+                "medals": dict(holder["medals"]),
+            } for holder in student_holders],
+        },
+        "coterie": {
+            "teams": [{
+                "team_id": holder["team_id"],
+                "team_name": holder["team_name"],
+                "emblem_key": holder["emblem_key"],
+                "rank": holder["rank"],
+                "medals": dict(holder["medals"]),
+            } for holder in team_holders],
+        },
+    }
+    internal = {
+        "punxsutawney_profile_ids": {
+            holder["_profile_id"] for holder in student_holders
+            if isinstance(holder.get("_profile_id"), int)
+        },
+        "coterie_profile_ids": coterie_member_ids,
+    }
+    return public, internal
+
+
+def traveling_cup_entitlements(
+    session: Session, *, profile_id: int, now: datetime | None = None
+) -> dict[str, bool]:
+    """Return one student's dynamic traveling-cup eligibility without writes."""
+    instant = aware_utc(now or datetime.now(timezone.utc))
+    payload = hall_of_champions_payload(session, _include_internal=True, now=instant)
+    internal = payload.pop("_traveling_cup_entitlements")
+    return {
+        "punxsutawney": profile_id in internal["punxsutawney_profile_ids"],
+        "coterie": profile_id in internal["coterie_profile_ids"],
+    }
+
+
 def _record_champion_achievement(
     champion: dict[str, object],
     *,
@@ -2027,7 +2126,12 @@ def _finalize_champion_achievements(champion: dict[str, object]) -> None:
     champion["achievements"] = achievements
 
 
-def hall_of_champions_payload(session: Session) -> dict[str, object]:
+def hall_of_champions_payload(
+    session: Session,
+    *,
+    _include_internal: bool = False,
+    now: datetime | None = None,
+) -> dict[str, object]:
     rows = session.execute(
         select(ContestResult, Contest, Season)
         .join(Contest, Contest.id == ContestResult.contest_id)
@@ -2057,6 +2161,7 @@ def hall_of_champions_payload(session: Session) -> dict[str, object]:
             champion = students_by_profile.get(result.profile_id)
             if champion is None:
                 champion = {
+                    "_profile_id": result.profile_id,
                     "display_name": result.display_name_snapshot,
                     "medals": _empty_medal_counts(),
                     "by_division": {
@@ -2078,6 +2183,12 @@ def hall_of_champions_payload(session: Session) -> dict[str, object]:
                         team, result.display_name_snapshot
                     ),
                     "emblem_key": public_team_emblem(team),
+                    "_normalized_name": (
+                        team.normalized_name if team is not None else None
+                    ),
+                    "_owner_profile_id": (
+                        team.creator_profile_id if team is not None else None
+                    ),
                     "medals": _empty_medal_counts(),
                     "by_division": {
                         "open": _empty_medal_counts(),
@@ -2222,12 +2333,28 @@ def hall_of_champions_payload(session: Session) -> dict[str, object]:
             "score": result.score,
         })
 
-    return {
+    traveling_cups, internal_entitlements = _traveling_cup_state(
+        session,
+        students=students,
+        teams=teams_payload,
+        now=aware_utc(now or datetime.now(timezone.utc)),
+    )
+    if not _include_internal:
+        for champion in students:
+            champion.pop("_profile_id", None)
+        for champion in teams_payload:
+            champion.pop("_normalized_name", None)
+            champion.pop("_owner_profile_id", None)
+    payload = {
         "students": students,
         "teams": teams_payload,
         "instruments": instruments,
         "director_team_contests": list(director_events.values()),
+        "traveling_cups": traveling_cups,
     }
+    if _include_internal:
+        payload["_traveling_cup_entitlements"] = internal_entitlements
+    return payload
 
 
 def crown_progress_payload(

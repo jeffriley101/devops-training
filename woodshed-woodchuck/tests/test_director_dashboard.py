@@ -302,6 +302,7 @@ def test_contest_authorization_and_hall_are_private_roster_safe(dashboard_databa
         assert event["title"] == "total_minutes Invitational"
         assert len(event["winners"]) == 2
         assert hall["teams"] == []
+        assert hall["traveling_cups"]["coterie"]["teams"] == []
         assert "Director Person" not in repr(event)
         assert "Member Person" not in repr(event)
 
