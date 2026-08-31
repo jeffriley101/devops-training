@@ -37,6 +37,14 @@ NOW = datetime(2026, 8, 25, 18, tzinfo=timezone.utc)
 ROOT = Path(__file__).resolve().parents[1]
 
 
+class FixedDashboardDateTime(datetime):
+    """Keep endpoint week selection aligned with deterministic fixture data."""
+
+    @classmethod
+    def now(cls, tz=None):
+        return NOW.replace(tzinfo=None) if tz is None else NOW.astimezone(tz)
+
+
 @pytest.fixture()
 def dashboard_database(monkeypatch: pytest.MonkeyPatch):
     engine = create_engine(
@@ -46,6 +54,7 @@ def dashboard_database(monkeypatch: pytest.MonkeyPatch):
     Base.metadata.create_all(engine)
     for module in (account_routes, director_dashboard, main, teams):
         monkeypatch.setattr(module, "SessionLocal", factory)
+    monkeypatch.setattr(director_dashboard, "datetime", FixedDashboardDateTime)
     with factory() as session:
         season = Season(
             key="back-to-school-2026", name="Back to School",
@@ -163,6 +172,10 @@ def test_dashboard_aggregates_metrics_charts_and_pending_state_without_identity_
 
     director = client_for("WC-DIRECTOR")
     payload = director.get(f"/director/dashboard?team_id={team.id}").json()
+    assert payload["period"] == {
+        "week_start": "2026-08-24",
+        "week_end": "2026-08-31",
+    }
     metrics = payload["metrics"]
     assert metrics["total_practice_minutes"] == 33
     assert metrics["average_minutes"] == 30
