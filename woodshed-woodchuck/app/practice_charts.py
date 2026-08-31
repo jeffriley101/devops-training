@@ -17,6 +17,7 @@ from .models import (
 
 
 MAX_PRACTICE_MINUTES = 1440
+MAX_DETECTED_PLAYING_SECONDS = MAX_PRACTICE_MINUTES * 60
 MAX_PRACTICE_DETAILS = 30
 MAX_DETAIL_LENGTH = 50
 MAX_DAILY_CREDITS = 75
@@ -81,6 +82,7 @@ def create_practice_chart_verification_request(
     include_team_contests: bool = True,
     team_id: int | None = None,
     ordinary_email_preset_id: int | None = None,
+    detected_playing_seconds: int | None = None,
 ) -> CreatedPracticeChartRequest:
     if profile.id is None:
         raise ValueError("The student account must be saved first.")
@@ -91,10 +93,31 @@ def create_practice_chart_verification_request(
     if isinstance(minutes, bool) or not isinstance(minutes, int):
         raise ValueError("Practice minutes must be a whole number.")
 
-    if minutes < 1 or minutes > MAX_PRACTICE_MINUTES:
-        raise ValueError(
-            "Practice minutes must be between 1 and 1440."
-        )
+    if source not in {"p-book", "pristine"}:
+        raise ValueError("Unsupported P-Chart source.")
+    if source == "pristine":
+        if verifier_id is not None:
+            raise ValueError("Pristine P-Charts do not require a verifier.")
+        if (
+            isinstance(detected_playing_seconds, bool)
+            or not isinstance(detected_playing_seconds, int)
+            or detected_playing_seconds < 1
+            or detected_playing_seconds > MAX_DETECTED_PLAYING_SECONDS
+        ):
+            raise ValueError(
+                "Detected playing time must be between 1 and 86400 seconds."
+            )
+        if minutes != detected_playing_seconds // 60:
+            raise ValueError("Pristine minutes must match detected playing time.")
+        if credits_awarded != 0 or ordinary_email_preset_id is not None:
+            raise ValueError("Pristine P-Charts cannot request delivery or credits.")
+    else:
+        if minutes < 1 or minutes > MAX_PRACTICE_MINUTES:
+            raise ValueError(
+                "Practice minutes must be between 1 and 1440."
+            )
+        if detected_playing_seconds is not None:
+            raise ValueError("Only Pristine P-Charts store detected playing time.")
 
     if not isinstance(note, str):
         raise ValueError("The P-Chart note must be text.")
@@ -106,8 +129,6 @@ def create_practice_chart_verification_request(
             "The P-Chart note must be 180 characters or fewer."
         )
 
-    if source != "p-book":
-        raise ValueError("Unsupported P-Chart source.")
     if type(include_contests) is not bool:
         raise ValueError("Contest inclusion must be true or false.")
     if type(include_team_contests) is not bool:
@@ -142,6 +163,10 @@ def create_practice_chart_verification_request(
             )
         )
         if existing_chart is not None:
+            if existing_chart.source != source:
+                raise ValueError(
+                    "That submission key belongs to a different P-Chart type."
+                )
             existing_verification = session.scalar(
                 select(PracticeChartVerification).where(
                     PracticeChartVerification.practice_chart_id
@@ -183,6 +208,7 @@ def create_practice_chart_verification_request(
         note=normalized_note or None,
         practice_details=normalized_details,
         source=source,
+        detected_playing_seconds=detected_playing_seconds,
         credits_awarded=credits_awarded,
         submission_key=submission_key,
         include_contests=include_contests,
@@ -218,6 +244,10 @@ def create_practice_chart_verification_request(
                 )
             )
             if existing_chart is not None:
+                if existing_chart.source != source:
+                    raise ValueError(
+                        "That submission key belongs to a different P-Chart type."
+                    )
                 existing_verification = session.scalar(
                     select(PracticeChartVerification).where(
                         PracticeChartVerification.practice_chart_id
@@ -236,6 +266,36 @@ def create_practice_chart_verification_request(
     return CreatedPracticeChartRequest(
         chart=chart,
         verification=verification,
+    )
+
+
+def create_pristine_practice_chart(
+    session: Session,
+    *,
+    profile: WoodchuckProfile,
+    detected_playing_seconds: int,
+    submission_key: str,
+    include_contests: bool = True,
+    include_team_contests: bool = True,
+    team_id: int | None = None,
+    practice_date: date,
+) -> CreatedPracticeChartRequest:
+    """Persist one self-verified microphone-activity practice session."""
+    return create_practice_chart_verification_request(
+        session,
+        profile=profile,
+        verifier_id=None,
+        practice_date=practice_date,
+        minutes=detected_playing_seconds // 60,
+        note="Pristine Practice",
+        practice_details=[],
+        source="pristine",
+        credits_awarded=0,
+        submission_key=submission_key,
+        include_contests=include_contests,
+        include_team_contests=include_team_contests,
+        team_id=team_id,
+        detected_playing_seconds=detected_playing_seconds,
     )
 
 

@@ -315,6 +315,7 @@ def test_contest_models_match_approved_foundation() -> None:
         PracticeChart: {
             "id", "profile_id", "practice_date", "minutes", "instrument",
                 "note", "practice_details", "source", "submission_key",
+                "detected_playing_seconds",
                 "include_contests", "include_team_contests", "team_id",
                 "ordinary_email_preset_id", "ordinary_email_attempted_at",
                 "ordinary_email_sent_at", "ordinary_email_error_code",

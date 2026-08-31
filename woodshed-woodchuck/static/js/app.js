@@ -4651,6 +4651,14 @@
           const existing = entriesByServerId.get(serverId);
 
           if (existing) {
+            if (existing.pristine !== (serverChart.pristine === true)) {
+              existing.pristine = serverChart.pristine === true;
+              changed = true;
+            }
+            if (existing.detectedPlayingSeconds !== serverChart.detected_playing_seconds) {
+              existing.detectedPlayingSeconds = serverChart.detected_playing_seconds;
+              changed = true;
+            }
             if (existing.verificationStatus !== status) {
               existing.verificationStatus = status;
               verificationChanged = true;
@@ -4682,6 +4690,8 @@
               ? serverChart.practice_details
               : [],
             source: serverChart.source || "p-book",
+            pristine: serverChart.pristine === true,
+            detectedPlayingSeconds: serverChart.detected_playing_seconds,
             creditsAwarded:
               Number(serverChart.credits_awarded) || 0,
             loggedAt:
@@ -4879,6 +4889,17 @@
       window.addEventListener("pagehide", stopPracticeTimerInterval);
     }
 
+    function formatDetectedPlayingTime(totalSeconds) {
+      const seconds = Math.max(0, Math.floor(totalSeconds));
+      const hours = Math.floor(seconds / 3600);
+      const minutes = Math.floor((seconds % 3600) / 60);
+      const remainder = seconds % 60;
+      const clock = hours > 0
+        ? `${hours}:${String(minutes).padStart(2, "0")}:${String(remainder).padStart(2, "0")}`
+        : `${minutes}:${String(remainder).padStart(2, "0")}`;
+      return `${clock} detected playing`;
+    }
+
     function formatEntry(entry) {
       const noteText = entry.note ? ` — ${entry.note}` : "";
       const details = Array.isArray(entry.practiceDetails)
@@ -4909,8 +4930,13 @@
             )
           : "";
 
+      const durationText = (entry.pristine === true || entry.isPristine === true) &&
+        Number.isInteger(entry.detectedPlayingSeconds)
+        ? formatDetectedPlayingTime(entry.detectedPlayingSeconds)
+        : `${entry.minutes} minutes`;
+
       return (
-        `${entry.dateKey} — ${entry.minutes} minutes` +
+        `${entry.dateKey} — ${durationText}` +
         `${detailText}${noteText}` +
         `${verificationText}${pristineText}${verifierNoteText}`
       );

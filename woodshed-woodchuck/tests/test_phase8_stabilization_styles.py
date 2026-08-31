@@ -48,7 +48,7 @@ def test_board_heading_cherry_description_and_team_contrast_hooks() -> None:
     assert "Practice Minutes" in practice_category
     assert 'data-division="open"' in practice_category
     assert 'data-division="verified"' in practice_category
-    assert 'contest-description-plain">All submitted P-Charts' in BOARD
+    assert 'contest-description-plain">All P-Charts, grouped by instrument' in BOARD
     assert "contest-description-cherry" not in BOARD
     plain_at = CSS.index(".contest-description-plain")
     plain = CSS[plain_at:plain_at + 150]

@@ -54,7 +54,7 @@ def test_right_controls_and_donation_link_are_unique() -> None:
     controls = ["🎒", "🐛", "🔗", "💝", "🗿"]
     assert [right.index(item) for item in controls] == sorted(right.index(item) for item in controls)
     assert "Open Spectrogram" in markup
-    assert "Pristine P-Chart — Coming Soon" in markup
+    assert 'href="/practice/pristine" aria-label="Open Pristine Practice"' in markup
     assert "Clothing Shelf, coming soon" not in markup
     assert "Gear Shelf, coming soon" not in markup
     assert "direct file upload" not in markup

@@ -6,7 +6,7 @@ from datetime import timezone
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel, Field, StrictBool
+from pydantic import BaseModel, Field, StrictBool, StrictInt
 from sqlalchemy import distinct, func, select
 
 from .account_routes import current_profile
@@ -24,6 +24,7 @@ from .models import (
 from .verifiers import validate_email
 from .practice_charts import (
     create_practice_chart_verification_request,
+    create_pristine_practice_chart,
 )
 
 
@@ -134,6 +135,13 @@ class PracticeChartCreate(BaseModel):
     ordinary_email_preset_id: int | None = Field(default=None, gt=0)
 
 
+class PristinePracticeChartCreate(BaseModel):
+    detected_playing_seconds: StrictInt = Field(ge=1, le=86400)
+    submission_key: str = Field(min_length=1, max_length=64)
+    include_contests: StrictBool = True
+    include_team_contests: StrictBool = True
+
+
 class PracticeEmailPresetCreate(BaseModel):
     display_name: str = Field(min_length=1, max_length=80)
     email: str = Field(min_length=3, max_length=254)
@@ -183,6 +191,8 @@ def chart_payload(
         "note": chart.note or "",
         "practice_details": chart.practice_details,
         "source": chart.source,
+        "pristine": chart.source == "pristine",
+        "detected_playing_seconds": chart.detected_playing_seconds,
         "credits_awarded": chart.credits_awarded,
         "include_contests": chart.include_contests,
         "include_team_contests": chart.include_team_contests,
@@ -464,6 +474,57 @@ def create_student_practice_chart(
                 requested=created.verification is not None,
                 email=verifier.email if verifier else None,
             ),
+        }
+
+
+@router.post("/pristine", status_code=201)
+def create_student_pristine_practice_chart(
+    request: Request,
+    submitted: PristinePracticeChartCreate,
+):
+    with SessionLocal() as session:
+        profile = current_profile(request, session)
+        if profile is None:
+            raise HTTPException(
+                status_code=401,
+                detail="Student sign-in is required.",
+            )
+        try:
+            active_season = session.scalar(select(Season).where(
+                Season.status == "active",
+                Season.starts_on <= datetime.now(CENTRAL).date(),
+            ).order_by(Season.starts_on.desc()))
+            team_membership = (
+                session.scalar(select(TeamMembership).where(
+                    TeamMembership.profile_id == profile.id,
+                    TeamMembership.season_id == active_season.id,
+                    TeamMembership.ended_at.is_(None),
+                ))
+                if active_season is not None and submitted.include_team_contests
+                else None
+            )
+            created = create_pristine_practice_chart(
+                session,
+                profile=profile,
+                detected_playing_seconds=submitted.detected_playing_seconds,
+                submission_key=submitted.submission_key,
+                include_contests=submitted.include_contests,
+                include_team_contests=submitted.include_team_contests,
+                team_id=team_membership.team_id if team_membership else None,
+                practice_date=datetime.now(CENTRAL).date(),
+            )
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+        except RuntimeError as error:
+            raise HTTPException(
+                status_code=500,
+                detail="The Pristine P-Chart could not be created.",
+            ) from error
+
+        return {
+            "created": created.created,
+            "streak": profile_practice_streak(session, profile.id),
+            "chart": chart_payload(created.chart, None, None),
         }
 
 

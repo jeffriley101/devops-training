@@ -64,7 +64,7 @@ def test_shop_practice_rooms_preserve_tools_and_add_arcade_door() -> None:
     assert 'href="https://brassspectrogram.netlify.app/"' in html
     assert 'target="_blank" rel="noopener noreferrer"' in html
     assert 'aria-label="Open Spectrogram" title="Brass Practice Tool"' in html
-    assert 'disabled aria-label="Pristine P-Chart — Coming Soon" title="Pristine P-Chart — Coming Soon"' in html
+    assert 'href="/practice/pristine" aria-label="Open Pristine Practice"' in html
     assert 'href="/arcade" aria-label="Open Arcade Room"' in html
     assert html.count('class="practice-room-emoji-control practice-room-door"') == 3
     assert "iframe" not in html.casefold() and "microphone" not in html.casefold()

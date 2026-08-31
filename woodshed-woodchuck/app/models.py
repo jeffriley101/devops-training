@@ -626,6 +626,15 @@ class PracticeChart(Base):
             "submission_key",
             name="uq_practice_chart_profile_submission",
         ),
+        CheckConstraint(
+            "detected_playing_seconds IS NULL OR detected_playing_seconds > 0",
+            name="ck_practice_chart_detected_seconds_positive",
+        ),
+        CheckConstraint(
+            "(source = 'pristine' AND detected_playing_seconds IS NOT NULL) OR "
+            "(source != 'pristine' AND detected_playing_seconds IS NULL)",
+            name="ck_practice_chart_pristine_source_duration",
+        ),
     )
 
     id: Mapped[int] = mapped_column(
@@ -673,6 +682,11 @@ class PracticeChart(Base):
         String(30),
         default="p-book",
         nullable=False,
+    )
+
+    detected_playing_seconds: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
     )
 
     submission_key: Mapped[str | None] = mapped_column(
@@ -1341,7 +1355,7 @@ class ContestResult(Base):
             name="uq_contest_result_week_contest_division_subject",
         ),
         CheckConstraint(
-            "division IN ('open', 'verified')",
+            "division IN ('open', 'verified', 'pristine')",
             name="ck_contest_result_division",
         ),
         CheckConstraint(

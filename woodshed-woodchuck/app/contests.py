@@ -447,7 +447,9 @@ def weekly_practice_by_instrument(
     *,
     contest_week: ContestWeek,
 ) -> dict[str, list[dict[str, object]]]:
-    charts, _approved_chart_ids = _charts_and_approved_ids(session, contest_week)
+    charts, _approved_chart_ids, _pristine_chart_ids = _charts_and_approved_ids(
+        session, contest_week
+    )
 
     open_totals: dict[str, tuple[str, int]] = {}
     for chart in charts:
@@ -594,10 +596,13 @@ def weekly_student_points(
     contest_week: ContestWeek,
     current_profile_id: int,
 ) -> dict[str, object]:
-    charts, approved_chart_ids = _charts_and_approved_ids(session, contest_week)
+    charts, approved_chart_ids, pristine_chart_ids = _charts_and_approved_ids(
+        session, contest_week
+    )
 
     open_scores: dict[int, int] = {}
     verified_scores: dict[int, int] = {}
+    pristine_scores: dict[int, int] = {}
     for chart in charts:
         open_scores[chart.profile_id] = (
             open_scores.get(chart.profile_id, 0) + chart.minutes
@@ -606,8 +611,12 @@ def weekly_student_points(
             verified_scores[chart.profile_id] = (
                 verified_scores.get(chart.profile_id, 0) + chart.minutes
             )
+        if chart.id in pristine_chart_ids:
+            pristine_scores[chart.profile_id] = (
+                pristine_scores.get(chart.profile_id, 0) + chart.minutes
+            )
 
-    profile_ids = set(open_scores) | set(verified_scores)
+    profile_ids = set(open_scores) | set(verified_scores) | set(pristine_scores)
     profiles = {
         profile.id: profile
         for profile in session.scalars(
@@ -622,6 +631,9 @@ def weekly_student_points(
     verified_scores = {
         key: value for key, value in verified_scores.items() if key in active_ids
     }
+    pristine_scores = {
+        key: value for key, value in pristine_scores.items() if key in active_ids
+    }
     open_rows, open_position = student_minutes_rows(
         open_scores,
         profiles,
@@ -632,14 +644,19 @@ def weekly_student_points(
         profiles,
         current_profile_id=current_profile_id,
     )
+    pristine_rows, pristine_position = student_minutes_rows(
+        pristine_scores,
+        profiles,
+        current_profile_id=current_profile_id,
+    )
     return {
         "open": open_rows,
         "verified": verified_rows,
-        "pristine": [],
+        "pristine": pristine_rows,
         "current_user_position": {
             "open": open_position,
             "verified": verified_position,
-            "pristine": {"has_score": False},
+            "pristine": pristine_position,
         },
     }
 
@@ -863,7 +880,7 @@ def medal_for_rank(rank: int) -> str | None:
 def _charts_and_approved_ids(
     session: Session, contest_week: ContestWeek, *,
     submitted_before: datetime | None = None,
-) -> tuple[list[PracticeChart], set[int]]:
+) -> tuple[list[PracticeChart], set[int], set[int]]:
     filters = [
         PracticeChart.practice_date >= contest_week.week_start,
         PracticeChart.practice_date < contest_week.week_end,
@@ -892,7 +909,8 @@ def _charts_and_approved_ids(
         if chart_ids
         else set()
     )
-    return charts, approved
+    pristine = {chart.id for chart in charts if chart.source == "pristine"}
+    return charts, approved, pristine
 
 
 def _team_rankings(
@@ -973,14 +991,18 @@ def _weekly_team_scores(
     source_cutoff: datetime | None = None,
 ) -> dict[str, dict[str, object]]:
     """Build weekly team totals, meaningful averages, and TPR divisions."""
-    charts, approved_ids = _charts_and_approved_ids(
+    charts, approved_ids, pristine_ids = _charts_and_approved_ids(
         session, contest_week, submitted_before=source_cutoff
     )
     contributions = {"open": {}, "verified": {}, "pristine": {}}
     for chart in charts:
         if not chart.include_team_contests or chart.team_id is None:
             continue
-        divisions = ["open"] + (["verified"] if chart.id in approved_ids else [])
+        divisions = ["open"]
+        if chart.id in approved_ids:
+            divisions.append("verified")
+        if chart.id in pristine_ids:
+            divisions.append("pristine")
         for division in divisions:
             key = (chart.team_id, chart.profile_id)
             contributions[division][key] = contributions[division].get(key, 0) + chart.minutes
@@ -1092,7 +1114,7 @@ def _season_team_practice_scores(
         week = weeks.get(week_start)
         if week is None:
             continue
-        _, approved = _charts_and_approved_ids(
+        _, approved, _pristine = _charts_and_approved_ids(
             session, week, submitted_before=source_cutoff
         )
         for division in ["open"] + (["verified"] if chart.id in approved else []):
@@ -1133,7 +1155,7 @@ def _seasonal_team_point_scores(
     )).all()
     eligibility: dict[tuple[date, int], set[str]] = {}
     for week in weeks:
-        charts, approved = _charts_and_approved_ids(
+        charts, approved, _pristine = _charts_and_approved_ids(
             session, week, submitted_before=source_cutoff
         )
         for chart in charts:
@@ -1308,7 +1330,9 @@ def _legacy_finalize_contest_week(
     if set(contests) != {definition["key"] for definition in CONTEST_DEFINITIONS}:
         raise RuntimeError("Band Camp contest definitions are missing.")
 
-    charts, approved_ids = _charts_and_approved_ids(session, contest_week)
+    charts, approved_ids, pristine_ids = _charts_and_approved_ids(
+        session, contest_week
+    )
     start_at, end_at = _week_utc_bounds(contest_week)
     camp_awards = session.scalars(select(CampPointAward).where(
         CampPointAward.occurred_at >= start_at,
@@ -1330,17 +1354,21 @@ def _legacy_finalize_contest_week(
         else {}
     )
 
-    point_scores = {"open": {}, "verified": {}}
+    point_scores = {"open": {}, "verified": {}, "pristine": {}}
     camp_point_scores: dict[int, int] = {}
-    instrument_totals = {"open": {}, "verified": {}}
+    instrument_totals = {"open": {}, "verified": {}, "pristine": {}}
     contributions: dict[tuple[str, str, int], int] = {}
     for chart in charts:
-        divisions = ["open"] + (["verified"] if chart.id in approved_ids else [])
+        divisions = ["open"]
+        if chart.id in approved_ids:
+            divisions.append("verified")
+        if chart.id in pristine_ids:
+            divisions.append("pristine")
         key, display = normalize_instrument(chart.instrument)
         for division in divisions:
             scores = point_scores[division]
             scores[chart.profile_id] = scores.get(chart.profile_id, 0) + chart.minutes
-            if key:
+            if key and division != "pristine":
                 totals = instrument_totals[division]
                 prior = totals.get(key, (display, 0))
                 totals[key] = (prior[0], prior[1] + chart.minutes)
@@ -1356,7 +1384,7 @@ def _legacy_finalize_contest_week(
     camp_points_contest = contests["weekly-camp-points"]
     gold_results: dict[tuple[int, str], ContestResult] = {}
     winning_instruments: set[tuple[str, str]] = set()
-    for division in ("open", "verified"):
+    for division in ("open", "verified", "pristine"):
         ranked_students = _ranked_student_scores(point_scores[division], profiles)
         for profile_id, display, score, rank in ranked_students:
             medal = medal_for_rank(rank)
@@ -1729,18 +1757,22 @@ def finalize_contest_week(
         if was_finalized and week.finalized_at is not None
         else now_utc
     )
-    charts, approved_ids = _charts_and_approved_ids(
+    charts, approved_ids, pristine_ids = _charts_and_approved_ids(
         session, week, submitted_before=source_cutoff
     )
     profile_ids = {chart.profile_id for chart in charts}
     profiles = {row.id: row for row in session.scalars(select(WoodchuckProfile).where(
         WoodchuckProfile.id.in_(profile_ids)
     )).all()} if profile_ids else {}
-    student_scores = {"open": {}, "verified": {}}
+    student_scores = {"open": {}, "verified": {}, "pristine": {}}
     instrument_scores = {"open": {}}
     instrument_contributors: dict[tuple[str, str], set[int]] = {}
     for chart in charts:
-        divisions = ["open"] + (["verified"] if chart.id in approved_ids else [])
+        divisions = ["open"]
+        if chart.id in approved_ids:
+            divisions.append("verified")
+        if chart.id in pristine_ids:
+            divisions.append("pristine")
         instrument_key, instrument_name = normalize_instrument(chart.instrument)
         for division in divisions:
             student_scores[division][chart.profile_id] = student_scores[division].get(chart.profile_id, 0) + chart.minutes
@@ -1752,7 +1784,7 @@ def finalize_contest_week(
 
     _set_finalization_stage(session, "contest_results")
     results: list[tuple[ContestResult, Contest, set[int]]] = []
-    for division in ("open", "verified"):
+    for division in ("open", "verified", "pristine"):
         for profile_id, display, score, rank in _ranked_student_scores(student_scores[division], profiles):
             if rank not in PLACEMENT_DANDELIONS:
                 continue
