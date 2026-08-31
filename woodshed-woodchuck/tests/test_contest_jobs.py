@@ -274,7 +274,6 @@ def test_all_three_contests_finalize_and_camp_points_are_open_only(
         ("weekly-points-leaders", "open", 25),
         ("weekly-points-leaders", "verified", 25),
         ("weekly-practice-by-instrument", "open", 25),
-        ("weekly-practice-by-instrument", "verified", 25),
         ("weekly-camp-points", "open", 1),
     }
 
@@ -507,7 +506,7 @@ def test_recently_closed_week_audit_respects_deadline_then_finalizes(
     dry_run = audit_or_repair_history(
         session, week_start=week.week_start, now=NOW, apply=False
     )
-    assert dry_run["created"]["results"] == 5
+    assert dry_run["created"]["results"] == 4
     assert session.scalar(select(func.count()).select_from(ContestResult)) == 0
 
     applied = audit_or_repair_history(
@@ -564,7 +563,7 @@ def test_incomplete_finalized_week_repairs_once_without_duplicate_rewards(
         session, week_start=incomplete.week_start, now=NOW, apply=False
     )
     assert dry_run["action"] == "repaired"
-    assert dry_run["created"]["results"] == 5
+    assert dry_run["created"]["results"] == 4
     assert session.scalar(select(func.count()).select_from(ContestResult)) == 0
 
     first = audit_or_repair_history(

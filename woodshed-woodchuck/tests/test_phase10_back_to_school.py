@@ -116,15 +116,16 @@ def test_hall_ui_separates_history_and_groups_achievements() -> None:
 def test_live_contests_are_collapsible_categories_with_future_divisions() -> None:
     rendered = TestClient(app).get("/quest").text
     assert rendered.count('class="contest-category-card"') == 8
-    assert rendered.count('data-division="open"') == 8
-    assert rendered.count('data-division="verified"') == 8
-    assert rendered.count('class="contest-division-card contest-division-coming-soon"') == 16
+    assert rendered.count('data-division="open"') == 4
+    assert rendered.count('data-division="verified"') == 4
+    assert rendered.count('data-division="pristine"') == 4
+    assert 'class="contest-division-card contest-division-coming-soon"' not in rendered
     assert "Open · Verified · Pristine 🚧 · MVP 🚧" not in rendered
     for category in (
         "weekly-points-leaders", "weekly-camp-points",
         "weekly-practice-by-instrument", "team-weekly-practice",
-        "team-seasonal-points", "team-average-practice",
-        "team-season-practice", "team-practice-rating",
+        "team-weekly-activity-points", "team-weekly-average-practice",
+        "team-lifetime-practice", "team-practice-rating",
     ):
         opening = re.search(
             rf'<details class="contest-category-card"[^>]*data-contest-category="{category}"[^>]*>',
@@ -132,9 +133,9 @@ def test_live_contests_are_collapsible_categories_with_future_divisions() -> Non
         )
         assert opening is not None
         assert " open" not in opening.group(0)
-    assert rendered.count("Pristine") >= 7
-    assert rendered.count("MVP") >= 7
-    assert rendered.count("Under construction") == 16
+    assert rendered.count("Pristine") >= 4
+    assert "MVP" not in rendered
+    assert "Under construction" not in rendered
     division_layout = CSS[
         CSS.index(".contest-category-divisions {"):
         CSS.index(".contest-division-card,")

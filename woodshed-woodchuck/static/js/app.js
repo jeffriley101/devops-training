@@ -3021,7 +3021,7 @@
         parts.push("Leading the board");
       } else if (Number.isInteger(behind)) {
         parts.push(campPoints
-          ? `${behind} Camp ${behind === 1 ? "point" : "points"} behind leader`
+          ? `${behind} Board Activity ${behind === 1 ? "Point" : "Points"} behind leader`
           : `${behind} min behind leader`);
       }
       if (position.in_top_five === false) parts.push("Outside Top Five");
@@ -3090,10 +3090,16 @@
     }
 
     function renderTeamBoards(standings) {
-      const boardKeys = ["team-weekly-practice", "team-seasonal-points", "team-average-practice", "team-season-practice", "team-practice-rating"];
+      const boardKeys = [
+        "team-weekly-activity-points",
+        "team-weekly-practice",
+        "team-weekly-average-practice",
+        "team-lifetime-practice",
+        "team-practice-rating",
+      ];
       boardKeys.forEach((key) => {
         let anyRows = false;
-        ["open", "verified"].forEach((division) => {
+        ["open", "verified", "pristine"].forEach((division) => {
           const list = document.getElementById(`${key}-${division}`);
           if (!list) return;
           list.replaceChildren();
@@ -3108,18 +3114,19 @@
             const teamName = document.createElement("span"); teamName.textContent = row.team_name;
             subject.append(emblem, teamName);
             const score = document.createElement("strong"); score.className = "contest-ranked-score";
-            const scoreValue = key === "team-average-practice"
-              ? (row.score / 100).toFixed(2)
-              : key === "team-practice-rating"
+            const scoreValue = key === "team-practice-rating"
                 ? Number(row.score).toFixed(1)
                 : String(row.score);
             score.textContent = scoreValue;
-            const scoreUnit = key === "team-seasonal-points"
+            const scoreUnit = key === "team-weekly-activity-points"
               ? "Board Activity Points"
               : key === "team-practice-rating" ? "Team Practice Rating" : "practice minutes";
             item.setAttribute("aria-label", `Rank ${row.rank}, ${row.team_name}, ${scoreValue} ${scoreUnit}`);
             item.append(rank, subject, score); list.append(item);
           });
+          document.getElementById(`${key}-${division}-empty`)?.classList.toggle(
+            "hidden", rows.length !== 0
+          );
         });
         document.getElementById(`${key}-empty`)?.classList.toggle("hidden", anyRows);
       });
@@ -3181,12 +3188,13 @@
           !practiceStandings ||
           !pointsStandings ||
           !Array.isArray(practiceStandings.open) ||
-          !Array.isArray(practiceStandings.verified) ||
           !Array.isArray(pointsStandings.open) ||
           !Array.isArray(pointsStandings.verified) ||
+          !Array.isArray(pointsStandings.pristine) ||
           !pointsStandings.current_user_position ||
           !pointsStandings.current_user_position.open ||
           !pointsStandings.current_user_position.verified ||
+          !pointsStandings.current_user_position.pristine ||
           !campPointsStandings ||
           !Array.isArray(campPointsStandings.open) ||
           !campPointsStandings.current_user_position ||
@@ -3224,7 +3232,6 @@
           weekRangeEl.textContent = `${startText} – ${endText}`;
         }
         renderDivision("open", practiceStandings.open);
-        renderDivision("verified", practiceStandings.verified);
         renderPointsDivision(
           "open",
           pointsStandings.open,
@@ -3234,6 +3241,11 @@
           "verified",
           pointsStandings.verified,
           pointsStandings.current_user_position.verified
+        );
+        renderPointsDivision(
+          "pristine",
+          pointsStandings.pristine,
+          pointsStandings.current_user_position.pristine
         );
         renderPointsDivision(
           "open",
@@ -3265,13 +3277,17 @@
 
   const BOARD_CONTEST_TITLES = Object.freeze({
     "weekly-camp-points": "Board Activity Points this Week",
-    "team-seasonal-points": "Lifetime Board Activity Points by Team",
+    "team-weekly-activity-points": "Board Activity Points this Week by Team",
     "weekly-points-leaders": "Practice Minutes this Week",
     "weekly-practice-by-instrument": "Practice Minutes this Week by Instrument",
     "team-weekly-practice": "Practice Minutes this Week by Team",
-    "team-average-practice": "Practice Minutes this Week by Team Average",
-    "team-season-practice": "Practice Minutes this Season by Team",
+    "team-weekly-average-practice": "Average Practice Minutes this Week by Team",
+    "team-lifetime-practice": "Lifetime Practice Minutes by Team",
     "team-practice-rating": "Team Practice Rating",
+    // Legacy finalized results retain their historical keys and score formats.
+    "team-seasonal-points": "Team Seasonal Points",
+    "team-average-practice": "Team Average Practice",
+    "team-season-practice": "Total Practice Minutes This Season",
   });
 
   function boardContestTitle(contest) {
@@ -3458,7 +3474,7 @@
           score.className = "medal-row-score";
           if (type === "camp-points") {
             score.textContent = `${result.score} Board Activity ${result.score === 1 ? "Point" : "Points"}`;
-          } else if (type === "teams" && result.contest.key === "team-seasonal-points") {
+          } else if (type === "teams" && ["team-weekly-activity-points", "team-seasonal-points"].includes(result.contest.key)) {
             score.textContent = `${result.score} ${result.score === 1 ? "point" : "points"}`;
           } else if (type === "teams" && result.contest.key === "team-average-practice") {
             score.textContent = `${(result.score / 100).toFixed(2)} min`;

@@ -178,38 +178,17 @@
         <div class="contest-category-list" aria-label="Contest categories">
           <details class="contest-category-card" data-contest-category="weekly-camp-points">
             <summary><span>Board Activity Points this Week</span></summary>
-            <div class="contest-category-divisions">
-              <section class="contest-division-card" data-division="open" aria-labelledby="open-camp-points-title">
-                <h4 id="open-camp-points-title">Open</h4>
-                <p class="contest-division-explanation">Board activities completed this week</p>
-                <div id="contest-open-camp-points" class="contest-ranked-list contest-camp-points-list" role="list" aria-label="Open Board Activity Points leaders"></div>
-                <p id="contest-open-camp-points-empty" class="contest-empty-state hidden">No Board Activity Points have been earned this week yet.</p>
-              </section>
-              <section class="contest-division-card" data-division="verified" aria-label="Verified Board Activity Points">
-                <h4>Verified</h4><p class="contest-empty-state">Board Activity Point activities do not have separate Verified standings.</p>
-              </section>
-              {% for division in ['Pristine', 'MVP'] %}
-              <section class="contest-division-card contest-division-coming-soon" aria-label="{{ division }} unavailable">
-                <h4>{{ division }} <span aria-hidden="true">🚧</span></h4><p>Under construction</p>
-              </section>
-              {% endfor %}
+            <div class="contest-unified-board">
+              <div id="contest-open-camp-points" class="contest-ranked-list contest-camp-points-list" role="list" aria-label="Board Activity Points leaders"></div>
+              <p id="contest-open-camp-points-empty" class="contest-empty-state hidden">No Board Activity Points have been earned this week yet.</p>
             </div>
           </details>
 
-          <details class="contest-category-card" data-contest-category="team-seasonal-points">
+          <details class="contest-category-card" data-contest-category="team-weekly-activity-points">
             <summary><span>Board Activity Points this Week by Team</span></summary>
-            <div class="contest-category-divisions" data-team-board="team-seasonal-points">
-              {% for division in ['open', 'verified'] %}
-              <section class="contest-division-card" data-division="{{ division }}">
-                <h4>{{ division|capitalize }}</h4><div id="team-seasonal-points-{{ division }}" class="contest-ranked-list" role="list"></div>
-              </section>
-              {% endfor %}
-              {% for division in ['Pristine', 'MVP'] %}
-              <section class="contest-division-card contest-division-coming-soon" aria-label="{{ division }} unavailable">
-                <h4>{{ division }} <span aria-hidden="true">🚧</span></h4><p>Under construction</p>
-              </section>
-              {% endfor %}
-              <p id="team-seasonal-points-empty" class="contest-empty-state">No team scores yet.</p>
+            <div class="contest-unified-board" data-team-board="team-weekly-activity-points">
+              <div id="team-weekly-activity-points-open" class="contest-ranked-list" role="list" aria-label="Weekly team Board Activity Points"></div>
+              <p id="team-weekly-activity-points-empty" class="contest-empty-state">No team scores yet.</p>
             </div>
           </details>
 
@@ -218,7 +197,7 @@
             <div class="contest-category-divisions">
               <section class="contest-division-card" data-division="open" aria-labelledby="open-points-title">
                 <h4 id="open-points-title">Open</h4>
-            <p class="contest-division-explanation">All contest-enabled P-Charts count toward weekly practice minutes. Verified standings include only charts that have been verified.</p>
+            <p class="contest-division-explanation">All P-Charts</p>
             <div id="contest-open-points" class="contest-ranked-list" role="list" aria-label="Open minutes leaders"></div>
             <p id="contest-open-points-empty" class="contest-empty-state hidden">
               No P-Charts have been submitted this week yet.
@@ -226,81 +205,65 @@
               </section>
               <section class="contest-division-card" data-division="verified" aria-labelledby="verified-points-title">
                 <h4 id="verified-points-title">Verified</h4>
-            <p class="contest-division-explanation">All contest-enabled P-Charts count toward weekly practice minutes. Verified standings include only charts that have been verified.</p>
+            <p class="contest-division-explanation">Verified P-Charts only</p>
             <div id="contest-verified-points" class="contest-ranked-list" role="list" aria-label="Verified minutes leaders"></div>
             <p id="contest-verified-points-empty" class="contest-empty-state hidden">
               No verified P-Charts have been approved this week yet.
             </p>
               </section>
-              {% for division in ['Pristine', 'MVP'] %}
-              <section class="contest-division-card contest-division-coming-soon" aria-label="{{ division }} unavailable">
-                <h4>{{ division }} <span aria-hidden="true">🚧</span></h4><p>Under construction</p>
+              <section class="contest-division-card" data-division="pristine" aria-labelledby="pristine-points-title">
+                <h4 id="pristine-points-title">Pristine</h4>
+                <p class="contest-division-explanation">Pristine P-Charts only</p>
+                <div id="contest-pristine-points" class="contest-ranked-list" role="list" aria-label="Pristine minutes leaders"></div>
+                <p id="contest-pristine-points-empty" class="contest-empty-state">No Pristine P-Charts have been submitted yet.</p>
               </section>
-              {% endfor %}
             </div>
           </details>
 
           <details class="contest-category-card" data-contest-category="weekly-practice-by-instrument">
             <summary><span>Practice Minutes this Week by Instrument</span></summary>
-            <div class="contest-category-divisions">
-              <section class="contest-division-card" data-division="open" aria-labelledby="open-instruments-title">
-                <h4 id="open-instruments-title">Open</h4>
-                <p class="contest-division-explanation contest-description-plain">All submitted P-Charts</p>
-                <div id="contest-open-standings" class="contest-ranked-list" role="list" aria-label="Open instrument standings"></div>
-                <p id="contest-open-empty" class="contest-empty-state hidden">No P-Charts have been submitted this week yet. Log practice to start the board.</p>
-              </section>
-              <section class="contest-division-card" data-division="verified" aria-labelledby="verified-instruments-title">
-                <h4 id="verified-instruments-title">Verified</h4>
-                <p class="contest-division-explanation">Approved P-Charts only</p>
-                <div id="contest-verified-standings" class="contest-ranked-list" role="list" aria-label="Verified instrument standings"></div>
-                <p id="contest-verified-empty" class="contest-empty-state hidden">No verified P-Charts have been approved this week yet.</p>
-              </section>
-              {% for division in ['Pristine', 'MVP'] %}
-              <section class="contest-division-card contest-division-coming-soon" aria-label="{{ division }} unavailable">
-                <h4>{{ division }} <span aria-hidden="true">🚧</span></h4><p>Under construction</p>
-              </section>
-              {% endfor %}
+            <div class="contest-unified-board">
+              <p class="contest-division-explanation contest-description-plain">All P-Charts, grouped by instrument</p>
+              <div id="contest-open-standings" class="contest-ranked-list" role="list" aria-label="Instrument standings"></div>
+              <p id="contest-open-empty" class="contest-empty-state hidden">No P-Charts have been submitted this week yet. Log practice to start the board.</p>
             </div>
           </details>
 
           {% for key, title in [
             ('team-weekly-practice', 'Practice Minutes this Week by Team'),
-            ('team-average-practice', 'Practice Minutes this Week by Team Average'),
-            ('team-season-practice', 'Practice Minutes Lifetime by Team')
+            ('team-weekly-average-practice', 'Average Practice Minutes this Week by Team')
           ] %}
           <details class="contest-category-card" data-contest-category="{{ key }}">
             <summary><span>{{ title }}</span></summary>
             <div class="contest-category-divisions" data-team-board="{{ key }}">
-              {% for division in ['open', 'verified'] %}
+              {% for division in ['open', 'verified', 'pristine'] %}
               <section class="contest-division-card" data-division="{{ division }}">
                 <h4>{{ division|capitalize }}</h4><div id="{{ key }}-{{ division }}" class="contest-ranked-list" role="list"></div>
+                <p id="{{ key }}-{{ division }}-empty" class="contest-empty-state">No {{ division|capitalize }} team scores yet.</p>
               </section>
               {% endfor %}
-              {% for division in ['Pristine', 'MVP'] %}
-              <section class="contest-division-card contest-division-coming-soon" aria-label="{{ division }} unavailable">
-                <h4>{{ division }} <span aria-hidden="true">🚧</span></h4><p>Under construction</p>
-              </section>
-              {% endfor %}
-              <p id="{{ key }}-empty" class="contest-empty-state">No team scores yet.</p>
             </div>
           </details>
           {% endfor %}
 
+          <details class="contest-category-card" data-contest-category="team-lifetime-practice">
+            <summary><span>Lifetime Practice Minutes by Team</span></summary>
+            <div class="contest-unified-board" data-team-board="team-lifetime-practice">
+              <div id="team-lifetime-practice-open" class="contest-ranked-list" role="list" aria-label="Lifetime team practice minutes"></div>
+              <p id="team-lifetime-practice-empty" class="contest-empty-state">No team scores yet.</p>
+            </div>
+          </details>
+
           <details class="contest-category-card" data-contest-category="team-practice-rating">
             <summary><span>Team Practice Rating</span></summary>
             <div class="contest-category-divisions" data-team-board="team-practice-rating">
-              {% for division in ['open', 'verified'] %}
+              {% for division in ['open', 'verified', 'pristine'] %}
               <section class="contest-division-card" data-division="{{ division }}">
                 <h4>{{ division|capitalize }}</h4>
                 <div id="team-practice-rating-{{ division }}" class="contest-ranked-list" role="list"></div>
+                <p id="team-practice-rating-{{ division }}-empty" class="contest-empty-state">No {{ division|capitalize }} team scores yet.</p>
               </section>
               {% endfor %}
-              {% for division in ['Pristine', 'MVP'] %}
-              <section class="contest-division-card contest-division-coming-soon" aria-label="{{ division }} unavailable">
-                <h4>{{ division }} <span aria-hidden="true">🚧</span></h4><p>Under construction</p>
-              </section>
-              {% endfor %}
-              <p id="team-practice-rating-empty" class="contest-empty-state">No team scores yet.</p>
             </div>
           </details>
         </div>

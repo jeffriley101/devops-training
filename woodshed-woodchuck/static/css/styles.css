@@ -6703,6 +6703,11 @@ select {
   grid-template-columns: minmax(0, 1fr);
 }
 
+.contest-unified-board {
+  padding: 0.7rem;
+  border-top: 1px solid rgba(255, 224, 138, 0.45);
+}
+
 .contest-division-card,
 .hall-division-card {
   min-width: 0;

@@ -15,7 +15,7 @@ def board_template() -> str:
 
 
 def test_board_contains_live_standings_markup() -> None:
-    markup = board_template()
+    markup = TestClient(app).get("/quest").text
 
     assert 'id="band-camp-standings"' in markup
     assert 'class="contest-category-list"' in markup
@@ -24,13 +24,17 @@ def test_board_contains_live_standings_markup() -> None:
     assert 'data-contest-category="weekly-practice-by-instrument"' in markup
     assert 'data-division="open"' in markup
     assert 'data-division="verified"' in markup
-    assert "Pristine" in markup and "MVP" in markup
-    assert "Under construction" in markup
+    assert "Pristine" in markup
+    assert "MVP" not in markup
     assert 'class="contest-ranked-list"' in markup
     assert 'role="list"' in markup
     assert 'id="contest-open-points"' in markup
     assert 'id="contest-verified-points"' in markup
     assert "Practice Minutes" in markup
+    assert "All P-Charts" in markup
+    assert "Verified P-Charts only" in markup
+    assert "Pristine P-Charts only" in markup
+    assert "All P-Charts, grouped by instrument" in markup
     assert 'aria-label="Open minutes leaders"' in markup
     assert 'aria-label="Verified minutes leaders"' in markup
     assert 'aria-label="Open points leaders"' not in markup
@@ -41,6 +45,34 @@ def test_board_contains_live_standings_markup() -> None:
     assert 'id="contest-open-camp-position"' not in markup
     assert 'id="contest-verified-camp-points"' not in markup
     assert "Your Position" not in markup
+    for key in (
+        "weekly-camp-points",
+        "team-weekly-activity-points",
+        "weekly-practice-by-instrument",
+        "team-lifetime-practice",
+    ):
+        start = markup.index(f'data-contest-category="{key}"')
+        end = markup.index("</details>", start)
+        assert 'data-division="' not in markup[start:end]
+
+    for key in (
+        "weekly-points-leaders",
+        "team-weekly-practice",
+        "team-weekly-average-practice",
+        "team-practice-rating",
+    ):
+        start = markup.index(f'data-contest-category="{key}"')
+        end = markup.index("</details>", start)
+        category = markup[start:end]
+        assert category.count('data-division="') == 3
+        assert 'data-division="pristine"' in category
+        pristine_empty_id = (
+            "contest-pristine-points-empty"
+            if key == "weekly-points-leaders"
+            else f"{key}-pristine-empty"
+        )
+        assert f'id="{pristine_empty_id}"' in category
+        assert "MVP" not in category
 
 
 def test_live_competitions_use_requested_order_and_live_tpr_board() -> None:
@@ -51,20 +83,33 @@ def test_live_competitions_use_requested_order_and_live_tpr_board() -> None:
         "Practice Minutes this Week",
         "Practice Minutes this Week by Instrument",
         "Practice Minutes this Week by Team",
-        "Practice Minutes this Week by Team Average",
-        "Practice Minutes Lifetime by Team",
+        "Average Practice Minutes this Week by Team",
+        "Lifetime Practice Minutes by Team",
         "Team Practice Rating",
     )
     positions = [markup.index(f"<span>{title}</span>") for title in titles]
 
     assert positions == sorted(positions)
-    tpr = markup[
-        markup.index('data-contest-category="team-practice-rating"'):
-        markup.index('data-contest-category="team-practice-rating"') + 900
-    ]
+    tpr_start = markup.index('data-contest-category="team-practice-rating"')
+    tpr = markup[tpr_start:markup.index("</details>", tpr_start)]
     assert 'data-team-board="team-practice-rating"' in tpr
     assert 'id="team-practice-rating-open"' in tpr
     assert 'id="team-practice-rating-verified"' in tpr
+    assert 'id="team-practice-rating-pristine"' in tpr
+
+
+def test_live_team_average_renders_readable_server_value_without_scaling() -> None:
+    javascript = (TEMPLATE_PATH.parents[1] / "static" / "js" / "app.js").read_text(
+        encoding="utf-8"
+    )
+    renderer = javascript[
+        javascript.index("    function renderTeamBoards"):
+        javascript.index("    function showError", javascript.index("    function renderTeamBoards"))
+    ]
+
+    assert '"team-weekly-average-practice"' in renderer
+    assert "row.score / 100" not in renderer
+    assert '["open", "verified", "pristine"]' in renderer
 
 
 def test_desktop_board_uses_centered_single_column_without_changing_mobile_flow() -> None:

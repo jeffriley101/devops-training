@@ -58,54 +58,63 @@ def contest_season_clause():
 CONTEST_DEFINITIONS = (
     {
         "key": "weekly-points-leaders",
-        "name": "Top Five Minutes Leaders",
+        "name": "Practice Minutes this Week",
         "metric_type": "practice_minutes",
         "subject_type": "student",
         "crown_category": "weekly-points-leaders",
     },
     {
         "key": "weekly-practice-by-instrument",
-        "name": "Weekly Practice Minutes by Instrument",
+        "name": "Practice Minutes this Week by Instrument",
         "metric_type": "practice_minutes",
         "subject_type": "instrument",
         "crown_category": None,
     },
     {
         "key": "weekly-camp-points",
-        "name": "Weekly Band Camp Points",
+        "name": "Board Activity Points this Week",
         "metric_type": "points",
         "subject_type": "student",
         "crown_category": "weekly-camp-points",
     },
     {
         "key": "team-weekly-practice",
-        "name": "Team Practice Minutes This Week",
+        "name": "Practice Minutes this Week by Team",
         "metric_type": "practice_minutes",
         "subject_type": "team",
         "crown_category": "team-crown",
     },
     {
-        "key": "team-seasonal-points",
-        "name": "Team Seasonal Points",
+        "key": "team-weekly-activity-points",
+        "name": "Board Activity Points this Week by Team",
         "metric_type": "points",
         "subject_type": "team",
         "crown_category": "team-crown",
     },
     {
-        "key": "team-average-practice",
-        "name": "Team Average Practice",
+        "key": "team-weekly-average-practice",
+        "name": "Average Practice Minutes this Week by Team",
         "metric_type": "practice_minutes",
         "subject_type": "team",
         "crown_category": "team-crown",
     },
     {
-        "key": "team-season-practice",
-        "name": "Total Practice Minutes This Season",
+        "key": "team-lifetime-practice",
+        "name": "Lifetime Practice Minutes by Team",
         "metric_type": "practice_minutes",
         "subject_type": "team",
         "crown_category": "team-crown",
     },
 )
+
+# These keys remain readable through stored Contest/ContestResult rows. Their
+# meanings conflict with the corrected live metrics, so current weeks use new
+# keys instead of rewriting historical scores in place.
+LEGACY_TEAM_CONTEST_REPLACEMENTS = {
+    "team-weekly-activity-points": "team-seasonal-points",
+    "team-weekly-average-practice": "team-average-practice",
+    "team-lifetime-practice": "team-season-practice",
+}
 
 CAMP_POINT_ACTIVITIES = frozenset({"hours", "care", "trivia", "marching"})
 CROWN_CATEGORIES = (
@@ -398,8 +407,15 @@ def ensure_band_camp_data(
 
 
 def normalize_instrument(instrument: str) -> tuple[str, str]:
-    display_name = " ".join(instrument.split()).title()
-    return display_name.casefold(), display_name
+    try:
+        key = canonical_instrument_key(instrument)
+    except ValueError:
+        display_name = " ".join(instrument.split()).title()
+        return display_name.casefold(), display_name
+    definition = next(
+        row for row in INSTRUMENTS_BY_LABEL.values() if row["key"] == key
+    )
+    return key, str(definition["label"])
 
 
 def olympic_rankings(totals: dict[str, tuple[str, int]]) -> list[dict[str, object]]:
@@ -431,10 +447,9 @@ def weekly_practice_by_instrument(
     *,
     contest_week: ContestWeek,
 ) -> dict[str, list[dict[str, object]]]:
-    charts, approved_chart_ids = _charts_and_approved_ids(session, contest_week)
+    charts, _approved_chart_ids = _charts_and_approved_ids(session, contest_week)
 
     open_totals: dict[str, tuple[str, int]] = {}
-    verified_totals: dict[str, tuple[str, int]] = {}
     for chart in charts:
         key, display_name = normalize_instrument(chart.instrument)
         if not key:
@@ -443,17 +458,7 @@ def weekly_practice_by_instrument(
         existing_open = open_totals.get(key, (display_name, 0))
         open_totals[key] = (existing_open[0], existing_open[1] + chart.minutes)
 
-        if chart.id in approved_chart_ids:
-            existing_verified = verified_totals.get(key, (display_name, 0))
-            verified_totals[key] = (
-                existing_verified[0],
-                existing_verified[1] + chart.minutes,
-            )
-
-    return {
-        "open": olympic_rankings(open_totals),
-        "verified": olympic_rankings(verified_totals),
-    }
+    return {"open": olympic_rankings(open_totals)}
 
 
 def public_woodchuck_name(profile: WoodchuckProfile | None) -> str:
@@ -619,9 +624,11 @@ def weekly_student_points(
     return {
         "open": open_rows,
         "verified": verified_rows,
+        "pristine": [],
         "current_user_position": {
             "open": open_position,
             "verified": verified_position,
+            "pristine": {"has_score": False},
         },
     }
 
@@ -634,6 +641,13 @@ def _week_utc_bounds(contest_week: ContestWeek) -> tuple[datetime, datetime]:
 
 
 CONTEST_CAMP_POINT_SOURCE = re.compile(r"^contest:([^:]+):")
+
+
+def _is_contest_placement_award(award: CampPointAward) -> bool:
+    return (
+        award.activity_type == "contest-placement"
+        or CONTEST_CAMP_POINT_SOURCE.match(award.duplicate_key) is not None
+    )
 
 
 def _camp_point_source_week(
@@ -673,19 +687,15 @@ def weekly_camp_points(
     current_profile_id: int,
 ) -> dict[str, object]:
     start_at, end_at = _week_utc_bounds(contest_week)
-    awards = session.scalars(select(CampPointAward)).all()
-    weeks_by_id, weeks_by_start = _camp_point_week_maps(
-        session, season_id=contest_week.season_id
-    )
+    awards = session.scalars(select(CampPointAward).where(
+        CampPointAward.occurred_at >= start_at,
+        CampPointAward.occurred_at < end_at,
+    )).all()
     scores: dict[int, int] = {}
     for award in awards:
-        has_contest_source, source_week = _camp_point_source_week(
-            award, weeks_by_id=weeks_by_id, weeks_by_start=weeks_by_start
-        )
-        if has_contest_source:
-            if source_week is None or source_week.id != contest_week.id:
-                continue
-        elif not start_at <= aware_utc(award.occurred_at) < end_at:
+        if _is_contest_placement_award(award):
+            # Placement awards remain permanent in the ledger, but never feed
+            # back into the activity contest that produced them.
             continue
         scores[award.profile_id] = scores.get(award.profile_id, 0) + award.points_awarded
     profiles = {
@@ -950,12 +960,12 @@ def _eligible_weekly_team_rosters(
 def _weekly_team_scores(
     session: Session, contest_week: ContestWeek, *,
     source_cutoff: datetime | None = None,
-) -> dict[str, dict[str, dict[int, int]]]:
-    """Cap each profile/team contribution at 300 minutes before summing."""
+) -> dict[str, dict[str, object]]:
+    """Build weekly team totals, meaningful averages, and TPR divisions."""
     charts, approved_ids = _charts_and_approved_ids(
         session, contest_week, submitted_before=source_cutoff
     )
-    contributions = {"open": {}, "verified": {}}
+    contributions = {"open": {}, "verified": {}, "pristine": {}}
     for chart in charts:
         if not chart.include_team_contests or chart.team_id is None:
             continue
@@ -965,12 +975,12 @@ def _weekly_team_scores(
             contributions[division][key] = contributions[division].get(key, 0) + chart.minutes
     eligible_rosters = _eligible_weekly_team_rosters(session, contest_week)
     result: dict[str, dict[str, object]] = {}
-    for division in ("open", "verified"):
+    for division in ("open", "verified", "pristine"):
         scores: dict[int, int] = {}
         members: dict[int, int] = {}
         meaningful: dict[tuple[int, int], int] = {}
         for (team_id, profile_id), minutes in contributions[division].items():
-            scores[team_id] = scores.get(team_id, 0) + min(minutes, 300)
+            scores[team_id] = scores.get(team_id, 0) + minutes
             if minutes < ACTIVE_MINUTES_THRESHOLD:
                 continue
             meaningful[(team_id, profile_id)] = minutes
@@ -978,7 +988,7 @@ def _weekly_team_scores(
         averages = {
             team_id: round(
                 sum(min(minutes, 300) for (row_team, _), minutes in meaningful.items()
-                    if row_team == team_id) * 100 / active_count
+                    if row_team == team_id) / active_count
             )
             for team_id, active_count in members.items()
         }
@@ -1001,6 +1011,50 @@ def _weekly_team_scores(
     return result
 
 
+def _weekly_team_activity_point_scores(
+    session: Session, contest_week: ContestWeek, *,
+    source_cutoff: datetime | None = None,
+) -> dict[int, int]:
+    """Return normal weekly BOARD points using immutable team attribution."""
+    start_at, end_at = _week_utc_bounds(contest_week)
+    filters = [
+        CampPointAward.team_id.is_not(None),
+        CampPointAward.occurred_at >= start_at,
+        CampPointAward.occurred_at < end_at,
+        CampPointAward.activity_type.in_(CAMP_POINT_ACTIVITIES),
+    ]
+    if source_cutoff is not None:
+        filters.append(CampPointAward.created_at <= aware_utc(source_cutoff))
+    scores: dict[int, int] = {}
+    for award in session.scalars(select(CampPointAward).where(*filters)).all():
+        if _is_contest_placement_award(award):
+            continue
+        scores[award.team_id] = scores.get(award.team_id, 0) + award.points_awarded
+    return scores
+
+
+def _lifetime_team_practice_scores(
+    session: Session, through_week: ContestWeek, *,
+    source_cutoff: datetime | None = None,
+) -> dict[int, int]:
+    """Return uncapped qualifying team practice through the scoring week."""
+    filters = [
+        PracticeChart.practice_date < through_week.week_end,
+        PracticeChart.include_contests.is_(True),
+        PracticeChart.include_team_contests.is_(True),
+        PracticeChart.team_id.is_not(None),
+    ]
+    if source_cutoff is not None:
+        filters.append(PracticeChart.created_at <= aware_utc(source_cutoff))
+    scores: dict[int, int] = {}
+    for chart in session.scalars(select(PracticeChart).where(*filters)).all():
+        scores[chart.team_id] = scores.get(chart.team_id, 0) + chart.minutes
+    return scores
+
+
+# Legacy semantics are intentionally isolated from team_leaderboards(). Stored
+# results under their old keys remain queryable, but current BOARD/finalization
+# never calls these season-scoped calculations.
 def _season_team_practice_scores(
     session: Session, season: Season, through_week: ContestWeek, *,
     source_cutoff: datetime | None = None,
@@ -1092,26 +1146,30 @@ def team_leaderboards(
     weekly = _weekly_team_scores(
         session, contest_week, source_cutoff=source_cutoff
     )
-    seasonal_practice = _season_team_practice_scores(
-        session, season, contest_week, source_cutoff=source_cutoff
+    lifetime_practice = _lifetime_team_practice_scores(
+        session, contest_week, source_cutoff=source_cutoff
     )
-    seasonal_points = _seasonal_team_point_scores(
-        session, season, contest_week, source_cutoff=source_cutoff
+    weekly_activity_points = _weekly_team_activity_point_scores(
+        session, contest_week, source_cutoff=source_cutoff
     )
     payload = {
-        "team-weekly-practice": {}, "team-average-practice": {},
-        "team-season-practice": {}, "team-seasonal-points": {},
+        "team-weekly-practice": {}, "team-weekly-average-practice": {},
+        "team-lifetime-practice": {}, "team-weekly-activity-points": {},
         "team-practice-rating": {},
     }
-    for division in ("open", "verified"):
+    for division in ("open", "verified", "pristine"):
         counts = weekly[division]["members"]
         payload["team-weekly-practice"][division] = _team_rankings(session, weekly[division]["totals"], counts)
-        payload["team-average-practice"][division] = _team_rankings(session, weekly[division]["averages"], counts)
+        payload["team-weekly-average-practice"][division] = _team_rankings(session, weekly[division]["averages"], counts)
         payload["team-practice-rating"][division] = _team_rankings(
             session, weekly[division]["tpr"], counts
         )
-        payload["team-season-practice"][division] = _team_rankings(session, seasonal_practice[division])
-        payload["team-seasonal-points"][division] = _team_rankings(session, seasonal_points[division])
+    payload["team-lifetime-practice"]["open"] = _team_rankings(
+        session, lifetime_practice
+    )
+    payload["team-weekly-activity-points"]["open"] = _team_rankings(
+        session, weekly_activity_points
+    )
     return payload
 
 
@@ -1668,17 +1726,18 @@ def finalize_contest_week(
         WoodchuckProfile.id.in_(profile_ids)
     )).all()} if profile_ids else {}
     student_scores = {"open": {}, "verified": {}}
-    instrument_scores = {"open": {}, "verified": {}}
+    instrument_scores = {"open": {}}
     instrument_contributors: dict[tuple[str, str], set[int]] = {}
     for chart in charts:
         divisions = ["open"] + (["verified"] if chart.id in approved_ids else [])
         instrument_key, instrument_name = normalize_instrument(chart.instrument)
         for division in divisions:
             student_scores[division][chart.profile_id] = student_scores[division].get(chart.profile_id, 0) + chart.minutes
-            previous = instrument_scores[division].get(instrument_key, (instrument_name, 0))
-            instrument_scores[division][instrument_key] = (previous[0], previous[1] + chart.minutes)
-            if chart.minutes >= 15:
-                instrument_contributors.setdefault((division, instrument_key), set()).add(chart.profile_id)
+        # Instrument competition is deliberately unified even when a chart is
+        # also eligible for the filtered Verified student division.
+        previous = instrument_scores["open"].get(instrument_key, (instrument_name, 0))
+        instrument_scores["open"][instrument_key] = (previous[0], previous[1] + chart.minutes)
+        instrument_contributors.setdefault(("open", instrument_key), set()).add(chart.profile_id)
 
     _set_finalization_stage(session, "contest_results")
     results: list[tuple[ContestResult, Contest, set[int]]] = []
@@ -1694,20 +1753,20 @@ def finalize_contest_week(
                 display_name_snapshot=display, score=score, rank=rank,
             )
             results.append((result, contests["weekly-points-leaders"], {profile_id}))
-        for row in olympic_rankings(instrument_scores[division]):
-            rank = int(row["rank"])
-            if rank not in PLACEMENT_DANDELIONS:
-                continue
-            key, _ = normalize_instrument(str(row["instrument"]))
-            result, _created = _contest_result_once(
-                session, contest_week_id=week.id,
-                contest=contests["weekly-practice-by-instrument"], division=division,
-                subject_type="instrument", subject_key=key, profile_id=None,
-                instrument=str(row["instrument"]), team_id=None,
-                display_name_snapshot=str(row["instrument"]),
-                score=int(row["total_minutes"]), rank=rank,
-            )
-            results.append((result, contests["weekly-practice-by-instrument"], instrument_contributors.get((division, key), set())))
+    for row in olympic_rankings(instrument_scores["open"]):
+        rank = int(row["rank"])
+        if rank not in PLACEMENT_DANDELIONS:
+            continue
+        key, _ = normalize_instrument(str(row["instrument"]))
+        result, _created = _contest_result_once(
+            session, contest_week_id=week.id,
+            contest=contests["weekly-practice-by-instrument"], division="open",
+            subject_type="instrument", subject_key=key, profile_id=None,
+            instrument=str(row["instrument"]), team_id=None,
+            display_name_snapshot=str(row["instrument"]),
+            score=int(row["total_minutes"]), rank=rank,
+        )
+        results.append((result, contests["weekly-practice-by-instrument"], instrument_contributors.get(("open", key), set())))
 
     _set_finalization_stage(session, "camp_points")
     start_at, end_at = _week_utc_bounds(week)
@@ -1718,6 +1777,8 @@ def finalize_contest_week(
     )).all()
     camp_scores: dict[int, int] = {}
     for award in camp_awards:
+        if _is_contest_placement_award(award):
+            continue
         camp_scores[award.profile_id] = camp_scores.get(award.profile_id, 0) + award.points_awarded
     camp_profiles = {row.id: row for row in session.scalars(select(WoodchuckProfile).where(
         WoodchuckProfile.id.in_(camp_scores)
@@ -1747,11 +1808,25 @@ def finalize_contest_week(
     boards = team_leaderboards(
         session, season=season, contest_week=week, source_cutoff=source_cutoff
     )
+    legacy_keys = set(session.scalars(select(Contest.key).where(
+        Contest.key.in_(LEGACY_TEAM_CONTEST_REPLACEMENTS.values())
+    )).all())
     for contest_key, divisions in boards.items():
         # TPR is a live BOARD quality indicator, not a medal/crown contest.
         if contest_key == "team-practice-rating":
             continue
         contest = contests[contest_key]
+        legacy_key = LEGACY_TEAM_CONTEST_REPLACEMENTS.get(contest_key)
+        if (
+            was_finalized
+            and legacy_key in legacy_keys
+            and week.finalized_at is not None
+            and aware_utc(contest.created_at) > aware_utc(week.finalized_at)
+        ):
+            # A repair of pre-correction history may fill old deterministic
+            # artifacts, but must not backfill a new metric and grant a second
+            # set of placement rewards for the same historical week.
+            continue
         for division, rows in divisions.items():
             for row in rows:
                 rank = int(row["rank"])

@@ -168,14 +168,14 @@ def test_successful_rollover_generates_complete_central_weeks_and_is_idempotent(
     assert session.scalar(select(func.count()).select_from(Season)) == 2
     assert session.scalar(select(func.count()).select_from(ContestWeek)) == 3
     assert {contest.name for contest in session.scalars(select(Contest))} == {
-        "Top Five Minutes Leaders",
-        "Weekly Practice Minutes by Instrument",
-            "Weekly Band Camp Points",
-            "Team Practice Minutes This Week",
-            "Team Seasonal Points",
-            "Team Average Practice",
-            "Total Practice Minutes This Season",
-        }
+        "Practice Minutes this Week",
+        "Practice Minutes this Week by Instrument",
+        "Board Activity Points this Week",
+        "Practice Minutes this Week by Team",
+        "Board Activity Points this Week by Team",
+        "Average Practice Minutes this Week by Team",
+        "Lifetime Practice Minutes by Team",
+    }
 
 
 def test_duplicate_key_and_conflicting_dates_are_rejected_safely(
@@ -364,7 +364,7 @@ def test_new_season_standings_start_empty_and_new_awards_use_current_week(
     assert all(not standings.get("open") for standings in empty["standings"].values())
     assert "verified" not in empty["standings"]["weekly-camp-points"]
     assert empty["standings"]["weekly-points-leaders"]["verified"] == []
-    assert empty["standings"]["weekly-practice-by-instrument"]["verified"] == []
+    assert set(empty["standings"]["weekly-practice-by-instrument"]) == {"open"}
 
     create_camp_point_award(
         session, profile=student, activity_type="care",

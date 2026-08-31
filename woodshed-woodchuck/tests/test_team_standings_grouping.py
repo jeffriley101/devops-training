@@ -57,8 +57,8 @@ def test_historical_team_rank_sequences_are_grouped_by_contest_scope():
         "team-weekly-practice",
     ]
     assert [group["contestName"] for group in groups] == [
-        "Practice Minutes this Week by Team Average",
-        "Lifetime Board Activity Points by Team",
+        "Team Average Practice",
+        "Team Seasonal Points",
         "Practice Minutes this Week by Team",
     ]
     for group in groups:
@@ -91,6 +91,6 @@ def test_medal_board_renders_clear_team_contest_headings_and_correct_metrics():
     assert 'groupSection.className = "medal-contest team-medal-contest-group"' in renderer
     assert 'heading.textContent = group.contestName' in renderer
     assert 'groupRows.appendChild(row)' in renderer
-    assert 'result.contest.key === "team-seasonal-points"' in renderer
+    assert '["team-weekly-activity-points", "team-seasonal-points"]' in renderer
     assert 'result.contest.key === "team-average-practice"' in renderer
     assert '(result.score / 100).toFixed(2)' in renderer

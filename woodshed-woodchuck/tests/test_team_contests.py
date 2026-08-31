@@ -18,6 +18,7 @@ from app.models import (
     WoodchuckProfile, WoodchuckState,
 )
 from app.teams import create_and_join_team, select_team
+from app.team_practice_rating import calculate_team_practice_rating
 
 
 NOW = datetime(2026, 7, 28, 15, tzinfo=timezone.utc)
@@ -63,23 +64,78 @@ def add_chart(
 def test_team_practice_cap_average_verified_and_season_formulas() -> None:
     session = database()
     season, _, week = ensure_band_camp_data(session, now=NOW)
-    captain = add_profile(session, 1); member = add_profile(session, 2); session.commit()
+    captain = add_profile(session, 1); member = add_profile(session, 2)
+    inactive = add_profile(session, 3); session.commit()
     team, _ = create_and_join_team(session, profile=captain, season=season, name="Cap Team", emblem_key="emoji:goat", now=NOW)
     select_team(session, profile=member, season=season, team=team, now=NOW); session.commit()
+    select_team(session, profile=inactive, season=season, team=team, now=NOW); session.commit()
     add_chart(session, captain, team.id, 200)
     add_chart(session, captain, team.id, 150)
     add_chart(session, member, team.id, 100, approved=False)
+    add_chart(session, inactive, team.id, 4, approved=False)
+    add_chart(
+        session, captain, team.id, 600, approved=False,
+        practice_date=date(2026, 6, 15),
+    )
     session.commit()
 
     boards = team_leaderboards(session, season=season, contest_week=week)
     weekly_open = boards["team-weekly-practice"]["open"][0]
     weekly_verified = boards["team-weekly-practice"]["verified"][0]
-    assert weekly_open["score"] == 400 and weekly_open["active_member_count"] == 2
+    assert weekly_open["score"] == 454 and weekly_open["active_member_count"] == 2
     assert weekly_open["emblem_key"] == "emoji:goat"
-    assert weekly_verified["score"] == 300 and weekly_verified["active_member_count"] == 1
-    assert boards["team-average-practice"]["open"][0]["score"] == 20000
-    assert boards["team-average-practice"]["verified"][0]["score"] == 30000
-    assert boards["team-season-practice"]["open"][0]["score"] == 400
+    assert weekly_verified["score"] == 350 and weekly_verified["active_member_count"] == 1
+    assert boards["team-weekly-average-practice"]["open"][0]["score"] == 200
+    assert boards["team-weekly-average-practice"]["verified"][0]["score"] == 300
+    assert boards["team-lifetime-practice"]["open"][0]["score"] == 1054
+    assert boards["team-weekly-practice"]["pristine"] == []
+    assert boards["team-weekly-average-practice"]["pristine"] == []
+    assert boards["team-practice-rating"]["pristine"] == []
+    assert boards["team-practice-rating"]["open"][0]["score"] == (
+        calculate_team_practice_rating([350, 100], eligible_roster=3).rating
+    )
+    assert boards["team-practice-rating"]["verified"][0]["score"] == (
+        calculate_team_practice_rating([350], eligible_roster=3).rating
+    )
+
+
+def test_team_activity_points_are_weekly_normal_activity_only() -> None:
+    session = database()
+    season, _, week = ensure_band_camp_data(session, now=NOW)
+    captain = add_profile(session, 20); session.commit()
+    team, _ = create_and_join_team(
+        session, profile=captain, season=season, name="Weekly Points",
+        emblem_key="letter:W", now=NOW,
+    )
+    for activity_type, points, occurred_at, duplicate_key in (
+        ("care", 2, NOW, "band-camp:2026-07-28:care"),
+        ("care", 30, datetime(2026, 7, 20, 15, tzinfo=timezone.utc), "old-care"),
+        ("bonus-challenge", 20, NOW, "bonus-challenge:team-should-not-count"),
+        ("contest-placement", 40, NOW, f"contest:{week.id}:team-placement"),
+    ):
+        session.add(CampPointAward(
+            profile_id=captain.id,
+            activity_type=activity_type,
+            points_awarded=points,
+            occurred_at=occurred_at,
+            duplicate_key=duplicate_key,
+            team_id=team.id,
+            created_at=NOW,
+        ))
+    session.commit()
+
+    boards = team_leaderboards(session, season=season, contest_week=week)
+    assert boards["team-weekly-activity-points"]["open"][0]["score"] == 2
+    assert set(boards["team-weekly-activity-points"]) == {"open"}
+
+    finalize_contest_week(
+        session, week_start=week.week_start, now=FINAL_NOW
+    )
+    session.commit()
+    result = session.scalar(select(ContestResult).join(Contest).where(
+        Contest.key == "team-weekly-activity-points",
+    ))
+    assert result is not None and result.score == 2
 
 
 def test_team_leaderboards_keep_each_teams_configured_emblem() -> None:
@@ -130,11 +186,11 @@ def test_finalization_snapshots_membership_and_rewards_every_team_board_once() -
 
     finalize_contest_week(session, week_start=week.week_start, now=FINAL_NOW); session.commit()
     team_results = session.scalars(select(ContestResult).where(ContestResult.subject_type == "team")).all()
-    assert len(team_results) == 8
+    assert len(team_results) == 6
     assert {row.division for row in team_results} == {"open", "verified"}
     assert {session.get(Contest, row.contest_id).key for row in team_results} == {
-        "team-weekly-practice", "team-average-practice",
-        "team-season-practice", "team-seasonal-points",
+        "team-weekly-practice", "team-weekly-average-practice",
+        "team-lifetime-practice", "team-weekly-activity-points",
     }
     assert session.scalar(select(func.count()).select_from(TeamWeekMembershipSnapshot)) == 2
     for profile in (captain, noncontributor):
@@ -143,13 +199,13 @@ def test_finalization_snapshots_membership_and_rewards_every_team_board_once() -
             RewardGrant.source_key.like("%:team-%"),
             RewardGrant.reward_type == "dandelion",
         )).all()
-        assert len(team_dandelions) == 8
+        assert len(team_dandelions) == 6
         assert all(grant.amount == 50 for grant in team_dandelions)
         crown = session.scalar(select(CrownProgress).where(
             CrownProgress.profile_id == profile.id,
             CrownProgress.category_key == "team-crown",
         ))
-        assert crown is not None and crown.qualifying_wins == 8
+        assert crown is not None and crown.qualifying_wins == 6
     first_counts = (
         session.scalar(select(func.count()).select_from(RewardGrant)),
         session.scalar(select(func.count()).select_from(CampPointAward)),
@@ -162,7 +218,7 @@ def test_finalization_snapshots_membership_and_rewards_every_team_board_once() -
         session.scalar(select(func.count()).select_from(ContestResult)),
     )
     hall = hall_of_champions_payload(session)
-    assert next(row for row in hall["students"] if row["display_name"] == noncontributor.display_name)["medals"]["gold"] == 8
+    assert next(row for row in hall["students"] if row["display_name"] == noncontributor.display_name)["medals"]["gold"] == 6
 
 
 def test_revised_olympic_rewards_and_weekly_participation() -> None:
@@ -249,3 +305,54 @@ def test_repair_preserves_team_and_individual_history_without_duplicates() -> No
     assert set(session.scalars(select(PracticeChart.id)).all()) == chart_ids
     hall = hall_of_champions_payload(session)
     assert any(row["display_name"] == captain.display_name for row in hall["students"])
+
+
+def test_repair_does_not_backfill_replacement_metrics_into_legacy_history() -> None:
+    session = database()
+    season, _, week = ensure_band_camp_data(session, now=NOW)
+    captain = add_profile(session, 70); session.commit()
+    team, _ = create_and_join_team(
+        session, profile=captain, season=season, name="Legacy Band",
+        emblem_key="letter:L", now=NOW,
+    )
+    add_chart(session, captain, team.id, 40, created_at=NOW)
+    legacy_keys = (
+        ("team-seasonal-points", "Team Seasonal Points", "points", 9),
+        ("team-average-practice", "Team Average Practice", "practice_minutes", 4000),
+        ("team-season-practice", "Total Practice Minutes This Season", "practice_minutes", 120),
+    )
+    legacy_results: list[ContestResult] = []
+    for key, name, metric_type, score in legacy_keys:
+        contest = Contest(
+            key=key, name=name, metric_type=metric_type,
+            subject_type="team", crown_category="team-crown", active=True,
+        )
+        session.add(contest); session.flush()
+        result = ContestResult(
+            contest_week_id=week.id, contest_id=contest.id, division="open",
+            subject_type="team", subject_key=str(team.id), team_id=team.id,
+            display_name_snapshot=team.display_name, score=score, rank=1,
+            medal="gold",
+        )
+        session.add(result)
+        legacy_results.append(result)
+    week.status = "finalized"
+    week.finalized_at = FINAL_NOW
+    session.commit()
+    legacy_snapshot = [(row.id, row.score) for row in legacy_results]
+
+    audit_or_repair_history(
+        session, week_start=week.week_start, now=FINAL_NOW, apply=True
+    )
+    session.commit()
+
+    assert [(row.id, row.score) for row in legacy_results] == legacy_snapshot
+    replacement_results = session.scalars(select(ContestResult).join(Contest).where(
+        ContestResult.contest_week_id == week.id,
+        Contest.key.in_((
+            "team-weekly-activity-points",
+            "team-weekly-average-practice",
+            "team-lifetime-practice",
+        )),
+    )).all()
+    assert replacement_results == []

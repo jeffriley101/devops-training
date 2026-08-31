@@ -167,15 +167,42 @@ def test_band_camp_records_are_created_idempotently(
         "weekly-practice-by-instrument",
         "weekly-camp-points",
         "team-weekly-practice",
-        "team-seasonal-points",
-        "team-average-practice",
-        "team-season-practice",
+        "team-weekly-activity-points",
+        "team-weekly-average-practice",
+        "team-lifetime-practice",
     }
     minutes = next(
         contest for contest in second[1] if contest.key == "weekly-points-leaders"
     )
-    assert minutes.name == "Top Five Minutes Leaders"
+    assert minutes.name == "Practice Minutes this Week"
     assert minutes.metric_type == "practice_minutes"
+
+
+def test_current_keys_do_not_rewrite_legacy_team_contest_history(
+    database: tuple[Session, sessionmaker[Session]],
+) -> None:
+    session, _ = database
+    legacy = Contest(
+        key="team-seasonal-points",
+        name="Team Seasonal Points",
+        metric_type="points",
+        subject_type="team",
+        crown_category="team-crown",
+        active=True,
+    )
+    session.add(legacy)
+    session.commit()
+
+    _, current, _ = ensure_band_camp_data(session, now=NOW)
+    session.refresh(legacy)
+
+    assert legacy.name == "Team Seasonal Points"
+    assert legacy.id not in {contest.id for contest in current}
+    assert {contest.key for contest in current} >= {
+        "team-weekly-activity-points",
+        "team-weekly-average-practice",
+        "team-lifetime-practice",
+    }
 
 
 def test_camp_point_activities_persist_once_and_aggregate_separately(
@@ -245,6 +272,42 @@ def test_camp_points_do_not_include_p_charts_or_practice_minutes(
     assert payload["weekly-points-leaders"]["open"][0]["total_minutes"] == 45
     assert payload["weekly-practice-by-instrument"]["open"][0]["total_minutes"] == 45
     assert payload["weekly-camp-points"]["open"][0]["total_points"] == 1
+
+
+def test_activity_board_includes_bonus_but_excludes_contest_placement(
+    database: tuple[Session, sessionmaker[Session]],
+) -> None:
+    session, _ = database
+    _, _, week = ensure_band_camp_data(session, now=NOW)
+    student = add_student(session, woodchuck_id="WC-ACTIVITY-RULES", instrument="Flute")
+    for activity_type, points, duplicate_key in (
+        ("care", 1, "band-camp:2026-07-28:care"),
+        ("bonus-challenge", 2, "bonus-challenge:2026-07-28:one"),
+        ("contest-placement", 3, "legacy-placement-without-contest-prefix"),
+    ):
+        session.add(CampPointAward(
+            profile_id=student.id,
+            activity_type=activity_type,
+            points_awarded=points,
+            occurred_at=NOW,
+            duplicate_key=duplicate_key,
+            created_at=NOW,
+        ))
+    session.commit()
+
+    rows = weekly_camp_points(
+        session, contest_week=week, current_profile_id=student.id
+    )["open"]
+
+    assert rows[0]["total_points"] == 3
+
+    finalize_contest_week(session, week_start=week.week_start, now=FINAL_NOW)
+    session.commit()
+    finalized = session.scalar(select(ContestResult).join(Contest).where(
+        Contest.key == "weekly-camp-points",
+        ContestResult.profile_id == student.id,
+    ))
+    assert finalized is not None and finalized.score == 3
 
 
 def test_student_camp_point_totals_use_persisted_central_week_and_exclude_future(
@@ -373,7 +436,9 @@ def test_board_week_and_season_camp_points_share_authoritative_ledger(
     student_position = payload["standings"]["weekly-camp-points"][
         "current_user_position"
     ]["open"]
-    assert student_position["total_points"] == 17
+    # The permanent total keeps placement awards, while the activity
+    # leaderboard deliberately excludes the 3-point contest placement.
+    assert student_position["total_points"] == 14
     assert session.scalar(select(func.count()).select_from(CampPointAward).where(
         CampPointAward.profile_id == student.id,
         CampPointAward.duplicate_key.like(
@@ -510,9 +575,59 @@ def test_weekly_practice_divisions_and_boundaries(
         {"rank": 1, "instrument": "Saxophone", "total_minutes": 100},
         {"rank": 2, "instrument": "Trumpet", "total_minutes": 50},
     ]
-    assert standings["verified"] == [
-        {"rank": 1, "instrument": "Saxophone", "total_minutes": 80},
-    ]
+    assert set(standings) == {"open"}
+
+
+def test_verified_week_uses_practice_date_not_response_date(
+    database: tuple[Session, sessionmaker[Session]],
+) -> None:
+    session, _ = database
+    _, _, week = ensure_band_camp_data(session, now=NOW)
+    student = add_student(session, woodchuck_id="WC-LATE-VERIFY", instrument="Flute")
+    chart = add_chart(
+        session,
+        profile=student,
+        practice_date=date(2026, 7, 28),
+        minutes=25,
+    )
+    session.add(PracticeChartVerification(
+        practice_chart_id=chart.id,
+        status="approved",
+        responded_at=datetime(2026, 8, 3, 16, 30, tzinfo=timezone.utc),
+    ))
+    session.commit()
+
+    standings = weekly_student_points(
+        session, contest_week=week, current_profile_id=student.id
+    )
+
+    assert standings["open"][0]["total_minutes"] == 25
+    assert standings["verified"][0]["total_minutes"] == 25
+    assert standings["pristine"] == []
+
+
+def test_instrument_aliases_share_one_canonical_row(
+    database: tuple[Session, sessionmaker[Session]],
+) -> None:
+    session, _ = database
+    _, _, week = ensure_band_camp_data(session, now=NOW)
+    for index, instrument in enumerate(("Piano", "Keyboard", "Piano / Keyboard"), 1):
+        student = add_student(
+            session, woodchuck_id=f"WC-KEYS-{index}", instrument="Piano / Keyboard"
+        )
+        add_chart(
+            session, profile=student, practice_date=date(2026, 7, 29),
+            minutes=10, instrument=instrument,
+        )
+    session.commit()
+
+    assert weekly_practice_by_instrument(session, contest_week=week) == {
+        "open": [{
+            "rank": 1,
+            "instrument": "Piano / Keyboard",
+            "total_minutes": 30,
+        }]
+    }
 
 
 def test_ties_use_olympic_ranking_and_instrument_sorting(
@@ -1007,7 +1122,7 @@ def test_multiple_finalization_rewards_reuse_one_woodchuck_state(
             RewardGrant.profile_id == student.id,
             RewardGrant.reward_type.in_(("dandelion", "participation_dandelion")),
         ))
-        assert reward_total == 205
+        assert reward_total == 155
         assert matching_states[0].state_json["progress"]["credits"] == (
             (existing_balance or 0) + reward_total
         )
@@ -1027,9 +1142,9 @@ def test_multiple_finalization_rewards_reuse_one_woodchuck_state(
             "states": session.scalar(select(func.count()).select_from(WoodchuckState)),
         }
         assert first_counts == {
-            "results": 4,
-            "grants": 7,
-            "camp_awards": 4,
+            "results": 3,
+            "grants": 6,
+            "camp_awards": 3,
             "crown_progress": 1,
             "states": 2,
         }
@@ -1092,7 +1207,7 @@ def test_existing_finalized_student_scores_are_not_rewritten(
     assert historical.medal == "gold"
     assert contest_results_payload(session, week)["results"][0]["contest"] == {
         "key": "weekly-points-leaders",
-        "name": "Top Five Minutes Leaders",
+        "name": "Practice Minutes this Week",
     }
 
 
@@ -1346,7 +1461,7 @@ def test_instrument_participation_threshold_and_division_deduplication(
         RewardGrant.source_key.like("%:weekly-practice-by-instrument:%")
     )).all()
     assert [(grant.profile_id, grant.amount) for grant in participation] == [
-        (eligible.id, 50), (eligible.id, 50),
+        (eligible.id, 50), (short.id, 50), (rival.id, 25),
     ]
     assert all(grant.reward_type == "dandelion" and grant.category_key is None for grant in participation)
 
@@ -1979,7 +2094,7 @@ def test_open_p_chart_submission_is_idempotent_listed_and_updates_standings(
     assert instruments["open"] == [
         {"rank": 1, "instrument": "Tuba", "total_minutes": 35}
     ]
-    assert instruments["verified"] == []
+    assert set(instruments) == {"open"}
 
     profile.instrument = "Flute"
     session.add(PracticeChartVerification(
@@ -1996,9 +2111,9 @@ def test_open_p_chart_submission_is_idempotent_listed_and_updates_standings(
         "standings"
     ]["weekly-practice-by-instrument"]
     assert approved_points["verified"][0]["total_minutes"] == 35
-    assert approved_instruments["verified"] == [
-        {"rank": 1, "instrument": "Tuba", "total_minutes": 35}
-    ]
+    assert approved_instruments == {
+        "open": [{"rank": 1, "instrument": "Tuba", "total_minutes": 35}]
+    }
 
 
 def test_contest_opt_out_stays_in_history_but_not_either_division(

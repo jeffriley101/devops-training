@@ -39,15 +39,17 @@ def test_shed_nameplate_level_team_badge_and_mirrored_secret_hooks() -> None:
 def test_board_wording_team_cards_placard_and_plunge_accessibility() -> None:
     html = (ROOT / "templates/quest.html").read_text(encoding="utf-8")
     assert '>PRACTICE MINUTES LEADERBOARD</h4>' in html
-    assert "All contest-enabled P-Charts count toward weekly practice minutes. Verified standings include only charts that have been verified." in html
+    assert "All P-Charts" in html
+    assert "Verified P-Charts only" in html
+    assert "Pristine P-Charts only" in html
     assert "Each contest win earns one Camp Point and one dandelion." not in html
     assert 'aria-label="Play Plunge Burrow"' in html and 'title="Play Plunge Burrow"' in html
     assert '<span aria-hidden="true">🕳️</span></a>' in html
     for title in (
         "Board Activity Points this Week by Team",
         "Practice Minutes this Week by Team",
-        "Practice Minutes this Week by Team Average",
-        "Practice Minutes Lifetime by Team",
+        "Average Practice Minutes this Week by Team",
+        "Lifetime Practice Minutes by Team",
         "Team Practice Rating",
     ):
         assert title in html
