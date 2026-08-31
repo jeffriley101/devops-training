@@ -7,8 +7,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 from app.contests import (
-    create_camp_point_award, ensure_band_camp_data, finalize_contest_week,
-    hall_of_champions_payload, team_leaderboards,
+    contest_results_payload, create_camp_point_award, ensure_band_camp_data,
+    finalize_contest_week, hall_of_champions_payload, team_leaderboards,
 )
 from app.contest_jobs import audit_or_repair_history
 from app.db import Base
@@ -166,7 +166,7 @@ def test_team_leaderboards_keep_each_teams_configured_emblem() -> None:
     ]
 
 
-def test_finalization_snapshots_membership_and_rewards_every_team_board_once() -> None:
+def test_finalization_keeps_team_rewards_out_of_personal_hall_medals() -> None:
     session = database()
     season, _, week = ensure_band_camp_data(session, now=NOW)
     captain = add_profile(session, 1); noncontributor = add_profile(session, 2); session.commit()
@@ -217,8 +217,22 @@ def test_finalization_snapshots_membership_and_rewards_every_team_board_once() -
         session.scalar(select(func.count()).select_from(CampPointAward)),
         session.scalar(select(func.count()).select_from(ContestResult)),
     )
+    # A team gold reward remains durable for every eligible recipient, but it
+    # is not a personal Hall medal. The Medal Board continues to use the
+    # original team ContestResult.
     hall = hall_of_champions_payload(session)
-    assert next(row for row in hall["students"] if row["display_name"] == noncontributor.display_name)["medals"]["gold"] == 6
+    assert all(
+        row["display_name"] != noncontributor.display_name
+        for row in hall["students"]
+    )
+    medal_results = contest_results_payload(session, week)["results"]
+    assert any(
+        row["subject_type"] == "team"
+        and row["team_name"] == "Final Team"
+        and row["contest"]["key"] == "team-weekly-practice"
+        and row["rank"] == 1
+        for row in medal_results
+    )
 
 
 def test_revised_olympic_rewards_and_weekly_participation() -> None:

@@ -2062,43 +2062,6 @@ def hall_of_champions_payload(session: Session) -> dict[str, object]:
             medal=result.medal,
         )
 
-    # Team champion wins are public Hall credit for each snapshotted,
-    # P-Chart-eligible recipient, represented by the idempotent crown grant.
-    team_wins = session.execute(
-        select(RewardGrant, ContestResult, WoodchuckProfile, Contest, Season)
-        .join(ContestResult, ContestResult.id == RewardGrant.contest_result_id)
-        .join(WoodchuckProfile, WoodchuckProfile.id == RewardGrant.profile_id)
-        .join(Contest, Contest.id == ContestResult.contest_id)
-        .join(ContestWeek, ContestWeek.id == ContestResult.contest_week_id)
-        .join(Season, Season.id == ContestWeek.season_id)
-        .where(
-            RewardGrant.reward_type == "crown_win",
-            RewardGrant.category_key == "team-crown",
-            ContestResult.subject_type == "team",
-            ContestResult.rank == 1,
-            ContestWeek.status == "finalized",
-            contest_season_clause(),
-        )
-    ).all()
-    for _grant, result, profile, contest, season in team_wins:
-        champion = students_by_profile.setdefault(profile.id, {
-            "display_name": public_woodchuck_name(profile),
-            "medals": _empty_medal_counts(),
-            "by_division": {"open": _empty_medal_counts(), "verified": _empty_medal_counts()},
-            "divisions": set(),
-            "_achievement_groups": {},
-        })
-        _increment_medal(champion["medals"], "gold")
-        _increment_medal(champion["by_division"][result.division], "gold")
-        champion["divisions"].add(result.division)
-        _record_champion_achievement(
-            champion,
-            season=season,
-            contest=contest,
-            division=result.division,
-            medal="gold",
-        )
-
     points_contest = session.scalar(
         select(Contest).where(Contest.key == "weekly-points-leaders")
     )
