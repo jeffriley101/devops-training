@@ -4,6 +4,7 @@ data class Station(
     val name: String,
     val totalDurationSeconds: Double,
     val tracks: List<StationTrack>,
+    val album5PreviewTracks: List<StationTrack> = emptyList(),
 )
 
 data class StationTrack(
@@ -13,4 +14,3 @@ data class StationTrack(
     val audioUrl: String?,
     val durationSeconds: Double,
 )
-

@@ -49,21 +49,10 @@ class StationRepository(
             val json = JSONObject(body)
             val tracksJson = json.optJSONArray("tracks")
                 ?: throw StationDataException("Station response has no tracks array")
-
-            val tracks = buildList {
-                for (index in 0 until tracksJson.length()) {
-                    val track = tracksJson.optJSONObject(index) ?: continue
-                    add(
-                        StationTrack(
-                            id = track.optionalString("id"),
-                            title = track.optionalString("title") ?: "Untitled KHJW track",
-                            artist = track.optionalString("artist") ?: "Hoojshwah",
-                            audioUrl = track.optionalString("audio_url"),
-                            durationSeconds = track.optDouble("duration_seconds", 0.0),
-                        )
-                    )
-                }
-            }
+            val tracks = parseTracks(tracksJson)
+            val album5PreviewTracks = json.optJSONArray("album5_preview_tracks")
+                ?.let(::parseTracks)
+                .orEmpty()
 
             if (tracks.isEmpty()) {
                 throw StationDataException("Station response contains zero tracks")
@@ -73,9 +62,25 @@ class StationRepository(
                 name = json.optionalString("station_name") ?: "Hoojshwah Radio",
                 totalDurationSeconds = json.optDouble("total_duration_seconds", 0.0),
                 tracks = tracks,
+                album5PreviewTracks = album5PreviewTracks,
             )
         } catch (error: JSONException) {
             throw StationDataException("Station response is malformed", error)
+        }
+    }
+
+    private fun parseTracks(tracksJson: org.json.JSONArray): List<StationTrack> = buildList {
+        for (index in 0 until tracksJson.length()) {
+            val track = tracksJson.optJSONObject(index) ?: continue
+            add(
+                StationTrack(
+                    id = track.optionalString("id"),
+                    title = track.optionalString("title") ?: "Untitled KHJW track",
+                    artist = track.optionalString("artist") ?: "Hoojshwah",
+                    audioUrl = track.optionalString("audio_url"),
+                    durationSeconds = track.optDouble("duration_seconds", 0.0),
+                )
+            )
         }
     }
 
@@ -88,4 +93,3 @@ class StationRepository(
 }
 
 class StationDataException(message: String, cause: Throwable? = null) : Exception(message, cause)
-

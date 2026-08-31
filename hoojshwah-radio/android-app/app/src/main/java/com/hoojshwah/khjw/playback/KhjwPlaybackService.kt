@@ -34,9 +34,12 @@ class KhjwPlaybackService : MediaSessionService() {
     private val mainHandler = Handler(Looper.getMainLooper())
 
     private var playableTracks: List<StationTrack> = emptyList()
+    private var album5PreviewTracks: List<StationTrack> = emptyList()
     private var synchronizationDurationSeconds = 0.0
     private var errorSkipsRemaining = 1
     private var backstageSelectionActive = false
+    private var album5PreviewQueued = false
+    private var album5PreviewActive = false
 
     override fun onCreate() {
         super.onCreate()
@@ -103,6 +106,7 @@ class KhjwPlaybackService : MediaSessionService() {
         playableTracks = station.tracks.filter {
             it.durationSeconds > 0.0 && !it.audioUrl.isNullOrBlank()
         }
+        album5PreviewTracks = station.album5PreviewTracks.filter { !it.audioUrl.isNullOrBlank() }
 
         if (playableTracks.isEmpty()) {
             updateStatus("The station has no playable tracks right now")
@@ -158,6 +162,12 @@ class KhjwPlaybackService : MediaSessionService() {
             return
         }
 
+        if (album5PreviewActive) {
+            Log.i(TAG, "Play received; resuming Album 5 Preview")
+            player.play()
+            return
+        }
+
         Log.i(TAG, "Play received; rejoining live signal")
         if (playableTracks.isEmpty()) {
             // Preserve the play intent. configureStation() will calculate a fresh live
@@ -182,6 +192,7 @@ class KhjwPlaybackService : MediaSessionService() {
     }
 
     private fun playBackstageTrack(trackId: String): Boolean {
+        if (album5PreviewQueued || album5PreviewActive) return false
         val requestedIndex = playableTracks.indexOfFirst { track -> track.id == trackId }
         if (requestedIndex < 0) return false
 
@@ -193,12 +204,43 @@ class KhjwPlaybackService : MediaSessionService() {
         return true
     }
 
+    private fun queueAlbum5Preview(): Boolean {
+        if (album5PreviewTracks.isEmpty() || album5PreviewActive) return false
+        album5PreviewQueued = true
+        updateStatus("Album 5 Preview queued for the next track boundary")
+        return true
+    }
+
+    private fun startAlbum5Preview() {
+        if (!album5PreviewQueued || album5PreviewTracks.isEmpty()) return
+        album5PreviewQueued = false
+        album5PreviewActive = true
+        backstageSelectionActive = false
+        player.setMediaItems(album5PreviewTracks.mapIndexed { index, track -> track.toMediaItem(index, true) })
+        player.repeatMode = Player.REPEAT_MODE_OFF
+        player.prepare()
+        player.play()
+        updateStatus("Playing Album 5 Preview")
+    }
+
+    private fun exitAlbum5Preview(): Boolean {
+        if (!album5PreviewQueued && !album5PreviewActive) return false
+        val shouldResume = player.playWhenReady
+        album5PreviewQueued = false
+        album5PreviewActive = false
+        backstageSelectionActive = false
+        setPlaylistAtLivePosition(prepare = shouldResume)
+        if (shouldResume) player.play()
+        updateStatus("Returning to the live KHJW signal")
+        return true
+    }
+
     private fun logPlaybackParameters(event: String) {
         val parameters = player.playbackParameters
         Log.i(TAG, "Playback parameters at $event: speed=${parameters.speed}, pitch=${parameters.pitch}")
     }
 
-    private fun StationTrack.toMediaItem(index: Int): MediaItem =
+    private fun StationTrack.toMediaItem(index: Int, isAlbum5Preview: Boolean = false): MediaItem =
         MediaItem.Builder()
             .setMediaId(id ?: "khjw-track-$index")
             .setUri(requireNotNull(audioUrl))
@@ -206,7 +248,7 @@ class KhjwPlaybackService : MediaSessionService() {
                 MediaMetadata.Builder()
                     .setTitle(title)
                     .setArtist(artist)
-                    .setAlbumTitle("Hoojshwah Radio")
+                    .setAlbumTitle(if (isAlbum5Preview) "Album 5 Preview" else "Hoojshwah Radio")
                     .setArtworkUri(Uri.parse(STATION_ARTWORK_URL))
                     .build()
             )
@@ -229,6 +271,8 @@ class KhjwPlaybackService : MediaSessionService() {
                 resultBuilder.setAvailableSessionCommands(
                     MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS.buildUpon()
                         .add(NativePlaybackCommands.selectBackstageTrack)
+                        .add(NativePlaybackCommands.queueAlbum5Preview)
+                        .add(NativePlaybackCommands.exitAlbum5Preview)
                         .build()
                 )
             }
@@ -245,17 +289,24 @@ class KhjwPlaybackService : MediaSessionService() {
             if (
                 controller.packageName != packageName ||
                 controller.uid != applicationInfo.uid ||
-                customCommand != NativePlaybackCommands.selectBackstageTrack
+                customCommand !in setOf(
+                    NativePlaybackCommands.selectBackstageTrack,
+                    NativePlaybackCommands.queueAlbum5Preview,
+                    NativePlaybackCommands.exitAlbum5Preview,
+                )
             ) {
                 return Futures.immediateFuture(SessionResult(SessionError.ERROR_PERMISSION_DENIED))
             }
 
-            val trackId = args.getString(NativePlaybackCommands.ARG_TRACK_ID)
-            val resultCode = if (trackId != null && playBackstageTrack(trackId)) {
-                SessionResult.RESULT_SUCCESS
-            } else {
-                SessionError.ERROR_BAD_VALUE
+            val succeeded = when (customCommand) {
+                NativePlaybackCommands.selectBackstageTrack -> {
+                    args.getString(NativePlaybackCommands.ARG_TRACK_ID)?.let(::playBackstageTrack) == true
+                }
+                NativePlaybackCommands.queueAlbum5Preview -> queueAlbum5Preview()
+                NativePlaybackCommands.exitAlbum5Preview -> exitAlbum5Preview()
+                else -> false
             }
+            val resultCode = if (succeeded) SessionResult.RESULT_SUCCESS else SessionError.ERROR_BAD_VALUE
             return Futures.immediateFuture(SessionResult(resultCode))
         }
     }
@@ -280,6 +331,14 @@ class KhjwPlaybackService : MediaSessionService() {
                     setPlaylistAtLivePosition(prepare = true)
                     player.play()
                 }
+            } else if (
+                album5PreviewQueued &&
+                !album5PreviewActive &&
+                reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO
+            ) {
+                mainHandler.post(::startAlbum5Preview)
+            } else if (album5PreviewActive) {
+                updateStatus("Playing Album 5 Preview")
             }
         }
 
@@ -288,15 +347,30 @@ class KhjwPlaybackService : MediaSessionService() {
                 Player.STATE_BUFFERING -> updateStatus("Buffering the KHJW signal…")
                 Player.STATE_READY -> {
                     errorSkipsRemaining = 1
-                    updateStatus(if (player.isPlaying) "Playing native KHJW audio" else "KHJW is ready")
+                    updateStatus(
+                        if (album5PreviewActive) "Playing Album 5 Preview"
+                        else if (player.isPlaying) "Playing native KHJW audio"
+                        else "KHJW is ready"
+                    )
                 }
-                Player.STATE_ENDED -> updateStatus("The KHJW signal ended unexpectedly")
+                Player.STATE_ENDED -> {
+                    if (album5PreviewActive) {
+                        exitAlbum5Preview()
+                    } else {
+                        updateStatus("The KHJW signal ended unexpectedly")
+                    }
+                }
                 else -> Unit
             }
         }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
-            if (isPlaying) updateStatus("Playing native KHJW audio")
+            if (isPlaying) {
+                updateStatus(
+                    if (album5PreviewActive) "Playing Album 5 Preview"
+                    else "Playing native KHJW audio"
+                )
+            }
             else if (player.playbackState == Player.STATE_READY) updateStatus("Paused")
         }
 

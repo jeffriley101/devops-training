@@ -1,0 +1,72 @@
+{
+  "id": "album5-preview",
+  "title": "Album 5 Preview",
+  "tracks": [
+    {
+      "id": "album5-preview-01",
+      "title": "Like Boom",
+      "artist": "Hoojshwah",
+      "audio_path": "audio/album5-preview/01-like-boom.mp3"
+    },
+    {
+      "id": "album5-preview-02",
+      "title": "Runnin Groves",
+      "artist": "Hoojshwah",
+      "audio_path": "audio/album5-preview/02-runnin-groves.mp3"
+    },
+    {
+      "id": "album5-preview-03",
+      "title": "Track is Burnin",
+      "artist": "Hoojshwah",
+      "audio_path": "audio/album5-preview/03-track-is-burnin.mp3"
+    },
+    {
+      "id": "album5-preview-04",
+      "title": "Clean Colorful",
+      "artist": "Hoojshwah",
+      "audio_path": "audio/album5-preview/04-clean-colorful.mp3"
+    },
+    {
+      "id": "album5-preview-05",
+      "title": "Brush It Off",
+      "artist": "Hoojshwah",
+      "audio_path": "audio/album5-preview/05-brush-it-off.mp3"
+    },
+    {
+      "id": "album5-preview-06",
+      "title": "Things to Say",
+      "artist": "Hoojshwah",
+      "audio_path": "audio/album5-preview/06-things-to-say.mp3"
+    },
+    {
+      "id": "album5-preview-07",
+      "title": "Low Lyer",
+      "artist": "Hoojshwah",
+      "audio_path": "audio/album5-preview/07-low-lyer.mp3"
+    },
+    {
+      "id": "album5-preview-08",
+      "title": "Take Me Out",
+      "artist": "Hoojshwah",
+      "audio_path": "audio/album5-preview/08-take-me-out.mp3"
+    },
+    {
+      "id": "album5-preview-09",
+      "title": "Chasin Falls",
+      "artist": "Hoojshwah",
+      "audio_path": "audio/chasin-falls.mp3"
+    },
+    {
+      "id": "album5-preview-10",
+      "title": "Stand It",
+      "artist": "Hoojshwah",
+      "audio_path": "audio/album5-preview/10-stand-it.mp3"
+    },
+    {
+      "id": "album5-preview-11",
+      "title": "Sleep Often Dream Walker",
+      "artist": "Hoojshwah",
+      "audio_path": "audio/album5-preview/11-sleep-often-dream-walker.mp3"
+    }
+  ]
+}

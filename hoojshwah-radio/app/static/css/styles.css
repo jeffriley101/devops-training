@@ -2779,6 +2779,24 @@ html body div#secret-guestbook-dialog.secret-guestbook-dialog {
   width: min(12rem, 100%);
 }
 
+.album5-preview-controls {
+  margin-top: 1rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.album5-preview-controls p {
+  margin: 0.25rem 0 0.65rem;
+}
+
+.album5-preview-controls button {
+  width: auto;
+}
+
+.album5-preview-active .reaction-panel {
+  display: none !important;
+}
+
 .master-secret-trigger {
   position: fixed;
   right: max(1.35rem, env(safe-area-inset-right));
