@@ -318,6 +318,17 @@ def p_book(request: Request):
     )
 
 
+@app.get("/practice/pristine")
+def pristine_practice(request: Request):
+    return _render(
+        request,
+        "pristine_practice.html",
+        title="Pristine Practice",
+        active_nav="store",
+        page_class="main-app-page pristine-practice-screen",
+    )
+
+
 @app.get("/quest")
 def quest(request: Request):
     member_since = None

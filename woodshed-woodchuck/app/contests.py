@@ -447,7 +447,9 @@ def weekly_practice_by_instrument(
     *,
     contest_week: ContestWeek,
 ) -> dict[str, list[dict[str, object]]]:
-    charts, _approved_chart_ids = _charts_and_approved_ids(session, contest_week)
+    charts, _approved_chart_ids, _pristine_chart_ids = _charts_and_approved_ids(
+        session, contest_week
+    )
 
     open_totals: dict[str, tuple[str, int]] = {}
     for chart in charts:
@@ -479,6 +481,17 @@ def public_team_emblem(team: Team | None) -> str:
     if team is not None and team.moderation_status == "hidden":
         return "shield:silver"
     return team.emblem_key if team is not None else "shield:silver"
+
+
+def lifetime_team_identity(result: ContestResult, team: Team | None) -> str:
+    """Identify the same season-scoped team safely across its later seasons."""
+    if team is not None and team.moderation_status != "hidden":
+        if team.creator_profile_id is not None:
+            return f"owner:{team.creator_profile_id}:name:{team.normalized_name}"
+        return f"name:{team.normalized_name}"
+    # Keep a moderated or deleted historical team separate rather than
+    # collapsing unrelated private identities into one public Hall row.
+    return f"historical:{result.team_id or result.subject_key}"
 
 
 def student_score_rows(
@@ -583,10 +596,13 @@ def weekly_student_points(
     contest_week: ContestWeek,
     current_profile_id: int,
 ) -> dict[str, object]:
-    charts, approved_chart_ids = _charts_and_approved_ids(session, contest_week)
+    charts, approved_chart_ids, pristine_chart_ids = _charts_and_approved_ids(
+        session, contest_week
+    )
 
     open_scores: dict[int, int] = {}
     verified_scores: dict[int, int] = {}
+    pristine_scores: dict[int, int] = {}
     for chart in charts:
         open_scores[chart.profile_id] = (
             open_scores.get(chart.profile_id, 0) + chart.minutes
@@ -595,8 +611,12 @@ def weekly_student_points(
             verified_scores[chart.profile_id] = (
                 verified_scores.get(chart.profile_id, 0) + chart.minutes
             )
+        if chart.id in pristine_chart_ids:
+            pristine_scores[chart.profile_id] = (
+                pristine_scores.get(chart.profile_id, 0) + chart.minutes
+            )
 
-    profile_ids = set(open_scores) | set(verified_scores)
+    profile_ids = set(open_scores) | set(verified_scores) | set(pristine_scores)
     profiles = {
         profile.id: profile
         for profile in session.scalars(
@@ -611,6 +631,9 @@ def weekly_student_points(
     verified_scores = {
         key: value for key, value in verified_scores.items() if key in active_ids
     }
+    pristine_scores = {
+        key: value for key, value in pristine_scores.items() if key in active_ids
+    }
     open_rows, open_position = student_minutes_rows(
         open_scores,
         profiles,
@@ -621,14 +644,19 @@ def weekly_student_points(
         profiles,
         current_profile_id=current_profile_id,
     )
+    pristine_rows, pristine_position = student_minutes_rows(
+        pristine_scores,
+        profiles,
+        current_profile_id=current_profile_id,
+    )
     return {
         "open": open_rows,
         "verified": verified_rows,
-        "pristine": [],
+        "pristine": pristine_rows,
         "current_user_position": {
             "open": open_position,
             "verified": verified_position,
-            "pristine": {"has_score": False},
+            "pristine": pristine_position,
         },
     }
 
@@ -852,7 +880,7 @@ def medal_for_rank(rank: int) -> str | None:
 def _charts_and_approved_ids(
     session: Session, contest_week: ContestWeek, *,
     submitted_before: datetime | None = None,
-) -> tuple[list[PracticeChart], set[int]]:
+) -> tuple[list[PracticeChart], set[int], set[int]]:
     filters = [
         PracticeChart.practice_date >= contest_week.week_start,
         PracticeChart.practice_date < contest_week.week_end,
@@ -881,7 +909,8 @@ def _charts_and_approved_ids(
         if chart_ids
         else set()
     )
-    return charts, approved
+    pristine = {chart.id for chart in charts if chart.source == "pristine"}
+    return charts, approved, pristine
 
 
 def _team_rankings(
@@ -962,14 +991,18 @@ def _weekly_team_scores(
     source_cutoff: datetime | None = None,
 ) -> dict[str, dict[str, object]]:
     """Build weekly team totals, meaningful averages, and TPR divisions."""
-    charts, approved_ids = _charts_and_approved_ids(
+    charts, approved_ids, pristine_ids = _charts_and_approved_ids(
         session, contest_week, submitted_before=source_cutoff
     )
     contributions = {"open": {}, "verified": {}, "pristine": {}}
     for chart in charts:
         if not chart.include_team_contests or chart.team_id is None:
             continue
-        divisions = ["open"] + (["verified"] if chart.id in approved_ids else [])
+        divisions = ["open"]
+        if chart.id in approved_ids:
+            divisions.append("verified")
+        if chart.id in pristine_ids:
+            divisions.append("pristine")
         for division in divisions:
             key = (chart.team_id, chart.profile_id)
             contributions[division][key] = contributions[division].get(key, 0) + chart.minutes
@@ -1081,7 +1114,7 @@ def _season_team_practice_scores(
         week = weeks.get(week_start)
         if week is None:
             continue
-        _, approved = _charts_and_approved_ids(
+        _, approved, _pristine = _charts_and_approved_ids(
             session, week, submitted_before=source_cutoff
         )
         for division in ["open"] + (["verified"] if chart.id in approved else []):
@@ -1122,7 +1155,7 @@ def _seasonal_team_point_scores(
     )).all()
     eligibility: dict[tuple[date, int], set[str]] = {}
     for week in weeks:
-        charts, approved = _charts_and_approved_ids(
+        charts, approved, _pristine = _charts_and_approved_ids(
             session, week, submitted_before=source_cutoff
         )
         for chart in charts:
@@ -1297,7 +1330,9 @@ def _legacy_finalize_contest_week(
     if set(contests) != {definition["key"] for definition in CONTEST_DEFINITIONS}:
         raise RuntimeError("Band Camp contest definitions are missing.")
 
-    charts, approved_ids = _charts_and_approved_ids(session, contest_week)
+    charts, approved_ids, pristine_ids = _charts_and_approved_ids(
+        session, contest_week
+    )
     start_at, end_at = _week_utc_bounds(contest_week)
     camp_awards = session.scalars(select(CampPointAward).where(
         CampPointAward.occurred_at >= start_at,
@@ -1319,17 +1354,21 @@ def _legacy_finalize_contest_week(
         else {}
     )
 
-    point_scores = {"open": {}, "verified": {}}
+    point_scores = {"open": {}, "verified": {}, "pristine": {}}
     camp_point_scores: dict[int, int] = {}
-    instrument_totals = {"open": {}, "verified": {}}
+    instrument_totals = {"open": {}, "verified": {}, "pristine": {}}
     contributions: dict[tuple[str, str, int], int] = {}
     for chart in charts:
-        divisions = ["open"] + (["verified"] if chart.id in approved_ids else [])
+        divisions = ["open"]
+        if chart.id in approved_ids:
+            divisions.append("verified")
+        if chart.id in pristine_ids:
+            divisions.append("pristine")
         key, display = normalize_instrument(chart.instrument)
         for division in divisions:
             scores = point_scores[division]
             scores[chart.profile_id] = scores.get(chart.profile_id, 0) + chart.minutes
-            if key:
+            if key and division != "pristine":
                 totals = instrument_totals[division]
                 prior = totals.get(key, (display, 0))
                 totals[key] = (prior[0], prior[1] + chart.minutes)
@@ -1345,7 +1384,7 @@ def _legacy_finalize_contest_week(
     camp_points_contest = contests["weekly-camp-points"]
     gold_results: dict[tuple[int, str], ContestResult] = {}
     winning_instruments: set[tuple[str, str]] = set()
-    for division in ("open", "verified"):
+    for division in ("open", "verified", "pristine"):
         ranked_students = _ranked_student_scores(point_scores[division], profiles)
         for profile_id, display, score, rank in ranked_students:
             medal = medal_for_rank(rank)
@@ -1718,18 +1757,22 @@ def finalize_contest_week(
         if was_finalized and week.finalized_at is not None
         else now_utc
     )
-    charts, approved_ids = _charts_and_approved_ids(
+    charts, approved_ids, pristine_ids = _charts_and_approved_ids(
         session, week, submitted_before=source_cutoff
     )
     profile_ids = {chart.profile_id for chart in charts}
     profiles = {row.id: row for row in session.scalars(select(WoodchuckProfile).where(
         WoodchuckProfile.id.in_(profile_ids)
     )).all()} if profile_ids else {}
-    student_scores = {"open": {}, "verified": {}}
+    student_scores = {"open": {}, "verified": {}, "pristine": {}}
     instrument_scores = {"open": {}}
     instrument_contributors: dict[tuple[str, str], set[int]] = {}
     for chart in charts:
-        divisions = ["open"] + (["verified"] if chart.id in approved_ids else [])
+        divisions = ["open"]
+        if chart.id in approved_ids:
+            divisions.append("verified")
+        if chart.id in pristine_ids:
+            divisions.append("pristine")
         instrument_key, instrument_name = normalize_instrument(chart.instrument)
         for division in divisions:
             student_scores[division][chart.profile_id] = student_scores[division].get(chart.profile_id, 0) + chart.minutes
@@ -1741,7 +1784,7 @@ def finalize_contest_week(
 
     _set_finalization_stage(session, "contest_results")
     results: list[tuple[ContestResult, Contest, set[int]]] = []
-    for division in ("open", "verified"):
+    for division in ("open", "verified", "pristine"):
         for profile_id, display, score, rank in _ranked_student_scores(student_scores[division], profiles):
             if rank not in PLACEMENT_DANDELIONS:
                 continue
@@ -1950,7 +1993,10 @@ def _increment_medal(counts: dict[str, int], medal: str) -> None:
 
 def _champion_sort_key(champion: dict[str, object]) -> tuple[object, ...]:
     medals = champion["medals"]
-    name = champion.get("display_name", champion.get("instrument_label", ""))
+    name = champion.get(
+        "display_name",
+        champion.get("team_name", champion.get("instrument_label", "")),
+    )
     return (
         -medals["gold"],
         -medals["silver"],
@@ -1958,6 +2004,120 @@ def _champion_sort_key(champion: dict[str, object]) -> tuple[object, ...]:
         str(name).casefold(),
         str(name),
     )
+
+
+def _rank_champions(champions: list[dict[str, object]]) -> list[dict[str, object]]:
+    """Return deterministic medal standings with Olympic ranks for exact ties."""
+    ordered = sorted(champions, key=_champion_sort_key)
+    previous_medals: tuple[int, int, int] | None = None
+    rank = 0
+    for position, champion in enumerate(ordered, start=1):
+        medals = champion["medals"]
+        medal_key = (medals["gold"], medals["silver"], medals["bronze"])
+        if medal_key != previous_medals:
+            rank = position
+            previous_medals = medal_key
+        champion["rank"] = rank
+    return ordered
+
+
+def _rank_one(champions: list[dict[str, object]]) -> list[dict[str, object]]:
+    return [champion for champion in champions if champion["rank"] == 1]
+
+
+def _current_team_member_ids(
+    session: Session, champion: dict[str, object], *, now: datetime
+) -> set[int]:
+    """Return current active members for one lifetime team identity."""
+    normalized_name = champion.get("_normalized_name")
+    owner_profile_id = champion.get("_owner_profile_id")
+    if not isinstance(normalized_name, str) or not normalized_name:
+        return set()
+    now_utc = aware_utc(now)
+    # Match the existing team-membership authority: a temporary display
+    # entitlement follows the active current season, not the season in which
+    # a lifetime medal was earned.
+    active_season = session.scalar(select(Season).where(
+        Season.status == "active",
+        Season.starts_on <= now_utc.astimezone(CENTRAL).date(),
+    ).order_by(Season.starts_on.desc()))
+    if active_season is None:
+        return set()
+    team_query = select(Team.id).where(
+        Team.season_id == active_season.id,
+        Team.normalized_name == normalized_name,
+        Team.moderation_status != "hidden",
+    )
+    if isinstance(owner_profile_id, int):
+        team_query = team_query.where(Team.creator_profile_id == owner_profile_id)
+    else:
+        team_query = team_query.where(Team.creator_profile_id.is_(None))
+    current_team_id = session.scalar(team_query)
+    if current_team_id is None:
+        return set()
+    return set(session.scalars(select(TeamMembership.profile_id).join(
+        WoodchuckProfile, WoodchuckProfile.id == TeamMembership.profile_id
+    ).where(
+        TeamMembership.team_id == current_team_id,
+        TeamMembership.season_id == active_season.id,
+        TeamMembership.started_at <= now_utc,
+        or_(TeamMembership.ended_at.is_(None), TeamMembership.ended_at > now_utc),
+        WoodchuckProfile.status == "active",
+    )).all())
+
+
+def _traveling_cup_state(
+    session: Session,
+    *,
+    students: list[dict[str, object]],
+    teams: list[dict[str, object]],
+    now: datetime,
+) -> tuple[dict[str, object], dict[str, set[int]]]:
+    """Build public current-holder data and private temporary entitlements."""
+    student_holders = _rank_one(students)
+    team_holders = _rank_one(teams)
+    coterie_member_ids: set[int] = set()
+    for team in team_holders:
+        coterie_member_ids.update(_current_team_member_ids(session, team, now=now))
+    public = {
+        "punxsutawney": {
+            "holders": [{
+                "display_name": holder["display_name"],
+                "rank": holder["rank"],
+                "medals": dict(holder["medals"]),
+            } for holder in student_holders],
+        },
+        "coterie": {
+            "teams": [{
+                "team_id": holder["team_id"],
+                "team_name": holder["team_name"],
+                "emblem_key": holder["emblem_key"],
+                "rank": holder["rank"],
+                "medals": dict(holder["medals"]),
+            } for holder in team_holders],
+        },
+    }
+    internal = {
+        "punxsutawney_profile_ids": {
+            holder["_profile_id"] for holder in student_holders
+            if isinstance(holder.get("_profile_id"), int)
+        },
+        "coterie_profile_ids": coterie_member_ids,
+    }
+    return public, internal
+
+
+def traveling_cup_entitlements(
+    session: Session, *, profile_id: int, now: datetime | None = None
+) -> dict[str, bool]:
+    """Return one student's dynamic traveling-cup eligibility without writes."""
+    instant = aware_utc(now or datetime.now(timezone.utc))
+    payload = hall_of_champions_payload(session, _include_internal=True, now=instant)
+    internal = payload.pop("_traveling_cup_entitlements")
+    return {
+        "punxsutawney": profile_id in internal["punxsutawney_profile_ids"],
+        "coterie": profile_id in internal["coterie_profile_ids"],
+    }
 
 
 def _record_champion_achievement(
@@ -1998,7 +2158,12 @@ def _finalize_champion_achievements(champion: dict[str, object]) -> None:
     champion["achievements"] = achievements
 
 
-def hall_of_champions_payload(session: Session) -> dict[str, object]:
+def hall_of_champions_payload(
+    session: Session,
+    *,
+    _include_internal: bool = False,
+    now: datetime | None = None,
+) -> dict[str, object]:
     rows = session.execute(
         select(ContestResult, Contest, Season)
         .join(Contest, Contest.id == ContestResult.contest_id)
@@ -2011,13 +2176,24 @@ def hall_of_champions_payload(session: Session) -> dict[str, object]:
         .order_by(ContestWeek.week_start.desc(), ContestResult.id.desc())
     ).all()
 
+    team_ids = {
+        result.team_id for result, _contest, _season in rows
+        if result.subject_type == "team" and result.team_id is not None
+    }
+    teams = {
+        team.id: team
+        for team in session.scalars(select(Team).where(Team.id.in_(team_ids))).all()
+    } if team_ids else {}
+
     students_by_profile: dict[int, dict[str, object]] = {}
+    teams_by_subject: dict[str, dict[str, object]] = {}
     instruments_by_key: dict[str, dict[str, object]] = {}
     for result, contest, season in rows:
         if result.subject_type == "student" and result.profile_id is not None:
             champion = students_by_profile.get(result.profile_id)
             if champion is None:
                 champion = {
+                    "_profile_id": result.profile_id,
                     "display_name": result.display_name_snapshot,
                     "medals": _empty_medal_counts(),
                     "by_division": {
@@ -2028,6 +2204,32 @@ def hall_of_champions_payload(session: Session) -> dict[str, object]:
                     "_achievement_groups": {},
                 }
                 students_by_profile[result.profile_id] = champion
+        elif result.subject_type == "team":
+            team = teams.get(result.team_id)
+            team_key = lifetime_team_identity(result, team)
+            champion = teams_by_subject.get(team_key)
+            if champion is None:
+                champion = {
+                    "team_id": result.team_id,
+                    "team_name": public_team_name(
+                        team, result.display_name_snapshot
+                    ),
+                    "emblem_key": public_team_emblem(team),
+                    "_normalized_name": (
+                        team.normalized_name if team is not None else None
+                    ),
+                    "_owner_profile_id": (
+                        team.creator_profile_id if team is not None else None
+                    ),
+                    "medals": _empty_medal_counts(),
+                    "by_division": {
+                        "open": _empty_medal_counts(),
+                        "verified": _empty_medal_counts(),
+                    },
+                    "divisions": set(),
+                    "_achievement_groups": {},
+                }
+                teams_by_subject[team_key] = champion
         elif result.subject_type == "instrument":
             champion = instruments_by_key.get(result.subject_key)
             if champion is None:
@@ -2060,43 +2262,6 @@ def hall_of_champions_payload(session: Session) -> dict[str, object]:
             contest=contest,
             division=result.division,
             medal=result.medal,
-        )
-
-    # Team champion wins are public Hall credit for each snapshotted,
-    # P-Chart-eligible recipient, represented by the idempotent crown grant.
-    team_wins = session.execute(
-        select(RewardGrant, ContestResult, WoodchuckProfile, Contest, Season)
-        .join(ContestResult, ContestResult.id == RewardGrant.contest_result_id)
-        .join(WoodchuckProfile, WoodchuckProfile.id == RewardGrant.profile_id)
-        .join(Contest, Contest.id == ContestResult.contest_id)
-        .join(ContestWeek, ContestWeek.id == ContestResult.contest_week_id)
-        .join(Season, Season.id == ContestWeek.season_id)
-        .where(
-            RewardGrant.reward_type == "crown_win",
-            RewardGrant.category_key == "team-crown",
-            ContestResult.subject_type == "team",
-            ContestResult.rank == 1,
-            ContestWeek.status == "finalized",
-            contest_season_clause(),
-        )
-    ).all()
-    for _grant, result, profile, contest, season in team_wins:
-        champion = students_by_profile.setdefault(profile.id, {
-            "display_name": public_woodchuck_name(profile),
-            "medals": _empty_medal_counts(),
-            "by_division": {"open": _empty_medal_counts(), "verified": _empty_medal_counts()},
-            "divisions": set(),
-            "_achievement_groups": {},
-        })
-        _increment_medal(champion["medals"], "gold")
-        _increment_medal(champion["by_division"][result.division], "gold")
-        champion["divisions"].add(result.division)
-        _record_champion_achievement(
-            champion,
-            season=season,
-            contest=contest,
-            division=result.division,
-            medal="gold",
         )
 
     points_contest = session.scalar(
@@ -2142,12 +2307,20 @@ def hall_of_champions_payload(session: Session) -> dict[str, object]:
         }
         students.append(champion)
 
+    teams_payload = list(teams_by_subject.values())
+    for champion in teams_payload:
+        champion["divisions"] = sorted(champion["divisions"])
+        _finalize_champion_achievements(champion)
+
     instruments = list(instruments_by_key.values())
     for champion in instruments:
         champion["divisions"] = sorted(champion["divisions"])
         _finalize_champion_achievements(champion)
-    students.sort(key=_champion_sort_key)
-    instruments.sort(key=_champion_sort_key)
+    students = _rank_champions(students)
+    teams_payload = _rank_champions(teams_payload)
+    # Retain this existing API field for consumers of historical instrument
+    # results. Instruments are intentionally not a primary Hall category.
+    instruments = _rank_champions(instruments)
     director_rows = session.execute(
         select(DirectorTeamContestResult, DirectorTeamContest, Team, Season)
         .join(
@@ -2192,11 +2365,28 @@ def hall_of_champions_payload(session: Session) -> dict[str, object]:
             "score": result.score,
         })
 
-    return {
+    traveling_cups, internal_entitlements = _traveling_cup_state(
+        session,
+        students=students,
+        teams=teams_payload,
+        now=aware_utc(now or datetime.now(timezone.utc)),
+    )
+    if not _include_internal:
+        for champion in students:
+            champion.pop("_profile_id", None)
+        for champion in teams_payload:
+            champion.pop("_normalized_name", None)
+            champion.pop("_owner_profile_id", None)
+    payload = {
         "students": students,
+        "teams": teams_payload,
         "instruments": instruments,
         "director_team_contests": list(director_events.values()),
+        "traveling_cups": traveling_cups,
     }
+    if _include_internal:
+        payload["_traveling_cup_entitlements"] = internal_entitlements
+    return payload
 
 
 def crown_progress_payload(

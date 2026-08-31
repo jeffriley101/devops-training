@@ -127,12 +127,13 @@ def test_book_history_uses_accessible_verified_and_pristine_badges() -> None:
     assert 'class="p-book-entry-badge p-book-pristine-badge"' in formatter
     assert 'aria-label="Pristine P-Chart" title="Pristine P-Chart">🥇</span>' in formatter
     assert "`${verificationText}${pristineText}${verifierNoteText}`" in formatter
+    assert "formatDetectedPlayingTime(entry.detectedPlayingSeconds)" in formatter
 
 
 def test_book_asset_versions_are_advanced() -> None:
     base = (ROOT / "templates/base.html").read_text(encoding="utf-8")
-    assert "/static/css/styles.css?v=108" in base
-    assert "/static/js/app.js?v=72" in base
+    assert "/static/css/styles.css?v=109" in base
+    assert "/static/js/app.js?v=73" in base
     assert "styles.css?v=68" not in base
     assert "app.js?v=34" not in base
 

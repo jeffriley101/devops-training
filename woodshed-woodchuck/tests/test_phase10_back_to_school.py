@@ -98,19 +98,19 @@ def test_streamers_burrow_launcher_and_bonus_challenge_contract() -> None:
     assert "board-locker" not in bonus
 
 
-def test_hall_ui_separates_history_and_groups_achievements() -> None:
+def test_hall_ui_separates_weekly_history_from_lifetime_medal_leaders() -> None:
     assert "Historical winners" not in BOARD
     assert '<summary id="past-winners-title">Medal Board of Past Winners</summary>' in BOARD
     assert '<summary id="hall-of-champions-title">Hall of Champions</summary>' in BOARD
     assert BOARD.count("history-disclosure") >= 2
-    assert "Seasonal history" in BOARD
-    assert 'id="seasonal-champions-list"' in BOARD
+    assert "Seasonal history" not in BOARD
+    assert 'id="lifetime-champions-list"' in BOARD
+    assert "All-Time Medal Leaders" in BOARD
     hall = APP[APP.index("function wireHallOfChampions"):APP.index("function wirePersonalCrownProgress")]
-    assert 'function renderSeasonalHall()' in hall
-    assert 'categoryDetails.className = "hall-category-card"' in hall
-    assert 'divisions.className = "hall-category-divisions"' in hall
-    assert 'divisionSection.dataset.division = divisionKey' in hall
-    assert 'history.season' in hall
+    assert 'function renderLifetimeHall()' in hall
+    assert 'renderLifetimeLeaders("Woodchucks", "students")' in hall
+    assert 'renderLifetimeLeaders("Teams", "teams")' in hall
+    assert 'renderSpecialChampionships()' in hall
 
 
 def test_live_contests_are_collapsible_categories_with_future_divisions() -> None:

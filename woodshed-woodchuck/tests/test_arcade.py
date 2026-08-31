@@ -100,7 +100,7 @@ def test_practice_room_destinations_are_preserved_as_three_doors() -> None:
     assert practice.count('class="practice-room-emoji-control practice-room-door"') == 3
     assert 'href="https://brassspectrogram.netlify.app/"' in practice
     assert 'target="_blank" rel="noopener noreferrer"' in practice
-    assert 'aria-label="Pristine P-Chart — Coming Soon"' in practice
+    assert 'href="/practice/pristine" aria-label="Open Pristine Practice"' in practice
     assert "<small>Coming Soon</small>" not in practice
     assert 'href="/arcade" aria-label="Open Arcade Room"' in practice
     assert practice.count('class="practice-room-door-tag"') == 3

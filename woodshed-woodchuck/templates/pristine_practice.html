@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section
+  class="pristine-practice"
+  data-pristine-practice
+  data-authenticated="{{ 'true' if authenticated_profile else 'false' }}"
+  aria-labelledby="pristine-practice-title"
+>
+  <header class="pristine-practice-header">
+    <div>
+      <p class="eyebrow">Practice Room B</p>
+      <h1 id="pristine-practice-title">Pristine Practice</h1>
+    </div>
+    <a class="btn btn-secondary" href="/store">Back to SHOP</a>
+  </header>
+
+  <p class="pristine-privacy">
+    Your microphone is used only to detect whether you are playing. Audio is
+    never saved or uploaded.
+  </p>
+
+  {% if not authenticated_profile %}
+  <p class="notice-card">Please <a href="/login">sign in</a> before starting Pristine Practice.</p>
+  {% endif %}
+
+  <div class="pristine-practice-console" aria-label="Pristine Practice timer">
+    <p class="pristine-microphone" data-pristine-microphone>Microphone not started</p>
+    <output class="pristine-timer" data-pristine-time aria-label="Detected playing time">00:00:00</output>
+    <strong class="pristine-status" data-pristine-status role="status" aria-live="polite">Listening</strong>
+
+    <div class="pristine-practice-actions">
+      <button class="btn btn-primary" type="button" data-pristine-start>Enable Microphone &amp; Start</button>
+      <button class="btn btn-secondary" type="button" data-pristine-pause disabled>Pause</button>
+      <button class="btn btn-primary" type="button" data-pristine-done disabled>Done</button>
+      <button class="btn btn-secondary" type="button" data-pristine-retry hidden>Retry Microphone</button>
+    </div>
+    <p class="pristine-feedback" data-pristine-feedback role="status" aria-live="polite"></p>
+  </div>
+</section>
+{% endblock %}
+
+{% block page_scripts %}
+<script src="/static/js/pristine-timer.js?v=1"></script>
+<script src="/static/js/pristine-practice.js?v=1"></script>
+{% endblock %}

@@ -3560,145 +3560,16 @@
     const emptyEl = document.getElementById("champions-empty");
     const errorEl = document.getElementById("champions-error");
     const contentEl = document.getElementById("champions-content");
-    const seasonalList = document.getElementById("seasonal-champions-list");
+    const lifetimeList = document.getElementById("lifetime-champions-list");
     const retryButton = document.getElementById("champions-retry");
-    const filterButtons = Array.from(
-      root.querySelectorAll("[data-champions-division]")
-    );
     const stateEls = [loadingEl, authEl, emptyEl, errorEl, contentEl];
-    let champions = { students: [], instruments: [], directorTeamContests: [] };
-    let division = "all";
-    const expanded = { students: false, instruments: false };
+    let champions = { students: [], teams: [], instruments: [], directorTeamContests: [] };
 
     function showState(element) {
       stateEls.forEach((candidate) => {
         if (candidate) candidate.classList.toggle("hidden", candidate !== element);
       });
       root.setAttribute("aria-busy", String(element === loadingEl));
-    }
-
-    function countsFor(champion) {
-      return division === "all"
-        ? champion.medals
-        : champion.by_division[division];
-    }
-
-    function championName(champion, type) {
-      return type === "students"
-        ? champion.display_name
-        : (window.WWInstruments.teamLabel(champion.instrument_label) || champion.instrument_label);
-    }
-
-    function sortedChampions(type) {
-      return champions[type]
-        .filter((champion) => countsFor(champion).total > 0)
-        .slice()
-        .sort((left, right) => {
-          const leftCounts = countsFor(left);
-          const rightCounts = countsFor(right);
-          return rightCounts.gold - leftCounts.gold ||
-            rightCounts.silver - leftCounts.silver ||
-            rightCounts.bronze - leftCounts.bronze ||
-            championName(left, type).localeCompare(championName(right, type), undefined, {
-              sensitivity: "base",
-            });
-        });
-    }
-
-    function medalStat(emoji, label, count) {
-      const stat = document.createElement("span");
-      const icon = document.createElement("span");
-      icon.setAttribute("aria-hidden", "true");
-      icon.textContent = emoji;
-      stat.append(icon, document.createTextNode(` ${label}: ${count}`));
-      return stat;
-    }
-
-    function renderType(type) {
-      const singular = type === "students" ? "student" : "instrument";
-      const list = document.getElementById(`${singular}-champions-list`);
-      const noResults = document.getElementById(`${singular}-champions-empty`);
-      const showAll = document.getElementById(`${singular}-champions-show-all`);
-      if (!list || !noResults || !showAll) return;
-      list.replaceChildren();
-      const ordered = sortedChampions(type);
-      const visible = expanded[type] ? ordered : ordered.slice(0, 10);
-
-      visible.forEach((champion) => {
-        const counts = countsFor(champion);
-        const card = document.createElement("article");
-        card.className = "champion-card";
-        const head = document.createElement("div");
-        head.className = "champion-card-head";
-        const name = document.createElement("strong");
-        name.textContent = type === "students"
-          ? champion.display_name
-          : `${champion.instrument_icon} ${window.WWInstruments.teamLabel(champion.instrument_label) || champion.instrument_label}`;
-        const total = document.createElement("span");
-        total.className = "champion-podium-total";
-        total.textContent = `${counts.total} podium${counts.total === 1 ? "" : "s"}`;
-        head.append(name, total);
-
-        const medalRow = document.createElement("div");
-        medalRow.className = "champion-medals";
-        medalRow.append(
-          medalStat("🥇", "Gold", counts.gold),
-          medalStat("🥈", "Silver", counts.silver),
-          medalStat("🥉", "Bronze", counts.bronze)
-        );
-        card.append(head, medalRow);
-
-        if (type === "students") {
-          const crown = document.createElement("p");
-          crown.className = "champion-crown";
-          if (champion.crown.earned) {
-            crown.classList.add("champion-crown-earned");
-            crown.textContent = `👑 Permanent crown earned · ${champion.crown.qualifying_wins} qualifying wins`;
-          } else {
-            crown.textContent = `Crown progress: ${champion.crown.qualifying_wins} of ${champion.crown.target_wins} qualifying wins`;
-          }
-          card.appendChild(crown);
-        }
-
-        const represented = document.createElement("p");
-        represented.className = "champion-divisions";
-        represented.textContent = `Divisions represented: ${champion.divisions
-          .map((value) => value === "open" ? "Open" : "Verified")
-          .join(", ")}`;
-        card.appendChild(represented);
-
-        const achievementList = document.createElement("ul");
-        achievementList.className = "champion-achievements";
-        champion.achievements
-          .filter((achievement) => division === "all" || achievement.division === division)
-          .forEach((achievement) => {
-            const item = document.createElement("li");
-            const divisionLabel = achievement.division === "open" ? "Open" : "Verified";
-            const medalParts = [
-              ["Gold", achievement.medals.gold],
-              ["Silver", achievement.medals.silver],
-              ["Bronze", achievement.medals.bronze],
-            ].filter((entry) => entry[1] > 0).map((entry) => `${entry[0]} ${entry[1]}`);
-            item.textContent = `${achievement.season.name} · ${achievement.contest.name} · ${divisionLabel} — ${medalParts.join(", ")}`;
-            achievementList.appendChild(item);
-          });
-        card.appendChild(achievementList);
-        list.appendChild(card);
-      });
-
-      noResults.classList.toggle("hidden", ordered.length !== 0);
-      showAll.classList.toggle("hidden", expanded[type] || ordered.length <= 10);
-    }
-
-    function render() {
-      filterButtons.forEach((button) => {
-        button.setAttribute(
-          "aria-pressed",
-          String(button.dataset.championsDivision === division)
-        );
-      });
-      renderType("students");
-      renderType("instruments");
     }
 
     function validCounts(value) {
@@ -3710,8 +3581,11 @@
     function validChampion(champion, type) {
       const name = type === "students"
         ? champion && champion.display_name
-        : champion && champion.instrument_label;
+        : type === "teams"
+          ? champion && champion.team_name
+          : champion && champion.instrument_label;
       return champion && typeof name === "string" && name.trim() &&
+        Number.isInteger(champion.rank) && champion.rank > 0 &&
         validCounts(champion.medals) && champion.by_division &&
         validCounts(champion.by_division.open) &&
         validCounts(champion.by_division.verified) &&
@@ -3724,7 +3598,7 @@
             ["open", "verified"].includes(achievement.division) &&
             validCounts(achievement.medals)
         ) &&
-        (type === "instruments" || (
+        (type !== "students" || (
           champion.crown &&
           Number.isInteger(champion.crown.qualifying_wins) &&
           champion.crown.qualifying_wins >= 0 &&
@@ -3733,141 +3607,96 @@
         ));
     }
 
-    function renderSeasonalHall() {
-      if (!seasonalList) return;
-      const categories = new Map();
-      ["students", "instruments"].forEach((type) => {
-        const entries = champions[type];
-        entries.forEach((champion, championIndex) => {
-          champion.achievements.forEach((achievement) => {
-            const categoryKey = achievement.contest.key;
-            let category = categories.get(categoryKey);
-            if (!category) {
-              category = {
-                name: boardContestTitle(achievement.contest),
-                divisions: { open: new Map(), verified: new Map() },
-              };
-              categories.set(categoryKey, category);
-            }
-            const championKey = `${type}:${championIndex}`;
-            const divisionEntries = category.divisions[achievement.division];
-            let entry = divisionEntries.get(championKey);
-            if (!entry) {
-              const instrumentName = type === "instruments"
-                ? (window.WWInstruments.teamLabel(champion.instrument_label) || champion.instrument_label)
-                : "";
-              entry = {
-                type,
-                name: type === "students"
-                  ? champion.display_name
-                  : `${champion.instrument_icon} ${instrumentName}`,
-                crownEarned: type === "students" && champion.crown.earned,
-                history: [],
-              };
-              divisionEntries.set(championKey, entry);
-            }
-            entry.history.push({
-              season: achievement.season.name,
-              medals: achievement.medals,
-            });
-          });
-        });
-      });
+    function medalSummary(medals) {
+      return `🥇 ${medals.gold} · 🥈 ${medals.silver} · 🥉 ${medals.bronze}`;
+    }
 
-      seasonalList.replaceChildren();
-      Array.from(categories.entries())
-        .sort((left, right) => left[1].name.localeCompare(right[1].name, undefined, {
-          sensitivity: "base",
-        }))
-        .forEach(([categoryKey, category]) => {
-          const categoryDetails = document.createElement("details");
-          categoryDetails.className = "hall-category-card";
-          categoryDetails.dataset.hallCategory = categoryKey;
-          const categorySummary = document.createElement("summary");
-          categorySummary.textContent = category.name;
-          categoryDetails.appendChild(categorySummary);
-          const divisions = document.createElement("div");
-          divisions.className = "hall-category-divisions";
-
-          ["open", "verified"].forEach((divisionKey) => {
-            const divisionSection = document.createElement("section");
-            divisionSection.className = "hall-division-card";
-            divisionSection.dataset.division = divisionKey;
-            const heading = document.createElement("h4");
-            heading.textContent = divisionKey === "open" ? "Open" : "Verified";
-            divisionSection.appendChild(heading);
-            const entries = Array.from(category.divisions[divisionKey].values());
-            if (!entries.length) {
-              const empty = document.createElement("p");
-              empty.className = "contest-empty-state";
-              empty.textContent = "No champion in this division yet.";
-              divisionSection.appendChild(empty);
-            } else {
-              entries.forEach((entry) => {
-                const card = document.createElement("article");
-                card.className = "champion-card";
-                const name = document.createElement("strong");
-                name.textContent = `${entry.name}${entry.crownEarned ? " 👑" : ""}`;
-                const achievements = document.createElement("ul");
-                achievements.className = "champion-achievements";
-                entry.history.forEach((history) => {
-                  const item = document.createElement("li");
-                  const medalParts = [
-                    ["Gold", history.medals.gold],
-                    ["Silver", history.medals.silver],
-                    ["Bronze", history.medals.bronze],
-                  ].filter((medal) => medal[1] > 0)
-                    .map((medal) => `${medal[0]} ${medal[1]}`);
-                  item.textContent = `${history.season} — ${medalParts.join(", ")}`;
-                  achievements.appendChild(item);
-                });
-                card.append(name, achievements);
-                divisionSection.appendChild(card);
-              });
-            }
-            divisions.appendChild(divisionSection);
-          });
-          categoryDetails.appendChild(divisions);
-          seasonalList.appendChild(categoryDetails);
-        });
-
-      if (champions.directorTeamContests.length) {
-        const eventDetails = document.createElement("details");
-        eventDetails.className = "hall-category-card";
-        eventDetails.dataset.hallCategory = "director-team-contests";
-        const summary = document.createElement("summary");
-        summary.textContent = "Director Team Contests";
-        eventDetails.appendChild(summary);
-        const eventList = document.createElement("div");
-        eventList.className = "hall-category-divisions";
-        const eventSection = document.createElement("section");
-        eventSection.className = "hall-division-card";
-        const heading = document.createElement("h4");
-        heading.textContent = "Team Events";
-        eventSection.appendChild(heading);
-        champions.directorTeamContests.forEach((event) => {
-          const card = document.createElement("article");
-          card.className = "champion-card";
-          const title = document.createElement("strong");
-          title.textContent = `${event.title} · ${event.metric_label}`;
-          const period = document.createElement("p");
-          period.textContent = `${event.season.name} · ${new Date(event.starts_at).toLocaleDateString()} – ${new Date(event.ends_at).toLocaleDateString()}`;
-          const winners = document.createElement("ul");
-          winners.className = "champion-achievements";
-          event.winners.forEach((winner) => {
-            const item = document.createElement("li");
-            const emblem = document.createElement("span");
-            renderTeamEmblem(emblem, winner.emblem_key);
-            item.append(emblem, document.createTextNode(` ${winner.team_name} — ${winner.score}`));
-            winners.appendChild(item);
-          });
-          card.append(title, period, winners);
-          eventSection.appendChild(card);
-        });
-        eventList.appendChild(eventSection);
-        eventDetails.appendChild(eventList);
-        seasonalList.appendChild(eventDetails);
+    function renderLifetimeLeaders(title, type) {
+      const section = document.createElement("section");
+      section.className = "hall-category-card";
+      section.dataset.hallCategory = type;
+      const heading = document.createElement("h4");
+      heading.textContent = title;
+      section.appendChild(heading);
+      const entries = champions[type];
+      if (!entries.length) {
+        const empty = document.createElement("p");
+        empty.className = "contest-empty-state";
+        empty.textContent = "No medal leaders yet.";
+        section.appendChild(empty);
+        return section;
       }
+      entries.forEach((champion) => {
+        const card = document.createElement("article");
+        card.className = "champion-card";
+        const name = document.createElement("strong");
+        if (type === "teams") {
+          const emblem = document.createElement("span");
+          renderTeamEmblem(emblem, champion.emblem_key);
+          name.append(emblem, document.createTextNode(` ${champion.rank}. ${champion.team_name}`));
+        } else {
+          name.textContent = `${champion.rank}. ${champion.display_name}`;
+        }
+        const medals = document.createElement("p");
+        medals.className = "champion-medals";
+        medals.textContent = medalSummary(champion.medals);
+        const achievementList = document.createElement("ul");
+        achievementList.className = "champion-achievements";
+        champion.achievements.forEach((achievement) => {
+          const item = document.createElement("li");
+          const division = achievement.division === "verified" ? "Verified" : "Open";
+          item.textContent = `${achievement.season.name} · ${boardContestTitle(achievement.contest)} · ${division} — ${medalSummary(achievement.medals)}`;
+          achievementList.appendChild(item);
+        });
+        card.append(name, medals, achievementList);
+        section.appendChild(card);
+      });
+      return section;
+    }
+
+    function renderSpecialChampionships() {
+      const section = document.createElement("section");
+      section.className = "hall-category-card";
+      section.dataset.hallCategory = "special-championships";
+      const heading = document.createElement("h4");
+      heading.textContent = "Special Championships";
+      section.appendChild(heading);
+      if (!champions.directorTeamContests.length) {
+        const empty = document.createElement("p");
+        empty.className = "contest-empty-state";
+        empty.textContent = "No special championships yet.";
+        section.appendChild(empty);
+        return section;
+      }
+      champions.directorTeamContests.forEach((event) => {
+        const card = document.createElement("article");
+        card.className = "champion-card";
+        const title = document.createElement("strong");
+        title.textContent = `${event.title} · ${event.metric_label}`;
+        const period = document.createElement("p");
+        period.textContent = `${event.season.name} · ${new Date(event.starts_at).toLocaleDateString()} – ${new Date(event.ends_at).toLocaleDateString()}`;
+        const winners = document.createElement("ul");
+        winners.className = "champion-achievements";
+        event.winners.forEach((winner) => {
+          const item = document.createElement("li");
+          const emblem = document.createElement("span");
+          renderTeamEmblem(emblem, winner.emblem_key);
+          item.append(emblem, document.createTextNode(` ${winner.team_name} — ${winner.score}`));
+          winners.appendChild(item);
+        });
+        card.append(title, period, winners);
+        section.appendChild(card);
+      });
+      return section;
+    }
+
+    function renderLifetimeHall() {
+      if (!lifetimeList) return;
+      lifetimeList.replaceChildren(
+        renderLifetimeLeaders("Woodchucks", "students"),
+        renderLifetimeLeaders("Teams", "teams"),
+        renderSpecialChampionships()
+      );
     }
 
     async function loadChampions() {
@@ -3883,6 +3712,9 @@
         champions = {
           students: payload && Array.isArray(payload.students)
             ? payload.students.filter((item) => validChampion(item, "students"))
+            : [],
+          teams: payload && Array.isArray(payload.teams)
+            ? payload.teams.filter((item) => validChampion(item, "teams"))
             : [],
           instruments: payload && Array.isArray(payload.instruments)
             ? payload.instruments.filter((item) => validChampion(item, "instruments"))
@@ -3900,11 +3732,11 @@
                   typeof winner.score === "number"))
             : [],
         };
-        if (!champions.students.length && !champions.instruments.length &&
+        if (!champions.students.length && !champions.teams.length &&
             !champions.directorTeamContests.length) {
           return showState(emptyEl);
         }
-        renderSeasonalHall();
+        renderLifetimeHall();
         showState(contentEl);
       } catch (_error) {
         showState(errorEl);
@@ -4819,6 +4651,14 @@
           const existing = entriesByServerId.get(serverId);
 
           if (existing) {
+            if (existing.pristine !== (serverChart.pristine === true)) {
+              existing.pristine = serverChart.pristine === true;
+              changed = true;
+            }
+            if (existing.detectedPlayingSeconds !== serverChart.detected_playing_seconds) {
+              existing.detectedPlayingSeconds = serverChart.detected_playing_seconds;
+              changed = true;
+            }
             if (existing.verificationStatus !== status) {
               existing.verificationStatus = status;
               verificationChanged = true;
@@ -4850,6 +4690,8 @@
               ? serverChart.practice_details
               : [],
             source: serverChart.source || "p-book",
+            pristine: serverChart.pristine === true,
+            detectedPlayingSeconds: serverChart.detected_playing_seconds,
             creditsAwarded:
               Number(serverChart.credits_awarded) || 0,
             loggedAt:
@@ -5047,6 +4889,17 @@
       window.addEventListener("pagehide", stopPracticeTimerInterval);
     }
 
+    function formatDetectedPlayingTime(totalSeconds) {
+      const seconds = Math.max(0, Math.floor(totalSeconds));
+      const hours = Math.floor(seconds / 3600);
+      const minutes = Math.floor((seconds % 3600) / 60);
+      const remainder = seconds % 60;
+      const clock = hours > 0
+        ? `${hours}:${String(minutes).padStart(2, "0")}:${String(remainder).padStart(2, "0")}`
+        : `${minutes}:${String(remainder).padStart(2, "0")}`;
+      return `${clock} detected playing`;
+    }
+
     function formatEntry(entry) {
       const noteText = entry.note ? ` — ${entry.note}` : "";
       const details = Array.isArray(entry.practiceDetails)
@@ -5077,8 +4930,13 @@
             )
           : "";
 
+      const durationText = (entry.pristine === true || entry.isPristine === true) &&
+        Number.isInteger(entry.detectedPlayingSeconds)
+        ? formatDetectedPlayingTime(entry.detectedPlayingSeconds)
+        : `${entry.minutes} minutes`;
+
       return (
-        `${entry.dateKey} — ${entry.minutes} minutes` +
+        `${entry.dateKey} — ${durationText}` +
         `${detailText}${noteText}` +
         `${verificationText}${pristineText}${verifierNoteText}`
       );
