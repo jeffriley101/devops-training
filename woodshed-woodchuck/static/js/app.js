@@ -4054,6 +4054,11 @@
         quantity.className = "shop-catalog-owned";
         quantity.textContent = `Owned ×${ownedCounts.get(item.item_key) || 0}`;
 
+        const dailyFind = document.createElement("span");
+        dailyFind.className = "shop-catalog-daily-find";
+        dailyFind.textContent = "Today's find";
+        dailyFind.hidden = item.rotating !== true;
+
         const buyButton = document.createElement("button");
         buyButton.className = "btn btn-primary shop-buy-button";
         buyButton.type = "button";
@@ -4062,7 +4067,7 @@
         buyButton.textContent = purchaseInFlight.has(item.item_key) ? "Buying…" : "Buy";
         buyButton.disabled = purchaseInFlight.has(item.item_key) || !inventoryAvailable;
 
-        card.append(emoji, name, price, quantity, buyButton);
+        card.append(emoji, name, price, quantity, dailyFind, buyButton);
         container.append(card);
       });
 

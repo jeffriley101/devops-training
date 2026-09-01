@@ -4206,6 +4206,12 @@ select {
 }
 
 .shop-catalog-panel { min-width: 0; }
+.shop-daily-finds-note {
+  margin: 0 0 .65rem;
+  color: #65441f;
+  font-size: .9rem;
+  text-align: center;
+}
 .shop-catalog-grid {
   display: grid;
   min-width: 0;
@@ -4239,6 +4245,16 @@ select {
 .shop-catalog-owned { font-size: .85rem; }
 .shop-catalog-item-price { grid-column: 1 / -1; }
 .shop-catalog-owned { grid-column: 1 / -1; font-weight: 800; }
+.shop-catalog-daily-find {
+  grid-column: 1 / -1;
+  justify-self: start;
+  padding: .12rem .42rem;
+  border-radius: 999px;
+  color: #fff8df;
+  background: #6b3f1f;
+  font-size: .72rem;
+  font-weight: 900;
+}
 .shop-buy-button {
   width: 100%;
   min-width: 0;
