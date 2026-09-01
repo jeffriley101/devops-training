@@ -164,7 +164,7 @@ def test_arcade_room_renders_nine_touch_friendly_cabinets() -> None:
     assert "min-height: 17rem" in CSS[CSS.index(".arcade-cabinet-link {"):]
     mobile = CSS[CSS.index("@media (max-width: 760px)"):]
     assert ".arcade-cabinet-grid { grid-template-columns: 1fr; }" in mobile
-    assert '/static/js/arcade.js?v=13' in ARCADE
+    assert '/static/js/arcade.js?v=14' in ARCADE
 
 
 def test_arcade_pages_route_game_specific_soundtracks() -> None:

@@ -50,14 +50,15 @@
   async function loadScores(gameKey) {
     const endpoint = SCORE_ENDPOINTS[gameKey];
     if (!endpoint) throw new Error("That game is unavailable.");
-    const response = await fetch(endpoint, {
-      credentials: "same-origin",
-      cache: "no-store",
-    });
-    let payload = {};
-    try { payload = await response.json(); } catch (_error) { payload = {}; }
-    if (!response.ok) throw new Error(payload.detail || "");
-    return payload;
+    if (gameKey === "plunge-burrow") {
+      const response = await fetch(endpoint, {
+        credentials: "same-origin",
+        cache: "no-store",
+      });
+      if (!response.ok) throw new Error();
+      return response.json();
+    }
+    return window.WoodshedArcadeEconomy.loadScores(gameKey);
   }
 
   function wireArcadeRoom() {

@@ -64,6 +64,7 @@ class ArcadePlayStartResult:
     reward_eligible: bool
     completed_reward_plays: int
     state_revision: int
+    resumed: bool = False
 
 
 def validate_arcade_play_game_key(game_key: str) -> str:
@@ -228,6 +229,34 @@ def start_arcade_play(
             )
 
     state = _state_for_update(session, profile_id)
+    # A browser can lose the response after this transaction commits.  Do not
+    # charge a second dandelion when the student safely retries the same game:
+    # the profile row lock above serializes concurrent start requests and this
+    # returns the already-authorized, unfinished run instead.
+    if key != "history-mystery":
+        unfinished_play = session.scalar(
+            select(ArcadePlaySession)
+            .where(
+                ArcadePlaySession.profile_id == profile_id,
+                ArcadePlaySession.game_key == key,
+                ArcadePlaySession.completed_at.is_(None),
+            )
+            .order_by(ArcadePlaySession.started_at.desc(), ArcadePlaySession.id.desc())
+            .with_for_update()
+        )
+        if unfinished_play is not None:
+            completed = _completed_plays_today(
+                session, profile_id=profile_id, game_key=key, now=timestamp
+            )
+            return ArcadePlayStartResult(
+                play=unfinished_play,
+                balance=_balance(state),
+                reward_eligible=completed < DAILY_REWARDED_PLAY_LIMIT,
+                completed_reward_plays=completed,
+                state_revision=state.revision,
+                resumed=True,
+            )
+
     current_balance = _balance(state)
     if current_balance < ARCADE_ENTRY_COST:
         raise InsufficientArcadeBalanceError(
