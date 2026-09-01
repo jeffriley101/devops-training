@@ -8,11 +8,13 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from .contests import traveling_cup_entitlements
 from .models import (
     CrownAward,
     OwnedItemCopy,
     RewardGrant,
     RewardInventoryPlacement,
+    TravelingCupPlacement,
     WoodchuckProfile,
     WoodchuckState,
 )
@@ -52,6 +54,17 @@ PLACEABLE_REWARD_TYPES = {
     "trophy": {"name": "Trophy", "emoji": "🏆"},
     "goat": {"name": "GOAT Reward", "emoji": "🐐"},
 }
+TRAVELING_CUP_DEFINITIONS = {
+    "punxsutawney-cup": {
+        "entitlement": "punxsutawney",
+        "name": "Punxsutawney Cup",
+    },
+    "coterie-cup": {
+        "entitlement": "coterie",
+        "name": "Coterie Cup",
+    },
+}
+TRAVELING_CUP_EMOJI = "🏆"
 
 
 def central_week_start(*, now: datetime | None = None) -> date:
@@ -178,6 +191,28 @@ def earned_reward_inventory_payload(
     }
 
 
+def traveling_cup_inventory_payload(
+    entitlement_key: str,
+    placement: TravelingCupPlacement | None,
+) -> dict[str, object]:
+    definition = TRAVELING_CUP_DEFINITIONS[entitlement_key]
+    return {
+        "id": entitlement_key,
+        "item_key": entitlement_key,
+        "name": definition["name"],
+        "emoji": TRAVELING_CUP_EMOJI,
+        "shelf": "earned",
+        "acquisition_source": "traveling-cup",
+        "purchase_price": None,
+        "placement_x": placement.placement_x if placement else None,
+        "placement_y": placement.placement_y if placement else None,
+        "placement_size": _normalized_size(
+            placement.placement_size if placement else "xlarge"
+        ),
+        "acquired_at": None,
+    }
+
+
 def list_inventory_payloads(session: Session, *, profile_id: int) -> list[dict[str, object]]:
     owned_payloads = [
         owned_item_payload(item)
@@ -227,7 +262,25 @@ def list_inventory_payloads(session: Session, *, profile_id: int) -> list[dict[s
         for grant in earned_rewards
         for ordinal in range(1, grant.amount + 1)
     ]
-    return [*owned_payloads, *crown_payloads, *reward_payloads]
+    cup_entitlements = traveling_cup_entitlements(
+        session, profile_id=profile_id
+    )
+    eligible_cup_keys = [
+        key for key, definition in TRAVELING_CUP_DEFINITIONS.items()
+        if cup_entitlements[definition["entitlement"]]
+    ]
+    cup_placements = {
+        placement.entitlement_key: placement
+        for placement in session.scalars(select(TravelingCupPlacement).where(
+            TravelingCupPlacement.profile_id == profile_id,
+            TravelingCupPlacement.entitlement_key.in_(eligible_cup_keys),
+        )).all()
+    } if eligible_cup_keys else {}
+    cup_payloads = [
+        traveling_cup_inventory_payload(key, cup_placements.get(key))
+        for key in eligible_cup_keys
+    ]
+    return [*owned_payloads, *crown_payloads, *reward_payloads, *cup_payloads]
 
 
 def _normalized_coordinate(value: float) -> float:
@@ -253,6 +306,114 @@ def _lock_placement_profile(session: Session, *, profile_id: int) -> None:
     )
     if locked_profile_id is None:
         raise OwnedItemAccessError("That owned item is unavailable.")
+
+
+def _traveling_cup_definition_for_entitled_profile(
+    session: Session, *, profile_id: int, inventory_key: str
+) -> dict[str, str]:
+    definition = TRAVELING_CUP_DEFINITIONS.get(inventory_key)
+    if definition is None:
+        raise OwnedItemAccessError("That traveling cup is unavailable.")
+    entitlements = traveling_cup_entitlements(session, profile_id=profile_id)
+    if not entitlements[definition["entitlement"]]:
+        raise OwnedItemAccessError("That traveling cup is unavailable.")
+    return definition
+
+
+def _traveling_cup_placement(
+    session: Session, *, profile_id: int, entitlement_key: str
+) -> TravelingCupPlacement | None:
+    return session.scalar(
+        select(TravelingCupPlacement)
+        .where(
+            TravelingCupPlacement.profile_id == profile_id,
+            TravelingCupPlacement.entitlement_key == entitlement_key,
+        )
+        .with_for_update()
+    )
+
+
+def place_traveling_cup_inventory_item(
+    session: Session,
+    *,
+    profile_id: int,
+    inventory_key: str,
+    placement_x: float,
+    placement_y: float,
+    placement_size: str = "xlarge",
+) -> dict[str, object]:
+    x = _normalized_coordinate(placement_x)
+    y = _normalized_coordinate(placement_y)
+    size = _normalized_size(placement_size)
+    _lock_placement_profile(session, profile_id=profile_id)
+    _traveling_cup_definition_for_entitled_profile(
+        session, profile_id=profile_id, inventory_key=inventory_key
+    )
+    placement = _traveling_cup_placement(
+        session, profile_id=profile_id, entitlement_key=inventory_key
+    )
+    if placement is None:
+        placement = TravelingCupPlacement(
+            profile_id=profile_id,
+            entitlement_key=inventory_key,
+            placement_x=x,
+            placement_y=y,
+            placement_size=size,
+        )
+        session.add(placement)
+    else:
+        placement.placement_x = x
+        placement.placement_y = y
+        placement.placement_size = size
+    session.flush()
+    return traveling_cup_inventory_payload(inventory_key, placement)
+
+
+def remove_traveling_cup_inventory_placement(
+    session: Session, *, profile_id: int, inventory_key: str
+) -> dict[str, object]:
+    _lock_placement_profile(session, profile_id=profile_id)
+    _traveling_cup_definition_for_entitled_profile(
+        session, profile_id=profile_id, inventory_key=inventory_key
+    )
+    placement = _traveling_cup_placement(
+        session, profile_id=profile_id, entitlement_key=inventory_key
+    )
+    if placement is not None:
+        placement.placement_x = None
+        placement.placement_y = None
+        session.flush()
+    return traveling_cup_inventory_payload(inventory_key, placement)
+
+
+def update_traveling_cup_inventory_size(
+    session: Session,
+    *,
+    profile_id: int,
+    inventory_key: str,
+    placement_size: str,
+) -> dict[str, object]:
+    size = _normalized_size(placement_size)
+    _lock_placement_profile(session, profile_id=profile_id)
+    _traveling_cup_definition_for_entitled_profile(
+        session, profile_id=profile_id, inventory_key=inventory_key
+    )
+    placement = _traveling_cup_placement(
+        session, profile_id=profile_id, entitlement_key=inventory_key
+    )
+    if placement is None:
+        placement = TravelingCupPlacement(
+            profile_id=profile_id,
+            entitlement_key=inventory_key,
+            placement_x=None,
+            placement_y=None,
+            placement_size=size,
+        )
+        session.add(placement)
+    else:
+        placement.placement_size = size
+    session.flush()
+    return traveling_cup_inventory_payload(inventory_key, placement)
 
 
 def place_owned_item_copy(
@@ -484,8 +645,17 @@ def place_inventory_item(
     inventory_id: str,
     placement_x: float,
     placement_y: float,
-    placement_size: str = "medium",
+    placement_size: str | None = None,
 ) -> dict[str, object]:
+    if inventory_id in TRAVELING_CUP_DEFINITIONS:
+        return place_traveling_cup_inventory_item(
+            session,
+            profile_id=profile_id,
+            inventory_key=inventory_id,
+            placement_x=placement_x,
+            placement_y=placement_y,
+            placement_size=placement_size or "xlarge",
+        )
     crown_award_id = crown_award_id_from_inventory_key(inventory_id)
     if crown_award_id is not None:
         return place_crown_inventory_item(
@@ -494,7 +664,7 @@ def place_inventory_item(
             inventory_key=inventory_id,
             placement_x=placement_x,
             placement_y=placement_y,
-            placement_size=placement_size,
+            placement_size=placement_size or "medium",
         )
     if reward_identity_from_inventory_key(inventory_id) is not None:
         return place_earned_reward_inventory_item(
@@ -503,7 +673,7 @@ def place_inventory_item(
             inventory_key=inventory_id,
             placement_x=placement_x,
             placement_y=placement_y,
-            placement_size=placement_size,
+            placement_size=placement_size or "medium",
         )
     try:
         owned_item_id = int(inventory_id)
@@ -515,13 +685,17 @@ def place_inventory_item(
         owned_item_id=owned_item_id,
         placement_x=placement_x,
         placement_y=placement_y,
-        placement_size=placement_size,
+        placement_size=placement_size or "medium",
     ))
 
 
 def remove_inventory_item_placement(
     session: Session, *, profile_id: int, inventory_id: str
 ) -> dict[str, object]:
+    if inventory_id in TRAVELING_CUP_DEFINITIONS:
+        return remove_traveling_cup_inventory_placement(
+            session, profile_id=profile_id, inventory_key=inventory_id
+        )
     if crown_award_id_from_inventory_key(inventory_id) is not None:
         return remove_crown_inventory_placement(
             session, profile_id=profile_id, inventory_key=inventory_id
@@ -547,6 +721,13 @@ def update_inventory_item_size(
     placement_size: str,
 ) -> dict[str, object]:
     size = _normalized_size(placement_size)
+    if inventory_id in TRAVELING_CUP_DEFINITIONS:
+        return update_traveling_cup_inventory_size(
+            session,
+            profile_id=profile_id,
+            inventory_key=inventory_id,
+            placement_size=size,
+        )
     _lock_placement_profile(session, profile_id=profile_id)
     crown_award_id = crown_award_id_from_inventory_key(inventory_id)
     if crown_award_id is not None:

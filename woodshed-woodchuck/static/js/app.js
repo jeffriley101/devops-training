@@ -580,6 +580,7 @@
         crown: "Earned crown",
         trophy: "Earned trophy",
         goat: "Earned GOAT reward",
+        "traveling-cup": "Current traveling cup",
       }[item.acquisition_source] || "Owned reward";
       details.append(name, source);
       identity.append(emoji, details);
