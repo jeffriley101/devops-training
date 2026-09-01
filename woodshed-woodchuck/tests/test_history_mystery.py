@@ -134,6 +134,17 @@ def test_ninth_cabinet_and_authenticated_history_route(history_database) -> None
     assert 'data-arcade-leaderboard="history-mystery"' not in TEMPLATE
 
 
+def test_history_mystery_uses_thunderpants_through_shared_soundtrack() -> None:
+    soundtrack = (ROOT / "static" / "js" / "arcade-soundtrack.js").read_text(
+        encoding="utf-8"
+    )
+    assert 'data-arcade-soundtrack="history-mystery"' in TEMPLATE
+    assert 'data-arcade-soundtrack-toggle' in TEMPLATE
+    assert '/static/js/arcade-soundtrack.js?v=3' in TEMPLATE
+    assert 'url: "/static/audio/arcade/thunderpants.mp3?v=1"' in soundtrack
+    assert (ROOT / "static" / "audio" / "arcade" / "thunderpants.mp3").is_file()
+
+
 def test_curated_question_bank_is_valid_complete_and_sourced() -> None:
     assert len(HISTORY_MYSTERY_QUESTIONS) == 26
     ids = [question["id"] for question in HISTORY_MYSTERY_QUESTIONS]
@@ -406,4 +417,3 @@ def test_history_migration_extends_constraints_and_adds_daily_guard() -> None:
     assert "uq_arcade_play_session_profile_game_daily_date" in migration
     assert "DELETE FROM arcade_play_sessions" in migration
     assert "DELETE FROM arcade_high_scores" in migration
-
