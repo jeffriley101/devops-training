@@ -927,10 +927,6 @@ def _team_rankings(
         -item[1], public_team_name(teams[item[0]]).casefold(),
         public_team_name(teams[item[0]]),
     ))
-    captain_ids = {team.creator_profile_id for team in teams.values() if team.creator_profile_id}
-    captains = {profile.id: profile for profile in session.scalars(select(WoodchuckProfile).where(
-        WoodchuckProfile.id.in_(captain_ids)
-    )).all()} if captain_ids else {}
     rows: list[dict[str, object]] = []
     previous: int | None = None
     rank = 0
@@ -943,22 +939,6 @@ def _team_rankings(
             "team_name": public_team_name(team),
             "emblem_key": public_team_emblem(team), "score": score,
             "active_member_count": (member_counts or {}).get(team_id, 0),
-            "captain_name": (
-                None if (
-                    team.moderation_status == "hidden"
-                    or team.visibility == "private"
-                    or team.creator_profile_id is None
-                )
-                else public_woodchuck_name(captains.get(team.creator_profile_id))
-            ),
-            "captain_label": (
-                None if (
-                    team.moderation_status == "hidden"
-                    or team.visibility == "private"
-                    or team.creator_profile_id is None
-                )
-                else "Team Captain"
-            ),
         })
     return rows
 

@@ -110,5 +110,5 @@ def test_tpr_board_is_server_authoritative_private_safe_and_olympic_ranked() -> 
         assert [row["rank"] for row in rows] == [1, 1, 1]
         assert [row["emblem_key"] for row in rows] == ["letter:A", "letter:B", "letter:C"]
         private = next(row for row in rows if row["team_id"] == teams[0][0].id)
-        assert private["captain_name"] is None
+        assert all("captain_name" not in row and "captain_label" not in row for row in rows)
         assert "Private Person" not in repr(private)

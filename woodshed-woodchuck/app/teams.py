@@ -86,22 +86,12 @@ def public_team_identity(team: Team) -> tuple[str, dict[str, str]]:
     return team.display_name, emblem_payload(team.emblem_key)
 
 
-def team_payload(team: Team, captain: WoodchuckProfile | None) -> dict[str, object]:
+def team_payload(team: Team) -> dict[str, object]:
     name, emblem = public_team_identity(team)
-    captain_visible = (
-        team.moderation_status != "hidden"
-        and captain is not None
-        and captain.status == "active"
-    )
     return {
         "id": team.id, "name": name, "emblem": emblem,
         "visibility": team.visibility,
         "director_led": team.director_led,
-        "captain": {
-            "display_name": captain.display_name if captain_visible else None,
-            "is_team_captain": captain_visible,
-            "accessible_label": "Team Captain" if captain_visible else None,
-        } if captain_visible else None,
     }
 
 
@@ -250,14 +240,6 @@ def selection_payload(session: Session, *, profile: WoodchuckProfile, now: datet
         Team.display_name, Team.id
     ).limit(MAX_PUBLIC_TEAMS)).all()
     current_team = session.get(Team, membership.team_id) if membership else None
-    visible_teams = list(teams)
-    if current_team is not None and current_team.id not in {team.id for team in visible_teams}:
-        visible_teams.append(current_team)
-    captain_ids = {team.creator_profile_id for team in visible_teams if team.creator_profile_id}
-    captains = {row.id: row for row in session.scalars(select(WoodchuckProfile).where(
-        WoodchuckProfile.id.in_(captain_ids), WoodchuckProfile.status == "active"
-    )).all()} if captain_ids else {}
-    current_captain = captains.get(current_team.creator_profile_id) if current_team else None
     week_membership_count = session.scalar(select(func.count(TeamMembership.id)).where(
         TeamMembership.profile_id == profile.id,
         TeamMembership.season_id == season.id,
@@ -270,9 +252,9 @@ def selection_payload(session: Session, *, profile: WoodchuckProfile, now: datet
     next_at = datetime.combine(week.week_end, time.min, CENTRAL).astimezone(timezone.utc)
     return {
         "season": {"key": season.key, "name": season.name},
-        "teams": [team_payload(team, captains.get(team.creator_profile_id)) for team in teams],
+        "teams": [team_payload(team) for team in teams],
         "membership": {
-            "team": team_payload(current_team, current_captain) if current_team else None,
+            "team": team_payload(current_team) if current_team else None,
             "selected_week_start": membership.selected_week_start.isoformat() if membership else None,
             "locked": locked,
             "correction_available": bool(membership and not locked),

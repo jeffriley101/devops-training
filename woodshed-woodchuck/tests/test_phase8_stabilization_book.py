@@ -58,7 +58,7 @@ def test_book_team_section_is_compact_and_shed_owned() -> None:
     assert "renderTeamEmblem(visual, currentTeam.emblem)" in script
 
 
-def test_team_boards_render_public_team_only_but_shed_keeps_captain() -> None:
+def test_team_boards_and_shed_render_team_identity_without_captain() -> None:
     script = (ROOT / "static/js/app.js").read_text(encoding="utf-8")
     board = script[script.index("function renderTeamBoards"):script.index("function showError", script.index("function renderTeamBoards"))]
     assert "row.team_name" in board and "row.emblem_key" in board
@@ -67,7 +67,8 @@ def test_team_boards_render_public_team_only_but_shed_keeps_captain() -> None:
     assert "active_member_count" not in board
     shed = script[script.index("function wireShedTeamBadge"):script.index("async function refreshPracticeStreak")]
     assert "createShedTeamCard(current, {current: true})" in shed
-    assert "Team Captain" in script
+    assert "team.captain" not in script
+    assert "Team Captain" not in script
 
 
 def test_practice_book_title_and_work_disclosure_copy() -> None:
@@ -133,7 +134,7 @@ def test_book_history_uses_accessible_verified_and_pristine_badges() -> None:
 def test_book_asset_versions_are_advanced() -> None:
     base = (ROOT / "templates/base.html").read_text(encoding="utf-8")
     assert "/static/css/styles.css?v=109" in base
-    assert "/static/js/app.js?v=73" in base
+    assert "/static/js/app.js?v=74" in base
     assert "styles.css?v=68" not in base
     assert "app.js?v=34" not in base
 
@@ -168,9 +169,9 @@ def test_shed_team_selector_has_one_current_card_and_polished_emblems() -> None:
     assert 'id="shed-team-emblem-preview"' in template
     assert "otherTeams = (payload.teams || []).filter((team) => team.id !== current?.id)" in script
     assert "otherSection.hidden = otherTeams.length === 0" in script
-    assert 'document.createTextNode("Captain: ")' in script
-    assert 'star.textContent = "⭐ "' in script
-    assert 'accessible.textContent = " Team Captain"' in script
+    assert 'document.createTextNode("Captain: ")' not in script
+    assert 'star.textContent = "⭐ "' not in script
+    assert 'accessible.textContent = " Team Captain"' not in script
     assert "Letter ${normalized.value}" in script
     assert "Shield`" in script
     assert "${item.value} ${item.key}" not in script

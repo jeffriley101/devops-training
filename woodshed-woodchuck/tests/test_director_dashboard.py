@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pytest
 from fastapi.testclient import TestClient
@@ -132,6 +133,42 @@ def test_dashboard_route_authorization_six_cards_and_multi_team_selector(
     other_team = add_owned_team(dashboard_database, "OTHER", "Other School", "letter:O")
     denied = director.get(f"/director/dashboard?team_id={other_team.id}")
     assert denied.status_code == 404
+
+
+def test_director_contest_times_convert_to_utc_and_display_in_central_time() -> None:
+    submitted = DirectorContestCreate(
+        title="Central Time Audit", description="",
+        starts_at=datetime(2026, 9, 1, 9, tzinfo=ZoneInfo("America/Chicago")),
+        ends_at=datetime(2026, 9, 1, 10, tzinfo=ZoneInfo("America/Chicago")),
+        finalizes_at=datetime(2026, 9, 1, 10, tzinfo=ZoneInfo("America/Chicago")),
+        metric="total_minutes", team_ids=[1],
+    )
+    assert submitted.starts_at == datetime(2026, 9, 1, 14, tzinfo=timezone.utc)
+    assert submitted.ends_at == datetime(2026, 9, 1, 15, tzinfo=timezone.utc)
+
+    script = (ROOT / "static" / "js" / "director-dashboard.js").read_text()
+    template = (ROOT / "templates" / "director_dashboard.html").read_text()
+    assert 'const CENTRAL_TIME_ZONE = "America/Chicago"' in script
+    formatter = script[
+        script.index("function formatCentralDateTime"):
+        script.index("function renderContestSetup")
+    ]
+    assert "timeZone: CENTRAL_TIME_ZONE" in formatter
+    assert '} CT`' in formatter
+    assert "formatCentralDateTime(contest.starts_at)" in script
+    assert "formatCentralDateTime(contest.ends_at)" in script
+    assert "new Date(contest.starts_at).toLocaleString()" not in script
+    assert template.count("(Central time)") == 3
+
+    app_script = (ROOT / "static" / "js" / "app.js").read_text()
+    hall_formatter = app_script[
+        app_script.index("function formatCentralContestDate"):
+        app_script.index("function renderLifetimeLeaders")
+    ]
+    assert 'timeZone: "America/Chicago"' in hall_formatter
+    assert "formatCentralContestDate(event.starts_at)" in app_script
+    assert "formatCentralContestDate(event.ends_at)" in app_script
+    assert "new Date(event.starts_at).toLocaleDateString()" not in app_script
 
 
 def test_dashboard_aggregates_metrics_charts_and_pending_state_without_identity_leak(
