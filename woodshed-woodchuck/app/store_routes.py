@@ -36,7 +36,7 @@ class StorePlacementSubmission(BaseModel):
 
     x: float = Field(ge=0, le=1)
     y: float = Field(ge=0, le=1)
-    size: Literal["medium", "large", "xlarge"] = "medium"
+    size: Literal["medium", "large", "xlarge"] | None = None
 
 
 class StoreSizeSubmission(BaseModel):

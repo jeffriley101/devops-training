@@ -317,6 +317,46 @@ class RewardInventoryPlacement(Base):
     )
 
 
+class TravelingCupPlacement(Base):
+    """A placement preference whose availability is always entitlement-derived."""
+
+    __tablename__ = "traveling_cup_placements"
+    __table_args__ = (
+        CheckConstraint(
+            "entitlement_key IN ('punxsutawney-cup', 'coterie-cup')",
+            name="ck_traveling_cup_placement_key",
+        ),
+        CheckConstraint(
+            "(placement_x IS NULL AND placement_y IS NULL) OR "
+            "(placement_x IS NOT NULL AND placement_y IS NOT NULL)",
+            name="ck_traveling_cup_placement_pair",
+        ),
+        CheckConstraint(
+            "placement_x >= 0 AND placement_x <= 1",
+            name="ck_traveling_cup_placement_x",
+        ),
+        CheckConstraint(
+            "placement_y >= 0 AND placement_y <= 1",
+            name="ck_traveling_cup_placement_y",
+        ),
+        CheckConstraint(
+            "placement_size IN ('medium', 'large', 'xlarge')",
+            name="ck_traveling_cup_placement_size",
+        ),
+    )
+
+    profile_id: Mapped[int] = mapped_column(
+        ForeignKey("woodchuck_profiles.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    entitlement_key: Mapped[str] = mapped_column(String(40), primary_key=True)
+    placement_x: Mapped[float | None] = mapped_column(Float, nullable=True)
+    placement_y: Mapped[float | None] = mapped_column(Float, nullable=True)
+    placement_size: Mapped[str] = mapped_column(
+        String(10), default="xlarge", server_default="xlarge", nullable=False
+    )
+
+
 class TrustedVerifier(Base):
     __tablename__ = "trusted_verifiers"
 
