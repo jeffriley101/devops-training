@@ -17,6 +17,16 @@
     return String(value == null ? "" : value).trim().toUpperCase();
   }
 
+  function formatTonality(value) {
+    return String(value || "")
+      .trim()
+      .replace(/^([A-Ga-g])([b#]?)(?:\s+)(major|minor)$/i,
+        function (_match, note, accidental, quality) {
+          const displayAccidental = accidental.toLowerCase() === "b" ? "b" : accidental;
+          return `${note.toUpperCase()}${displayAccidental} ${quality.toUpperCase()}`;
+        });
+  }
+
   class DressedToTheNinesGame {
     constructor(options) {
       const settings = options || {};
@@ -107,6 +117,7 @@
       NINES_QUESTIONS,
       NINES_RULES: root.NINES_RULES,
       normalizeAnswer,
+      formatTonality,
     };
   }
 
@@ -167,7 +178,7 @@
     scoreOutput.textContent = String(state.score);
     timeOutput.textContent = String(Math.ceil(state.remainingMs / 1000));
     tonalityOutput.textContent = state.currentQuestion
-      ? state.currentQuestion.tonality.toUpperCase()
+      ? formatTonality(state.currentQuestion.tonality)
       : "READY";
     questionOutput.textContent = state.currentQuestion
       ? `Ninth above ${state.currentQuestion.start}?`

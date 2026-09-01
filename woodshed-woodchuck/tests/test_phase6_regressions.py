@@ -242,7 +242,8 @@ def test_shop_photo_only_scene_and_unboxed_accessible_emoji_controls() -> None:
     markup = (ROOT / "templates/store.html").read_text(encoding="utf-8")
     css = (ROOT / "static/css/styles.css").read_text(encoding="utf-8")
     scene_css = css[css.index(".shop-scene {"):css.index(".shop-feature-dialog {")]
-    assert 'src="/static/img/shop3.png"' in markup
+    assert 'src="/static/img/shop-viking-valley-fair.png"' in markup
+    assert 'src="/static/img/shop3.png"' not in markup
     assert "object-fit: cover" in scene_css
     assert "background: none" in scene_css
     assert ".shop-scene::before" not in css

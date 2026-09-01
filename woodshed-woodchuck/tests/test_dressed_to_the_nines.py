@@ -33,7 +33,7 @@ CSS = (ROOT / "static" / "css" / "styles.css").read_text(encoding="utf-8")
 def run_nines_node(body: str) -> dict[str, object]:
     source = f"""
 const assert = require("node:assert/strict");
-const {{ DressedToTheNinesGame, NINES_QUESTIONS, NINES_RULES, normalizeAnswer }} =
+const {{ DressedToTheNinesGame, NINES_QUESTIONS, NINES_RULES, normalizeAnswer, formatTonality }} =
   require("./static/js/dressed-to-the-nines.js");
 {body}
 """
@@ -133,8 +133,24 @@ def test_nines_uses_sand_drop_and_shared_arcade_mute() -> None:
     )
     assert 'data-arcade-soundtrack="dressed-to-the-nines"' in TEMPLATE
     assert 'data-arcade-soundtrack-toggle' in TEMPLATE
-    assert '/static/js/arcade-soundtrack.js?v=4' in TEMPLATE
+    assert '/static/js/arcade-soundtrack.js?v=5' in TEMPLATE
+    assert '/static/js/dressed-to-the-nines.js?v=2' in TEMPLATE
     assert 'url: "/static/audio/arcade/sand-drop.mp3?v=1"' in soundtrack
+
+
+def test_flat_tonalities_keep_lowercase_accidentals_in_display() -> None:
+    result = run_nines_node("""
+assert.equal(formatTonality("Eb Major"), "Eb MAJOR");
+assert.equal(formatTonality("Bb Major"), "Bb MAJOR");
+assert.equal(formatTonality("D Minor"), "D MINOR");
+assert.notEqual(formatTonality("Eb Major"), "EB MAJOR");
+assert.notEqual(formatTonality("Bb Major"), "BB MAJOR");
+console.log(JSON.stringify({ eb: formatTonality("Eb Major"), bb: formatTonality("Bb Major") }));
+""")
+    assert result == {"eb": "Eb MAJOR", "bb": "Bb MAJOR"}
+    assert "state.currentQuestion.tonality.toUpperCase()" not in GAME_JS
+    nines_strong = CSS[CSS.index(".nines-card strong"):]
+    assert "text-transform: none" in nines_strong[:180]
 
 
 def test_question_bank_is_exact_and_answers_are_natural_notes() -> None:

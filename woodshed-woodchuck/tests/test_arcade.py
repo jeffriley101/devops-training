@@ -170,7 +170,7 @@ def test_arcade_room_renders_nine_touch_friendly_cabinets() -> None:
 def test_arcade_pages_route_game_specific_soundtracks() -> None:
     assert '/static/js/arcade-soundtrack.js' not in ARCADE
     for template in (GAME, PLUNGE, SCALE, HISTORY, WHEEL, THIRDS, NINES, INTERVAL):
-        assert '/static/js/arcade-soundtrack.js?v=4' in template
+        assert '/static/js/arcade-soundtrack.js?v=5' in template
     assert 'data-arcade-soundtrack="{{ arcade_game.key }}"' in GAME
     assert 'data-arcade-soundtrack="plunge-burrow"' in PLUNGE
     assert 'data-arcade-soundtrack="scale-keyboard"' in SCALE
@@ -221,13 +221,14 @@ def test_arcade_games_use_the_shared_soundtrack_toggle() -> None:
     for template in (GAME, PLUNGE, SCALE, HISTORY, WHEEL, THIRDS, NINES, INTERVAL):
         assert 'data-arcade-soundtrack-toggle' in template
         assert 'class="arcade-soundtrack-toggle"' in template
-        assert 'aria-label="Mute Arcade soundtrack"' in template
+        assert 'aria-label="Turn on Arcade music"' in template
+        assert '>🔇</button>' in template
     assert "window.WoodshedAudio.setEnabled" in SOUNDTRACK_JS
     assert "updateSoundtrackToggle" in SOUNDTRACK_JS
     assert "syncSoundtrackPreference" in SOUNDTRACK_JS
     assert SOUNDTRACK_JS.count("new Audio(") == 1
     assert 'window.addEventListener("pagehide", stopSoundtrack' in SOUNDTRACK_JS
-    assert "if (!runActive && audio.paused && !audio.ended) playSoundtrack()" in SOUNDTRACK_JS
+    assert "if (!runActive && audio.paused && !audio.ended) void playSoundtrack()" in SOUNDTRACK_JS
     assert "audio.volume = Math.max(0, Math.min(1" in SOUNDTRACK_JS
 
 
@@ -235,6 +236,12 @@ def test_soundtrack_toggle_uses_authoritative_woodshed_audio_state_only() -> Non
     assert 'typeof sound.isEnabled !== "function" || sound.isEnabled()' in SOUNDTRACK_JS
     assert 'typeof sound.getVolume === "function" ? sound.getVolume()' in SOUNDTRACK_JS
     assert "window.WoodshedAudio.setEnabled" in SOUNDTRACK_JS
+    assert "let playbackActivated = false" in SOUNDTRACK_JS
+    assert 'const label = musicOn ? "Mute Arcade soundtrack" : "Turn on Arcade music"' in SOUNDTRACK_JS
+    assert "playbackActivated = true" in SOUNDTRACK_JS
+    initializer = SOUNDTRACK_JS[SOUNDTRACK_JS.index('document.addEventListener("DOMContentLoaded"'):]
+    assert "audio.currentTime = 0" in initializer
+    assert "\n    playSoundtrack();" not in initializer
     assert "localStorage" not in SOUNDTRACK_JS
     assert "sessionStorage" not in SOUNDTRACK_JS
 

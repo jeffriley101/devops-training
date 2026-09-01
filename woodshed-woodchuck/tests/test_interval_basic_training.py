@@ -135,11 +135,11 @@ def test_interval_soundtrack_is_idle_only_and_uses_shared_mute_state() -> None:
     )
     assert 'data-arcade-soundtrack="interval-basic-training"' in TEMPLATE
     assert 'data-arcade-soundtrack-toggle' in TEMPLATE
-    assert '/static/js/arcade-soundtrack.js?v=4' in TEMPLATE
+    assert '/static/js/arcade-soundtrack.js?v=5' in TEMPLATE
     assert '/static/js/interval-basic-training.js?v=2' in TEMPLATE
     assert 'url: "/static/audio/arcade/black-hole-rappelling.mp3?v=1"' in soundtrack
     assert 'document.addEventListener("woodshed:arcade-soundtrack-run-state"' in soundtrack
-    assert "if (stopped || runActive || !applyPreferences()) return" in soundtrack
+    assert "if (stopped || runActive || !applyPreferences()) {" in soundtrack
     assert "if (!enabled || runActive) audio.pause()" in soundtrack
     assert "setSoundtrackRunActive(true)" in GAME_JS
     assert "setSoundtrackRunActive(false)" in GAME_JS
@@ -150,7 +150,12 @@ def test_interval_soundtrack_controller_pauses_resumes_and_honors_mute() -> None
     source = r'''
 const assert = require("node:assert/strict");
 const listeners = new Map();
-const toggle = { textContent: "", setAttribute() {}, addEventListener() {} };
+const toggleListeners = {};
+const toggle = {
+  textContent: "", attributes: {},
+  setAttribute(name, value) { this.attributes[name] = value; },
+  addEventListener(type, callback) { toggleListeners[type] = callback; },
+};
 const soundtrackRoot = { dataset: { arcadeSoundtrack: "interval-basic-training" } };
 global.document = {
   querySelector(selector) {
@@ -174,45 +179,63 @@ global.window.WoodshedAudio = {
   setEnabled(value) { enabled = value; },
 };
 let createdAudio;
+let playAttempts = 0;
 global.Audio = class {
   constructor(url) {
-    this.url = url; this.paused = true; this.ended = false; this.plays = 0;
+    this.url = url; this.paused = true; this.ended = false;
     this.pauses = 0; createdAudio = this;
   }
   addEventListener() {}
-  play() { this.paused = false; this.plays += 1; return Promise.resolve(); }
+  play() {
+    playAttempts += 1;
+    this.paused = false;
+    return Promise.resolve();
+  }
   pause() { this.paused = true; this.pauses += 1; }
 };
 require("./static/js/arcade-soundtrack.js");
 function emit(type, event = {}) {
   for (const callback of listeners.get(type) || []) callback(event);
 }
+(async function () {
 emit("DOMContentLoaded");
-assert.equal(createdAudio.plays, 1);
+await Promise.resolve(); await Promise.resolve();
+assert.equal(playAttempts, 0);
+assert.equal(toggle.textContent, "🔇");
+assert.equal(toggle.attributes["aria-label"], "Turn on Arcade music");
+await toggleListeners.click();
+assert.equal(playAttempts, 1);
+assert.equal(toggle.textContent, "🔊");
+assert.equal(toggle.attributes["aria-label"], "Mute Arcade soundtrack");
 emit("woodshed:arcade-soundtrack-run-state", {
   detail: { gameKey: "interval-basic-training", active: true },
 });
 assert.equal(createdAudio.paused, true);
 emit("pointerdown");
-assert.equal(createdAudio.plays, 1);
+assert.equal(playAttempts, 1);
 emit("woodshed:arcade-soundtrack-run-state", {
   detail: { gameKey: "interval-basic-training", active: false, resumeDelayMs: 350 },
 });
-assert.equal(createdAudio.plays, 2);
-enabled = false;
+await Promise.resolve(); await Promise.resolve();
+assert.equal(playAttempts, 2);
+await toggleListeners.click();
+assert.equal(enabled, false);
+assert.equal(toggle.textContent, "🔇");
 emit("woodshed:arcade-soundtrack-run-state", {
   detail: { gameKey: "interval-basic-training", active: true },
 });
 emit("woodshed:arcade-soundtrack-run-state", {
   detail: { gameKey: "interval-basic-training", active: false },
 });
-assert.equal(createdAudio.plays, 2);
-console.log(JSON.stringify({ plays: createdAudio.plays, pauses: createdAudio.pauses }));
+await Promise.resolve();
+assert.equal(playAttempts, 2);
+console.log(JSON.stringify({ plays: playAttempts, pauses: createdAudio.pauses }));
+}()).catch(function (error) { console.error(error); process.exit(1); });
 '''
     result = subprocess.run(
         ["node", "-e", source], cwd=ROOT, check=True, capture_output=True, text=True
     )
-    assert json.loads(result.stdout) == {"plays": 2, "pauses": 3}
+    assert json.loads(result.stdout) == {"plays": 2, "pauses": 4}
 
 
 def test_exact_interval_table_all_starts_are_c4_and_duration_is_30_seconds() -> None:

@@ -125,7 +125,7 @@ def test_thirds_reuses_gerry_four_and_shared_arcade_mute() -> None:
     )
     assert 'data-arcade-soundtrack="thirds"' in TEMPLATE
     assert 'data-arcade-soundtrack-toggle' in TEMPLATE
-    assert '/static/js/arcade-soundtrack.js?v=4' in TEMPLATE
+    assert '/static/js/arcade-soundtrack.js?v=5' in TEMPLATE
     assert 'thirds: {' in soundtrack
     assert 'url: "/static/audio/arcade/gerry-4.wav?v=1"' in soundtrack
 

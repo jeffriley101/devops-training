@@ -365,7 +365,7 @@ def test_cheer_uses_shared_audio_and_final_score_submission_is_guarded() -> None
     assert "activePlayToken" in WHEEL_JS
     assert 'data-arcade-soundtrack="wheel-of-woodchuck"' in WHEEL
     assert 'data-arcade-soundtrack-toggle' in WHEEL
-    assert "/static/js/arcade-soundtrack.js?v=4" in WHEEL
+    assert "/static/js/arcade-soundtrack.js?v=5" in WHEEL
     soundtrack = (ROOT / "static" / "js" / "arcade-soundtrack.js").read_text(
         encoding="utf-8"
     )

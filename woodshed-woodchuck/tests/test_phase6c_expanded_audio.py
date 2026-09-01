@@ -73,9 +73,10 @@ def test_bonus_challenge_sound_requires_new_server_confirmation():
     assert 'fetch("/contests/quest/completions"' not in quest
     assert "if (!response.ok)" in quest
     response_at = quest.index("const response = await fetch")
-    committed_at = quest.index("payload.created === true && payload.reward_created === true")
+    created_at = quest.index("if (payload.created === true) {")
+    committed_at = quest.index("if (payload.reward_created === true)", created_at)
     sound_at = quest.index('playSound("questCompleted")', committed_at)
-    assert response_at < committed_at < sound_at
+    assert response_at < created_at < committed_at < sound_at
     assert quest.count('playSound("questCompleted")') == 1
 
 

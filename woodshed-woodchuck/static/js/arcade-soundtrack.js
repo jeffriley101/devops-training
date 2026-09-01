@@ -50,6 +50,7 @@
   let resumeTimer = null;
   let stopped = false;
   let runActive = false;
+  let playbackActivated = false;
 
   audio.preload = "auto";
   audio.loop = soundtrack.loop === true;
@@ -72,10 +73,11 @@
   function updateSoundtrackToggle() {
     const toggle = document.querySelector("[data-arcade-soundtrack-toggle]");
     if (!toggle) return;
-    const enabled = preferences().enabled;
-    toggle.textContent = enabled ? "🔊" : "🔇";
-    toggle.setAttribute("aria-label", `${enabled ? "Mute" : "Unmute"} Arcade soundtrack`);
-    toggle.setAttribute("title", `${enabled ? "Mute" : "Unmute"} Arcade soundtrack`);
+    const musicOn = preferences().enabled && playbackActivated;
+    const label = musicOn ? "Mute Arcade soundtrack" : "Turn on Arcade music";
+    toggle.textContent = musicOn ? "🔊" : "🔇";
+    toggle.setAttribute("aria-label", label);
+    toggle.setAttribute("title", label);
   }
 
   function clearRestart() {
@@ -89,12 +91,30 @@
   }
 
   function playSoundtrack() {
-    if (stopped || runActive || !applyPreferences()) return;
-    const attempt = audio.play();
-    if (attempt && typeof attempt.catch === "function") {
-      attempt.catch(function () {
-        // A later normal user gesture can satisfy browser autoplay policy.
-      });
+    if (stopped || runActive || !applyPreferences()) {
+      updateSoundtrackToggle();
+      return Promise.resolve(false);
+    }
+    try {
+      const attempt = audio.play();
+      if (attempt && typeof attempt.then === "function") {
+        return attempt.then(function () {
+          playbackActivated = true;
+          updateSoundtrackToggle();
+          return true;
+        }).catch(function () {
+          playbackActivated = false;
+          updateSoundtrackToggle();
+          return false;
+        });
+      }
+      playbackActivated = !audio.paused;
+      updateSoundtrackToggle();
+      return Promise.resolve(playbackActivated);
+    } catch (_error) {
+      playbackActivated = false;
+      updateSoundtrackToggle();
+      return Promise.resolve(false);
     }
   }
 
@@ -118,13 +138,17 @@
 
   function syncSoundtrackPreference() {
     const enabled = applyPreferences();
-    if (enabled && !runActive && audio.paused && !audio.ended) playSoundtrack();
+    if (enabled && !runActive && audio.paused && !audio.ended) void playSoundtrack();
     if (!enabled || runActive) audio.pause();
     updateSoundtrackToggle();
   }
 
-  function activateFromGesture() {
-    if (!runActive && audio.paused && !audio.ended) playSoundtrack();
+  function activateFromGesture(event) {
+    const target = event && event.target;
+    if (target && typeof target.closest === "function" && target.closest("[data-arcade-soundtrack-toggle]")) {
+      return;
+    }
+    if (!runActive && audio.paused && !audio.ended) void playSoundtrack();
   }
 
   function handleRunState(event) {
@@ -157,15 +181,21 @@
     if (toggle) toggle.addEventListener("change", syncSoundtrackPreference);
     if (volume) volume.addEventListener("input", syncSoundtrackPreference);
     if (soundtrackToggle) {
-      soundtrackToggle.addEventListener("click", function () {
+      soundtrackToggle.addEventListener("click", async function () {
         if (!window.WoodshedAudio || typeof window.WoodshedAudio.setEnabled !== "function") return;
-        window.WoodshedAudio.setEnabled(!preferences().enabled);
-        syncSoundtrackPreference();
+        if (preferences().enabled && playbackActivated) {
+          window.WoodshedAudio.setEnabled(false);
+          syncSoundtrackPreference();
+          return;
+        }
+        if (!preferences().enabled) window.WoodshedAudio.setEnabled(true);
+        applyPreferences();
+        await playSoundtrack();
+        updateSoundtrackToggle();
       });
     }
     applyPreferences();
     updateSoundtrackToggle();
     audio.currentTime = 0;
-    playSoundtrack();
   }, { once: true });
 }());

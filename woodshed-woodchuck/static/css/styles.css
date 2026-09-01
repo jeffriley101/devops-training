@@ -3540,16 +3540,77 @@ select {
   margin: 0;
   overflow-wrap: anywhere;
 }
-.p-book-whistler-art {
+.ww-character-reaction {
+  position: fixed;
+  z-index: 1450;
+  inset: 0;
+  display: grid;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 0.8rem;
+  justify-items: center;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  opacity: 0;
+  color: #fff8df;
+  background: linear-gradient(180deg, rgba(54, 29, 18, 0.985), rgba(18, 12, 10, 0.99));
+  box-shadow: none;
+  transform: scale(0.985);
+  transition: opacity 160ms ease, transform 160ms ease;
+  cursor: pointer;
+}
+.ww-character-reaction.is-visible { opacity: 1; transform: none; }
+.ww-character-reaction img {
   display: block;
-  width: min(100%, 11rem);
-  max-height: 14rem;
-  margin: 0.65rem auto 0;
-  border: 2px solid #59636a;
-  border-radius: 12px;
-  object-fit: cover;
-  object-position: center 18%;
+  width: min(48rem, 100%);
+  height: 100%;
+  min-height: 0;
+  max-height: 100%;
+  object-fit: contain;
+  object-position: center top;
   pointer-events: none;
+}
+.ww-character-reaction-speech {
+  box-sizing: border-box;
+  width: min(44rem, 100%);
+  min-width: 0;
+  margin: 0;
+  padding: 0.8rem 3.5rem 0.8rem 1rem;
+  border: 2px solid rgba(255, 226, 164, 0.76);
+  border-radius: 16px;
+  color: #2f1b12;
+  background: #fff4ce;
+  font-size: 1.3rem;
+  font-weight: 850;
+  line-height: 1.3;
+  text-align: center;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+.ww-character-reaction-speaker { font-weight: 950; }
+.ww-character-reaction-quote { font-weight: 800; }
+.ww-character-reaction-dismiss {
+  position: absolute;
+  top: max(0.5rem, env(safe-area-inset-top));
+  right: max(0.5rem, env(safe-area-inset-right));
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: #2f1b12;
+  background: #fff4ce;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  font-size: 1.55rem;
+  line-height: 1;
+  cursor: pointer;
 }
 .p-book-page .pirate-logbook {
   display: block;
@@ -5120,27 +5181,19 @@ select {
   border-top: 2px solid #46515a;
 }
 
-.bonus-challenge-john {
-  display: grid;
-  place-items: center;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.bonus-challenge-john-art {
-  display: block;
-  width: min(100%, 18rem);
-  max-height: 18rem;
-  object-fit: contain;
-  object-position: center top;
-  pointer-events: none;
-}
-
 @media (max-width: 430px) {
   .mum-artwork { gap: 0.45rem; }
   .mum-artwork img { height: 9rem; }
-  .p-book-whistler-art { width: min(100%, 8.5rem); max-height: 10.5rem; }
-  .bonus-challenge-john-art { width: min(100%, 13rem); max-height: 13rem; }
+  .ww-character-reaction {
+    padding: max(0.5rem, env(safe-area-inset-top)) max(0.5rem, env(safe-area-inset-right)) max(0.5rem, env(safe-area-inset-bottom)) max(0.5rem, env(safe-area-inset-left));
+    gap: 0.45rem;
+  }
+  .ww-character-reaction img { width: 100%; height: 100%; max-height: 100%; }
+  .ww-character-reaction-speech {
+    width: 100%;
+    padding: 0.65rem 3rem 0.65rem 0.75rem;
+    font-size: 1rem;
+  }
 }
 
 .practice-room-emoji-control {
@@ -6198,7 +6251,7 @@ select {
 }
 .thirds-card strong { font-size: clamp(1.8rem, 7vw, 3rem); }
 .thirds-card span { font-weight: 950; letter-spacing: 0.1em; }
-.nines-card strong { font-size: clamp(1.65rem, 6vw, 2.7rem); }
+.nines-card strong { font-size: clamp(1.65rem, 6vw, 2.7rem); text-transform: none; }
 .nines-card span { font-weight: 950; letter-spacing: 0.07em; }
 .nines-answer-grid {
   display: grid;
