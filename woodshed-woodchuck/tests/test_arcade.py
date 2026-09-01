@@ -125,8 +125,8 @@ def test_practice_room_destinations_are_preserved_as_three_doors() -> None:
     assert "position: static" in tag
 
 
-def test_arcade_room_renders_seven_touch_friendly_cabinets() -> None:
-    assert ARCADE.count('class="arcade-cabinet ') == 7
+def test_arcade_room_renders_eight_touch_friendly_cabinets() -> None:
+    assert ARCADE.count('class="arcade-cabinet ') == 8
     assert 'href="/plunge-burrow"' in ARCADE
     assert 'href="/arcade/blue"' in ARCADE
     assert 'href="/arcade/radio-tuner"' in ARCADE
@@ -134,11 +134,12 @@ def test_arcade_room_renders_seven_touch_friendly_cabinets() -> None:
     assert 'href="/arcade/scale-keyboard"' in ARCADE
     assert 'href="/arcade/thirds"' in ARCADE
     assert 'href="/arcade/dressed-to-the-nines"' in ARCADE
-    assert ARCADE.count("<h2>Top 5</h2>") == 7
-    assert ARCADE.count('class="arcade-cabinet-marquee"') == 7
-    assert ARCADE.count('class="arcade-cabinet-control-panel" aria-hidden="true"') == 7
-    assert ARCADE.count('data-arcade-personal-best=') == 7
-    assert ARCADE.count("1🌼 TO PLAY · WIN UP TO 5🌼") == 7
+    assert 'href="/arcade/interval-basic-training"' in ARCADE
+    assert ARCADE.count("<h2>Top 5</h2>") == 8
+    assert ARCADE.count('class="arcade-cabinet-marquee"') == 8
+    assert ARCADE.count('class="arcade-cabinet-control-panel" aria-hidden="true"') == 8
+    assert ARCADE.count('data-arcade-personal-best=') == 8
+    assert ARCADE.count("1🌼 TO PLAY · WIN UP TO 5🌼") == 8
     assert "arcade-cabinet-copy" not in ARCADE
     for retired_copy in (
         "Burrow, collect, and build your band.",
@@ -156,7 +157,7 @@ def test_arcade_room_renders_seven_touch_friendly_cabinets() -> None:
     assert "min-height: 17rem" in CSS[CSS.index(".arcade-cabinet-link {"):]
     mobile = CSS[CSS.index("@media (max-width: 760px)"):]
     assert ".arcade-cabinet-grid { grid-template-columns: 1fr; }" in mobile
-    assert '/static/js/arcade.js?v=11' in ARCADE
+    assert '/static/js/arcade.js?v=12' in ARCADE
 
 
 def test_arcade_pages_route_game_specific_soundtracks() -> None:
@@ -209,7 +210,7 @@ def test_arcade_leaderboards_render_each_olympic_rank_once() -> None:
     assert "item.value = Number(row.rank)" in renderer
     assert "item.textContent = `${name} — ${row.score}`" in renderer
     assert "${row.rank}." not in renderer
-    assert ARCADE.count("<ol data-arcade-leaderboard=") == 7
+    assert ARCADE.count("<ol data-arcade-leaderboard=") == 8
 
 
 def test_arcade_removes_unnecessary_copy() -> None:

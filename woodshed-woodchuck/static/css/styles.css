@@ -5257,7 +5257,8 @@ select {
 .wheel-game,
 .scale-keyboard-game,
 .thirds-game,
-.nines-game {
+.nines-game,
+.interval-game {
   width: min(100%, 72rem);
   min-width: 0;
   margin: 0 auto;
@@ -5377,6 +5378,12 @@ select {
   --arcade-cabinet-frame-middle: #663b91;
   --arcade-cabinet-frame-end: #351d50;
   --arcade-cabinet-border: #7447a0;
+}
+.arcade-cabinet-intervals {
+  --arcade-cabinet-frame-start: #f0a24a;
+  --arcade-cabinet-frame-middle: #a95a24;
+  --arcade-cabinet-frame-end: #573016;
+  --arcade-cabinet-border: #ba6829;
 }
 
 .arcade-cabinet-link {
@@ -5565,6 +5572,16 @@ select {
   color: #f4d35e;
   font-size: 0.85rem;
 }
+.arcade-interval-screen {
+  grid-template-columns: 1fr auto 1fr;
+  gap: 0.3rem;
+  color: #fff;
+  background: linear-gradient(145deg, #35200f, #100b07);
+}
+.arcade-interval-screen i,
+.arcade-interval-screen b { font-style: normal; }
+.arcade-interval-screen i { font-size: 2rem; font-weight: 950; }
+.arcade-interval-screen b { color: #f4d35e; font-size: 1.7rem; }
 .arcade-thirds-screen i,
 .arcade-thirds-screen b { font-style: normal; }
 .arcade-thirds-screen i { font-size: 2.2rem; font-weight: 950; }
@@ -6067,7 +6084,8 @@ select {
 .scale-keyboard-actions p { margin: 0; }
 
 .thirds-game,
-.nines-game {
+.nines-game,
+.interval-game {
   width: min(100%, 48rem);
 }
 .thirds-active-area,
@@ -6147,6 +6165,45 @@ select {
 .nines-start { width: 100%; }
 .nines-message { min-height: 1.4em; margin: 0; text-align: center; }
 
+.interval-active-area {
+  display: grid;
+  width: min(100%, 34rem);
+  margin: 0 auto;
+  gap: 0.65rem;
+  padding: clamp(0.75rem, 2vw, 1rem);
+  border: 3px solid #ba6829;
+  border-radius: 0.9rem;
+  background: rgba(5, 12, 20, 0.72);
+}
+.interval-status {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.45rem;
+}
+.interval-status p,
+.interval-mistakes {
+  margin: 0;
+  padding: 0.45rem 0.2rem;
+  border-radius: 0.45rem;
+  background: #24243b;
+  text-align: center;
+}
+.interval-answer-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+.interval-answer-grid button {
+  min-width: 0;
+  min-height: 3.5rem;
+  padding: 0.5rem 0.25rem;
+  font-size: clamp(0.9rem, 3.3vw, 1.1rem);
+  font-weight: 950;
+}
+.interval-replay,
+.interval-start { width: 100%; }
+.interval-message { min-height: 1.4em; margin: 0; text-align: center; }
+
 @media (max-width: 760px) {
   .arcade-cabinet-grid { grid-template-columns: 1fr; }
   .practice-room-door { min-height: 11rem; }
@@ -6175,7 +6232,8 @@ select {
   .wheel-game,
   .scale-keyboard-game,
   .thirds-game,
-  .nines-game { padding: 0.75rem; }
+  .nines-game,
+  .interval-game { padding: 0.75rem; }
   .arcade-game-status { gap: 0.35rem; }
   .arcade-game-status p { padding: 0.5rem 0.25rem; font-size: 0.88rem; }
   .arcade-game-actions .btn { width: 100%; }

@@ -898,7 +898,8 @@ class ArcadeHighScore(Base):
         ),
         CheckConstraint(
             "game_key IN ('blue', 'radio-tuner', 'wheel-of-woodchuck', "
-            "'scale-keyboard', 'thirds', 'dressed-to-the-nines')",
+            "'scale-keyboard', 'thirds', 'dressed-to-the-nines', "
+            "'interval-basic-training')",
             name="ck_arcade_high_score_game_key",
         ),
         CheckConstraint(
@@ -937,7 +938,7 @@ class ArcadePlaySession(Base):
         CheckConstraint(
             "game_key IN ('plunge-burrow', 'blue', 'radio-tuner', "
             "'wheel-of-woodchuck', 'scale-keyboard', 'thirds', "
-            "'dressed-to-the-nines')",
+            "'dressed-to-the-nines', 'interval-basic-training')",
             name="ck_arcade_play_session_game_key",
         ),
         CheckConstraint(

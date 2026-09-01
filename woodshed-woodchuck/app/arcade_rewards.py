@@ -25,6 +25,7 @@ ARCADE_PLAY_GAME_KEYS = frozenset({
     "scale-keyboard",
     "thirds",
     "dressed-to-the-nines",
+    "interval-basic-training",
 })
 
 # Conservative first-pass tiers based on each game's existing duration and
@@ -37,6 +38,7 @@ ARCADE_PAYOUT_THRESHOLDS: dict[str, tuple[tuple[int, int], ...]] = {
     "scale-keyboard": ((800, 1), (1800, 2), (3000, 3), (5000, 5)),
     "thirds": ((3, 1), (6, 2), (9, 3), (12, 5)),
     "dressed-to-the-nines": ((3, 1), (6, 2), (9, 3), (12, 5)),
+    "interval-basic-training": ((3, 1), (6, 2), (9, 3), (12, 5)),
 }
 
 

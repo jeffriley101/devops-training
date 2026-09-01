@@ -18,7 +18,7 @@ def test_tone_is_exactly_pinned_local_licensed_and_loaded_in_order():
     assert "MIT License" in license_file.read_text()
     assert "cdn" not in BASE.casefold()
     tone_pos = BASE.index('/static/vendor/tone/Tone.js?v=15.1.22')
-    audio_pos = BASE.index('/static/js/audio.js?v=12')
+    audio_pos = BASE.index('/static/js/audio.js?v=13')
     app_pos = BASE.index('/static/js/app.js?v=74')
     assert tone_pos < audio_pos < app_pos
 
@@ -70,9 +70,10 @@ def test_scale_keyboard_pitch_uses_the_shared_muted_volume_graph():
     assert 'oscillator: { type: "triangle8" }' in AUDIO
     assert "attack: 0.004, decay: 0.3, sustain: 0.025, release: 0.18" in AUDIO
     assert "piano," in AUDIO
-    assert "function playPianoPitch(frequency)" in AUDIO
+    assert "function playPianoPitch(frequency, duration)" in AUDIO
     assert "if (!enabled || !Number.isFinite(pitch) || pitch <= 0) return false" in AUDIO
-    assert "current.piano.triggerAttackRelease(pitch, 0.42)" in AUDIO
+    assert "current.piano.triggerAttackRelease(pitch, noteDuration)" in AUDIO
+    assert "? Number(duration) : 0.42" in AUDIO
     assert "playPianoPitch, setEnabled, setVolume" in AUDIO
 
 

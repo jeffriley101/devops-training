@@ -9,6 +9,7 @@
     "scale-keyboard": "/arcade/scores/scale-keyboard",
     thirds: "/arcade/scores/thirds",
     "dressed-to-the-nines": "/arcade/scores/dressed-to-the-nines",
+    "interval-basic-training": "/arcade/scores/interval-basic-training",
   };
   const BLUE_GAME_SECONDS = 20;
   const RADIO_GAME_SECONDS = 30;
