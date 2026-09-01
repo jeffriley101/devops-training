@@ -136,7 +136,7 @@ def test_interval_soundtrack_is_idle_only_and_uses_shared_mute_state() -> None:
     assert 'data-arcade-soundtrack="interval-basic-training"' in TEMPLATE
     assert 'data-arcade-soundtrack-toggle' in TEMPLATE
     assert '/static/js/arcade-soundtrack.js?v=5' in TEMPLATE
-    assert '/static/js/interval-basic-training.js?v=2' in TEMPLATE
+    assert '/static/js/interval-basic-training.js?v=3' in TEMPLATE
     assert 'url: "/static/audio/arcade/black-hole-rappelling.mp3?v=1"' in soundtrack
     assert 'document.addEventListener("woodshed:arcade-soundtrack-run-state"' in soundtrack
     assert "if (stopped || runActive || !applyPreferences()) {" in soundtrack

@@ -278,7 +278,7 @@ def test_score_completion_uses_one_play_token_and_persistent_top_five() -> None:
     assert 'startPlay("scale-keyboard")' in GAME_JS
     assert "completePlay(activePlayToken, game.score)" in GAME_JS
     assert "if (finishPromise) return finishPromise" in GAME_JS
-    assert 'fetch("/arcade/scores/scale-keyboard"' in GAME_JS
+    assert 'WoodshedArcadeEconomy.loadScores("scale-keyboard")' in GAME_JS
     assert 'data-arcade-leaderboard="scale-keyboard"' in TEMPLATE
     assert "arcade_high_scores" not in DATA_JS
 

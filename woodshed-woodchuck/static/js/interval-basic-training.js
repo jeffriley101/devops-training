@@ -212,15 +212,9 @@
   }
 
   function loadScores() {
-    return fetch(`/arcade/scores/${GAME_KEY}`, {
-      credentials: "same-origin",
-      cache: "no-store",
-    }).then(function (response) {
-      return response.json().catch(function () { return {}; }).then(function (payload) {
-        if (!response.ok) throw new Error(payload.detail || "Scores are unavailable.");
-        renderLeaderboard(payload);
-        return payload;
-      });
+    return root.WoodshedArcadeEconomy.loadScores(GAME_KEY).then(function (payload) {
+      renderLeaderboard(payload);
+      return payload;
     });
   }
 

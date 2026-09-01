@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
+import subprocess
 
 import pytest
 from fastapi.testclient import TestClient
@@ -207,6 +208,61 @@ def test_completion_pays_once_and_retry_is_idempotent(economy_database) -> None:
         assert row.reward_granted_at is not None
 
 
+@pytest.mark.parametrize(
+    "game_key", ("scale-keyboard", "radio-tuner", "interval-basic-training")
+)
+def test_retrying_an_unfinished_shared_game_reuses_its_paid_play(
+    economy_database, game_key: str
+) -> None:
+    client, profile = signed_client(economy_database, "RESUME", credits=4)
+
+    first = client.post("/arcade/plays", json={"game_key": game_key})
+    retry = client.post("/arcade/plays", json={"game_key": game_key})
+
+    assert first.status_code == retry.status_code == 200
+    assert retry.json()["play_token"] == first.json()["play_token"]
+    assert first.json()["balance"] == retry.json()["balance"] == 3
+    assert retry.json()["resumed"] is True
+    assert balance(economy_database, profile.id) == 3
+    with economy_database() as session:
+        plays = session.scalars(select(ArcadePlaySession)).all()
+        assert len(plays) == 1
+
+
+@pytest.mark.parametrize(
+    "game_key", ("scale-keyboard", "radio-tuner", "interval-basic-training")
+)
+def test_repeated_shared_game_completion_keeps_one_score_and_one_payout(
+    economy_database, game_key: str
+) -> None:
+    client, profile = signed_client(economy_database, "STRESS", credits=20)
+    scores = (0, 3, 6, 9, 12)
+    for score in scores:
+        play = client.post("/arcade/plays", json={"game_key": game_key}).json()
+        completed = client.post(
+            f"/arcade/plays/{play['play_token']}/complete", json={"score": score}
+        )
+        assert completed.status_code == 200
+        assert completed.json()["best_score"] == score
+        if score:
+            assert completed.json()["leaderboard"][0]["score"] == score
+        else:
+            assert completed.json()["leaderboard"] == []
+
+    with economy_database() as session:
+        plays = session.scalars(select(ArcadePlaySession).where(
+            ArcadePlaySession.profile_id == profile.id,
+            ArcadePlaySession.game_key == game_key,
+        )).all()
+        high_scores = session.scalars(select(ArcadeHighScore).where(
+            ArcadeHighScore.profile_id == profile.id,
+            ArcadeHighScore.game_key == game_key,
+        )).all()
+    assert len(plays) == len(scores)
+    assert len(high_scores) == 1
+    assert high_scores[0].best_score == 12
+
+
 def test_conflicting_replay_and_another_profile_are_rejected(economy_database) -> None:
     owner, _profile = signed_client(economy_database, "OWNER", credits=4)
     stranger, _ = signed_client(economy_database, "OTHER", credits=4)
@@ -378,6 +434,54 @@ def test_all_nine_clients_use_shared_start_and_completion_contract() -> None:
     assert 'body: JSON.stringify({ game_key: gameKey })' in ECONOMY_JS
     assert "encodeURIComponent(playToken)" in ECONOMY_JS
     assert "root.WWState.saveState(state, { sync: false })" in ECONOMY_JS
+
+
+def test_shared_arcade_requests_are_attributed_retried_and_student_friendly() -> None:
+    assert 'operation: "status"' in ECONOMY_JS
+    assert 'operation: "start"' in ECONOMY_JS
+    assert 'operation: "complete"' in ECONOMY_JS
+    assert 'operation: "leaderboard-read"' in ECONOMY_JS
+    assert '"X-Woodshed-Arcade-Game": settings.gameKey || "unknown"' in ECONOMY_JS
+    assert "const RETRY_DELAY_MS = 350" in ECONOMY_JS
+    assert "receivedResponse: false" in ECONOMY_JS
+    assert "receivedResponse: true" in ECONOMY_JS
+    assert "Couldn't reach the Woodshed. Try again." in ECONOMY_JS
+    assert "playTokens.set(payload.play_token, gameKey)" in ECONOMY_JS
+    assert "playTokens.delete(playToken)" in ECONOMY_JS
+    assert "WoodshedArcadeEconomy.loadScores" in ARCADE_JS
+    assert "WoodshedArcadeEconomy.loadScores" in SCALE_JS
+    assert "WoodshedArcadeEconomy.loadScores" in INTERVAL_JS
+
+
+def test_shared_client_retries_lost_start_and_completion_responses_once() -> None:
+    script = f'''
+const assert = require("node:assert/strict");
+global.document = {{ querySelectorAll() {{ return []; }} }};
+global.setTimeout = function (callback) {{ callback(); return 1; }};
+global.console = {{ warn() {{}} }};
+let calls = 0;
+global.fetch = async function () {{
+  calls += 1;
+  if (calls === 1 || calls === 3) throw new TypeError("NetworkError when attempting to fetch resource.");
+  const payload = calls === 2
+    ? {{ play_token: "safe-play-token-1234567890", balance: 4, reward_eligible: true }}
+    : {{ balance: 5, payout: 1, reward_eligible: true, best_score: 3, leaderboard: [] }};
+  return {{ ok: true, status: 200, json: async () => payload }};
+}};
+require({str(ROOT / "static" / "js" / "arcade-economy.js")!r});
+(async function () {{
+  const economy = global.WoodshedArcadeEconomy;
+  const started = await economy.startPlay("scale-keyboard");
+  const completed = await economy.completePlay(started.play_token, 3);
+  assert.equal(started.play_token, "safe-play-token-1234567890");
+  assert.equal(completed.payout, 1);
+  assert.equal(calls, 4);
+}})().catch(function (error) {{ console.error(error); process.exit(1); }});
+'''
+    result = subprocess.run(
+        ["node", "-e", script], check=False, capture_output=True, text=True
+    )
+    assert result.returncode == 0, result.stderr
 
 
 def test_arcade_economy_migration_extends_scores_and_creates_play_ledger() -> None:

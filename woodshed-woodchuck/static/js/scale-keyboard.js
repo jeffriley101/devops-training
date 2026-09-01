@@ -154,6 +154,13 @@
     });
   }
 
+  function loadScores() {
+    return root.WoodshedArcadeEconomy.loadScores("scale-keyboard").then(function (payload) {
+      renderLeaderboard(payload);
+      return payload;
+    });
+  }
+
   function renderKeyboard() {
     keyboard.replaceChildren();
     if (!game.currentScale) return;
@@ -288,8 +295,5 @@
   startButton.addEventListener("click", function () { void startGame(); });
   render();
   root.WoodshedArcadeEconomy.loadStatus("scale-keyboard").catch(function () {});
-  fetch("/arcade/scores/scale-keyboard", { credentials: "same-origin", cache: "no-store" })
-    .then(function (response) { return response.ok ? response.json() : null; })
-    .then(function (payload) { if (payload) renderLeaderboard(payload); })
-    .catch(function () {});
+  loadScores().catch(function () {});
 }(typeof globalThis !== "undefined" ? globalThis : this));
