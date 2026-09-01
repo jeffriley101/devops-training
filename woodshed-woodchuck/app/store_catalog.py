@@ -2,10 +2,16 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from datetime import date, datetime, timezone
+import hashlib
 from zoneinfo import ZoneInfo
 
 
 STORE_TIMEZONE = ZoneInfo("America/Chicago")
+DAILY_ROTATION_COUNT = 2
+DAILY_ROTATION_SALTS = {
+    "gear": "woodshed-gear-shelf-v1",
+    "little_buddy": "woodshed-little-buddy-shelf-v1",
+}
 
 
 @dataclass(frozen=True)
@@ -23,7 +29,7 @@ class CatalogItem:
 
 GEAR_FIXED = (
     CatalogItem("candle", "Candle", "🕯️", 25, "gear"),
-    CatalogItem("fruit", "Fruit", "🍎", 50, "gear"),
+    CatalogItem("fruit", "Apple", "🍎", 50, "gear"),
     CatalogItem("ice-cream", "Ice Cream", "🍦", 75, "gear"),
     CatalogItem("ufo", "UFO", "🛸", 1000, "gear"),
 )
@@ -37,11 +43,11 @@ LITTLE_BUDDY_FIXED = (
     CatalogItem("ladybug", "Ladybug", "🐞", 25, "little-buddy"),
     CatalogItem("caterpillar", "Caterpillar", "🐛", 50, "little-buddy"),
     CatalogItem("snail", "Snail", "🐌", 75, "little-buddy"),
+    CatalogItem("ant", "Ant", "🐜", 100, "little-buddy"),
 )
 LITTLE_BUDDY_ROTATION = (
     CatalogItem("bee", "Bee", "🐝", 100, "little-buddy", True),
     CatalogItem("butterfly", "Butterfly", "🦋", 100, "little-buddy", True),
-    CatalogItem("ant", "Ant", "🐜", 100, "little-buddy", True),
     CatalogItem("beetle", "Beetle", "🪲", 100, "little-buddy", True),
 )
 
@@ -76,16 +82,43 @@ def central_activity_date(*, now: datetime | None = None) -> date:
     return instant.astimezone(STORE_TIMEZONE).date()
 
 
+def daily_rotation_items(
+    activity_date: date,
+    *,
+    category: str,
+    pool: tuple[CatalogItem, ...],
+    count: int = DAILY_ROTATION_COUNT,
+) -> tuple[CatalogItem, ...]:
+    stable_pool = tuple(sorted(pool, key=lambda item: item.item_key))
+    if count < 1 or len(stable_pool) < count:
+        raise ValueError("The daily SHOP rotation pool is too small.")
+    if len({item.item_key for item in stable_pool}) != len(stable_pool):
+        raise ValueError("The daily SHOP rotation pool contains duplicate item keys.")
+    salt = DAILY_ROTATION_SALTS.get(category, f"woodshed-{category}-shelf-v1")
+    digest = hashlib.sha256(salt.encode("utf-8")).digest()
+    category_offset = int.from_bytes(digest[:4], "big") % len(stable_pool)
+    start = (activity_date.toordinal() + category_offset) % len(stable_pool)
+    return tuple(
+        stable_pool[(start + offset) % len(stable_pool)]
+        for offset in range(count)
+    )
+
+
 def catalog_for_date(activity_date: date) -> dict[str, tuple[CatalogItem, ...]]:
-    rotation_index = activity_date.toordinal()
     return {
         "gear": (
             *GEAR_FIXED,
-            GEAR_ROTATION[rotation_index % len(GEAR_ROTATION)],
+            *daily_rotation_items(
+                activity_date, category="gear", pool=GEAR_ROTATION,
+            ),
         ),
         "little_buddy": (
             *LITTLE_BUDDY_FIXED,
-            LITTLE_BUDDY_ROTATION[rotation_index % len(LITTLE_BUDDY_ROTATION)],
+            *daily_rotation_items(
+                activity_date,
+                category="little_buddy",
+                pool=LITTLE_BUDDY_ROTATION,
+            ),
         ),
     }
 

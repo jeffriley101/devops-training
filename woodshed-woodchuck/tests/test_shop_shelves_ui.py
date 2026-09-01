@@ -26,8 +26,8 @@ def test_shelves_render_every_server_catalog_item_including_ufo() -> None:
     response = TestClient(app).get("/store/catalog")
     assert response.status_code == 200
     shelves = response.json()["shelves"]
-    assert len(shelves["gear"]) == 5
-    assert len(shelves["little_buddy"]) == 4
+    assert len(shelves["gear"]) == 6
+    assert len(shelves["little_buddy"]) == 6
     assert any(
         item["item_key"] == "ufo" and item["price"] == 1000
         for item in shelves["gear"]
@@ -41,11 +41,24 @@ def test_shelves_render_every_server_catalog_item_including_ufo() -> None:
     assert "shelfItems[shelfKey].forEach((item)" in SHOP_WIRING
     for field in ("item.emoji", "item.name", "item.price", "item.item_key"):
         assert field in SHOP_WIRING
+    assert 'dailyFind.textContent = "Today\'s find"' in SHOP_WIRING
+    assert "dailyFind.hidden = item.rotating !== true" in SHOP_WIRING
+
+
+def test_both_shelves_explain_the_two_daily_finds_without_cluttering_scene() -> None:
+    gear = STORE[STORE.index('data-shop-panel-content="gear"'):STORE.index('data-shop-panel-content="little-buddy"')]
+    buddies = STORE[STORE.index('data-shop-panel-content="little-buddy"'):STORE.index('data-shop-panel-content="practice-room"')]
+    assert gear.count("2 daily finds") == 1
+    assert buddies.count("2 daily finds") == 1
+    assert gear.count("New finds tomorrow") == 1
+    assert buddies.count("New finds tomorrow") == 1
+    scene = STORE[STORE.index('class="shop-scene"'):STORE.index('id="shop-feature-dialog"')]
+    assert "daily finds" not in scene.casefold()
 
 
 def test_rotating_items_and_prices_are_not_client_hardcoded() -> None:
     for server_item in (
-        "Candle", "Fruit", "Ice Cream", "Ladybug", "Caterpillar", "Snail",
+        "Candle", "Apple", "Ice Cream", "Ladybug", "Caterpillar", "Snail",
         "Camp Lantern", "Kite", "Balloon", "Skateboard",
         "Bee", "Butterfly", "Ant", "Beetle",
     ):

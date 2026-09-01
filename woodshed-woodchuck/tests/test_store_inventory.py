@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timezone
+from zoneinfo import ZoneInfo
 
 import pytest
 from fastapi.testclient import TestClient
@@ -13,8 +14,18 @@ from app.db import Base
 from app.main import app
 from app.models import OwnedItemCopy, WoodchuckProfile, WoodchuckState
 from app.security import hash_pin
-from app.store_catalog import ALL_ITEMS, catalog_for_date, catalog_payload
-from app.store_inventory import grant_owned_item
+from app.store_catalog import (
+    ALL_ITEMS,
+    GEAR_FIXED,
+    GEAR_ROTATION,
+    LITTLE_BUDDY_FIXED,
+    LITTLE_BUDDY_ROTATION,
+    catalog_for_date,
+    catalog_payload,
+    central_activity_date,
+    daily_rotation_items,
+)
+from app.store_inventory import grant_owned_item, purchase_catalog_item
 
 
 @pytest.fixture()
@@ -70,23 +81,33 @@ def test_catalog_has_locked_shelves_items_and_prices() -> None:
     gear = payload["shelves"]["gear"]
     buddies = payload["shelves"]["little_buddy"]
 
-    assert [(item["item_key"], item["emoji"], item["price"]) for item in gear[:3]] == [
-        ("candle", "🕯️", 25),
-        ("fruit", "🍎", 50),
-        ("ice-cream", "🍦", 75),
+    assert [(item["item_key"], item["name"], item["emoji"], item["price"]) for item in gear[:4]] == [
+        ("candle", "Candle", "🕯️", 25),
+        ("fruit", "Apple", "🍎", 50),
+        ("ice-cream", "Ice Cream", "🍦", 75),
+        ("ufo", "UFO", "🛸", 1000),
     ]
-    assert [(item["item_key"], item["emoji"], item["price"]) for item in buddies[:3]] == [
+    assert [(item["item_key"], item["emoji"], item["price"]) for item in buddies[:4]] == [
         ("ladybug", "🐞", 25),
         ("caterpillar", "🐛", 50),
         ("snail", "🐌", 75),
+        ("ant", "🐜", 100),
     ]
-    assert len(gear) == 5
-    assert len(buddies) == 4
-    assert (gear[3]["item_key"], gear[3]["emoji"], gear[3]["price"]) == (
-        "ufo", "🛸", 1000
-    )
-    assert gear[-1]["rotating"] is True and gear[-1]["price"] == 100
-    assert buddies[-1]["rotating"] is True and buddies[-1]["price"] == 100
+    assert len(gear) == len(buddies) == 6
+    assert all(item["rotating"] is True and item["price"] == 100 for item in gear[-2:])
+    assert all(item["rotating"] is True and item["price"] == 100 for item in buddies[-2:])
+    assert [item.item_key for item in GEAR_FIXED] == [
+        "candle", "fruit", "ice-cream", "ufo",
+    ]
+    assert [item.item_key for item in GEAR_ROTATION] == [
+        "camp-lantern", "kite", "balloon", "skateboard",
+    ]
+    assert [item.item_key for item in LITTLE_BUDDY_FIXED] == [
+        "ladybug", "caterpillar", "snail", "ant",
+    ]
+    assert [item.item_key for item in LITTLE_BUDDY_ROTATION] == [
+        "bee", "butterfly", "beetle",
+    ]
     assert not any("instrument" in item.name.casefold() for item in ALL_ITEMS.values())
 
 
@@ -115,18 +136,45 @@ def test_daily_rotation_is_deterministic_and_central_date_owned() -> None:
     repeat = catalog_for_date(date(2026, 8, 13))
     next_day = catalog_for_date(date(2026, 8, 14))
     assert first == repeat
-    assert first["gear"][-1] != next_day["gear"][-1]
-    assert first["little_buddy"][-1] != next_day["little_buddy"][-1]
+    assert first["gear"][-2:] != next_day["gear"][-2:]
+    assert first["little_buddy"][-2:] != next_day["little_buddy"][-2:]
+    assert len({item.item_key for item in first["gear"][-2:]}) == 2
+    assert len({item.item_key for item in first["little_buddy"][-2:]}) == 2
+    assert not ({item.item_key for item in GEAR_FIXED} & {item.item_key for item in first["gear"][-2:]})
+    assert not (
+        {item.item_key for item in LITTLE_BUDDY_FIXED}
+        & {item.item_key for item in first["little_buddy"][-2:]}
+    )
 
-    before_midnight = catalog_payload(
-        now=datetime(2026, 8, 14, 4, 59, tzinfo=timezone.utc)
-    )
-    after_midnight = catalog_payload(
-        now=datetime(2026, 8, 14, 5, 1, tzinfo=timezone.utc)
-    )
+    chicago = ZoneInfo("America/Chicago")
+    before = datetime(2026, 8, 13, 23, 59, tzinfo=chicago)
+    after = datetime(2026, 8, 14, 0, 1, tzinfo=chicago)
+    before_midnight = catalog_payload(now=before)
+    after_midnight = catalog_payload(now=after)
     assert before_midnight["activity_date"] == "2026-08-13"
     assert after_midnight["activity_date"] == "2026-08-14"
+    assert before_midnight["shelves"] != after_midnight["shelves"]
     assert before_midnight["timezone"] == "America/Chicago"
+
+    utc_date_already_changed = datetime(2026, 8, 14, 0, 30, tzinfo=timezone.utc)
+    assert central_activity_date(now=utc_date_already_changed) == date(2026, 8, 13)
+    assert catalog_payload(now=utc_date_already_changed) == catalog_payload(
+        now=datetime(2026, 8, 13, 19, 30, tzinfo=chicago)
+    )
+
+
+def test_rotation_helper_is_stable_distinct_and_category_salted() -> None:
+    day = date(2026, 9, 1)
+    gear = daily_rotation_items(day, category="gear", pool=GEAR_ROTATION)
+    buddies = daily_rotation_items(
+        day, category="little_buddy", pool=LITTLE_BUDDY_ROTATION,
+    )
+    assert gear == daily_rotation_items(day, category="gear", pool=GEAR_ROTATION)
+    assert len(gear) == len(set(gear)) == 2
+    assert len(buddies) == len(set(buddies)) == 2
+    assert daily_rotation_items(
+        day, category="gear", pool=LITTLE_BUDDY_ROTATION,
+    ) != buddies
 
 
 def test_purchase_deducts_authoritative_balance_and_creates_one_copy(store_database) -> None:
@@ -230,15 +278,48 @@ def test_authenticated_store_and_both_shelves_load_with_inventory(
 
     assert page.status_code == catalog.status_code == inventory.status_code == 200
     shelves = catalog.json()["shelves"]
-    assert len(shelves["gear"]) == 5
-    assert len(shelves["little_buddy"]) == 4
+    assert len(shelves["gear"]) == 6
+    assert len(shelves["little_buddy"]) == 6
     assert {item["item_key"] for item in shelves["gear"]} >= {
         "candle", "fruit", "ice-cream", "ufo",
     }
     assert {item["item_key"] for item in shelves["little_buddy"]} >= {
-        "ladybug", "caterpillar", "snail",
+        "ladybug", "caterpillar", "snail", "ant",
     }
     assert [item["item_key"] for item in inventory.json()["items"]] == ["candle"]
+
+
+@pytest.mark.parametrize("shelf_key", ["gear", "little_buddy"])
+def test_purchased_daily_item_remains_owned_and_placeable_after_rotation(
+    store_database, shelf_key: str,
+) -> None:
+    client, profile_id = signed_in_client(store_database, credits=500)
+    day_a = date(2026, 9, 1)
+    day_b = date(2026, 9, 2)
+    available_a = {item.item_key for item in catalog_for_date(day_a)[shelf_key][-2:]}
+    available_b = {item.item_key for item in catalog_for_date(day_b)[shelf_key][-2:]}
+    rotated_out_key = next(iter(available_a - available_b))
+    purchase_time = datetime(2026, 9, 1, 18, tzinfo=timezone.utc)
+
+    with store_database() as session:
+        owned, _balance = purchase_catalog_item(
+            session,
+            profile_id=profile_id,
+            item_key=rotated_out_key,
+            now=purchase_time,
+        )
+        session.commit()
+        owned_id = owned.id
+
+    inventory = client.get("/store/inventory")
+    placed = client.put(
+        f"/store/inventory/{owned_id}/placement",
+        json={"x": 0.25, "y": 0.35, "size": "large"},
+    )
+    assert inventory.status_code == placed.status_code == 200
+    assert any(item["item_key"] == rotated_out_key for item in inventory.json()["items"])
+    assert placed.json()["item"]["item_key"] == rotated_out_key
+    assert placed.json()["item"]["placement_size"] == "large"
 
 
 def test_mum_free_grant_is_idempotent_and_never_deducts_balance(store_database) -> None:

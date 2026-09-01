@@ -20,7 +20,7 @@ def test_tone_is_exactly_pinned_local_licensed_and_loaded_in_order():
     tone_pos = BASE.index('/static/vendor/tone/Tone.js?v=15.1.22')
     audio_pos = BASE.index('/static/js/audio.js?v=14')
     reaction_pos = BASE.index('/static/js/character-reaction.js?v=3')
-    app_pos = BASE.index('/static/js/app.js?v=77')
+    app_pos = BASE.index('/static/js/app.js?v=78')
     assert tone_pos < audio_pos < reaction_pos < app_pos
 
 
