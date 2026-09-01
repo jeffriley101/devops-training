@@ -10,6 +10,7 @@ from .arcade_scores import (
 )
 from .arcade_rewards import (
     DAILY_REWARDED_PLAY_LIMIT,
+    ArcadeDailyLimitError,
     ArcadePlayConflictError,
     InsufficientArcadeBalanceError,
     arcade_play_status,
@@ -76,7 +77,7 @@ def create_arcade_play(submitted: ArcadePlayStart, request: Request):
                 "daily_reward_limit": DAILY_REWARDED_PLAY_LIMIT,
                 "state_revision": result.state_revision,
             }
-        except InsufficientArcadeBalanceError as error:
+        except (ArcadeDailyLimitError, InsufficientArcadeBalanceError) as error:
             session.rollback()
             raise HTTPException(status_code=409, detail=str(error)) from error
         except ValueError as error:

@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="history-mystery-game" data-history-mystery-game aria-labelledby="history-mystery-title">
+  <header class="arcade-room-header">
+    <h1 id="history-mystery-title">History Mystery</h1>
+    <a class="btn btn-secondary" href="/arcade">Back to Arcade</a>
+  </header>
+
+  <div class="arcade-economy-status" aria-label="Arcade cost and balance">
+    <span>Balance 🌼 <output data-arcade-balance>—</output></span>
+    <span>1🌼 TO PLAY · WIN UP TO 5🌼</span>
+  </div>
+  <p class="arcade-economy-message" data-arcade-economy-message role="status" aria-live="polite"></p>
+
+  <div class="history-mystery-active-area">
+    <div class="history-mystery-status" aria-label="Game status">
+      <p>Score <strong id="history-mystery-score">0</strong> / 5</p>
+      <p>Best <strong id="history-mystery-best">0</strong> / 5</p>
+      <p>Question <strong id="history-mystery-progress">0</strong> of 5</p>
+    </div>
+
+    <section class="history-mystery-card" aria-label="Current history question">
+      <strong id="history-mystery-category">Daily Quiz</strong>
+      <p id="history-mystery-prompt">Five questions. One try today.</p>
+      <div id="history-mystery-answers" class="history-mystery-answer-grid" role="group" aria-label="Answer choices"></div>
+    </section>
+
+    <button id="history-mystery-start" class="btn btn-primary history-mystery-start" type="button">New Game</button>
+    <p id="history-mystery-message" class="history-mystery-message" role="status" aria-live="polite">Five questions. One try today.</p>
+  </div>
+
+  <p class="history-mystery-date">Daily quiz for {{ history_mystery_date }} (Central)</p>
+  <script id="history-mystery-question-data" type="application/json">{{ history_mystery_questions | tojson }}</script>
+</section>
+{% endblock %}
+
+{% block page_scripts %}
+<script src="/static/js/arcade-economy.js?v=1"></script>
+<script src="/static/js/history-mystery.js?v=1"></script>
+{% endblock %}
+

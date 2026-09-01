@@ -112,7 +112,7 @@ def play(client: TestClient, score: int):
 
 
 def test_eighth_cabinet_stable_key_and_authenticated_route(interval_database) -> None:
-    assert ARCADE.count('class="arcade-cabinet ') == 8
+    assert ARCADE.count('class="arcade-cabinet ') == 9
     assert 'class="arcade-cabinet arcade-cabinet-intervals"' in ARCADE
     assert 'href="/arcade/interval-basic-training"' in ARCADE
     assert 'data-arcade-personal-best="interval-basic-training"' in ARCADE

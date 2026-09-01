@@ -10,6 +10,7 @@ ARCADE_GAME_KEYS = frozenset({
     "blue", "radio-tuner", "wheel-of-woodchuck", "scale-keyboard", "thirds",
     "dressed-to-the-nines",
     "interval-basic-training",
+    "history-mystery",
 })
 MAX_ARCADE_SCORE = 2_147_483_647
 

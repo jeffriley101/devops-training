@@ -110,7 +110,7 @@ def play(client: TestClient, score: int):
 
 
 def test_seventh_cabinet_and_nines_route_are_authenticated(nines_database) -> None:
-    assert ARCADE.count('class="arcade-cabinet ') == 8
+    assert ARCADE.count('class="arcade-cabinet ') == 9
     assert 'class="arcade-cabinet arcade-cabinet-nines"' in ARCADE
     assert 'href="/arcade/dressed-to-the-nines"' in ARCADE
     assert 'data-arcade-personal-best="dressed-to-the-nines"' in ARCADE

@@ -44,6 +44,10 @@ from .content import (
     SHOP_SHARE_URL,
 )
 from .instruments import instrument_definition_payloads, shed_artwork_url
+from .history_mystery import (
+    history_mystery_central_date,
+    history_mystery_questions_for_date,
+)
 from .models import WoodchuckState
 from .board_seasons import board_season_for_date
 
@@ -474,6 +478,23 @@ def arcade_interval_basic_training(request: Request):
         title="Interval Basic Training",
         active_nav="store",
         page_class="main-app-page arcade-screen",
+    )
+
+
+@app.get("/arcade/history-mystery")
+def arcade_history_mystery(request: Request):
+    with SessionLocal() as session:
+        if current_profile(request, session) is None:
+            return RedirectResponse(url="/login", status_code=303)
+    play_date = history_mystery_central_date()
+    return _render(
+        request,
+        "history_mystery.html",
+        title="History Mystery",
+        active_nav="store",
+        page_class="main-app-page arcade-screen",
+        history_mystery_date=play_date.isoformat(),
+        history_mystery_questions=history_mystery_questions_for_date(play_date),
     )
 
 
