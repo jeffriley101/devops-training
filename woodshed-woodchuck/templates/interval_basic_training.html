@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="interval-game" data-interval-game aria-labelledby="interval-title">
+  <header class="arcade-room-header">
+    <h1 id="interval-title">Interval Basic Training</h1>
+    <a class="btn btn-secondary" href="/arcade">Back to Arcade</a>
+  </header>
+
+  <div class="arcade-economy-status" aria-label="Arcade cost and balance">
+    <span>Balance 🌼 <output data-arcade-balance>—</output></span>
+    <span>1🌼 TO PLAY · WIN UP TO 5🌼</span>
+  </div>
+  <p class="arcade-economy-message" data-arcade-economy-message role="status" aria-live="polite"></p>
+
+  <div class="interval-active-area">
+    <div class="interval-status" aria-label="Game status">
+      <p>Score <strong id="interval-score">0</strong></p>
+      <p>Best <strong id="interval-best">0</strong></p>
+      <p>Time <strong id="interval-time">30</strong></p>
+    </div>
+    <p class="interval-mistakes">Mistakes: <strong id="interval-mistakes">0 / 2</strong></p>
+
+    <button id="interval-replay" class="btn btn-secondary interval-replay" type="button" disabled>Replay</button>
+
+    <div class="interval-answer-grid" role="group" aria-label="Choose the interval">
+      {% for label in ("Unison", "2nd", "3rd", "4th", "5th", "6th", "7th", "Octave", "9th") %}
+      <button class="btn btn-secondary" type="button" data-interval-answer="{{ label }}" disabled>{{ label }}</button>
+      {% endfor %}
+    </div>
+
+    <button id="interval-start" class="btn btn-primary interval-start" type="button">New Game</button>
+    <p id="interval-message" class="interval-message" role="status" aria-live="polite">Ready</p>
+  </div>
+
+  <section class="arcade-game-leaderboard" aria-labelledby="interval-leaderboard-title">
+    <h2 id="interval-leaderboard-title">Top 5</h2>
+    <ol data-arcade-leaderboard="interval-basic-training"><li>Loading…</li></ol>
+  </section>
+</section>
+{% endblock %}
+
+{% block page_scripts %}
+<script src="/static/js/arcade-economy.js?v=1"></script>
+<script src="/static/js/interval-basic-training.js?v=1"></script>
+{% endblock %}

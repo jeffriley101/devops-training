@@ -125,19 +125,22 @@ def test_practice_room_destinations_are_preserved_as_three_doors() -> None:
     assert "position: static" in tag
 
 
-def test_arcade_room_renders_six_touch_friendly_cabinets() -> None:
-    assert ARCADE.count('class="arcade-cabinet ') == 6
+def test_arcade_room_renders_nine_touch_friendly_cabinets() -> None:
+    assert ARCADE.count('class="arcade-cabinet ') == 9
     assert 'href="/plunge-burrow"' in ARCADE
     assert 'href="/arcade/blue"' in ARCADE
     assert 'href="/arcade/radio-tuner"' in ARCADE
     assert 'href="/arcade/wheel-of-woodchuck"' in ARCADE
     assert 'href="/arcade/scale-keyboard"' in ARCADE
     assert 'href="/arcade/thirds"' in ARCADE
-    assert ARCADE.count("<h2>Top 5</h2>") == 6
-    assert ARCADE.count('class="arcade-cabinet-marquee"') == 6
-    assert ARCADE.count('class="arcade-cabinet-control-panel" aria-hidden="true"') == 6
-    assert ARCADE.count('data-arcade-personal-best=') == 6
-    assert ARCADE.count("1🌼 TO PLAY · WIN UP TO 5🌼") == 6
+    assert 'href="/arcade/dressed-to-the-nines"' in ARCADE
+    assert 'href="/arcade/interval-basic-training"' in ARCADE
+    assert 'href="/arcade/history-mystery"' in ARCADE
+    assert ARCADE.count("<h2>Top 5</h2>") == 8
+    assert ARCADE.count('class="arcade-cabinet-marquee"') == 9
+    assert ARCADE.count('class="arcade-cabinet-control-panel" aria-hidden="true"') == 9
+    assert ARCADE.count('data-arcade-personal-best=') == 9
+    assert ARCADE.count("1🌼 TO PLAY · WIN UP TO 5🌼") == 9
     assert "arcade-cabinet-copy" not in ARCADE
     for retired_copy in (
         "Burrow, collect, and build your band.",
@@ -155,7 +158,7 @@ def test_arcade_room_renders_six_touch_friendly_cabinets() -> None:
     assert "min-height: 17rem" in CSS[CSS.index(".arcade-cabinet-link {"):]
     mobile = CSS[CSS.index("@media (max-width: 760px)"):]
     assert ".arcade-cabinet-grid { grid-template-columns: 1fr; }" in mobile
-    assert '/static/js/arcade.js?v=10' in ARCADE
+    assert '/static/js/arcade.js?v=13' in ARCADE
 
 
 def test_arcade_pages_route_game_specific_soundtracks() -> None:
@@ -197,7 +200,8 @@ def test_arcade_landing_renders_personal_bests_from_existing_score_payload() -> 
     room = ARCADE_JS[ARCADE_JS.index("function wireArcadeRoom"):ARCADE_JS.index("function wireArcadeGame")]
     assert "function renderPersonalBest" in ARCADE_JS
     assert "data-arcade-personal-best" in ARCADE_JS
-    assert "renderPersonalBest(list.dataset.arcadeLeaderboard, payload.best_score)" in room
+    assert "renderPersonalBest(gameKey, payload.best_score)" in room
+    assert "data-arcade-personal-best" in room
 
 
 def test_arcade_leaderboards_render_each_olympic_rank_once() -> None:
@@ -208,7 +212,7 @@ def test_arcade_leaderboards_render_each_olympic_rank_once() -> None:
     assert "item.value = Number(row.rank)" in renderer
     assert "item.textContent = `${name} — ${row.score}`" in renderer
     assert "${row.rank}." not in renderer
-    assert ARCADE.count("<ol data-arcade-leaderboard=") == 6
+    assert ARCADE.count("<ol data-arcade-leaderboard=") == 8
 
 
 def test_arcade_removes_unnecessary_copy() -> None:

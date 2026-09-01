@@ -898,7 +898,8 @@ class ArcadeHighScore(Base):
         ),
         CheckConstraint(
             "game_key IN ('blue', 'radio-tuner', 'wheel-of-woodchuck', "
-            "'scale-keyboard', 'thirds')",
+            "'scale-keyboard', 'thirds', 'dressed-to-the-nines', "
+            "'interval-basic-training', 'history-mystery')",
             name="ck_arcade_high_score_game_key",
         ),
         CheckConstraint(
@@ -934,10 +935,23 @@ class ArcadePlaySession(Base):
     __tablename__ = "arcade_play_sessions"
     __table_args__ = (
         UniqueConstraint("play_token", name="uq_arcade_play_session_token"),
+        UniqueConstraint(
+            "profile_id",
+            "game_key",
+            "daily_play_date",
+            name="uq_arcade_play_session_profile_game_daily_date",
+        ),
         CheckConstraint(
             "game_key IN ('plunge-burrow', 'blue', 'radio-tuner', "
-            "'wheel-of-woodchuck', 'scale-keyboard', 'thirds')",
+            "'wheel-of-woodchuck', 'scale-keyboard', 'thirds', "
+            "'dressed-to-the-nines', 'interval-basic-training', "
+            "'history-mystery')",
             name="ck_arcade_play_session_game_key",
+        ),
+        CheckConstraint(
+            "(game_key = 'history-mystery' AND daily_play_date IS NOT NULL) OR "
+            "(game_key <> 'history-mystery' AND daily_play_date IS NULL)",
+            name="ck_arcade_play_session_daily_date_scope",
         ),
         CheckConstraint(
             "entry_cost = 1", name="ck_arcade_play_session_entry_cost"
@@ -969,6 +983,7 @@ class ArcadePlaySession(Base):
     started_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
     )
+    daily_play_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     entry_cost: Mapped[int] = mapped_column(
         Integer, default=1, server_default="1", nullable=False
     )

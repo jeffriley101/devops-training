@@ -505,13 +505,15 @@
     if (!audioContextIsRunning()) unlocked = false;
   }
 
-  function playPianoPitch(frequency) {
+  function playPianoPitch(frequency, duration) {
     const pitch = Number(frequency);
+    const noteDuration = Number.isFinite(Number(duration)) && Number(duration) > 0
+      ? Number(duration) : 0.42;
     if (!enabled || !Number.isFinite(pitch) || pitch <= 0) return false;
     function trigger() {
       const current = buildGraph();
       if (!current) return false;
-      current.piano.triggerAttackRelease(pitch, 0.42);
+      current.piano.triggerAttackRelease(pitch, noteDuration);
       return true;
     }
     if (audioContextIsRunning()) return trigger();

@@ -8,6 +8,9 @@
     "wheel-of-woodchuck": "/arcade/scores/wheel-of-woodchuck",
     "scale-keyboard": "/arcade/scores/scale-keyboard",
     thirds: "/arcade/scores/thirds",
+    "dressed-to-the-nines": "/arcade/scores/dressed-to-the-nines",
+    "interval-basic-training": "/arcade/scores/interval-basic-training",
+    "history-mystery": "/arcade/scores/history-mystery",
   };
   const BLUE_GAME_SECONDS = 20;
   const RADIO_GAME_SECONDS = 30;
@@ -59,14 +62,18 @@
 
   function wireArcadeRoom() {
     const lists = Array.from(document.querySelectorAll("[data-arcade-leaderboard]"));
-    if (!lists.length || document.querySelector("[data-arcade-game]")) return;
-    lists.forEach(async (list) => {
+    const bestOutputs = Array.from(document.querySelectorAll("[data-arcade-personal-best]"));
+    const gameKeys = new Set(lists.map((list) => list.dataset.arcadeLeaderboard));
+    bestOutputs.forEach((output) => gameKeys.add(output.dataset.arcadePersonalBest));
+    if (!gameKeys.size || document.querySelector("[data-arcade-game]")) return;
+    gameKeys.forEach(async (gameKey) => {
+      const gameLists = lists.filter((list) => list.dataset.arcadeLeaderboard === gameKey);
       try {
-        const payload = await loadScores(list.dataset.arcadeLeaderboard);
-        renderLeaderboard(list, payload.leaderboard);
-        renderPersonalBest(list.dataset.arcadeLeaderboard, payload.best_score);
+        const payload = await loadScores(gameKey);
+        gameLists.forEach((list) => renderLeaderboard(list, payload.leaderboard));
+        renderPersonalBest(gameKey, payload.best_score);
       } catch (_error) {
-        renderLeaderboard(list, []);
+        gameLists.forEach((list) => renderLeaderboard(list, []));
       }
     });
   }

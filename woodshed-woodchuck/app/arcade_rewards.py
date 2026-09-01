@@ -7,6 +7,7 @@ from secrets import token_urlsafe
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .arcade_scores import MAX_ARCADE_SCORE, arcade_score_payload, record_arcade_high_score
@@ -24,6 +25,9 @@ ARCADE_PLAY_GAME_KEYS = frozenset({
     "wheel-of-woodchuck",
     "scale-keyboard",
     "thirds",
+    "dressed-to-the-nines",
+    "interval-basic-training",
+    "history-mystery",
 })
 
 # Conservative first-pass tiers based on each game's existing duration and
@@ -35,6 +39,9 @@ ARCADE_PAYOUT_THRESHOLDS: dict[str, tuple[tuple[int, int], ...]] = {
     "wheel-of-woodchuck": ((1000, 1), (2500, 2), (5000, 3), (9000, 5)),
     "scale-keyboard": ((800, 1), (1800, 2), (3000, 3), (5000, 5)),
     "thirds": ((3, 1), (6, 2), (9, 3), (12, 5)),
+    "dressed-to-the-nines": ((3, 1), (6, 2), (9, 3), (12, 5)),
+    "interval-basic-training": ((3, 1), (6, 2), (9, 3), (12, 5)),
+    "history-mystery": ((3, 1), (4, 2), (5, 5)),
 }
 
 
@@ -43,6 +50,10 @@ class InsufficientArcadeBalanceError(ValueError):
 
 
 class ArcadePlayConflictError(ValueError):
+    pass
+
+
+class ArcadeDailyLimitError(ValueError):
     pass
 
 
@@ -136,6 +147,20 @@ def _completed_plays_today(
     return int(session.scalar(statement) or 0)
 
 
+def _central_play_date(now: datetime) -> date:
+    return now.astimezone(ARCADE_TIMEZONE).date()
+
+
+def _has_daily_history_play(
+    session: Session, *, profile_id: int, play_date: date
+) -> bool:
+    return session.scalar(select(ArcadePlaySession.id).where(
+        ArcadePlaySession.profile_id == profile_id,
+        ArcadePlaySession.game_key == "history-mystery",
+        ArcadePlaySession.daily_play_date == play_date,
+    )) is not None
+
+
 def arcade_play_status(
     session: Session,
     *,
@@ -155,6 +180,13 @@ def arcade_play_status(
     completed = _completed_plays_today(
         session, profile_id=profile_id, game_key=key, now=timestamp
     )
+    daily_play_available = True
+    if key == "history-mystery":
+        daily_play_available = not _has_daily_history_play(
+            session,
+            profile_id=profile_id,
+            play_date=_central_play_date(timestamp),
+        )
     return {
         "game_key": key,
         "balance": _balance(state) if state is not None else 0,
@@ -163,6 +195,7 @@ def arcade_play_status(
         "completed_reward_plays": completed,
         "daily_reward_limit": DAILY_REWARDED_PLAY_LIMIT,
         "reward_eligible": completed < DAILY_REWARDED_PLAY_LIMIT,
+        "daily_play_available": daily_play_available,
     }
 
 
@@ -184,6 +217,16 @@ def start_arcade_play(
     if profile_exists is None:
         raise ValueError("The signed-in Woodchuck profile is unavailable.")
 
+    daily_play_date = None
+    if key == "history-mystery":
+        daily_play_date = _central_play_date(timestamp)
+        if _has_daily_history_play(
+            session, profile_id=profile_id, play_date=daily_play_date
+        ):
+            raise ArcadeDailyLimitError(
+                "History Mystery can be played once each Central day."
+            )
+
     state = _state_for_update(session, profile_id)
     current_balance = _balance(state)
     if current_balance < ARCADE_ENTRY_COST:
@@ -200,10 +243,18 @@ def start_arcade_play(
         game_key=key,
         play_token=token_urlsafe(32),
         started_at=timestamp,
+        daily_play_date=daily_play_date,
         entry_cost=ARCADE_ENTRY_COST,
     )
     session.add(play)
-    session.flush()
+    try:
+        session.flush()
+    except IntegrityError as error:
+        if key == "history-mystery":
+            raise ArcadeDailyLimitError(
+                "History Mystery can be played once each Central day."
+            ) from error
+        raise
     return ArcadePlayStartResult(
         play=play,
         balance=new_balance,
@@ -247,6 +298,8 @@ def complete_arcade_play(
     )
     if play is None or play.profile_id != profile_id:
         raise ValueError("That Arcade play is unavailable.")
+    if play.game_key == "history-mystery" and score > 5:
+        raise ValueError("History Mystery scores must be between 0 and 5.")
     if play.completed_at is not None:
         if play.submitted_score != score:
             raise ArcadePlayConflictError(
