@@ -191,6 +191,53 @@ def test_dashboard_aggregates_metrics_charts_and_pending_state_without_identity_
     assert "Student Person" not in repr(payload["charts"])
 
 
+def test_dashboard_total_is_raw_while_average_and_tpr_use_their_own_caps(
+    dashboard_database,
+) -> None:
+    team = add_owned_team(
+        dashboard_database, "DIRECTOR", "Uncapped Metrics Band", "emoji:bear"
+    )
+    with dashboard_database() as session:
+        member = profile(session, "MEMBER")
+        student = profile(session, "STUDENT")
+        season = session.scalar(select(Season))
+        session.add_all([
+            TeamMembership(
+                season_id=season.id, team_id=team.id, profile_id=member.id,
+                selected_week_start=date(2026, 8, 24),
+                started_at=NOW - timedelta(days=5),
+            ),
+            TeamMembership(
+                season_id=season.id, team_id=team.id, profile_id=student.id,
+                selected_week_start=date(2026, 8, 24),
+                started_at=NOW - timedelta(days=5),
+            ),
+            PracticeChart(
+                profile_id=member.id, practice_date=date(2026, 8, 24),
+                minutes=420, instrument="Flute", team_id=team.id,
+                include_contests=True, include_team_contests=True,
+                created_at=NOW - timedelta(days=1),
+            ),
+            PracticeChart(
+                profile_id=student.id, practice_date=date(2026, 8, 25),
+                minutes=100, instrument="Trumpet", team_id=team.id,
+                include_contests=True, include_team_contests=True,
+                created_at=NOW,
+            ),
+        ])
+        session.commit()
+
+    payload = client_for("WC-DIRECTOR").get(
+        f"/director/dashboard?team_id={team.id}"
+    ).json()
+    metrics = payload["metrics"]
+    assert metrics["total_practice_minutes"] == 520
+    assert metrics["average_minutes"] == 200
+    assert metrics["team_practice_rating"] == 62.2
+    assert sum(row["minutes"] for row in payload["charts"]["daily_practice"]) == 520
+    assert sum(row["minutes"] for row in payload["charts"]["by_instrument"]) == 520
+
+
 def _event_setup(factory, metric: str):
     first = add_owned_team(factory, "DIRECTOR", f"Alpha {metric}", "letter:A")
     second = add_owned_team(factory, "DIRECTOR", f"Bravo {metric}", "letter:B")
@@ -287,6 +334,75 @@ def test_director_contest_exact_window_metrics_ties_and_finalization(
         assert [row.score for row in session.scalars(select(DirectorTeamContestResult).where(
             DirectorTeamContestResult.contest_id == contest_id
         ).order_by(DirectorTeamContestResult.team_name_snapshot)).all()] == [expected, expected]
+
+
+def test_director_contest_metric_caps_are_independent(dashboard_database) -> None:
+    team = add_owned_team(
+        dashboard_database, "DIRECTOR", "Metric Caps Band", "emoji:wolf"
+    )
+    start = datetime(2026, 8, 20, 14, tzinfo=timezone.utc)
+    end = start + timedelta(days=1)
+    with dashboard_database() as session:
+        owner = profile(session, "DIRECTOR")
+        member = profile(session, "MEMBER")
+        student = profile(session, "STUDENT")
+        season = session.scalar(select(Season))
+        session.add_all([
+            TeamMembership(
+                season_id=season.id, team_id=team.id, profile_id=member.id,
+                selected_week_start=date(2026, 8, 17),
+                started_at=start - timedelta(days=1),
+            ),
+            TeamMembership(
+                season_id=season.id, team_id=team.id, profile_id=student.id,
+                selected_week_start=date(2026, 8, 17),
+                started_at=start - timedelta(days=1),
+            ),
+        ])
+        session.commit()
+        contests = {}
+        for metric in ("total_minutes", "average_minutes", "team_practice_rating"):
+            contests[metric] = create_director_contest(
+                session,
+                profile=owner,
+                submitted=DirectorContestCreate(
+                    title=f"{metric} Cap Audit", description="Independent caps",
+                    starts_at=start, ends_at=end, finalizes_at=end,
+                    metric=metric, team_ids=[team.id],
+                ),
+                now=start,
+            )
+        session.add_all([
+            PracticeChart(
+                profile_id=member.id, practice_date=start.date(), minutes=450,
+                instrument="Flute", team_id=team.id, include_contests=True,
+                include_team_contests=True, created_at=start,
+            ),
+            PracticeChart(
+                profile_id=student.id, practice_date=start.date(), minutes=100,
+                instrument="Trumpet", team_id=team.id, include_contests=True,
+                include_team_contests=True, created_at=start,
+            ),
+        ])
+        session.commit()
+
+        scores = {}
+        for metric, contest in contests.items():
+            finalized, created = finalize_director_contest(
+                session, contest=contest, profile=owner, now=end
+            )
+            assert created is True and finalized.status == "finalized"
+            result = session.scalar(select(DirectorTeamContestResult).where(
+                DirectorTeamContestResult.contest_id == contest.id
+            ))
+            assert result.rank == 1
+            scores[metric] = result.score
+
+    assert scores == {
+        "total_minutes": 550.0,
+        "average_minutes": 200.0,
+        "team_practice_rating": 62.2,
+    }
 
 
 def test_contest_authorization_and_hall_are_private_roster_safe(dashboard_database) -> None:
