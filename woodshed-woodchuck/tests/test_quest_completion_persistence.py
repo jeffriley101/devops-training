@@ -459,7 +459,8 @@ def test_browser_handler_is_single_request_confirmed_ui_and_audio_safe() -> None
     assert "if (completionInFlight) return" in quest
     assert "stateApi.saveState(next, { sync: false })" in quest
     assert "window.WWAccountSync.syncNow" not in quest
-    assert "payload.created === true && payload.reward_created === true" in quest
+    assert "if (payload.created === true) {" in quest
+    assert "if (payload.reward_created === true) playSound(\"questCompleted\")" in quest
     assert "next.daily.completed = payload.completed === true" in quest
     assert "next.daily.loggedMinutes = payload.logged_minutes" in quest
     assert "ww:camp-points-saved" in quest

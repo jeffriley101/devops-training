@@ -10,6 +10,16 @@
     }
   }
 
+  function showCharacterReaction(options) {
+    try {
+      if (window.WoodshedCharacterReaction) {
+        window.WoodshedCharacterReaction.show(options);
+      }
+    } catch (_error) {
+      // Character cameos are supplemental and never block a saved action.
+    }
+  }
+
   function playCampReward(includeTriviaChime) {
     if (window.WoodshedAudio) {
       window.WoodshedAudio.playCampReward(Boolean(includeTriviaChime));
@@ -1340,8 +1350,13 @@
         setQuestFeedback(rewardMessage);
         renderQuestStatus(next);
         hydrateHome(next);
-        if (payload.created === true && payload.reward_created === true) {
-          playSound("questCompleted");
+        if (payload.created === true) {
+          showCharacterReaction({
+            characterName: "John",
+            imageUrl: "/static/img/characters/john.png",
+            message: "Ah geez, I've been trying to play that all day!",
+          });
+          if (payload.reward_created === true) playSound("questCompleted");
         }
       } catch (error) {
         if (errorEl) {
@@ -5216,6 +5231,14 @@
         if (deliveryStatusEl && deliveryMessages.length) {
           deliveryStatusEl.hidden = false;
           deliveryStatusEl.textContent = deliveryMessages.join(" · ");
+        }
+
+        if (createdPayload.created === true) {
+          showCharacterReaction({
+            characterName: "Coach Whistler",
+            imageUrl: "/static/img/characters/whistler.png",
+            message: "Whee-oo-wheet! ... Good job!",
+          });
         }
 
         if (createdPayload.created === true) {

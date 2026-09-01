@@ -18,9 +18,10 @@ def test_tone_is_exactly_pinned_local_licensed_and_loaded_in_order():
     assert "MIT License" in license_file.read_text()
     assert "cdn" not in BASE.casefold()
     tone_pos = BASE.index('/static/vendor/tone/Tone.js?v=15.1.22')
-    audio_pos = BASE.index('/static/js/audio.js?v=13')
-    app_pos = BASE.index('/static/js/app.js?v=75')
-    assert tone_pos < audio_pos < app_pos
+    audio_pos = BASE.index('/static/js/audio.js?v=14')
+    reaction_pos = BASE.index('/static/js/character-reaction.js?v=3')
+    app_pos = BASE.index('/static/js/app.js?v=77')
+    assert tone_pos < audio_pos < reaction_pos < app_pos
 
 
 def test_audio_unlock_is_gesture_only_lazy_and_reuses_graph():
@@ -63,6 +64,20 @@ def test_arcade_pickup_effect_uses_the_shared_sound_preference_graph():
     assert "arcadePickup: 45" in AUDIO
     assert 'name === "arcadePickup"' in AUDIO
     assert 'graph.chime.triggerAttackRelease("B5", 0.075, now, 0.2)' in AUDIO
+
+
+def test_character_reactions_share_one_muted_volume_aware_whistle_effect():
+    reaction = (ROOT / "static/js/character-reaction.js").read_text()
+    assert '"characterWhistle"' in AUDIO
+    assert "const whistle = new Tone.Synth" in AUDIO
+    assert 'oscillator: { type: "sine" }' in AUDIO
+    assert 'graph.whistle.triggerAttackRelease("E6", 0.1, now, 0.2)' in AUDIO
+    assert 'graph.whistle.triggerAttackRelease("G6", 0.13, now + 0.12, 0.17)' in AUDIO
+    assert "if (!enabled || !EFFECT_NAMES.includes(name)) return false" in AUDIO
+    assert "new Tone.Gain(outputLevel()).toDestination()" in AUDIO
+    assert 'audio.play("characterWhistle")' in reaction
+    assert "localStorage" not in reaction
+    assert "new Audio(" not in reaction
 
 
 def test_scale_keyboard_pitch_uses_the_shared_muted_volume_graph():

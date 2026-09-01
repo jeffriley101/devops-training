@@ -10,7 +10,7 @@
     "secretReward", "goatTracker", "questCompleted", "bandCampBonus",
     "marchingCompleted", "practiceRoomOpen", "medalEarned",
     "burrowPortal", "carrotCollected", "instrumentCollected",
-    "bandSetCompleted", "arcadePickup", "arcadeCheer",
+    "bandSetCompleted", "arcadePickup", "arcadeCheer", "characterWhistle",
   ];
   const GOAT_CLIP_URLS = [
     "/static/audio/goats/goat-01.mp3",
@@ -115,6 +115,12 @@
         volume: -17,
       },
     }).connect(filter);
+    const whistle = new Tone.Synth({
+      oscillator: { type: "sine" },
+      envelope: { attack: 0.012, decay: 0.045, sustain: 0.42, release: 0.09 },
+      portamento: 0.035,
+      volume: -19,
+    }).connect(filter);
     const doorFilter = new Tone.Filter({ frequency: 380, type: "bandpass", Q: 1.2 }).connect(master);
     const door = new Tone.NoiseSynth({
       noise: { type: "brown" },
@@ -131,7 +137,7 @@
     }).connect(crowdFilter);
     const goatGain = new Tone.Gain(0.35).connect(master);
     graph = {
-      master, filter, chime, warm, wood, click, flourish, piano,
+      master, filter, chime, warm, wood, click, flourish, piano, whistle,
       doorFilter, door, crowdFilter, crowd, goatGain,
     };
     buildGoatPool(Tone, goatGain);
@@ -411,6 +417,9 @@
         [["C5", 0.08], ["E5", 0.2], ["G5", 0.34]].forEach(function (step) {
           graph.chime.triggerAttackRelease(step[0], 0.18, now + step[1], 0.2);
         });
+      } else if (name === "characterWhistle") {
+        graph.whistle.triggerAttackRelease("E6", 0.1, now, 0.2);
+        graph.whistle.triggerAttackRelease("G6", 0.13, now + 0.12, 0.17);
       }
       return true;
     } catch (_error) {
