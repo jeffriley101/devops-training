@@ -9,6 +9,7 @@
   const NOTE_GAP_MS = 120;
   const SECOND_NOTE_DELAY_MS = NOTE_DURATION_MS + NOTE_GAP_MS;
   const SEQUENCE_DURATION_MS = SECOND_NOTE_DELAY_MS + NOTE_DURATION_MS;
+  const SOUNDTRACK_RUN_STATE_EVENT = "woodshed:arcade-soundtrack-run-state";
   const INTERVAL_QUESTIONS = Object.freeze([
     Object.freeze({ label: "Unison", firstMidi: 60, secondMidi: 60, firstNote: "C4", secondNote: "C4" }),
     Object.freeze({ label: "2nd", firstMidi: 60, secondMidi: 62, firstNote: "C4", secondNote: "D4" }),
@@ -181,6 +182,17 @@
   let starting = false;
   let saving = false;
 
+  function setSoundtrackRunActive(active) {
+    page.dispatchEvent(new root.CustomEvent(SOUNDTRACK_RUN_STATE_EVENT, {
+      bubbles: true,
+      detail: {
+        gameKey: GAME_KEY,
+        active: active === true,
+        resumeDelayMs: active ? 0 : NOTE_DURATION_MS,
+      },
+    }));
+  }
+
   function renderLeaderboard(payload) {
     bestOutput.textContent = String(payload.best_score || 0);
     leaderboard.replaceChildren();
@@ -275,6 +287,7 @@
     if (timer !== null) root.clearInterval(timer);
     timer = null;
     cancelQuestionAudio();
+    setSoundtrackRunActive(false);
     answerLocked = false;
     saving = true;
     render();
@@ -326,6 +339,7 @@
       render();
       return;
     }
+    setSoundtrackRunActive(true);
     try {
       if (root.WoodshedAudio) await root.WoodshedAudio.unlock();
     } catch (_error) { /* A muted/unavailable sound graph must not lose a paid run. */ }

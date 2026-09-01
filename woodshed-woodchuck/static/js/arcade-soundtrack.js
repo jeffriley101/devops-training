@@ -18,6 +18,22 @@
       url: "/static/audio/arcade/gerry-4.wav?v=1",
       loop: true,
     },
+    thirds: {
+      url: "/static/audio/arcade/gerry-4.wav?v=1",
+      loop: true,
+    },
+    "dressed-to-the-nines": {
+      url: "/static/audio/arcade/sand-drop.mp3?v=1",
+      loop: true,
+    },
+    "wheel-of-woodchuck": {
+      url: "/static/audio/arcade/mudslide.mp3?v=1",
+      loop: true,
+    },
+    "interval-basic-training": {
+      url: "/static/audio/arcade/black-hole-rappelling.mp3?v=1",
+      loop: true,
+    },
     "history-mystery": {
       url: "/static/audio/arcade/thunderpants.mp3?v=1",
       loop: true,
@@ -28,9 +44,12 @@
   const soundtrack = soundtrackRoot && SOUNDTRACKS[soundtrackRoot.dataset.arcadeSoundtrack];
   if (!soundtrack) return;
 
+  const gameKey = soundtrackRoot.dataset.arcadeSoundtrack;
   const audio = new Audio(soundtrack.url);
   let restartTimer = null;
+  let resumeTimer = null;
   let stopped = false;
+  let runActive = false;
 
   audio.preload = "auto";
   audio.loop = soundtrack.loop === true;
@@ -64,8 +83,13 @@
     restartTimer = null;
   }
 
+  function clearResume() {
+    if (resumeTimer !== null) window.clearTimeout(resumeTimer);
+    resumeTimer = null;
+  }
+
   function playSoundtrack() {
-    if (stopped || !applyPreferences()) return;
+    if (stopped || runActive || !applyPreferences()) return;
     const attempt = audio.play();
     if (attempt && typeof attempt.catch === "function") {
       attempt.catch(function () {
@@ -87,24 +111,43 @@
   function stopSoundtrack() {
     stopped = true;
     clearRestart();
+    clearResume();
     audio.pause();
     audio.currentTime = 0;
   }
 
   function syncSoundtrackPreference() {
     const enabled = applyPreferences();
-    if (enabled && audio.paused && !audio.ended) playSoundtrack();
-    if (!enabled) audio.pause();
+    if (enabled && !runActive && audio.paused && !audio.ended) playSoundtrack();
+    if (!enabled || runActive) audio.pause();
     updateSoundtrackToggle();
   }
 
   function activateFromGesture() {
-    if (audio.paused && !audio.ended) playSoundtrack();
+    if (!runActive && audio.paused && !audio.ended) playSoundtrack();
+  }
+
+  function handleRunState(event) {
+    const detail = event && event.detail;
+    if (!detail || detail.gameKey !== gameKey) return;
+    clearResume();
+    runActive = detail.active === true;
+    if (runActive) {
+      clearRestart();
+      audio.pause();
+      return;
+    }
+    const delayMs = Math.max(0, Number(detail.resumeDelayMs) || 0);
+    resumeTimer = window.setTimeout(function () {
+      resumeTimer = null;
+      syncSoundtrackPreference();
+    }, delayMs);
   }
 
   if (!audio.loop) audio.addEventListener("ended", restartAfterPause);
   document.addEventListener("pointerdown", activateFromGesture, true);
   document.addEventListener("keydown", activateFromGesture, true);
+  document.addEventListener("woodshed:arcade-soundtrack-run-state", handleRunState);
   window.addEventListener("pagehide", stopSoundtrack, { once: true });
 
   document.addEventListener("DOMContentLoaded", function () {

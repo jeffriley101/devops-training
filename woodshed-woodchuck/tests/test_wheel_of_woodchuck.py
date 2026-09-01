@@ -363,8 +363,13 @@ def test_cheer_uses_shared_audio_and_final_score_submission_is_guarded() -> None
     assert "if (finishPromise) return finishPromise" in WHEEL_JS
     assert "WoodshedArcadeEconomy.completePlay" in WHEEL_JS
     assert "activePlayToken" in WHEEL_JS
-    assert 'data-arcade-soundtrack' not in WHEEL
-    assert "/static/js/arcade-soundtrack.js" not in WHEEL
+    assert 'data-arcade-soundtrack="wheel-of-woodchuck"' in WHEEL
+    assert 'data-arcade-soundtrack-toggle' in WHEEL
+    assert "/static/js/arcade-soundtrack.js?v=4" in WHEEL
+    soundtrack = (ROOT / "static" / "js" / "arcade-soundtrack.js").read_text(
+        encoding="utf-8"
+    )
+    assert 'url: "/static/audio/arcade/mudslide.mp3?v=1"' in soundtrack
 
 
 def test_wheel_scores_persist_only_higher_and_keep_ties_private_safe(

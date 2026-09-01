@@ -129,6 +129,92 @@ def test_eighth_cabinet_stable_key_and_authenticated_route(interval_database) ->
     assert response.text.count("data-interval-answer=") == 9
 
 
+def test_interval_soundtrack_is_idle_only_and_uses_shared_mute_state() -> None:
+    soundtrack = (ROOT / "static" / "js" / "arcade-soundtrack.js").read_text(
+        encoding="utf-8"
+    )
+    assert 'data-arcade-soundtrack="interval-basic-training"' in TEMPLATE
+    assert 'data-arcade-soundtrack-toggle' in TEMPLATE
+    assert '/static/js/arcade-soundtrack.js?v=4' in TEMPLATE
+    assert '/static/js/interval-basic-training.js?v=2' in TEMPLATE
+    assert 'url: "/static/audio/arcade/black-hole-rappelling.mp3?v=1"' in soundtrack
+    assert 'document.addEventListener("woodshed:arcade-soundtrack-run-state"' in soundtrack
+    assert "if (stopped || runActive || !applyPreferences()) return" in soundtrack
+    assert "if (!enabled || runActive) audio.pause()" in soundtrack
+    assert "setSoundtrackRunActive(true)" in GAME_JS
+    assert "setSoundtrackRunActive(false)" in GAME_JS
+    assert "root.WoodshedAudio.playPianoPitch(" in GAME_JS
+
+
+def test_interval_soundtrack_controller_pauses_resumes_and_honors_mute() -> None:
+    source = r'''
+const assert = require("node:assert/strict");
+const listeners = new Map();
+const toggle = { textContent: "", setAttribute() {}, addEventListener() {} };
+const soundtrackRoot = { dataset: { arcadeSoundtrack: "interval-basic-training" } };
+global.document = {
+  querySelector(selector) {
+    if (selector === "[data-arcade-soundtrack]") return soundtrackRoot;
+    if (selector === "[data-arcade-soundtrack-toggle]") return toggle;
+    return null;
+  },
+  getElementById() { return null; },
+  addEventListener(type, callback) {
+    if (!listeners.has(type)) listeners.set(type, []);
+    listeners.get(type).push(callback);
+  },
+};
+global.window = global;
+global.window.addEventListener = function () {};
+global.window.setTimeout = function (callback) { callback(); return 1; };
+global.window.clearTimeout = function () {};
+let enabled = true;
+global.window.WoodshedAudio = {
+  isEnabled() { return enabled; }, getVolume() { return 0.4; },
+  setEnabled(value) { enabled = value; },
+};
+let createdAudio;
+global.Audio = class {
+  constructor(url) {
+    this.url = url; this.paused = true; this.ended = false; this.plays = 0;
+    this.pauses = 0; createdAudio = this;
+  }
+  addEventListener() {}
+  play() { this.paused = false; this.plays += 1; return Promise.resolve(); }
+  pause() { this.paused = true; this.pauses += 1; }
+};
+require("./static/js/arcade-soundtrack.js");
+function emit(type, event = {}) {
+  for (const callback of listeners.get(type) || []) callback(event);
+}
+emit("DOMContentLoaded");
+assert.equal(createdAudio.plays, 1);
+emit("woodshed:arcade-soundtrack-run-state", {
+  detail: { gameKey: "interval-basic-training", active: true },
+});
+assert.equal(createdAudio.paused, true);
+emit("pointerdown");
+assert.equal(createdAudio.plays, 1);
+emit("woodshed:arcade-soundtrack-run-state", {
+  detail: { gameKey: "interval-basic-training", active: false, resumeDelayMs: 350 },
+});
+assert.equal(createdAudio.plays, 2);
+enabled = false;
+emit("woodshed:arcade-soundtrack-run-state", {
+  detail: { gameKey: "interval-basic-training", active: true },
+});
+emit("woodshed:arcade-soundtrack-run-state", {
+  detail: { gameKey: "interval-basic-training", active: false },
+});
+assert.equal(createdAudio.plays, 2);
+console.log(JSON.stringify({ plays: createdAudio.plays, pauses: createdAudio.pauses }));
+'''
+    result = subprocess.run(
+        ["node", "-e", source], cwd=ROOT, check=True, capture_output=True, text=True
+    )
+    assert json.loads(result.stdout) == {"plays": 2, "pauses": 3}
+
+
 def test_exact_interval_table_all_starts_are_c4_and_duration_is_30_seconds() -> None:
     result = run_interval_node("""
 assert.equal(INTERVAL_BASIC_TRAINING_RULES.gameKey, "interval-basic-training");

@@ -1,10 +1,13 @@
 {% extends "base.html" %}
 
 {% block content %}
-<section class="wheel-game" data-wheel-of-woodchuck aria-labelledby="wheel-game-title">
+<section class="wheel-game" data-wheel-of-woodchuck data-arcade-soundtrack="wheel-of-woodchuck" aria-labelledby="wheel-game-title">
   <header class="arcade-room-header">
     <h1 id="wheel-game-title">Wheel of Woodchuck</h1>
-    <a class="btn btn-secondary" href="/arcade">Back to Arcade</a>
+    <div class="arcade-header-actions">
+      <button class="arcade-soundtrack-toggle" type="button" data-arcade-soundtrack-toggle aria-label="Mute Arcade soundtrack" title="Mute Arcade soundtrack">🔊</button>
+      <a class="btn btn-secondary" href="/arcade">Back to Arcade</a>
+    </div>
   </header>
 
   <div class="arcade-economy-status" aria-label="Arcade cost and balance">
@@ -66,4 +69,5 @@
 <script src="/static/js/arcade-economy.js?v=1"></script>
 <script src="/static/js/wheel-terms.js?v=1"></script>
 <script src="/static/js/wheel-of-woodchuck.js?v=4"></script>
+<script src="/static/js/arcade-soundtrack.js?v=4"></script>
 {% endblock %}

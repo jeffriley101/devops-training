@@ -115,7 +115,7 @@ def test_scale_keyboard_uses_gerry_four_through_shared_soundtrack() -> None:
     )
     assert 'data-arcade-soundtrack="scale-keyboard"' in TEMPLATE
     assert 'data-arcade-soundtrack-toggle' in TEMPLATE
-    assert '/static/js/arcade-soundtrack.js?v=3' in TEMPLATE
+    assert '/static/js/arcade-soundtrack.js?v=4' in TEMPLATE
     assert 'url: "/static/audio/arcade/gerry-4.wav?v=1"' in soundtrack
     assert (ROOT / "static" / "audio" / "arcade" / "gerry-4.wav").is_file()
     assert "root.WoodshedAudio.playPianoPitch(midiToFrequency(midi))" in GAME_JS
