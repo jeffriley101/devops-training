@@ -132,18 +132,8 @@
     const emblem = document.createElement("span");
     renderTeamEmblem(emblem, team.emblem || team.emblem_key);
     const name = document.createElement("span");
-    name.textContent = team.captain ? ` ${team.name} — ` : ` ${team.name}`;
-    const captain = document.createElement("span");
-    captain.className = "team-captain-label";
-    if (team.captain) {
-      captain.innerHTML = '<span aria-hidden="true">⭐</span> ';
-      captain.append(document.createTextNode(team.captain.display_name));
-    }
-    const accessible = document.createElement("span");
-    accessible.className = "sr-only";
-    accessible.textContent = " Team Captain";
-    captain.append(accessible);
-    container.replaceChildren(...(team.captain ? [emblem, name, captain] : [emblem, name]));
+    name.textContent = ` ${team.name}`;
+    container.replaceChildren(emblem, name);
   }
 
   function createShedTeamCard(team, { current = false, locked = false } = {}) {
@@ -167,19 +157,7 @@
     name.textContent = team.name;
     main.append(emblem, name);
 
-    const captain = document.createElement("span");
-    captain.className = "shed-team-choice-captain";
-    captain.append(document.createTextNode("Captain: "));
-    const star = document.createElement("span");
-    star.setAttribute("aria-hidden", "true");
-    star.textContent = "⭐ ";
-    if (team.captain) captain.append(star, document.createTextNode(team.captain.display_name));
-    const accessible = document.createElement("span");
-    accessible.className = "sr-only";
-    accessible.textContent = " Team Captain";
-    captain.append(accessible);
     content.append(main);
-    if (team.captain) content.append(captain);
     if (current) {
       const selected = document.createElement("span");
       selected.className = "shed-team-selected-status";
@@ -3611,6 +3589,13 @@
       return `🥇 ${medals.gold} · 🥈 ${medals.silver} · 🥉 ${medals.bronze}`;
     }
 
+    function formatCentralContestDate(value) {
+      return new Intl.DateTimeFormat(undefined, {
+        timeZone: "America/Chicago",
+        dateStyle: "medium",
+      }).format(new Date(value));
+    }
+
     function renderLifetimeLeaders(title, type) {
       const section = document.createElement("section");
       section.className = "hall-category-card";
@@ -3674,7 +3659,7 @@
         const title = document.createElement("strong");
         title.textContent = `${event.title} · ${event.metric_label}`;
         const period = document.createElement("p");
-        period.textContent = `${event.season.name} · ${new Date(event.starts_at).toLocaleDateString()} – ${new Date(event.ends_at).toLocaleDateString()}`;
+        period.textContent = `${event.season.name} · ${formatCentralContestDate(event.starts_at)} – ${formatCentralContestDate(event.ends_at)} CT`;
         const winners = document.createElement("ul");
         winners.className = "champion-achievements";
         event.winners.forEach((winner) => {

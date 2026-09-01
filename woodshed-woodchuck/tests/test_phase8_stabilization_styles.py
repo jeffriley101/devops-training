@@ -22,12 +22,11 @@ def test_authoritative_emblem_renderer_handles_shield_letter_and_emoji() -> None
     assert "emblem.textContent = current?.emblem?.value" not in shed_loader
 
 
-def test_captain_star_and_accessible_label_are_shared() -> None:
+def test_team_labels_and_choices_do_not_render_public_captain_identity() -> None:
     label = APP[APP.index("function appendTeamLabel"):APP.index("const questPool")]
-    assert 'aria-hidden="true">⭐' in label
-    assert 'accessible.textContent = " Team Captain"' in label
     assert "function createShedTeamCard" in label
-    assert 'star.textContent = "⭐ "' in label
+    assert "team.captain" not in label
+    assert "Team Captain" not in label
 
 
 def test_member_since_is_only_on_board_beneath_name() -> None:

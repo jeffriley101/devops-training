@@ -168,7 +168,7 @@ def dashboard_payload(
         for member_id, minutes in member_minutes.items()
     }
     meaningful = [minutes for minutes in capped.values() if minutes >= ACTIVE_MINUTES_THRESHOLD]
-    total_minutes = sum(capped.values())
+    total_minutes = sum(member_minutes.values())
     average_minutes = round(sum(meaningful) / len(meaningful), 1) if meaningful else 0.0
     tpr = calculate_team_practice_rating(
         list(member_minutes.values()), eligible_roster=len(roster)
@@ -372,7 +372,7 @@ def _contest_team_scores(
         active_count = len(active_values)
         roster_count = len(rosters[team_id])
         if contest.metric == "total_minutes":
-            score = float(sum(min(minutes, TEAM_MEMBER_MINUTES_CAP) for minutes in member_values))
+            score = float(sum(member_values))
         elif contest.metric == "average_minutes":
             score = round(sum(active_values) / active_count, 1) if active_count else 0.0
         else:

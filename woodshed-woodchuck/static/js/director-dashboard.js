@@ -8,6 +8,7 @@
   const emblemSelect = document.getElementById("director-team-emblem");
   let payload = null;
   let currentTeam = null;
+  const CENTRAL_TIME_ZONE = "America/Chicago";
 
   async function request(url, options = {}) {
     const response = await fetch(url, {credentials: "same-origin", ...options});
@@ -106,6 +107,14 @@
     return new Date(assumedUtc.getTime() - (represented - assumedUtc.getTime())).toISOString();
   }
 
+  function formatCentralDateTime(value) {
+    return `${new Intl.DateTimeFormat(undefined, {
+      timeZone: CENTRAL_TIME_ZONE,
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(new Date(value))} CT`;
+  }
+
   function renderContestSetup(data) {
     const metricSelect = document.getElementById("director-contest-metric");
     if (!metricSelect.options.length) {
@@ -136,7 +145,7 @@
       const title = document.createElement("h3");
       title.textContent = contest.title;
       const details = document.createElement("p");
-      details.textContent = `${contest.metric_label} · ${new Date(contest.starts_at).toLocaleString()} – ${new Date(contest.ends_at).toLocaleString()} · ${contest.status}`;
+      details.textContent = `${contest.metric_label} · ${formatCentralDateTime(contest.starts_at)} – ${formatCentralDateTime(contest.ends_at)} · ${contest.status}`;
       card.append(title, details);
       if (contest.description) {
         const description = document.createElement("p");
