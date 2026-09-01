@@ -449,6 +449,20 @@ def arcade_thirds(request: Request):
     )
 
 
+@app.get("/arcade/dressed-to-the-nines")
+def arcade_dressed_to_the_nines(request: Request):
+    with SessionLocal() as session:
+        if current_profile(request, session) is None:
+            return RedirectResponse(url="/login", status_code=303)
+    return _render(
+        request,
+        "dressed_to_the_nines.html",
+        title="Dressed to the Nines",
+        active_nav="store",
+        page_class="main-app-page arcade-screen",
+    )
+
+
 @app.get("/store")
 def store(request: Request):
     site_url = public_site_url(request)

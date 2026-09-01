@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="nines-game" data-nines-game aria-labelledby="nines-title">
+  <header class="arcade-room-header">
+    <h1 id="nines-title">Dressed to the Nines</h1>
+    <a class="btn btn-secondary" href="/arcade">Back to Arcade</a>
+  </header>
+
+  <div class="arcade-economy-status" aria-label="Arcade cost and balance">
+    <span>Balance 🌼 <output data-arcade-balance>—</output></span>
+    <span>1🌼 TO PLAY · WIN UP TO 5🌼</span>
+  </div>
+  <p class="arcade-economy-message" data-arcade-economy-message role="status" aria-live="polite"></p>
+
+  <div class="nines-active-area">
+    <div class="nines-status" aria-label="Game status">
+      <p>Score <strong id="nines-score">0</strong></p>
+      <p>Best <strong id="nines-best">0</strong></p>
+      <p>Time <strong id="nines-time">30</strong></p>
+    </div>
+
+    <section class="nines-card" aria-label="Current ninth question">
+      <strong id="nines-tonality">Ready</strong>
+      <span id="nines-question">Choose New Game</span>
+    </section>
+
+    <div class="nines-answer-grid" role="group" aria-label="Choose the note a ninth above">
+      {% for note in ("A", "B", "C", "D", "E", "F", "G") %}
+      <button class="btn btn-secondary" type="button" data-nines-answer="{{ note }}" disabled>{{ note }}</button>
+      {% endfor %}
+    </div>
+    <button id="nines-start" class="btn btn-primary nines-start" type="button">New Game</button>
+    <p id="nines-message" class="nines-message" role="status" aria-live="polite">Ready</p>
+  </div>
+
+  <section class="arcade-game-leaderboard" aria-labelledby="nines-leaderboard-title">
+    <h2 id="nines-leaderboard-title">Top 5</h2>
+    <ol data-arcade-leaderboard="dressed-to-the-nines"><li>Loading…</li></ol>
+  </section>
+</section>
+{% endblock %}
+
+{% block page_scripts %}
+<script src="/static/js/arcade-economy.js?v=1"></script>
+<script src="/static/js/dressed-to-the-nines.js?v=1"></script>
+{% endblock %}

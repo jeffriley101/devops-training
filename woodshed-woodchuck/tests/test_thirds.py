@@ -105,7 +105,7 @@ def play(client: TestClient, score: int):
 
 
 def test_sixth_cabinet_and_thirds_route_are_authenticated(thirds_database) -> None:
-    assert ARCADE.count('class="arcade-cabinet ') == 6
+    assert ARCADE.count('class="arcade-cabinet ') == 7
     assert 'class="arcade-cabinet arcade-cabinet-thirds"' in ARCADE
     assert 'href="/arcade/thirds"' in ARCADE
     assert 'data-arcade-personal-best="thirds"' in ARCADE
@@ -240,7 +240,7 @@ def test_thirds_top_five_keeps_privacy_safe_names_and_olympic_ties(
                for row in payload["leaderboard"])
 
 
-def test_arcade_frames_use_six_distinct_outer_identities_and_dark_inner_panel() -> None:
+def test_existing_arcade_frames_keep_distinct_outer_identities_and_dark_inner_panel() -> None:
     identities = {
         "plunge": "#a46a38",
         "blue": "#4298e4",
@@ -256,7 +256,7 @@ def test_arcade_frames_use_six_distinct_outer_identities_and_dark_inner_panel() 
     inner = CSS[CSS.index(".arcade-cabinet-link {"):]
     inner = inner[:inner.index("}")]
     assert "linear-gradient(180deg, #2a2d45, #131422)" in inner
-    assert ARCADE.count("1🌼 TO PLAY · WIN UP TO 5🌼") == 6
+    assert ARCADE.count("1🌼 TO PLAY · WIN UP TO 5🌼") == 7
     assert "arcade-cabinet-copy" not in ARCADE
 
 

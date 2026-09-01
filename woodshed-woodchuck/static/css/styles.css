@@ -5256,7 +5256,8 @@ select {
 .arcade-game,
 .wheel-game,
 .scale-keyboard-game,
-.thirds-game {
+.thirds-game,
+.nines-game {
   width: min(100%, 72rem);
   min-width: 0;
   margin: 0 auto;
@@ -5370,6 +5371,12 @@ select {
   --arcade-cabinet-frame-middle: #a82e38;
   --arcade-cabinet-frame-end: #5d1720;
   --arcade-cabinet-border: #8d202b;
+}
+.arcade-cabinet-nines {
+  --arcade-cabinet-frame-start: #a876d4;
+  --arcade-cabinet-frame-middle: #663b91;
+  --arcade-cabinet-frame-end: #351d50;
+  --arcade-cabinet-border: #7447a0;
 }
 
 .arcade-cabinet-link {
@@ -5541,6 +5548,22 @@ select {
   gap: 0.3rem;
   color: #fff;
   background: linear-gradient(145deg, #40151a, #17090d);
+}
+.arcade-nines-screen {
+  grid-template-columns: 1fr auto 1fr;
+  gap: 0.3rem;
+  color: #fff;
+  background: linear-gradient(145deg, #301741, #110819);
+}
+.arcade-nines-screen i,
+.arcade-nines-screen b { font-style: normal; }
+.arcade-nines-screen i { font-size: 2.2rem; font-weight: 950; }
+.arcade-nines-screen b {
+  padding: 0.3rem;
+  border: 2px solid #f4d35e;
+  border-radius: 50%;
+  color: #f4d35e;
+  font-size: 0.85rem;
 }
 .arcade-thirds-screen i,
 .arcade-thirds-screen b { font-style: normal; }
@@ -6043,10 +6066,12 @@ select {
 }
 .scale-keyboard-actions p { margin: 0; }
 
-.thirds-game {
+.thirds-game,
+.nines-game {
   width: min(100%, 48rem);
 }
-.thirds-active-area {
+.thirds-active-area,
+.nines-active-area {
   display: grid;
   width: min(100%, 32rem);
   margin: 0 auto;
@@ -6056,19 +6081,22 @@ select {
   border-radius: 0.9rem;
   background: rgba(5, 12, 20, 0.72);
 }
-.thirds-status {
+.thirds-status,
+.nines-status {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 0.45rem;
 }
-.thirds-status p {
+.thirds-status p,
+.nines-status p {
   margin: 0;
   padding: 0.45rem 0.2rem;
   border-radius: 0.45rem;
   background: #24243b;
   text-align: center;
 }
-.thirds-card {
+.thirds-card,
+.nines-card {
   display: grid;
   min-height: 7.5rem;
   place-content: center;
@@ -6083,6 +6111,20 @@ select {
 }
 .thirds-card strong { font-size: clamp(1.8rem, 7vw, 3rem); }
 .thirds-card span { font-weight: 950; letter-spacing: 0.1em; }
+.nines-card strong { font-size: clamp(1.65rem, 6vw, 2.7rem); }
+.nines-card span { font-weight: 950; letter-spacing: 0.07em; }
+.nines-answer-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(2.75rem, 1fr));
+  gap: 0.45rem;
+}
+.nines-answer-grid button {
+  min-width: 0;
+  min-height: 3.25rem;
+  padding: 0.45rem 0.2rem;
+  font-size: 1.2rem;
+  font-weight: 950;
+}
 .thirds-answer-form {
   display: grid;
   grid-template-columns: auto minmax(4rem, 1fr) auto;
@@ -6102,6 +6144,8 @@ select {
 }
 .thirds-start { width: 100%; }
 .thirds-message { min-height: 1.4em; margin: 0; text-align: center; }
+.nines-start { width: 100%; }
+.nines-message { min-height: 1.4em; margin: 0; text-align: center; }
 
 @media (max-width: 760px) {
   .arcade-cabinet-grid { grid-template-columns: 1fr; }
@@ -6130,7 +6174,8 @@ select {
   .arcade-game,
   .wheel-game,
   .scale-keyboard-game,
-  .thirds-game { padding: 0.75rem; }
+  .thirds-game,
+  .nines-game { padding: 0.75rem; }
   .arcade-game-status { gap: 0.35rem; }
   .arcade-game-status p { padding: 0.5rem 0.25rem; font-size: 0.88rem; }
   .arcade-game-actions .btn { width: 100%; }
@@ -6139,6 +6184,7 @@ select {
   .scale-keyboard-actions .btn { width: 100%; }
   .thirds-answer-form { grid-template-columns: 1fr 1fr; }
   .thirds-answer-form label { grid-column: 1 / -1; }
+  .nines-answer-grid { grid-template-columns: repeat(4, minmax(3rem, 1fr)); }
   .pristine-practice { padding: 0.8rem; }
   .pristine-practice-header { align-items: stretch; flex-direction: column; }
   .pristine-practice-header .btn,

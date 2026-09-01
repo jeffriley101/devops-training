@@ -39,6 +39,9 @@ SCALE_JS = (ROOT / "static" / "js" / "scale-keyboard.js").read_text(
     encoding="utf-8"
 )
 THIRDS_JS = (ROOT / "static" / "js" / "thirds.js").read_text(encoding="utf-8")
+NINES_JS = (ROOT / "static" / "js" / "dressed-to-the-nines.js").read_text(
+    encoding="utf-8"
+)
 
 @pytest.fixture()
 def economy_database(monkeypatch: pytest.MonkeyPatch):
@@ -110,6 +113,7 @@ def test_page_views_are_free_and_start_deducts_exactly_once(economy_database) ->
         "/arcade/wheel-of-woodchuck",
         "/arcade/scale-keyboard",
         "/arcade/thirds",
+        "/arcade/dressed-to-the-nines",
     ):
         assert client.get(path).status_code == 200
     assert client.get("/arcade/plays/status/scale-keyboard").json()["balance"] == 4
@@ -345,7 +349,7 @@ def test_service_start_and_complete_are_one_play_one_score(economy_database) -> 
     assert result["balance"] == 3
 
 
-def test_all_six_clients_use_shared_start_and_completion_contract() -> None:
+def test_all_seven_clients_use_shared_start_and_completion_contract() -> None:
     assert 'startPlay(gameKey)' in ARCADE_JS
     assert 'completePlay(\n          activePlayToken, score' in ARCADE_JS
     assert 'startPlay("plunge-burrow")' in PLUNGE_JS
@@ -356,6 +360,8 @@ def test_all_six_clients_use_shared_start_and_completion_contract() -> None:
     assert "completePlay(activePlayToken, game.score)" in SCALE_JS
     assert 'startPlay("thirds")' in THIRDS_JS
     assert "completePlay(token, game.score)" in THIRDS_JS
+    assert "startPlay(GAME_KEY)" in NINES_JS
+    assert "completePlay(token, game.score)" in NINES_JS
     assert 'body: JSON.stringify({ game_key: gameKey })' in ECONOMY_JS
     assert "encodeURIComponent(playToken)" in ECONOMY_JS
     assert "root.WWState.saveState(state, { sync: false })" in ECONOMY_JS
