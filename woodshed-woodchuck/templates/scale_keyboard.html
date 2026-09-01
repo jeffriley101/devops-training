@@ -1,10 +1,13 @@
 {% extends "base.html" %}
 
 {% block content %}
-<section class="scale-keyboard-game" data-scale-keyboard aria-labelledby="scale-keyboard-title">
+<section class="scale-keyboard-game" data-scale-keyboard data-arcade-soundtrack="scale-keyboard" aria-labelledby="scale-keyboard-title">
   <header class="arcade-room-header">
     <h1 id="scale-keyboard-title">Scale Keyboard</h1>
-    <a class="btn btn-secondary" href="/arcade">Back to Arcade</a>
+    <div class="arcade-header-actions">
+      <button class="arcade-soundtrack-toggle" type="button" data-arcade-soundtrack-toggle aria-label="Mute Arcade soundtrack" title="Mute Arcade soundtrack">🔊</button>
+      <a class="btn btn-secondary" href="/arcade">Back to Arcade</a>
+    </div>
   </header>
 
   <div class="arcade-economy-status" aria-label="Arcade cost and balance">
@@ -41,4 +44,5 @@
 <script src="/static/js/arcade-economy.js?v=1"></script>
 <script src="/static/js/scale-keyboard-data.js?v=2"></script>
 <script src="/static/js/scale-keyboard.js?v=3"></script>
+<script src="/static/js/arcade-soundtrack.js?v=3"></script>
 {% endblock %}

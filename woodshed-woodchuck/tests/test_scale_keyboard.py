@@ -109,6 +109,18 @@ def test_fifth_cabinet_and_authenticated_route(scale_database) -> None:
     assert 'data-scale-keyboard' in authenticated.text
 
 
+def test_scale_keyboard_uses_gerry_four_through_shared_soundtrack() -> None:
+    soundtrack = (ROOT / "static" / "js" / "arcade-soundtrack.js").read_text(
+        encoding="utf-8"
+    )
+    assert 'data-arcade-soundtrack="scale-keyboard"' in TEMPLATE
+    assert 'data-arcade-soundtrack-toggle' in TEMPLATE
+    assert '/static/js/arcade-soundtrack.js?v=3' in TEMPLATE
+    assert 'url: "/static/audio/arcade/gerry-4.wav?v=1"' in soundtrack
+    assert (ROOT / "static" / "audio" / "arcade" / "gerry-4.wav").is_file()
+    assert "root.WoodshedAudio.playPianoPitch(midiToFrequency(midi))" in GAME_JS
+
+
 def test_scale_pool_has_correct_common_major_pitch_sequences() -> None:
     result = run_scale_node("""
 assert.equal(SCALE_KEYBOARD_SCALES.length, 7);

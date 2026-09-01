@@ -14,6 +14,14 @@
       url: "/static/audio/arcade/trouble.mp3?v=1",
       restartDelayMs: 6000,
     },
+    "scale-keyboard": {
+      url: "/static/audio/arcade/gerry-4.wav?v=1",
+      loop: true,
+    },
+    "history-mystery": {
+      url: "/static/audio/arcade/thunderpants.mp3?v=1",
+      loop: true,
+    },
   });
   const RESTART_DELAY_MS = 6000;
   const soundtrackRoot = document.querySelector("[data-arcade-soundtrack]");

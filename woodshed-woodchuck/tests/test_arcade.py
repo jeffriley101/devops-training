@@ -21,6 +21,12 @@ STORE = (ROOT / "templates" / "store.html").read_text(encoding="utf-8")
 ARCADE = (ROOT / "templates" / "arcade.html").read_text(encoding="utf-8")
 GAME = (ROOT / "templates" / "arcade_game.html").read_text(encoding="utf-8")
 PLUNGE = (ROOT / "templates" / "plunge_burrow.html").read_text(encoding="utf-8")
+SCALE = (ROOT / "templates" / "scale_keyboard.html").read_text(encoding="utf-8")
+HISTORY = (ROOT / "templates" / "history_mystery.html").read_text(encoding="utf-8")
+WHEEL = (ROOT / "templates" / "wheel_of_woodchuck.html").read_text(encoding="utf-8")
+THIRDS = (ROOT / "templates" / "thirds.html").read_text(encoding="utf-8")
+NINES = (ROOT / "templates" / "dressed_to_the_nines.html").read_text(encoding="utf-8")
+INTERVAL = (ROOT / "templates" / "interval_basic_training.html").read_text(encoding="utf-8")
 CSS = (ROOT / "static" / "css" / "styles.css").read_text(encoding="utf-8")
 ARCADE_JS = (ROOT / "static" / "js" / "arcade.js").read_text(encoding="utf-8")
 APP_JS = (ROOT / "static" / "js" / "app.js").read_text(encoding="utf-8")
@@ -163,13 +169,17 @@ def test_arcade_room_renders_nine_touch_friendly_cabinets() -> None:
 
 def test_arcade_pages_route_game_specific_soundtracks() -> None:
     assert '/static/js/arcade-soundtrack.js' not in ARCADE
-    for template in (GAME, PLUNGE):
-        assert '/static/js/arcade-soundtrack.js?v=2' in template
+    for template in (GAME, PLUNGE, SCALE, HISTORY):
+        assert '/static/js/arcade-soundtrack.js?v=3' in template
     assert 'data-arcade-soundtrack="{{ arcade_game.key }}"' in GAME
     assert 'data-arcade-soundtrack="plunge-burrow"' in PLUNGE
+    assert 'data-arcade-soundtrack="scale-keyboard"' in SCALE
+    assert 'data-arcade-soundtrack="history-mystery"' in HISTORY
     assert (ROOT / "static" / "audio" / "arcade" / "jeremy-9.mp3").is_file()
     assert (ROOT / "static" / "audio" / "arcade" / "gerry-3.mp3").is_file()
     assert (ROOT / "static" / "audio" / "arcade" / "trouble.mp3").is_file()
+    assert (ROOT / "static" / "audio" / "arcade" / "gerry-4.wav").is_file()
+    assert (ROOT / "static" / "audio" / "arcade" / "thunderpants.mp3").is_file()
     assert '"plunge-burrow": {' in SOUNDTRACK_JS
     assert 'url: "/static/audio/arcade/jeremy-9.mp3?v=1"' in SOUNDTRACK_JS
     assert 'blue: {' in SOUNDTRACK_JS
@@ -177,6 +187,10 @@ def test_arcade_pages_route_game_specific_soundtracks() -> None:
     assert 'loop: true' in SOUNDTRACK_JS
     assert '"radio-tuner": {' in SOUNDTRACK_JS
     assert 'url: "/static/audio/arcade/trouble.mp3?v=1"' in SOUNDTRACK_JS
+    assert '"scale-keyboard": {' in SOUNDTRACK_JS
+    assert 'url: "/static/audio/arcade/gerry-4.wav?v=1"' in SOUNDTRACK_JS
+    assert '"history-mystery": {' in SOUNDTRACK_JS
+    assert 'url: "/static/audio/arcade/thunderpants.mp3?v=1"' in SOUNDTRACK_JS
     assert "const RESTART_DELAY_MS = 6000" in SOUNDTRACK_JS
     assert "audio.loop = soundtrack.loop === true" in SOUNDTRACK_JS
     assert 'if (!audio.loop) audio.addEventListener("ended", restartAfterPause)' in SOUNDTRACK_JS
@@ -188,12 +202,32 @@ def test_arcade_pages_route_game_specific_soundtracks() -> None:
 
 
 def test_arcade_games_use_the_shared_soundtrack_toggle() -> None:
-    for template in (GAME, PLUNGE):
+    for template in (GAME, PLUNGE, SCALE, HISTORY):
         assert 'data-arcade-soundtrack-toggle' in template
         assert 'class="arcade-soundtrack-toggle"' in template
     assert "window.WoodshedAudio.setEnabled" in SOUNDTRACK_JS
     assert "updateSoundtrackToggle" in SOUNDTRACK_JS
     assert "syncSoundtrackPreference" in SOUNDTRACK_JS
+    assert SOUNDTRACK_JS.count("new Audio(") == 1
+    assert 'window.addEventListener("pagehide", stopSoundtrack' in SOUNDTRACK_JS
+    assert "if (audio.paused && !audio.ended) playSoundtrack()" in SOUNDTRACK_JS
+    assert "audio.volume = Math.max(0, Math.min(1" in SOUNDTRACK_JS
+
+
+def test_unassigned_arcade_games_and_candidate_tracks_remain_unwired() -> None:
+    for template in (WHEEL, THIRDS, NINES, INTERVAL):
+        assert "data-arcade-soundtrack" not in template
+        assert "/static/js/arcade-soundtrack.js" not in template
+    for game_key in (
+        "wheel-of-woodchuck", "thirds", "dressed-to-the-nines",
+        "interval-basic-training",
+    ):
+        assert f'"{game_key}": {{' not in SOUNDTRACK_JS
+    for candidate in (
+        "sand-drop.mp3", "mudslide.mp3", "black-hole-rappelling.mp3",
+        "thunderpants26.mp3",
+    ):
+        assert candidate not in SOUNDTRACK_JS.lower()
 
 
 def test_arcade_landing_renders_personal_bests_from_existing_score_payload() -> None:
