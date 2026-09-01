@@ -12,14 +12,31 @@ from app.instruments import (
 
 ROOT = Path(__file__).resolve().parents[1]
 SAX_ART = "/static/img/shed-cabin-new.png"
-@pytest.mark.parametrize("instrument", INSTRUMENT_OPTIONS)
-def test_every_current_instrument_uses_the_safe_shared_artwork(instrument):
-    assert instrument in INSTRUMENT_OPTIONS
+INSTRUMENT_ART = {
+    "Flute": "/static/img/shed/instruments/flute.png",
+    "Clarinet": "/static/img/shed/instruments/clarinet.png",
+    "Trumpet": "/static/img/shed/instruments/trumpet.png",
+    "Trombone": "/static/img/shed/instruments/trombone.png",
+    "Percussion": "/static/img/shed/instruments/percussion.png",
+}
+
+
+@pytest.mark.parametrize(("instrument", "artwork"), INSTRUMENT_ART.items())
+def test_approved_instrument_artwork_resolves_from_the_authoritative_mapping(
+    instrument, artwork
+):
+    assert shed_artwork_url(instrument) == artwork
+    asset = ROOT / "static" / artwork.removeprefix("/static/")
+    assert asset.is_file() and asset.stat().st_size > 0
+
+
+@pytest.mark.parametrize("instrument", ["Saxophone", "Tuba", "Vocals"])
+def test_instruments_without_approved_artwork_keep_the_safe_fallback(instrument):
     assert shed_artwork_url(instrument) == SAX_ART
 
 
 def test_shed_artwork_matching_is_case_insensitive_and_has_safe_fallback():
-    assert shed_artwork_url("  tRuMpEt  ") == SAX_ART
+    assert shed_artwork_url("  tRuMpEt  ") == INSTRUMENT_ART["Trumpet"]
     assert shed_artwork_url("PIANO / KEYBOARD") == SAX_ART
     assert shed_artwork_url(None) == SAX_ART
     assert shed_artwork_url("") == SAX_ART
@@ -49,7 +66,10 @@ def test_selected_artwork_is_wired_only_to_the_shed():
 
 
 def test_future_artwork_mapping_has_one_authoritative_canonical_key_path():
-    assert SHED_ARTWORK_BY_INSTRUMENT_KEY == {}
+    assert SHED_ARTWORK_BY_INSTRUMENT_KEY == {
+        canonical_instrument_key(instrument): artwork
+        for instrument, artwork in INSTRUMENT_ART.items()
+    }
     assert {canonical_instrument_key(instrument) for instrument in INSTRUMENT_OPTIONS} == {
         "flute",
         "clarinet",

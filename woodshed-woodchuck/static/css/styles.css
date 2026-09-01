@@ -1151,6 +1151,24 @@ select {
   margin: 0.25rem 0 0;
 }
 
+.mum-artwork {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem;
+  overflow: hidden;
+}
+
+.mum-artwork img {
+  display: block;
+  width: 100%;
+  height: clamp(10rem, 28vw, 14rem);
+  border: 2px solid rgba(108, 76, 42, 0.38);
+  border-radius: 12px;
+  object-fit: cover;
+  object-position: center 24%;
+  pointer-events: none;
+}
+
 .mum-close-button {
   width: 2.5rem;
   height: 2.5rem;
@@ -3522,6 +3540,17 @@ select {
   margin: 0;
   overflow-wrap: anywhere;
 }
+.p-book-whistler-art {
+  display: block;
+  width: min(100%, 11rem);
+  max-height: 14rem;
+  margin: 0.65rem auto 0;
+  border: 2px solid #59636a;
+  border-radius: 12px;
+  object-fit: cover;
+  object-position: center 18%;
+  pointer-events: none;
+}
 .p-book-page .pirate-logbook {
   display: block;
   padding: 1rem;
@@ -5089,6 +5118,29 @@ select {
   margin: 0;
   padding: 0;
   border-top: 2px solid #46515a;
+}
+
+.bonus-challenge-john {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.bonus-challenge-john-art {
+  display: block;
+  width: min(100%, 18rem);
+  max-height: 18rem;
+  object-fit: contain;
+  object-position: center top;
+  pointer-events: none;
+}
+
+@media (max-width: 430px) {
+  .mum-artwork { gap: 0.45rem; }
+  .mum-artwork img { height: 9rem; }
+  .p-book-whistler-art { width: min(100%, 8.5rem); max-height: 10.5rem; }
+  .bonus-challenge-john-art { width: min(100%, 13rem); max-height: 13rem; }
 }
 
 .practice-room-emoji-control {
