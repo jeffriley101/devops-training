@@ -1,10 +1,13 @@
 {% extends "base.html" %}
 
 {% block content %}
-<section class="interval-game" data-interval-game aria-labelledby="interval-title">
+<section class="interval-game" data-interval-game data-arcade-soundtrack="interval-basic-training" aria-labelledby="interval-title">
   <header class="arcade-room-header">
     <h1 id="interval-title">Interval Basic Training</h1>
-    <a class="btn btn-secondary" href="/arcade">Back to Arcade</a>
+    <div class="arcade-header-actions">
+      <button class="arcade-soundtrack-toggle" type="button" data-arcade-soundtrack-toggle aria-label="Mute Arcade soundtrack" title="Mute Arcade soundtrack">🔊</button>
+      <a class="btn btn-secondary" href="/arcade">Back to Arcade</a>
+    </div>
   </header>
 
   <div class="arcade-economy-status" aria-label="Arcade cost and balance">
@@ -42,5 +45,6 @@
 
 {% block page_scripts %}
 <script src="/static/js/arcade-economy.js?v=1"></script>
-<script src="/static/js/interval-basic-training.js?v=1"></script>
+<script src="/static/js/interval-basic-training.js?v=2"></script>
+<script src="/static/js/arcade-soundtrack.js?v=4"></script>
 {% endblock %}

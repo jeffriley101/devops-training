@@ -119,6 +119,17 @@ def test_sixth_cabinet_and_thirds_route_are_authenticated(thirds_database) -> No
     assert 'data-thirds-game' in response.text
 
 
+def test_thirds_reuses_gerry_four_and_shared_arcade_mute() -> None:
+    soundtrack = (ROOT / "static" / "js" / "arcade-soundtrack.js").read_text(
+        encoding="utf-8"
+    )
+    assert 'data-arcade-soundtrack="thirds"' in TEMPLATE
+    assert 'data-arcade-soundtrack-toggle' in TEMPLATE
+    assert '/static/js/arcade-soundtrack.js?v=4' in TEMPLATE
+    assert 'thirds: {' in soundtrack
+    assert 'url: "/static/audio/arcade/gerry-4.wav?v=1"' in soundtrack
+
+
 def test_initial_cards_are_exact_and_all_answers_are_natural_notes() -> None:
     result = run_thirds_node("""
 assert.equal(THIRDS_RULES.gameSeconds, 30);

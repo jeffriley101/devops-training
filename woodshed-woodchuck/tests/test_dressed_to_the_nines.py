@@ -127,6 +127,16 @@ def test_seventh_cabinet_and_nines_route_are_authenticated(nines_database) -> No
     assert response.text.count("data-nines-answer=") == 7
 
 
+def test_nines_uses_sand_drop_and_shared_arcade_mute() -> None:
+    soundtrack = (ROOT / "static" / "js" / "arcade-soundtrack.js").read_text(
+        encoding="utf-8"
+    )
+    assert 'data-arcade-soundtrack="dressed-to-the-nines"' in TEMPLATE
+    assert 'data-arcade-soundtrack-toggle' in TEMPLATE
+    assert '/static/js/arcade-soundtrack.js?v=4' in TEMPLATE
+    assert 'url: "/static/audio/arcade/sand-drop.mp3?v=1"' in soundtrack
+
+
 def test_question_bank_is_exact_and_answers_are_natural_notes() -> None:
     result = run_nines_node("""
 assert.equal(NINES_RULES.gameKey, "dressed-to-the-nines");
