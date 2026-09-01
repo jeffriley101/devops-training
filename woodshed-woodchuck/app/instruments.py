@@ -57,7 +57,13 @@ INSTRUMENT_DEFINITIONS = (
 _DEFAULT_SHED_ARTWORK_URL = "/static/img/shed-cabin-new.png"
 # Add a supported-instrument key here only when its production cabin artwork
 # exists. Until then every instrument intentionally uses the approved cabin.
-SHED_ARTWORK_BY_INSTRUMENT_KEY: dict[str, str] = {}
+SHED_ARTWORK_BY_INSTRUMENT_KEY: dict[str, str] = {
+    "flute": "/static/img/shed/instruments/flute.png",
+    "clarinet": "/static/img/shed/instruments/clarinet.png",
+    "trumpet": "/static/img/shed/instruments/trumpet.png",
+    "trombone": "/static/img/shed/instruments/trombone.png",
+    "percussion": "/static/img/shed/instruments/percussion.png",
+}
 
 
 def shed_artwork_url(instrument_value: str | None) -> str:

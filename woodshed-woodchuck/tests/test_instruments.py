@@ -187,7 +187,7 @@ def test_hand_percussion_is_legacy_only_and_vocals_is_selectable() -> None:
 
     assert canonical_instrument_key("Hand Percussion") == "percussion"
     assert canonical_instrument_key("hand-percussion") == "percussion"
-    assert shed_artwork_url("Hand Percussion") == "/static/img/shed-cabin-new.png"
+    assert shed_artwork_url("Hand Percussion") == "/static/img/shed/instruments/percussion.png"
 
 
 def test_historical_hand_percussion_p_chart_remains_readable(
