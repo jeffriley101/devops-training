@@ -16,13 +16,16 @@ from sqlalchemy.pool import StaticPool
 from starlette.requests import Request
 
 from app import account_routes
+from app.contests import normalize_instrument
 from app.account_routes import InstrumentUpdate, change_profile_instrument
 from app.accounts import create_woodchuck_profile, update_profile_instrument
 from app.db import Base
 from app.instruments import (
     INSTRUMENT_DEFINITIONS,
     INSTRUMENT_OPTIONS,
+    canonical_instrument_key,
     normalize_supported_instrument,
+    shed_artwork_url,
 )
 from app.models import (
     PracticeChart,
@@ -164,6 +167,8 @@ def test_instrument_definitions_and_shed_assets_are_complete() -> None:
     assert definitions["Drum Major"]["fallback_symbol"] == "🫡"
     assert definitions["Color Guard"]["image_url"] is None
     assert definitions["Color Guard"]["fallback_symbol"] == "🚩"
+    assert definitions["Vocals"]["fallback_symbol"] == "🎤"
+    assert "Hand Percussion" not in definitions
 
     static_dir = Path(__file__).resolve().parents[1] / "static"
     for label in ("Clarinet", "Tuba"):
@@ -171,6 +176,46 @@ def test_instrument_definitions_and_shed_assets_are_complete() -> None:
         assert (static_dir / image_path).is_file()
     assert not (static_dir / "img/instruments/drum-major.svg").exists()
     assert not (static_dir / "img/instruments/color-guard.svg").exists()
+
+
+def test_hand_percussion_is_legacy_only_and_vocals_is_selectable() -> None:
+    assert "Vocals" in INSTRUMENT_OPTIONS
+    assert normalize_supported_instrument(" vocals ") == "Vocals"
+    assert "Hand Percussion" not in INSTRUMENT_OPTIONS
+    with pytest.raises(ValueError, match="supported instrument"):
+        normalize_supported_instrument("Hand Percussion")
+
+    assert canonical_instrument_key("Hand Percussion") == "percussion"
+    assert canonical_instrument_key("hand-percussion") == "percussion"
+    assert shed_artwork_url("Hand Percussion") == "/static/img/shed-cabin-new.png"
+
+
+def test_historical_hand_percussion_p_chart_remains_readable(
+    session: Session,
+) -> None:
+    profile = WoodchuckProfile(
+        woodchuck_id="WC-LEGACY-HAND-PERCUSSION",
+        display_name="Legacy Player",
+        pin_hash="legacy-pin-hash",
+        instrument="Hand Percussion",
+        level="Intermediate",
+        goal="Keep practicing",
+    )
+    session.add(profile)
+    session.commit()
+
+    created = create_practice_chart_verification_request(
+        session,
+        profile=profile,
+        verifier_id=None,
+        practice_date=date(2026, 8, 31),
+        minutes=20,
+    )
+
+    assert created.chart.instrument == "Hand Percussion"
+    assert normalize_instrument(created.chart.instrument) == (
+        "percussion", "Percussion",
+    )
 
 
 def test_shed_uses_dynamic_instrument_renderer_and_safe_profile_form() -> None:

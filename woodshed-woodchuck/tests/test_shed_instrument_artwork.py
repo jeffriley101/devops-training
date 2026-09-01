@@ -66,9 +66,13 @@ def test_future_artwork_mapping_has_one_authoritative_canonical_key_path():
         "piano-keyboard",
         "accordion",
         "harp",
-        "hand-percussion",
+        "vocals",
         "auxiliary-percussion",
     }
+    assert {
+        "flute", "clarinet", "saxophone", "trumpet", "trombone", "tuba",
+        "percussion", "vocals",
+    }.issubset({canonical_instrument_key(instrument) for instrument in INSTRUMENT_OPTIONS})
     source = (ROOT / "app/instruments.py").read_text(encoding="utf-8")
     assert "woodchuck-trumpet.png" not in source
     assert "woodchuck-drum.png" not in source

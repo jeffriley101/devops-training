@@ -50,7 +50,7 @@ INSTRUMENT_DEFINITIONS = (
     instrument("piano-keyboard", "Piano / Keyboard", "🎹", team_label="The Pianos & Keyboards"),
     instrument("accordion", "Accordion", "🪗", team_label="The Accordions"),
     instrument("harp", "Harp", "🪉", team_label="The Harps"),
-    instrument("hand-percussion", "Hand Percussion", "🪘", team_label="The Hand Percussion"),
+    instrument("vocals", "Vocals", "🎤", team_label="The Vocals"),
     instrument("auxiliary-percussion", "Auxiliary Percussion", "🪇", team_label="The Auxiliary Percussion"),
 )
 
@@ -77,6 +77,11 @@ INSTRUMENTS_BY_LABEL = {
 _PIANO_KEYBOARD_ALIASES = frozenset({
     "piano keyboard", "piano", "keyboard",
 })
+_LEGACY_CANONICAL_ALIASES = {
+    # Historical profiles and P-Charts keep their original display text, but
+    # retired Hand Percussion records aggregate with current Percussion data.
+    "hand percussion": "percussion",
+}
 
 
 def canonical_instrument_key(value: str) -> str:
@@ -86,6 +91,9 @@ def canonical_instrument_key(value: str) -> str:
     normalized = re.sub(r"[\s/_-]+", " ", value.strip().casefold())
     if normalized in _PIANO_KEYBOARD_ALIASES:
         return "piano-keyboard"
+    legacy_key = _LEGACY_CANONICAL_ALIASES.get(normalized)
+    if legacy_key is not None:
+        return legacy_key
     for definition in INSTRUMENT_DEFINITIONS:
         key = str(definition["key"])
         label = re.sub(
