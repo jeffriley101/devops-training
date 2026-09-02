@@ -6,7 +6,7 @@
 }(typeof window !== "undefined" ? window : globalThis, function () {
   "use strict";
 
-  const SILENCE_GRACE_MS = 10000;
+  const SILENCE_GRACE_MS = 8000;
   const SAFETY_PAUSE_MS = 60 * 60 * 1000;
 
   function createTimer(options) {
@@ -34,6 +34,7 @@
       return Object.freeze({
         playingMilliseconds: Math.floor(playingMs),
         playingSeconds: Math.floor(playingMs / 1000),
+        hasPlayed,
         soundDetected,
         status,
         paused: manualPaused || silencePaused || safetyPaused,
@@ -52,9 +53,16 @@
       }
       if (done) return snapshot();
 
-      if (lastSampleAt !== null && soundDetected && !manualPaused &&
+      if (lastSampleAt !== null && hasPlayed && !manualPaused &&
           !silencePaused && !safetyPaused) {
-        playingMs += Math.min(now - lastSampleAt, maxSampleGapMs);
+        let eligibleElapsed = Math.min(now - lastSampleAt, maxSampleGapMs);
+        if (!soundDetected && silenceStartedAt !== null) {
+          const graceEndsAt = silenceStartedAt + silenceGraceMs;
+          eligibleElapsed = Math.min(
+            eligibleElapsed, Math.max(0, graceEndsAt - lastSampleAt)
+          );
+        }
+        playingMs += eligibleElapsed;
       }
       lastSampleAt = now;
       soundDetected = Boolean(nextSoundDetected);

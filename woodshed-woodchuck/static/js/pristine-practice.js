@@ -2,7 +2,7 @@
   "use strict";
 
   const root = document.querySelector("[data-pristine-practice]");
-  if (!root || !window.PristinePracticeTimer) return;
+  if (!root || !window.PristinePracticeTimer || !window.PristinePracticeDetector) return;
 
   const timerOutput = root.querySelector("[data-pristine-time]");
   const statusOutput = root.querySelector("[data-pristine-status]");
@@ -19,11 +19,7 @@
   let samples = null;
   let frameId = null;
   let calibrationUntil = 0;
-  let noiseFloor = 0.008;
-  let smoothedRms = 0;
-  let activeFrames = 0;
-  let quietFrames = 0;
-  let detected = false;
+  let detector = window.PristinePracticeDetector.createDetector();
   let sessionStarted = false;
   let submissionKey = null;
   let submitting = false;
@@ -44,7 +40,7 @@
     if (state.status === "paused") return "Paused";
     if (state.status === "done") return "Done";
     if (state.silenceMilliseconds > 0) {
-      const remaining = Math.max(0, 10 - Math.floor(state.silenceMilliseconds / 1000));
+      const remaining = Math.max(0, 8 - Math.floor(state.silenceMilliseconds / 1000));
       return `Listening · pauses after ${remaining}s of silence`;
     }
     return "Listening";
@@ -69,31 +65,15 @@
     return Math.sqrt(energy / samples.length);
   }
 
-  function detectActivity(rms, calibrating) {
-    smoothedRms = (smoothedRms * 0.72) + (rms * 0.28);
-    if (calibrating) {
-      noiseFloor = (noiseFloor * 0.92) + (rms * 0.08);
-      return false;
-    }
-    const onThreshold = Math.max(0.014, (noiseFloor * 2.5) + 0.006);
-    const offThreshold = Math.max(0.01, onThreshold * 0.7);
-    if (smoothedRms >= onThreshold) {
-      activeFrames += 1;
-      quietFrames = 0;
-      if (activeFrames >= 2) detected = true;
-    } else if (smoothedRms < offThreshold) {
-      quietFrames += 1;
-      activeFrames = 0;
-      if (quietFrames >= 8) detected = false;
-      if (!detected) noiseFloor = (noiseFloor * 0.995) + (rms * 0.005);
-    }
-    return detected;
-  }
-
   function monitor(timestamp) {
     if (!analyser || !sessionStarted || timer.snapshot().done) return;
     const calibrating = timestamp < calibrationUntil;
-    const active = detectActivity(rmsValue(), calibrating);
+    const previousState = timer.snapshot();
+    const activity = detector.sample(rmsValue(), timestamp, {
+      calibrating,
+      canContinue: previousState.hasPlayed && !previousState.paused,
+    });
+    const active = activity.detected;
     microphoneOutput.textContent = calibrating
       ? "Calibrating to the room…"
       : active ? "Sound detected" : "Microphone ready";
@@ -115,11 +95,7 @@
   function resetSession() {
     timer = window.PristinePracticeTimer.createTimer();
     calibrationUntil = 0;
-    noiseFloor = 0.008;
-    smoothedRms = 0;
-    activeFrames = 0;
-    quietFrames = 0;
-    detected = false;
+    detector = window.PristinePracticeDetector.createDetector();
     sessionStarted = false;
     submissionKey = null;
     delete retryButton.dataset.retrySave;

@@ -79,6 +79,7 @@ def test_pristine_route_ui_and_microphone_privacy(pristine_database) -> None:
     store = (ROOT / "templates" / "store.html").read_text(encoding="utf-8")
     template = (ROOT / "templates" / "pristine_practice.html").read_text(encoding="utf-8")
     script = (ROOT / "static" / "js" / "pristine-practice.js").read_text(encoding="utf-8")
+    detector = (ROOT / "static" / "js" / "pristine-detector.js").read_text(encoding="utf-8")
 
     assert 'href="/practice/pristine" aria-label="Open Pristine Practice"' in store
     assert "Pristine P-Chart — Coming Soon" not in store
@@ -89,6 +90,13 @@ def test_pristine_route_ui_and_microphone_privacy(pristine_database) -> None:
     assert "data-pristine-retry" in template
     assert "getUserMedia" in script and "createAnalyser" in script
     assert "getFloatTimeDomainData" in script
+    assert "PristinePracticeDetector.createDetector" in script
+    assert "/static/js/pristine-timer.js?v=2" in template
+    assert "/static/js/pristine-detector.js?v=1" in template
+    assert "/static/js/pristine-practice.js?v=2" in template
+    assert "START_CONFIRMATION_MS = 180" in detector
+    assert "strongTransientThreshold" in detector
+    assert "adaptIdleFloor" in detector
     assert "MediaRecorder" not in script
     assert "FormData" not in script
     assert 'fetch("/practice-charts/pristine"' in script
@@ -378,23 +386,39 @@ const timer = api.createTimer({maxSampleGapMs: Infinity});
 assert.equal(timer.sample(0, true).playingSeconds, 0);
 assert.equal(timer.sample(5000, true).playingSeconds, 5);
 assert.equal(timer.sample(6000, false).playingSeconds, 6);
-let state = timer.sample(15000, false);
+let state = timer.sample(13000, false);
 assert.equal(state.status, 'listening');
 assert.equal(state.paused, false);
-assert.equal(state.playingSeconds, 6);
-state = timer.sample(16000, false);
+assert.equal(state.playingSeconds, 13);
+state = timer.sample(13999, false);
+assert.equal(state.status, 'listening');
+assert.equal(state.playingSeconds, 13);
+state = timer.sample(14000, false);
 assert.equal(state.status, 'paused');
-assert.equal(state.playingSeconds, 6);
+assert.equal(state.playingSeconds, 14);
 assert.equal(timer.sample(20000, true).status, 'playing');
-assert.equal(timer.sample(23000, true).playingSeconds, 9);
-assert.equal(timer.pause(24000).playingSeconds, 10);
-assert.equal(timer.sample(30000, true).playingSeconds, 10);
+assert.equal(timer.sample(23000, true).playingSeconds, 17);
+assert.equal(timer.pause(24000).playingSeconds, 18);
+assert.equal(timer.sample(30000, true).playingSeconds, 18);
 timer.resume(31000);
-assert.equal(timer.sample(32000, true).playingSeconds, 11);
+assert.equal(timer.sample(32000, true).playingSeconds, 19);
 const done = timer.finish(33000);
 assert.equal(done.status, 'done');
-assert.equal(done.playingSeconds, 12);
-assert.equal(timer.sample(50000, true).playingSeconds, 12);
+assert.equal(done.playingSeconds, 20);
+assert.equal(timer.sample(50000, true).playingSeconds, 20);
+
+const beforePlaying = api.createTimer({maxSampleGapMs: Infinity});
+beforePlaying.sample(0, false);
+state = beforePlaying.sample(8000, false);
+assert.equal(state.playingSeconds, 0);
+assert.equal(state.status, 'listening');
+
+const returnedInTime = api.createTimer({maxSampleGapMs: Infinity});
+returnedInTime.sample(0, true);
+returnedInTime.sample(1000, false);
+state = returnedInTime.sample(7999, true);
+assert.equal(state.status, 'playing');
+assert.equal(state.playingSeconds, 7);
 
 const safety = api.createTimer({safetyPauseMs: 60000, maxSampleGapMs: Infinity});
 safety.sample(0, true);
@@ -404,8 +428,58 @@ assert.equal(state.playingSeconds, 60);
 assert.equal(safety.sample(90000, true).playingSeconds, 60);
 safety.resume(90000);
 assert.equal(safety.sample(100000, true).playingSeconds, 70);
-assert.equal(api.SILENCE_GRACE_MS, 10000);
+assert.equal(api.SILENCE_GRACE_MS, 8000);
 assert.equal(api.SAFETY_PAUSE_MS, 3600000);
+"""
+    result = subprocess.run(
+        ["node", "-e", script],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_pristine_detector_uses_hysteresis_confirmation_and_idle_adaptation() -> None:
+    script = r"""
+const assert = require('node:assert/strict');
+const api = require('./static/js/pristine-detector.js');
+const detector = api.createDetector({smoothingAlpha: 1, initialNoiseFloor: 0.008});
+detector.sample(0.008, 0, {calibrating: true});
+let state = detector.sample(0.012, 100, {canContinue: false});
+assert.equal(state.detected, false);
+assert.ok(state.startThreshold > state.continueThreshold);
+assert.ok(state.continueThreshold > state.noiseFloor);
+
+// A weak bump is below the restart threshold, and strong sustained sound
+// needs the short confirmation window before it starts the timer.
+assert.equal(detector.sample(0.020, 200, {canContinue: false}).detected, false);
+assert.equal(detector.sample(0.030, 300, {canContinue: false}).detected, false);
+assert.equal(detector.sample(0.030, 470, {canContinue: false}).detected, false);
+state = detector.sample(0.030, 480, {canContinue: false});
+assert.equal(state.detected, true);
+
+// Once a real session is playing, a quieter sustained note may continue it.
+state = detector.sample(0.015, 500, {canContinue: true});
+assert.equal(state.detected, true);
+
+// After the silence grace has paused the timer, that same weak noise cannot
+// restart it. A clearly loud percussion-like transient can.
+assert.equal(detector.sample(0.015, 600, {canContinue: false}).detected, false);
+state = detector.sample(0.065, 700, {canContinue: false});
+assert.equal(state.detected, true);
+assert.equal(state.strongTransient, true);
+
+const idle = api.createDetector({smoothingAlpha: 1, initialNoiseFloor: 0.005});
+const startingFloor = idle.snapshot(false, false).noiseFloor;
+for (let index = 0; index < 180; index += 1) {
+  idle.sample(0.008, index * 20, {canContinue: false});
+}
+const adaptedFloor = idle.snapshot(false, false).noiseFloor;
+assert.ok(adaptedFloor > startingFloor);
+idle.sample(0.050, 4000, {canContinue: true});
+assert.equal(idle.snapshot(false, false).noiseFloor, adaptedFloor);
 """
     result = subprocess.run(
         ["node", "-e", script],
