@@ -1425,7 +1425,6 @@
     const stateClasses = [
       "tuner-state-neutral",
       "tuner-state-pristine",
-      "tuner-state-good",
       "tuner-state-flat",
       "tuner-state-sharp",
       "tuner-state-very-flat",
@@ -2028,6 +2027,16 @@
     function playClick(scheduledTime) {
       if (!audioContext) return;
 
+      const sound = window.WoodshedAudio;
+      const enabled = !sound || typeof sound.isEnabled !== "function" || sound.isEnabled();
+      const volume = sound && typeof sound.getVolume === "function"
+        ? sound.getVolume() : 0.35;
+      const peakGain = Math.min(0.6, Math.max(0, Number(volume) || 0) * 0.6);
+      if (!enabled || peakGain <= 0) {
+        showBeat(scheduledTime);
+        return;
+      }
+
       const oscillator = audioContext.createOscillator();
       const gain = audioContext.createGain();
       oscillator.type = "sine";
@@ -2035,7 +2044,7 @@
 
       gain.gain.setValueAtTime(0.0001, scheduledTime);
       gain.gain.exponentialRampToValueAtTime(
-        0.14,
+        peakGain,
         scheduledTime + 0.003
       );
       gain.gain.exponentialRampToValueAtTime(

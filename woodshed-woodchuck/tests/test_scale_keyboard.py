@@ -115,7 +115,7 @@ def test_scale_keyboard_uses_gerry_four_through_shared_soundtrack() -> None:
     )
     assert 'data-arcade-soundtrack="scale-keyboard"' in TEMPLATE
     assert 'data-arcade-soundtrack-toggle' in TEMPLATE
-    assert '/static/js/arcade-soundtrack.js?v=5' in TEMPLATE
+    assert '/static/js/arcade-soundtrack.js?v=6' in TEMPLATE
     assert 'url: "/static/audio/arcade/gerry-4.wav?v=1"' in soundtrack
     assert (ROOT / "static" / "audio" / "arcade" / "gerry-4.wav").is_file()
     assert "root.WoodshedAudio.playPianoPitch(midiToFrequency(midi))" in GAME_JS
@@ -276,11 +276,23 @@ def test_keyboard_markup_is_touch_friendly_and_feedback_uses_shared_audio() -> N
 
 def test_score_completion_uses_one_play_token_and_persistent_top_five() -> None:
     assert 'startPlay("scale-keyboard")' in GAME_JS
-    assert "completePlay(activePlayToken, game.score)" in GAME_JS
+    assert "const finalScore = game.snapshot().score" in GAME_JS
+    assert "scoreOutput.textContent = String(finalScore)" in GAME_JS
+    assert "completePlay(activePlayToken, finalScore)" in GAME_JS
     assert "if (finishPromise) return finishPromise" in GAME_JS
     assert 'WoodshedArcadeEconomy.loadScores("scale-keyboard")' in GAME_JS
     assert 'data-arcade-leaderboard="scale-keyboard"' in TEMPLATE
     assert "arcade_high_scores" not in DATA_JS
+
+
+def test_each_accepted_press_renders_the_accumulated_score() -> None:
+    press_handler = GAME_JS[GAME_JS.index("function pressKey"):GAME_JS.index("function finishRun")]
+    assert "const result = game.press(midi)" in press_handler
+    assert "scoreOutput.textContent = String(result.score)" in press_handler
+    assert "render();" in press_handler
+    renderer = GAME_JS[GAME_JS.index("function render()"):GAME_JS.index("function loadNextScale")]
+    assert "const state = game.snapshot()" in renderer
+    assert "scoreOutput.textContent = String(state.score)" in renderer
 
 
 def test_scale_personal_best_persists_through_play_api(scale_database) -> None:

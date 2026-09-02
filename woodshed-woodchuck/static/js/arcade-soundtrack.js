@@ -51,6 +51,7 @@
   let stopped = false;
   let runActive = false;
   let playbackActivated = false;
+  let soundtrackEnabled = true;
 
   audio.preload = "auto";
   audio.loop = soundtrack.loop === true;
@@ -58,13 +59,14 @@
   function preferences() {
     const sound = window.WoodshedAudio;
     return {
-      enabled: !sound || typeof sound.isEnabled !== "function" || sound.isEnabled(),
+      masterEnabled: !sound || typeof sound.isEnabled !== "function" || sound.isEnabled(),
       volume: sound && typeof sound.getVolume === "function" ? sound.getVolume() : 0.35,
     };
   }
 
   function applyPreferences() {
-    const { enabled, volume } = preferences();
+    const { masterEnabled, volume } = preferences();
+    const enabled = masterEnabled && soundtrackEnabled;
     audio.muted = !enabled;
     audio.volume = Math.max(0, Math.min(1, Number(volume) || 0));
     return enabled;
@@ -73,7 +75,7 @@
   function updateSoundtrackToggle() {
     const toggle = document.querySelector("[data-arcade-soundtrack-toggle]");
     if (!toggle) return;
-    const musicOn = preferences().enabled && playbackActivated;
+    const musicOn = preferences().masterEnabled && soundtrackEnabled && playbackActivated;
     const label = musicOn ? "Mute Arcade soundtrack" : "Turn on Arcade music";
     toggle.textContent = musicOn ? "🔊" : "🔇";
     toggle.setAttribute("aria-label", label);
@@ -130,6 +132,7 @@
 
   function stopSoundtrack() {
     stopped = true;
+    playbackActivated = false;
     clearRestart();
     clearResume();
     audio.pause();
@@ -145,6 +148,10 @@
 
   function activateFromGesture(event) {
     const target = event && event.target;
+    if (target && typeof target.closest === "function" && target.closest("a[href]")) {
+      stopSoundtrack();
+      return;
+    }
     if (target && typeof target.closest === "function" && target.closest("[data-arcade-soundtrack-toggle]")) {
       return;
     }
@@ -173,6 +180,7 @@
   document.addEventListener("keydown", activateFromGesture, true);
   document.addEventListener("woodshed:arcade-soundtrack-run-state", handleRunState);
   window.addEventListener("pagehide", stopSoundtrack, { once: true });
+  window.addEventListener("beforeunload", stopSoundtrack, { once: true });
 
   document.addEventListener("DOMContentLoaded", function () {
     const toggle = document.getElementById("sound-effects-enabled");
@@ -182,13 +190,13 @@
     if (volume) volume.addEventListener("input", syncSoundtrackPreference);
     if (soundtrackToggle) {
       soundtrackToggle.addEventListener("click", async function () {
-        if (!window.WoodshedAudio || typeof window.WoodshedAudio.setEnabled !== "function") return;
-        if (preferences().enabled && playbackActivated) {
-          window.WoodshedAudio.setEnabled(false);
+        if (soundtrackEnabled && playbackActivated) {
+          soundtrackEnabled = false;
+          audio.pause();
           syncSoundtrackPreference();
           return;
         }
-        if (!preferences().enabled) window.WoodshedAudio.setEnabled(true);
+        soundtrackEnabled = true;
         applyPreferences();
         await playSoundtrack();
         updateSoundtrackToggle();

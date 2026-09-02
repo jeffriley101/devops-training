@@ -133,7 +133,7 @@ def test_nines_uses_sand_drop_and_shared_arcade_mute() -> None:
     )
     assert 'data-arcade-soundtrack="dressed-to-the-nines"' in TEMPLATE
     assert 'data-arcade-soundtrack-toggle' in TEMPLATE
-    assert '/static/js/arcade-soundtrack.js?v=5' in TEMPLATE
+    assert '/static/js/arcade-soundtrack.js?v=6' in TEMPLATE
     assert '/static/js/dressed-to-the-nines.js?v=2' in TEMPLATE
     assert 'url: "/static/audio/arcade/sand-drop.mp3?v=1"' in soundtrack
 

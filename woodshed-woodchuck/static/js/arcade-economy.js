@@ -53,7 +53,27 @@
       }
 
       let payload = {};
-      try { payload = await response.json(); } catch (_error) { payload = {}; }
+      let responseParseFailed = false;
+      try { payload = await response.json(); } catch (_error) {
+        responseParseFailed = true;
+      }
+      if (response.ok && responseParseFailed) {
+        const details = {
+          gameKey: settings.gameKey,
+          operation: settings.operation,
+          endpoint: settings.endpoint,
+          attempt,
+          status: response.status,
+          receivedResponse: true,
+          responseParseFailed: true,
+        };
+        logRequestFailure(details);
+        if (attempt < attempts) {
+          await wait(RETRY_DELAY_MS);
+          continue;
+        }
+        throw new ArcadeRequestError(FRIENDLY_NETWORK_MESSAGE, details);
+      }
       if (!response.ok) {
         const details = {
           gameKey: settings.gameKey,

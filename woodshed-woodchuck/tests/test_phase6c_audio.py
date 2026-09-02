@@ -20,7 +20,7 @@ def test_tone_is_exactly_pinned_local_licensed_and_loaded_in_order():
     tone_pos = BASE.index('/static/vendor/tone/Tone.js?v=15.1.22')
     audio_pos = BASE.index('/static/js/audio.js?v=14')
     reaction_pos = BASE.index('/static/js/character-reaction.js?v=3')
-    app_pos = BASE.index('/static/js/app.js?v=78')
+    app_pos = BASE.index('/static/js/app.js?v=79')
     assert tone_pos < audio_pos < reaction_pos < app_pos
 
 
@@ -201,7 +201,7 @@ def test_visual_confirmation_and_metronome_implementation_remain_present():
     assert "AudioContext" in APP
     metronome = APP[APP.index("function wireMetronome"):APP.index("function wireBandCamp")]
     assert "AudioContext" in metronome
-    assert "WoodshedAudio" not in metronome
+    assert "WoodshedAudio" in metronome
     assert "Tone" not in metronome
     assert 'startButton.addEventListener("click", toggleMetronome)' in metronome
     assert "resumePromise = Promise.resolve(audioContext.resume())" in metronome
@@ -217,4 +217,7 @@ def test_visual_confirmation_and_metronome_implementation_remain_present():
     assert 'audioContext.state !== "running"' not in after_resume
     assert "if (isRunning && contextIsRunning)" in metronome
     assert "gain.connect(audioContext.destination)" in metronome
+    assert "const peakGain = Math.min(0.6" in metronome
+    assert "sound.isEnabled()" in metronome
+    assert "sound.getVolume()" in metronome
     assert 'document.addEventListener("visibilitychange"' in metronome

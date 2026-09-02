@@ -1068,10 +1068,6 @@ select {
   background: #1769d2;
 }
 
-.tuner-state-good {
-  background: #147a43;
-}
-
 .tuner-state-flat,
 .tuner-state-sharp {
   background: #a94f00;
@@ -3318,6 +3314,17 @@ select {
 .p-book-option-group .p-book-option-card + .p-book-option-detail {
   margin-top: 0;
 }
+.p-book-email-preset-manager {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+  gap: 0.65rem;
+  min-width: 0;
+}
+.p-book-email-preset-manager > summary,
+.p-book-email-preset-manager > p,
+.p-book-email-preset-manager > label { margin: 0; }
+.p-book-email-preset-manager > .btn { justify-self: start; }
 .p-book-warm-field,
 .p-book-work-field { border-radius: 12px; background: #fff1b8; }
 #p-book-form input:not([type="checkbox"]):not([type="radio"]),

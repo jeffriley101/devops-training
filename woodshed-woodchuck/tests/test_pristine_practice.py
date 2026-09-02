@@ -87,13 +87,16 @@ def test_pristine_route_ui_and_microphone_privacy(pristine_database) -> None:
     assert "Audio is\n    never saved or uploaded." in template
     assert "data-pristine-time" in template
     assert "data-pristine-done" in template
+    assert "Save &amp; Finish" in template
+    assert "Leave Without Saving" in template
+    assert "Leaving this screen will not save your practice." in template
     assert "data-pristine-retry" in template
     assert "getUserMedia" in script and "createAnalyser" in script
     assert "getFloatTimeDomainData" in script
     assert "PristinePracticeDetector.createDetector" in script
     assert "/static/js/pristine-timer.js?v=2" in template
     assert "/static/js/pristine-detector.js?v=1" in template
-    assert "/static/js/pristine-practice.js?v=2" in template
+    assert "/static/js/pristine-practice.js?v=3" in template
     assert "START_CONFIRMATION_MS = 180" in detector
     assert "strongTransientThreshold" in detector
     assert "adaptIdleFloor" in detector
@@ -102,6 +105,12 @@ def test_pristine_route_ui_and_microphone_privacy(pristine_database) -> None:
     assert 'fetch("/practice-charts/pristine"' in script
     assert "No playing was detected yet." in script
     assert "if (currentState.playingSeconds < 1)" in script
+    assert "function hasUnsavedPractice()" in script
+    assert "timer.snapshot().playingSeconds >= 1" in script
+    assert 'window.addEventListener("beforeunload"' in script
+    assert "event.returnValue = \"\"" in script
+    assert "if (approved) leaveApproved = true" in script
+    assert "window.location.assign(destination || \"/store\")" in script
 
     with TestClient(app) as client:
         response = client.get("/practice/pristine")

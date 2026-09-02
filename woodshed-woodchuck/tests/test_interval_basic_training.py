@@ -135,7 +135,7 @@ def test_interval_soundtrack_is_idle_only_and_uses_shared_mute_state() -> None:
     )
     assert 'data-arcade-soundtrack="interval-basic-training"' in TEMPLATE
     assert 'data-arcade-soundtrack-toggle' in TEMPLATE
-    assert '/static/js/arcade-soundtrack.js?v=5' in TEMPLATE
+    assert '/static/js/arcade-soundtrack.js?v=6' in TEMPLATE
     assert '/static/js/interval-basic-training.js?v=3' in TEMPLATE
     assert 'url: "/static/audio/arcade/black-hole-rappelling.mp3?v=1"' in soundtrack
     assert 'document.addEventListener("woodshed:arcade-soundtrack-run-state"' in soundtrack
@@ -174,9 +174,10 @@ global.window.addEventListener = function () {};
 global.window.setTimeout = function (callback) { callback(); return 1; };
 global.window.clearTimeout = function () {};
 let enabled = true;
+let masterChanges = 0;
 global.window.WoodshedAudio = {
   isEnabled() { return enabled; }, getVolume() { return 0.4; },
-  setEnabled(value) { enabled = value; },
+  setEnabled(value) { enabled = value; masterChanges += 1; },
 };
 let createdAudio;
 let playAttempts = 0;
@@ -219,7 +220,8 @@ emit("woodshed:arcade-soundtrack-run-state", {
 await Promise.resolve(); await Promise.resolve();
 assert.equal(playAttempts, 2);
 await toggleListeners.click();
-assert.equal(enabled, false);
+assert.equal(enabled, true);
+assert.equal(masterChanges, 0);
 assert.equal(toggle.textContent, "🔇");
 emit("woodshed:arcade-soundtrack-run-state", {
   detail: { gameKey: "interval-basic-training", active: true },
@@ -235,7 +237,7 @@ console.log(JSON.stringify({ plays: playAttempts, pauses: createdAudio.pauses })
     result = subprocess.run(
         ["node", "-e", source], cwd=ROOT, check=True, capture_output=True, text=True
     )
-    assert json.loads(result.stdout) == {"plays": 2, "pauses": 4}
+    assert json.loads(result.stdout) == {"plays": 2, "pauses": 5}
 
 
 def test_exact_interval_table_all_starts_are_c4_and_duration_is_30_seconds() -> None:

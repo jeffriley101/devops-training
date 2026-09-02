@@ -422,7 +422,7 @@ def test_all_nine_clients_use_shared_start_and_completion_contract() -> None:
     assert 'startPlay("wheel-of-woodchuck")' in WHEEL_JS
     assert "completePlay(\n      activePlayToken" in WHEEL_JS
     assert 'startPlay("scale-keyboard")' in SCALE_JS
-    assert "completePlay(activePlayToken, game.score)" in SCALE_JS
+    assert "completePlay(activePlayToken, finalScore)" in SCALE_JS
     assert 'startPlay("thirds")' in THIRDS_JS
     assert "completePlay(token, game.score)" in THIRDS_JS
     assert "startPlay(GAME_KEY)" in NINES_JS
@@ -476,6 +476,38 @@ require({str(ROOT / "static" / "js" / "arcade-economy.js")!r});
   assert.equal(started.play_token, "safe-play-token-1234567890");
   assert.equal(completed.payout, 1);
   assert.equal(calls, 4);
+}})().catch(function (error) {{ console.error(error); process.exit(1); }});
+'''
+    result = subprocess.run(
+        ["node", "-e", script], check=False, capture_output=True, text=True
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_shared_client_retries_an_unreadable_success_response() -> None:
+    script = f'''
+const assert = require("node:assert/strict");
+global.document = {{ querySelectorAll() {{ return []; }} }};
+global.setTimeout = function (callback) {{ callback(); return 1; }};
+global.console = {{ warn() {{}} }};
+let calls = 0;
+global.fetch = async function () {{
+  calls += 1;
+  if (calls === 1) {{
+    return {{ ok: true, status: 200, json: async () => {{ throw new SyntaxError("truncated"); }} }};
+  }}
+  return {{
+    ok: true,
+    status: 200,
+    json: async () => ({{ best_score: 1800, leaderboard: [{{ rank: 1, score: 1800 }}] }}),
+  }};
+}};
+require({str(ROOT / "static" / "js" / "arcade-economy.js")!r});
+(async function () {{
+  const payload = await global.WoodshedArcadeEconomy.loadScores("scale-keyboard");
+  assert.equal(calls, 2);
+  assert.equal(payload.best_score, 1800);
+  assert.equal(payload.leaderboard[0].score, 1800);
 }})().catch(function (error) {{ console.error(error); process.exit(1); }});
 '''
     result = subprocess.run(

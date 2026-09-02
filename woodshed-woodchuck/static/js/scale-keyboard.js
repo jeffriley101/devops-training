@@ -218,6 +218,7 @@
     if (betweenScales) return;
     const result = game.press(midi);
     if (!result.accepted) return;
+    scoreOutput.textContent = String(result.score);
     try {
       if (root.WoodshedAudio) {
         root.WoodshedAudio.playPianoPitch(midiToFrequency(midi));
@@ -245,9 +246,11 @@
     if (nextScaleTimer !== null) root.clearTimeout(nextScaleTimer);
     nextScaleTimer = null;
     game.status = "ended";
+    const finalScore = game.snapshot().score;
     render();
-    message.textContent = `Time! Final score: ${game.score}. Saving…`;
-    finishPromise = root.WoodshedArcadeEconomy.completePlay(activePlayToken, game.score)
+    scoreOutput.textContent = String(finalScore);
+    message.textContent = `Time! Final score: ${finalScore}. Saving…`;
+    finishPromise = root.WoodshedArcadeEconomy.completePlay(activePlayToken, finalScore)
       .then(function (payload) {
         renderLeaderboard(payload);
         message.textContent = payload.updated

@@ -112,5 +112,5 @@ def test_new_effects_share_preferences_master_and_metronome_isolation():
     assert "window.localStorage" in AUDIO
     assert "/account/state" not in AUDIO
     metronome = APP[APP.index("function wireMetronome"):APP.index("function wireBandCamp")]
-    assert "WoodshedAudio" not in metronome
+    assert "WoodshedAudio" in metronome
     assert "Tone" not in metronome

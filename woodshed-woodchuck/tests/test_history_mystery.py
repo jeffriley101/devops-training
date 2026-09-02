@@ -140,7 +140,7 @@ def test_history_mystery_uses_thunderpants_through_shared_soundtrack() -> None:
     )
     assert 'data-arcade-soundtrack="history-mystery"' in TEMPLATE
     assert 'data-arcade-soundtrack-toggle' in TEMPLATE
-    assert '/static/js/arcade-soundtrack.js?v=5' in TEMPLATE
+    assert '/static/js/arcade-soundtrack.js?v=6' in TEMPLATE
     assert 'url: "/static/audio/arcade/thunderpants.mp3?v=1"' in soundtrack
     assert (ROOT / "static" / "audio" / "arcade" / "thunderpants.mp3").is_file()
 

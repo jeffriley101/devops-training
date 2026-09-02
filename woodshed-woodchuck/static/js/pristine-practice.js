@@ -11,6 +11,7 @@
   const startButton = root.querySelector("[data-pristine-start]");
   const pauseButton = root.querySelector("[data-pristine-pause]");
   const doneButton = root.querySelector("[data-pristine-done]");
+  const leaveButton = root.querySelector("[data-pristine-leave]");
   const retryButton = root.querySelector("[data-pristine-retry]");
   let timer = window.PristinePracticeTimer.createTimer();
   let stream = null;
@@ -23,6 +24,30 @@
   let sessionStarted = false;
   let submissionKey = null;
   let submitting = false;
+  let saved = false;
+  let leaveApproved = false;
+
+  function hasUnsavedPractice() {
+    return !saved && timer.snapshot().playingSeconds >= 1;
+  }
+
+  function approveLeaving() {
+    if (!hasUnsavedPractice()) {
+      leaveApproved = true;
+      return true;
+    }
+    const approved = window.confirm(
+      "Your practice has not been saved. Leave without saving?"
+    );
+    if (approved) leaveApproved = true;
+    return approved;
+  }
+
+  function leaveWithoutSaving(destination) {
+    if (!approveLeaving()) return;
+    void stopMicrophone();
+    window.location.assign(destination || "/store");
+  }
 
   function formatTime(totalSeconds) {
     const seconds = Math.max(0, Math.floor(totalSeconds));
@@ -98,6 +123,8 @@
     detector = window.PristinePracticeDetector.createDetector();
     sessionStarted = false;
     submissionKey = null;
+    saved = false;
+    leaveApproved = false;
     delete retryButton.dataset.retrySave;
     retryButton.textContent = "Retry Microphone";
     feedback.textContent = "";
@@ -164,7 +191,7 @@
     if (!sessionStarted || submitting) return;
     const currentState = timer.snapshot();
     if (currentState.playingSeconds < 1) {
-      feedback.textContent = "No playing was detected yet. Play something before pressing Done.";
+      feedback.textContent = "No playing was detected yet. Play something before pressing Save & Finish.";
       render(currentState);
       return;
     }
@@ -190,6 +217,7 @@
       feedback.textContent = payload.created
         ? `Pristine P-Chart saved: ${formatTime(payload.chart.detected_playing_seconds)} detected playing time.`
         : "This Pristine P-Chart was already saved.";
+      saved = true;
       startButton.textContent = "Start Another Session";
       startButton.hidden = false;
     } catch (error) {
@@ -213,6 +241,19 @@
     render(state);
   });
   doneButton.addEventListener("click", finishSession);
+  leaveButton.addEventListener("click", function () { leaveWithoutSaving("/store"); });
+  document.addEventListener("click", function (event) {
+    const link = event.target && typeof event.target.closest === "function"
+      ? event.target.closest("a[href]") : null;
+    if (!link || !hasUnsavedPractice() || leaveApproved) return;
+    event.preventDefault();
+    leaveWithoutSaving(link.href);
+  });
+  window.addEventListener("beforeunload", function (event) {
+    if (!hasUnsavedPractice() || leaveApproved) return;
+    event.preventDefault();
+    event.returnValue = "";
+  });
   retryButton.addEventListener("click", async function () {
     if (retryButton.dataset.retrySave === "true") {
       retryButton.hidden = true;
