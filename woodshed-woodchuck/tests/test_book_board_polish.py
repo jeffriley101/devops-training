@@ -50,6 +50,25 @@ def test_book_option_groups_enclose_their_existing_controls() -> None:
     assert 'id="p-book-verifier" name="p-book-verifier" aria-label="Connected parent or mentor"' in BOOK
 
 
+def test_preset_email_manager_is_one_column_in_requested_order() -> None:
+    email = group("p-book-email-option-group")
+    ordered = (
+        "Manage preset email address",
+        'id="p-book-email-preset"',
+        "Do not submit your band director",
+        "Recipient Name",
+        'id="p-book-preset-name"',
+        "Recipient Email",
+        'id="p-book-preset-email"',
+        'id="p-book-save-preset"',
+    )
+    positions = [email.index(value) for value in ordered]
+    assert positions == sorted(positions)
+    assert 'class="mentor-card p-book-email-preset-manager"' in email
+    manager_css = CSS[CSS.index(".p-book-email-preset-manager {"):]
+    assert "grid-template-columns: minmax(0, 1fr)" in manager_css
+
+
 def test_closed_board_activity_body_is_removed_from_desktop_layout() -> None:
     closed_rule_start = CSS.index(".board-activity:not([open]) > .board-activity-body {")
     closed_rule = CSS[closed_rule_start:CSS.index("}", closed_rule_start)]

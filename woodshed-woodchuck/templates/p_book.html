@@ -105,13 +105,13 @@
       <span><strong>Email your Practice Book to someone that agrees to receive your emails</strong><small>Uncheck to prevent emailing anyone.</small></span>
     </label>
     <div class="p-book-option-detail">
-      <select id="p-book-email-preset" aria-label="Saved email recipients"><option value="">Choose a saved recipient</option></select>
-      <details class="mentor-card">
-        <summary>Manage preset email addresses</summary>
+      <details class="mentor-card p-book-email-preset-manager">
+        <summary>Manage preset email address</summary>
+        <select id="p-book-email-preset" aria-label="Saved email recipients"><option value="">Choose a saved recipient</option></select>
         <p class="body-copy">Do not submit your band director or teacher's email address without talking with them first, please!</p>
-        <label for="p-book-preset-name">Recipient name</label>
+        <label for="p-book-preset-name">Recipient Name</label>
         <input id="p-book-preset-name" maxlength="80" />
-        <label for="p-book-preset-email">Recipient email</label>
+        <label for="p-book-preset-email">Recipient Email</label>
         <input id="p-book-preset-email" type="email" maxlength="254" />
         <button id="p-book-save-preset" class="btn btn-secondary" type="button">Save Preset</button>
         <div id="p-book-preset-list" class="p-book-preset-list" aria-live="polite"></div>

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import subprocess
 
 import pytest
 from fastapi.testclient import TestClient
@@ -165,12 +166,13 @@ def test_arcade_room_renders_nine_touch_friendly_cabinets() -> None:
     mobile = CSS[CSS.index("@media (max-width: 760px)"):]
     assert ".arcade-cabinet-grid { grid-template-columns: 1fr; }" in mobile
     assert '/static/js/arcade.js?v=14' in ARCADE
+    assert '/static/js/arcade-economy.js?v=3' in ARCADE
 
 
 def test_arcade_pages_route_game_specific_soundtracks() -> None:
     assert '/static/js/arcade-soundtrack.js' not in ARCADE
     for template in (GAME, PLUNGE, SCALE, HISTORY, WHEEL, THIRDS, NINES, INTERVAL):
-        assert '/static/js/arcade-soundtrack.js?v=5' in template
+        assert '/static/js/arcade-soundtrack.js?v=6' in template
     assert 'data-arcade-soundtrack="{{ arcade_game.key }}"' in GAME
     assert 'data-arcade-soundtrack="plunge-burrow"' in PLUNGE
     assert 'data-arcade-soundtrack="scale-keyboard"' in SCALE
@@ -223,19 +225,23 @@ def test_arcade_games_use_the_shared_soundtrack_toggle() -> None:
         assert 'class="arcade-soundtrack-toggle"' in template
         assert 'aria-label="Turn on Arcade music"' in template
         assert '>🔇</button>' in template
-    assert "window.WoodshedAudio.setEnabled" in SOUNDTRACK_JS
+    assert "window.WoodshedAudio.setEnabled" not in SOUNDTRACK_JS
     assert "updateSoundtrackToggle" in SOUNDTRACK_JS
     assert "syncSoundtrackPreference" in SOUNDTRACK_JS
     assert SOUNDTRACK_JS.count("new Audio(") == 1
     assert 'window.addEventListener("pagehide", stopSoundtrack' in SOUNDTRACK_JS
+    assert 'window.addEventListener("beforeunload", stopSoundtrack' in SOUNDTRACK_JS
+    assert 'target.closest("a[href]")' in SOUNDTRACK_JS
     assert "if (!runActive && audio.paused && !audio.ended) void playSoundtrack()" in SOUNDTRACK_JS
     assert "audio.volume = Math.max(0, Math.min(1" in SOUNDTRACK_JS
 
 
-def test_soundtrack_toggle_uses_authoritative_woodshed_audio_state_only() -> None:
+def test_soundtrack_toggle_preserves_authoritative_master_audio_state() -> None:
     assert 'typeof sound.isEnabled !== "function" || sound.isEnabled()' in SOUNDTRACK_JS
     assert 'typeof sound.getVolume === "function" ? sound.getVolume()' in SOUNDTRACK_JS
-    assert "window.WoodshedAudio.setEnabled" in SOUNDTRACK_JS
+    assert "window.WoodshedAudio.setEnabled" not in SOUNDTRACK_JS
+    assert "let soundtrackEnabled = true" in SOUNDTRACK_JS
+    assert "masterEnabled && soundtrackEnabled" in SOUNDTRACK_JS
     assert "let playbackActivated = false" in SOUNDTRACK_JS
     assert 'const label = musicOn ? "Mute Arcade soundtrack" : "Turn on Arcade music"' in SOUNDTRACK_JS
     assert "playbackActivated = true" in SOUNDTRACK_JS
@@ -246,12 +252,76 @@ def test_soundtrack_toggle_uses_authoritative_woodshed_audio_state_only() -> Non
     assert "sessionStorage" not in SOUNDTRACK_JS
 
 
+def test_navigation_gesture_stops_soundtrack_before_page_exit() -> None:
+    source = r'''
+const assert = require("node:assert/strict");
+const listeners = new Map();
+const toggleListeners = {};
+const toggle = {
+  textContent: "", setAttribute() {},
+  addEventListener(type, callback) { toggleListeners[type] = callback; },
+};
+global.document = {
+  querySelector(selector) {
+    if (selector === "[data-arcade-soundtrack]") {
+      return { dataset: { arcadeSoundtrack: "scale-keyboard" } };
+    }
+    if (selector === "[data-arcade-soundtrack-toggle]") return toggle;
+    return null;
+  },
+  getElementById() { return null; },
+  addEventListener(type, callback) {
+    if (!listeners.has(type)) listeners.set(type, []);
+    listeners.get(type).push(callback);
+  },
+};
+global.window = global;
+global.window.addEventListener = function () {};
+global.window.setTimeout = function (callback) { callback(); return 1; };
+global.window.clearTimeout = function () {};
+global.window.WoodshedAudio = { isEnabled() { return true; }, getVolume() { return 0.4; } };
+let audio;
+let plays = 0;
+global.Audio = class {
+  constructor() { this.paused = true; this.ended = false; audio = this; }
+  addEventListener() {}
+  play() { plays += 1; this.paused = false; return Promise.resolve(); }
+  pause() { this.paused = true; }
+};
+require("./static/js/arcade-soundtrack.js");
+function emit(type, event = {}) {
+  for (const callback of listeners.get(type) || []) callback(event);
+}
+(async function () {
+  emit("DOMContentLoaded");
+  await toggleListeners.click();
+  assert.equal(plays, 1);
+  emit("pointerdown", {
+    target: { closest(selector) { return selector === "a[href]" ? {} : null; } },
+  });
+  assert.equal(audio.paused, true);
+  emit("woodshed:arcade-soundtrack-run-state", {
+    detail: { gameKey: "scale-keyboard", active: false },
+  });
+  await Promise.resolve();
+  assert.equal(plays, 1);
+}()).catch(function (error) { console.error(error); process.exit(1); });
+'''
+    result = subprocess.run(
+        ["node", "-e", source], cwd=ROOT, check=False, capture_output=True, text=True
+    )
+    assert result.returncode == 0, result.stderr
+
+
 def test_arcade_landing_renders_personal_bests_from_existing_score_payload() -> None:
     room = ARCADE_JS[ARCADE_JS.index("function wireArcadeRoom"):ARCADE_JS.index("function wireArcadeGame")]
     assert "function renderPersonalBest" in ARCADE_JS
     assert "data-arcade-personal-best" in ARCADE_JS
     assert "renderPersonalBest(gameKey, payload.best_score)" in room
     assert "data-arcade-personal-best" in room
+    assert ARCADE.index('/static/js/arcade-economy.js?v=3') < ARCADE.index('/static/js/arcade.js?v=14')
+    assert ARCADE.count('data-arcade-leaderboard=') == 8
+    assert 'data-arcade-leaderboard="history-mystery"' not in ARCADE
 
 
 def test_arcade_leaderboards_render_each_olympic_rank_once() -> None:

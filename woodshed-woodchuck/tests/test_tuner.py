@@ -25,23 +25,19 @@ def run_tuner_javascript(source: str):
 def test_tuning_classification_boundaries():
     actual = run_tuner_javascript(
         """
-const cents = [0, -0.5, 0.5, -0.5001, 0.5001, -3, 3, -3.0001, 3.0001, -18, 18, -18.0001, 18.0001];
+const cents = [-21, -20, -2, -1.999, 0, 1.999, 2, 20, 21];
 console.log(JSON.stringify(cents.map((value) => WWTuner.classifyCents(value))));
 """
     )
     assert actual == [
-        "PRISTINE",
-        "PRISTINE",
-        "PRISTINE",
-        "GOOD",
-        "GOOD",
-        "GOOD",
-        "GOOD",
-        "FLAT",
-        "SHARP",
-        "FLAT",
-        "SHARP",
         "VERY FLAT",
+        "FLAT",
+        "FLAT",
+        "PRISTINE",
+        "PRISTINE",
+        "PRISTINE",
+        "SHARP",
+        "SHARP",
         "VERY SHARP",
     ]
 
@@ -80,8 +76,10 @@ def test_tuner_is_full_screen_minimal_and_uses_locked_state_colors():
     assert "position: fixed" in tuner_css
     assert ".tuner-state-flat,\n.tuner-state-sharp" in CSS
     assert ".tuner-state-very-flat,\n.tuner-state-very-sharp" in CSS
-    assert "/static/js/tuner.js?v=1" in BASE
-    assert BASE.index("/static/js/tuner.js?v=1") < BASE.index("/static/js/app.js?v=78")
+    assert ".tuner-state-good" not in CSS
+    assert "background: #1769d2" in CSS[CSS.index(".tuner-state-pristine"):]
+    assert "/static/js/tuner.js?v=2" in BASE
+    assert BASE.index("/static/js/tuner.js?v=2") < BASE.index("/static/js/app.js?v=79")
 
 
 def test_tuner_requests_microphone_smooths_results_and_releases_resources():

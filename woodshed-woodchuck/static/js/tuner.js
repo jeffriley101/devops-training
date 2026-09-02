@@ -6,12 +6,11 @@
   function classifyCents(cents) {
     const value = Number(cents);
     if (!Number.isFinite(value)) return "NEUTRAL";
-    const distance = Math.abs(value);
-    if (distance <= 0.5) return "PRISTINE";
-    if (distance <= 3) return "GOOD";
-    if (value < -18) return "VERY FLAT";
-    if (value > 18) return "VERY SHARP";
-    return value < 0 ? "FLAT" : "SHARP";
+    if (value < -20) return "VERY FLAT";
+    if (value <= -2) return "FLAT";
+    if (value < 2) return "PRISTINE";
+    if (value <= 20) return "SHARP";
+    return "VERY SHARP";
   }
 
   function frequencyToNote(frequency) {

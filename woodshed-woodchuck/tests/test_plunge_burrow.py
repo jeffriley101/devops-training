@@ -66,7 +66,7 @@ def test_plunge_uses_the_shared_arcade_soundtrack() -> None:
     assert "Soundtrack coming soon" not in TEMPLATE
     assert 'id="plunge-music-enabled"' not in TEMPLATE
     assert 'id="plunge-music-volume"' not in TEMPLATE
-    assert '/static/js/arcade-soundtrack.js?v=5' in TEMPLATE
+    assert '/static/js/arcade-soundtrack.js?v=6' in TEMPLATE
     assert 'data-arcade-soundtrack="plunge-burrow"' in TEMPLATE
     assert "SOUNDTRACK_URL" not in GAME_JS
     assert "startMusic" not in GAME_JS
