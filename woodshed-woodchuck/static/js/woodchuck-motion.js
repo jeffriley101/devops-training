@@ -1,6 +1,8 @@
 (function (root) {
   "use strict";
 
+  const WOODCHUCK_MOTION_IMAGE = "/static/img/woodchuck-home.png";
+
   function restartAnimation(element, className) {
     if (!element) return;
     element.classList.remove(className);
@@ -17,6 +19,12 @@
     const layer = root.document && root.document.querySelector(".woodshed-character-layer");
     const art = layer && layer.querySelector(".woodshed-character-art");
     if (!layer || !art) return false;
+
+    // The production SHED cabin is currently one flattened background image.
+    // Reuse the existing standalone Woodchuck art for motion so the room and
+    // placed decorations never shift with him.
+    art.src = WOODCHUCK_MOTION_IMAGE;
+    art.alt = "Woodchuck";
 
     layer.classList.add("ww-motion-ready");
     layer.setAttribute("role", "button");
