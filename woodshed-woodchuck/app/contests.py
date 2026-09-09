@@ -2234,7 +2234,10 @@ def hall_of_champions_payload(
             continue
 
         _increment_medal(champion["medals"], result.medal)
-        _increment_medal(champion["by_division"][result.division], result.medal)
+        division_medals = champion["by_division"].setdefault(
+            result.division, _empty_medal_counts()
+        )
+        _increment_medal(division_medals, result.medal)
         champion["divisions"].add(result.division)
         _record_champion_achievement(
             champion,
