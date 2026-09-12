@@ -39,6 +39,28 @@ VERIFIER_ROLES = frozenset(
 ACTIVE_CONNECTION_STATUSES = ("pending", "accepted")
 
 
+def accepted_active_verifier_students(session: Session, *, verifier_id: int) -> list[dict]:
+    """Safe connection roster; pending capacity reservations are not access grants."""
+    return [dict(row) for row in session.execute(select(
+        StudentVerifierConnection.id.label("connection_id"),
+        StudentVerifierConnection.role,
+        WoodchuckProfile.id.label("profile_id"), WoodchuckProfile.display_name,
+        WoodchuckProfile.instrument, WoodchuckProfile.level,
+    ).join(WoodchuckProfile, WoodchuckProfile.id == StudentVerifierConnection.profile_id).where(
+        StudentVerifierConnection.verifier_id == verifier_id,
+        StudentVerifierConnection.status == "accepted", WoodchuckProfile.status == "active",
+    ).order_by(WoodchuckProfile.display_name, WoodchuckProfile.id)).mappings()]
+
+
+def select_verifier_student(roster: list[dict], connection_id: int | None) -> dict | None:
+    if connection_id is None:
+        return roster[0] if roster else None
+    for student in roster:
+        if student["connection_id"] == connection_id:
+            return student
+    raise ValueError("Connected student not found.")
+
+
 def band_director_students(
     session: Session, *, verifier_id: int
 ) -> list[dict[str, str | int]]:

@@ -25,7 +25,7 @@ from .verifier_routes import (
 )
 from .practice_chart_routes import router as practice_chart_router
 from .band_director_dashboard import dashboard_metrics
-from .verifiers import band_director_students
+from .trusted_verifier_dashboard import verifier_dashboard_snapshot
 from .contests import router as contest_router
 from .contest_admin import router as contest_admin_router
 from .director_dashboard import router as director_router
@@ -209,7 +209,7 @@ def trusted_verifier_login_page(request: Request):
 
 
 @app.get("/trusted-verifiers/dashboard")
-def trusted_verifier_dashboard_page(request: Request):
+def trusted_verifier_dashboard_page(request: Request, connection_id: int | None = None):
     with SessionLocal() as session:
         verifier = current_verifier(request, session)
 
@@ -219,15 +219,18 @@ def trusted_verifier_dashboard_page(request: Request):
                 status_code=303,
             )
 
-        has_director_students = bool(band_director_students(session, verifier_id=verifier.id))
-
-    return _render(
-        request,
-        "trusted_verifier_dashboard.html",
-        title="Trusted Verifier Dashboard",
-        active_nav=None,
-        has_director_students=has_director_students,
-    )
+        try:
+            snapshot = verifier_dashboard_snapshot(session, verifier_id=verifier.id,
+                                                   connection_id=connection_id)
+        except ValueError as error:
+            raise HTTPException(status_code=404, detail=str(error),
+                                headers={"Cache-Control": "no-store"}) from error
+        return templates.TemplateResponse(
+            request=request, name="trusted_verifier_dashboard.html",
+            context={"title": "Trusted Verifier Dashboard", "verifier_name": verifier.display_name,
+                     "verifier_email": verifier.email, **snapshot},
+            headers={"Cache-Control": "no-store"},
+        )
 
 
 @app.get("/band-director/dashboard")

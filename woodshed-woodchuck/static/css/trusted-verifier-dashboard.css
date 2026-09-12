@@ -1,0 +1,55 @@
+.verifier-dashboard { width: 100%; max-width: 850px; box-sizing: border-box; margin-inline: auto; padding: clamp(.75rem, 3vw, 1.75rem); border-radius: 1.25rem; background: #f5ecd8; color: #483725; overflow-wrap: anywhere; }
+.verifier-dashboard h2, .verifier-dashboard h3, .verifier-dashboard h4 { margin: 0 0 .75rem; }
+.verifier-dashboard h3 { font-size: 1.2rem; }
+.verifier-dashboard p { margin: .5rem 0; }
+.verifier-account { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .75rem; padding: .75rem .25rem; font-size: .85rem; color: #6b604f; }
+.verifier-account a { color: #435e40; }
+.verifier-identity { padding: 1.5rem .25rem 1rem; }
+.verifier-identity h2 { font-size: clamp(1.8rem, 5vw, 2.5rem); margin-top: .5rem; }
+.verifier-eyebrow { text-transform: uppercase; letter-spacing: .12em; font-size: .75rem; font-weight: 700; color: #526847; }
+.verifier-muted { color: #6b604f; font-size: .9rem; line-height: 1.5; }
+.verifier-panel, .verifier-rating-card { padding: 1.5rem; margin-block: 1rem; border: 1px solid #d8cbb3; border-radius: 1rem; background: #fffaf0; }
+.verifier-rating-card { background: #edf2e3; border-color: #c5d1b5; }
+.verifier-rating { display: flex; align-items: center; flex-wrap: wrap; gap: 1.5rem; color: #31533a; }
+.verifier-rating > strong { font-size: clamp(3.8rem, 12vw, 5rem); line-height: 1.15; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+.verifier-trend { display: flex; align-items: center; gap: .5rem; font-weight: 600; }
+.verifier-trend > span:first-child { font-size: 2.2rem; }
+.verifier-trend-up { color: #28713c; }
+.verifier-trend-down { color: #a4372c; }
+.verifier-trend-steady { color: #69655f; }
+.verifier-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin: .75rem 0 0; }
+.verifier-metrics dt { font-size: .85rem; line-height: 1.4; color: #6b604f; }
+.verifier-metrics dd { margin: .3rem 0 0; font-size: 1.5rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.verifier-week-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.verifier-week-metrics dd { font-size: 2rem; color: #31533a; }
+.verifier-week-metrics small { font-size: .8rem; font-weight: 400; }
+.verifier-quality { border-top: 1px solid #e1d7c6; margin-top: 1.25rem; padding-top: 1rem; }
+.verifier-quality h4 { font-size: .9rem; font-weight: 600; }
+.verifier-quality dd, .verifier-all-time dd { font-size: 1.2rem; }
+.verifier-all-time { padding: .75rem 1.5rem; margin-block: 1rem; }
+.verifier-all-time h3 { font-size: 1rem; }
+.verifier-season h4 { color: #31533a; }
+.verifier-season strong { font-size: 1.5rem; }
+.verifier-season-metrics, .verifier-all-time-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.verifier-team { border-top: 1px solid #e1d7c6; padding-top: .75rem; }
+.verifier-achievements { list-style: none; padding: 0; margin: 0; display: grid; gap: .75rem; }
+.verifier-achievements li { display: flex; align-items: center; gap: .8rem; padding: .65rem; border-radius: .6rem; background: #f7efda; }
+.verifier-achievement-icon { font-size: 1.8rem; flex-shrink: 0; }
+.verifier-achievements time { display: block; margin-top: .2rem; color: #6b604f; font-size: .8rem; }
+.verifier-review-notice { padding: .75rem 1rem; border-radius: .6rem; background: #f1e6c9; }
+.verifier-review-notice a { color: #4b572f; font-weight: 600; }
+.verifier-reviews { background: #faf6ed; scroll-margin-top: 1rem; }
+.verifier-reviews[data-pending="true"] { background: #fffaf0; border-color: #9eaf88; }
+.verifier-reviews .btn, .verifier-account .btn, #verifier-connection { min-height: 44px; }
+.verifier-reviews textarea { width: 100%; min-width: 0; box-sizing: border-box; }
+#verifier-student-selector { display: grid; gap: .35rem; max-width: 26rem; margin-block: .75rem; }
+#verifier-student-selector label { font-size: .85rem; }
+#verifier-connection { width: 100%; max-width: 100%; min-width: 0; background: #fffaf0; color: #483725; }
+@media (max-width: 420px) {
+  .verifier-panel, .verifier-rating-card { padding: 1rem; }
+  .verifier-all-time { padding: .75rem 1rem; }
+  .verifier-metrics { gap: .65rem; }
+  .verifier-week-metrics dd { font-size: 1.7rem; }
+  .verifier-season-metrics, .verifier-all-time-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .verifier-reviews .button-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

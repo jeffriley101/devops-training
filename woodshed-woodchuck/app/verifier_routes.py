@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 import logging
 
-from fastapi import APIRouter, Form, HTTPException, Request
+from fastapi import APIRouter, Form, HTTPException, Request, Response
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -23,6 +23,8 @@ from .practice_charts import (
     respond_to_practice_chart_verification,
 )
 from .verifiers import (
+    accepted_active_verifier_students,
+    select_verifier_student,
     VERIFIER_ROLES,
     accept_trusted_verifier_invitation,
     authenticate_trusted_verifier,
@@ -597,7 +599,8 @@ def pending_practice_chart_payload(
 
 
 @router.get("/practice-charts")
-def list_verifier_practice_charts(request: Request):
+def list_verifier_practice_charts(request: Request, response: Response, connection_id: int | None = None):
+    response.headers["Cache-Control"] = "no-store"
     with SessionLocal() as session:
         verifier = current_verifier(request, session)
 
@@ -606,6 +609,17 @@ def list_verifier_practice_charts(request: Request):
                 status_code=401,
                 detail="Trusted-verifier sign-in is required.",
             )
+
+        selected_profile_id = None
+        if connection_id is not None:
+            try:
+                student = select_verifier_student(
+                    accepted_active_verifier_students(session, verifier_id=verifier.id), connection_id,
+                )
+            except ValueError as error:
+                raise HTTPException(status_code=404, detail=str(error),
+                                    headers={"Cache-Control": "no-store"}) from error
+            selected_profile_id = student["profile_id"]
 
         rows = session.execute(
             select(
@@ -635,6 +649,7 @@ def list_verifier_practice_charts(request: Request):
                 == verifier.id,
                 StudentVerifierConnection.status == "accepted",
                 WoodchuckProfile.status == "active",
+                PracticeChart.profile_id == selected_profile_id if selected_profile_id is not None else True,
             )
             .order_by(
                 PracticeChartVerification.requested_at.asc(),

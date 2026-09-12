@@ -11,14 +11,6 @@
     return;
   }
 
-  const title = document.querySelector(
-    "#verifier-dashboard-title"
-  );
-
-  const email = document.querySelector(
-    "#verifier-dashboard-email"
-  );
-
   const errorText = document.querySelector(
     "#verifier-dashboard-error"
   );
@@ -36,13 +28,6 @@
       element.removeChild(element.firstChild);
     }
   };
-
-  const roleLabel = (role) =>
-    String(role || "")
-      .replaceAll("_", " ")
-      .replace(/\b\w/g, (character) =>
-        character.toUpperCase()
-      );
 
   const addText = (
     parent,
@@ -65,35 +50,6 @@
     window.location.assign(
       "/trusted-verifiers/login"
     );
-  };
-
-  const renderStudent = (connection) => {
-    const student = connection.student;
-    const card = document.createElement("article");
-
-    card.className = "mentor-card";
-
-    addText(card, "h3", student.display_name);
-
-    addText(
-      card,
-      "p",
-      `${student.instrument} · ${student.level}`
-    );
-
-    addText(
-      card,
-      "p",
-      `Practice goal: ${student.goal}`
-    );
-
-    addText(
-      card,
-      "p",
-      `Your role: ${roleLabel(connection.role)}`
-    );
-
-    studentList.appendChild(card);
   };
 
   const respondToPracticeChart = async (
@@ -151,6 +107,7 @@
       const completedButton = decision === "approved" ? buttons[0] : buttons[1];
       if (completedButton) completedButton.classList.add("is-confirmed-success");
 
+      await refreshSnapshot();
       await loadPracticeCharts();
     } catch (error) {
       errorText.textContent =
@@ -270,50 +227,46 @@
     practiceChartList.appendChild(card);
   };
 
-  const loadDashboard = async () => {
-    const response = await fetch(
-      "/trusted-verifiers/me",
-      {
-        credentials: "same-origin",
-      }
-    );
+  // Delegation survives replacing the snapshot after a review response.
+  studentList.addEventListener("change", (event) => {
+    if (event.target.id === "verifier-connection") event.target.form.requestSubmit();
+  });
 
-    const payload = await response.json();
+  const updateReviewNotice = (count) => {
+    const notice = document.querySelector("#verifier-review-notice");
+    if (notice) {
+      notice.hidden = count === 0;
+      notice.querySelector("a").textContent = count === 1
+        ? "1 P-Chart needs your review" : `${count} P-Charts need your review`;
+    }
+    const reviews = document.querySelector("#verifier-reviews");
+    if (reviews) reviews.dataset.pending = String(count > 0);
+  };
 
-    if (
-      !response.ok ||
-      payload.authenticated !== true
-    ) {
-      redirectToLogin();
+  const refreshSnapshot = async () => {
+    const url = "/trusted-verifiers/dashboard?connection_id=" + encodeURIComponent(studentList.dataset.connectionId);
+    const response = await fetch(url, {credentials: "same-origin", cache: "no-store"});
+    if (!response.ok || response.redirected) {
+      clearElement(studentList);
+      clearElement(practiceChartList);
+      window.location.assign("/trusted-verifiers/dashboard");
       return;
     }
-
-    title.textContent =
-      `${payload.verifier.display_name}'s Musicians`;
-
-    email.textContent = payload.verifier.email;
-
-    clearElement(studentList);
-
-    if (payload.student_connections.length === 0) {
-      addText(
-        studentList,
-        "p",
-        "No musicians are connected to this account yet.",
-        "body-copy"
-      );
-
-      return;
-    }
-
-    payload.student_connections.forEach(
-      renderStudent
-    );
+    const page = new DOMParser().parseFromString(await response.text(), "text/html");
+    const snapshot = page.querySelector("#verifier-student-list");
+    if (snapshot) studentList.replaceChildren(...snapshot.childNodes);
   };
 
   const loadPracticeCharts = async () => {
+    const connectionId = studentList.dataset.connectionId;
+    if (!connectionId) {
+      updateReviewNotice(0);
+      clearElement(practiceChartList);
+      addText(practiceChartList, "p", "No P-Charts are waiting for review.", "body-copy");
+      return;
+    }
     const response = await fetch(
-      "/trusted-verifiers/practice-charts",
+      "/trusted-verifiers/practice-charts?connection_id=" + encodeURIComponent(connectionId),
       {
         credentials: "same-origin",
       }
@@ -327,6 +280,9 @@
     }
 
     if (!response.ok) {
+      clearElement(studentList);
+      clearElement(practiceChartList);
+      updateReviewNotice(0);
       throw new Error(
         payload.detail ||
         "Could not load pending P-Charts."
@@ -334,6 +290,7 @@
     }
 
     clearElement(practiceChartList);
+    updateReviewNotice(payload.pending_charts.length);
 
     if (payload.pending_charts.length === 0) {
       addText(
@@ -376,10 +333,7 @@
     }
   });
 
-  Promise.all([
-    loadDashboard(),
-    loadPracticeCharts(),
-  ]).catch((error) => {
+  loadPracticeCharts().catch((error) => {
     errorText.textContent =
       error.message || "Could not load the dashboard.";
   });

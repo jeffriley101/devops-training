@@ -1,76 +1,125 @@
 {% extends "base.html" %}
-
 {% block content %}
-<section class="card">
-  <div class="section-head">
-    <p class="chip">Trusted Verifier</p>
-    <h2 id="verifier-dashboard-title">
-      Your Musicians
-    </h2>
+<link rel="stylesheet" href="/static/css/trusted-verifier-dashboard.css?v=2" />
+<section class="verifier-dashboard">
+  <header class="verifier-account">
+    <p id="verifier-dashboard-title">{{ verifier_name }}’s Musicians</p>
+    {% if has_director_students %}<a href="/band-director/dashboard">Band Director Dashboard</a>{% endif %}
+  </header>
 
-    <p
-      id="verifier-dashboard-email"
-      class="body-copy"
-    ></p>
+  <div id="verifier-student-list" data-connection-id="{{ student.connection_id if student else '' }}">
+    {% if student %}
+    <section class="verifier-identity" aria-labelledby="verifier-student-name">
+      <p class="verifier-eyebrow">Your musician</p>
+      {% if connections|length > 1 %}
+      <form method="get" action="/trusted-verifiers/dashboard" id="verifier-student-selector">
+        <label for="verifier-connection">Student</label>
+        <select id="verifier-connection" name="connection_id">
+          {% for connection in connections %}
+          <option value="{{ connection.connection_id }}"{% if student.connection_id == connection.connection_id %} selected{% endif %}>{{ connection.display_name }}</option>
+          {% endfor %}
+        </select>
+        <noscript><button type="submit" class="btn btn-secondary">View student</button></noscript>
+      </form>
+      {% endif %}
+      <h2 id="verifier-student-name">{{ student.display_name }}</h2>
+      <p>{{ student.instrument }} <span aria-hidden="true">·</span> {{ student.level }}</p>
+      <p class="verifier-muted">Your relationship: {{ student.role|replace('_', ' ')|title }}</p>
+    </section>
+
+    <p id="verifier-review-notice" class="verifier-review-notice" aria-live="polite" hidden><a href="#verifier-reviews"></a></p>
+
+    <section class="verifier-rating-card" aria-labelledby="verifier-rating-heading">
+      <h3 id="verifier-rating-heading">Practice Rating</h3>
+      <div class="verifier-rating">
+        <strong>{{ ('%.1f'|format(student.rating)).removesuffix('.0') }}</strong>
+        <div class="verifier-trend verifier-trend-{{ student.trend.direction }}">
+          <span aria-hidden="true">{{ student.trend.arrow }}</span>
+          <span>{{ {'up': 'Improving', 'steady': 'Steady', 'down': 'Declining'}[student.trend.direction] }}</span>
+        </div>
+      </div>
+      <p class="verifier-muted">Based on the most recently completed week</p>
+    </section>
+
+    <section class="verifier-panel" aria-labelledby="verifier-week-heading">
+      <h3 id="verifier-week-heading">This Week</h3>
+      <dl class="verifier-metrics verifier-week-metrics">
+        {% for label, value, unit in [
+          ('Minutes this week', student.weekly.total, ''),
+          ('P-Charts this week', student.weekly.charts, ''),
+          ('Practice streak', student.practice_streak, 'day' if student.practice_streak == 1 else 'days')
+        ] %}
+        <div><dt>{{ label }}</dt><dd>{{ value }}{% if unit %} <small>{{ unit }}</small>{% endif %}</dd></div>
+        {% endfor %}
+      </dl>
+      {% if student.lifetime.charts == 0 %}<p class="verifier-muted">A little practice is a great place to start.</p>{% endif %}
+      <section class="verifier-quality" aria-labelledby="verifier-quality-heading">
+        <h4 id="verifier-quality-heading">Practice quality</h4>
+        <dl class="verifier-metrics">
+          <div><dt>Verified minutes this week</dt><dd>{{ student.weekly.verified }}</dd></div>
+          <div><dt>Pristine minutes this week</dt><dd>{{ student.weekly.pristine }}</dd></div>
+        </dl>
+      </section>
+    </section>
+
+    <section class="verifier-panel verifier-season" aria-labelledby="verifier-season-heading">
+      <h3 id="verifier-season-heading">Current season</h3>
+      {% if student.season %}
+      <h4>{{ student.season.name }}</h4>
+      <p class="verifier-muted">{{ student.season.starts_on.strftime('%b %-d, %Y') }} – {{ student.season.ends_on.strftime('%b %-d, %Y') if student.season.ends_on else 'Ongoing' }}</p>
+      <dl class="verifier-metrics verifier-season-metrics">
+        <div><dt>Minutes this season</dt><dd>{{ student.season.minutes }}</dd></div>
+        <div><dt>P-Charts this season</dt><dd>{{ student.season.charts }}</dd></div>
+        <div><dt>Practice days this season</dt><dd>{{ student.season.days }}</dd></div>
+        <div><dt>Verified minutes this season</dt><dd>{{ student.season.verified }}</dd></div>
+        <div><dt>Pristine minutes this season</dt><dd>{{ student.season.pristine }}</dd></div>
+      </dl>
+      {% else %}<p class="verifier-muted">No current season.</p>{% endif %}
+      <p class="verifier-team">{{ student.team.name if student.team else 'No team yet' }}</p>
+    </section>
+
+    <section class="verifier-panel verifier-all-time" aria-labelledby="verifier-lifetime-heading">
+      <h3 id="verifier-lifetime-heading">All Time</h3>
+      <dl class="verifier-metrics verifier-all-time-metrics">
+        <div><dt>Lifetime minutes</dt><dd>{{ student.lifetime.total }}</dd></div>
+        <div><dt>Lifetime P-Charts</dt><dd>{{ student.lifetime.charts }}</dd></div>
+        <div><dt>Lifetime practice days</dt><dd>{{ student.lifetime.days }}</dd></div>
+        <div><dt>Lifetime Verified minutes</dt><dd>{{ student.lifetime.verified }}</dd></div>
+        <div><dt>Lifetime Pristine minutes</dt><dd>{{ student.lifetime.pristine }}</dd></div>
+      </dl>
+    </section>
+
+    <section class="verifier-panel" aria-labelledby="verifier-achievements-heading">
+      <h3 id="verifier-achievements-heading">Recent achievements</h3>
+      {% if student.achievements %}
+      <ul class="verifier-achievements">
+        {% for event in student.achievements %}
+        <li><span class="verifier-achievement-icon" aria-hidden="true">{{ event.icon }}</span>
+          <div><strong>{{ event.label }}{% if event.quantity > 1 %} × {{ event.quantity }}{% endif %}</strong>
+          <time datetime="{{ event.earned_at.isoformat() }}">{{ event.earned_at.strftime('%b %-d, %Y') }}</time></div>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}<p class="verifier-muted">Every practice is a step forward. Earned achievements will be celebrated here.</p>{% endif %}
+    </section>
+    {% else %}
+    <section class="verifier-panel"><h2>Your musicians</h2><p>No musicians are connected to this account yet.</p></section>
+    {% endif %}
   </div>
 
-  {% if has_director_students %}
-  <p><a class="btn btn-secondary" href="/band-director/dashboard">Band Director Dashboard</a></p>
-  {% endif %}
-
-  <div
-    id="verifier-student-list"
-    class="stack-form"
-    aria-live="polite"
-  >
-    <p class="body-copy">Loading connected musicians...</p>
-  </div>
-
-  <hr class="section-divider" />
-
-  <section aria-labelledby="verifier-pchart-heading">
-    <h3 id="verifier-pchart-heading">
-      P-Charts Awaiting Review
-    </h3>
-
-    <p class="body-copy">
-      Approve practice you can confirm, or reject a chart that
-      needs to be corrected and resubmitted.
-    </p>
-
-    <div
-      id="verifier-practice-chart-list"
-      class="stack-form"
-      aria-live="polite"
-    >
-      <p class="body-copy">Loading P-Charts...</p>
-    </div>
-
-    <p
-      id="verifier-practice-chart-feedback"
-      class="body-copy"
-      aria-live="polite"
-    ></p>
+  <section id="verifier-reviews" class="verifier-panel verifier-reviews" aria-labelledby="verifier-pchart-heading">
+    <h3 id="verifier-pchart-heading">P-Charts requiring review</h3>
+    <p class="verifier-muted">Approve practice you can confirm, or reject a chart that needs to be corrected and resubmitted.</p>
+    <div id="verifier-practice-chart-list" class="stack-form" aria-live="polite"><p class="body-copy">Loading P-Charts...</p></div>
+    <p id="verifier-practice-chart-feedback" class="body-copy" aria-live="polite"></p>
   </section>
-
-  <p
-    id="verifier-dashboard-error"
-    class="error-text"
-    aria-live="polite"
-  ></p>
-
-  <div class="button-row">
-    <button
-      id="trusted-verifier-logout-button"
-      class="btn btn-secondary"
-      type="button"
-    >
-      Sign Out
-    </button>
-  </div>
+  <p id="verifier-dashboard-error" class="error-text" aria-live="polite"></p>
+  <footer class="verifier-account">
+    <p id="verifier-dashboard-email">{{ verifier_email }}</p>
+    <button id="trusted-verifier-logout-button" class="btn btn-secondary" type="button">Sign Out</button>
+  </footer>
 </section>
 {% endblock %}
-
 {% block page_scripts %}
-<script src="/static/js/trusted-verifier-dashboard.js?v=2"></script>
+<script src="/static/js/trusted-verifier-dashboard.js?v=4"></script>
 {% endblock %}
