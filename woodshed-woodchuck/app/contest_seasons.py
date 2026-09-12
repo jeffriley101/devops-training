@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -11,14 +11,14 @@ from .contests import (
     CENTRAL,
     aware_utc,
     contest_week_schedule,
-    contest_season_clause,
     ensure_contest_definitions,
 )
 from .models import ContestWeek, Season
+from .seasons import season_covering_date
 
 
 SEASON_KEY_PATTERN = re.compile(
-    r"^(?:band-camp|back-to-school)-[a-z0-9][a-z0-9-]*$"
+    r"^[a-z0-9]+(?:-[a-z0-9]+)+$"
 )
 
 
@@ -116,10 +116,16 @@ def rollover_season(
         raise SeasonRolloverError("Rollover blocked: " + ", ".join(blockers))
     if not SEASON_KEY_PATTERN.fullmatch(next_key):
         raise SeasonRolloverError(
-            "Next season key must use the band-camp-* or back-to-school-* format."
+            "Next season key must use lowercase letters/numbers separated by hyphens."
         )
-    if next_key == source_key or existing_next is not None:
+    if next_key == source_key:
         raise SeasonRolloverError("Next season key already exists.")
+    if existing_next is not None and (
+        (existing_next.name, existing_next.starts_on, existing_next.ends_on, existing_next.timezone)
+        != (normalized_name, next_starts_on, next_ends_on, "America/Chicago")
+        or existing_next.status not in ("planned", "active")
+    ):
+        raise SeasonRolloverError("The existing next season configuration conflicts.")
     if not normalized_name:
         raise SeasonRolloverError("Next season name is required.")
     _validate_next_dates(next_starts_on, next_ends_on)
@@ -129,6 +135,7 @@ def rollover_season(
     conflict = session.scalar(
         select(Season).where(
             Season.key != source.key,
+            Season.key != next_key,
             Season.starts_on <= next_ends_on,
             (Season.ends_on.is_(None) | (Season.ends_on >= next_starts_on)),
         )
@@ -136,8 +143,19 @@ def rollover_season(
     if conflict is not None:
         raise SeasonRolloverError("Next season dates conflict with an existing season.")
 
+    if existing_next is not None:
+        for week in session.scalars(select(ContestWeek).where(ContestWeek.season_id == existing_next.id)):
+            if (week.week_start < next_starts_on or week.week_end > next_ends_on + timedelta(days=1)
+                    or week.week_start.weekday() != 0 or week.week_end != week.week_start + timedelta(days=7)):
+                raise SeasonRolloverError("Existing next-season week has conflicting boundaries.")
+    if session.scalar(select(ContestWeek.id).where(
+        ContestWeek.week_start >= next_starts_on, ContestWeek.week_start <= next_ends_on,
+        ContestWeek.season_id != (existing_next.id if existing_next is not None else -1),
+    )) is not None:
+        raise SeasonRolloverError("Existing week belongs to another season; explicit repair required.")
+
     ensure_contest_definitions(session)
-    next_season = Season(
+    next_season = existing_next or Season(
         key=next_key,
         name=normalized_name,
         timezone="America/Chicago",
@@ -146,6 +164,7 @@ def rollover_season(
         status="active",
     )
     session.add(next_season)
+    next_season.status = "active"
     session.flush()
 
     weeks_created = 0
@@ -154,15 +173,19 @@ def rollover_season(
         week_end, verification_deadline_at, finalize_after = contest_week_schedule(
             week_start
         )
-        session.add(ContestWeek(
-            season_id=next_season.id,
-            week_start=week_start,
-            week_end=week_end,
-            verification_deadline_at=verification_deadline_at,
-            finalize_after=finalize_after,
-            status="open",
+        existing_week = session.scalar(select(ContestWeek).where(
+            ContestWeek.season_id == next_season.id, ContestWeek.week_start == week_start,
         ))
-        weeks_created += 1
+        if existing_week is not None:
+            if existing_week.week_end != week_end:
+                raise SeasonRolloverError("Existing next-season week has conflicting boundaries.")
+        else:
+            session.add(ContestWeek(
+                season_id=next_season.id, week_start=week_start, week_end=week_end,
+                verification_deadline_at=verification_deadline_at,
+                finalize_after=finalize_after, status="open",
+            ))
+            weeks_created += 1
         week_start = week_end
 
     source.status = "closed"
@@ -176,31 +199,32 @@ def rollover_season(
 
 
 def season_status_payload(session: Session, *, now: datetime) -> dict[str, object]:
-    active = session.scalar(
-        select(Season).where(
-            Season.status == "active",
-            contest_season_clause(),
-        ).order_by(Season.starts_on.desc())
-    )
-    if active is None:
+    today = now.astimezone(CENTRAL).date()
+    active = season_covering_date(session, today)
+    # Rollover readiness intentionally concerns an expired, not-yet-closed
+    # source. Do not mislabel that source as the current date-covered season.
+    source = session.scalar(select(Season).where(
+        Season.status == "active", Season.ends_on < today,
+    ).order_by(Season.ends_on.desc(), Season.id)) or active
+    if source is None:
         return {"active_season": None, "rollover_allowed": False,
-                "blocking_reasons": ["no_active_season"]}
-    weeks = session.scalars(
-        select(ContestWeek).where(ContestWeek.season_id == active.id)
-    ).all()
-    blockers = _source_blockers(session, active, now=now)
-    return {
-        "active_season": {
-            "key": active.key,
-            "name": active.name,
-            "timezone": active.timezone,
-            "starts_on": active.starts_on.isoformat(),
-            "ends_on": active.ends_on.isoformat() if active.ends_on else None,
-            "status": active.status,
+                "rollover_source": None, "blocking_reasons": ["no_active_season"]}
+    def summary(season):
+        if season is None:
+            return None
+        weeks = session.scalars(select(ContestWeek).where(ContestWeek.season_id == season.id)).all()
+        return {
+            "key": season.key, "name": season.name, "timezone": season.timezone,
+            "starts_on": season.starts_on.isoformat(),
+            "ends_on": season.ends_on.isoformat() if season.ends_on else None,
+            "status": season.status,
             "total_weeks": len(weeks),
             "open_weeks": sum(week.status == "open" for week in weeks),
             "finalized_weeks": sum(week.status == "finalized" for week in weeks),
-        },
+        }
+    blockers = _source_blockers(session, source, now=now)
+    return {
+        "active_season": summary(active), "rollover_source": summary(source),
         "rollover_allowed": not blockers,
         "blocking_reasons": blockers,
     }

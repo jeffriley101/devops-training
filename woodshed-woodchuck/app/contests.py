@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, true
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -44,16 +44,22 @@ from .team_practice_rating import (
 )
 
 
-BAND_CAMP_KEY = "band-camp-2026"
-BAND_CAMP_NAME = "Band Camp"
-BAND_CAMP_START = date(2026, 7, 27)
+from .seasons import (
+    CANONICAL_SEASONS, SeasonConfigurationError, season_covering_date,
+    canonical_definition_for_date, create_missing_season,
+)
+
+# Compatibility constants for historical callers.
+BAND_CAMP_KEY = CANONICAL_SEASONS[0].key
+BAND_CAMP_NAME = CANONICAL_SEASONS[0].name
+BAND_CAMP_START = CANONICAL_SEASONS[0].starts_on
 CENTRAL_TIMEZONE = "America/Chicago"
 CENTRAL = ZoneInfo(CENTRAL_TIMEZONE)
-CONTEST_SEASON_PREFIXES = ("band-camp-", "back-to-school-")
 
 
 def contest_season_clause():
-    return or_(*(Season.key.like(f"{prefix}%") for prefix in CONTEST_SEASON_PREFIXES))
+    # Every durable Season is a contest season, including historical/custom keys.
+    return true()
 
 CONTEST_DEFINITIONS = (
     {
@@ -334,7 +340,7 @@ def ensure_contest_definitions(session: Session) -> list[Contest]:
     return contests
 
 
-def ensure_band_camp_data(
+def ensure_current_contest_data(
     session: Session,
     *,
     now: datetime,
@@ -342,46 +348,21 @@ def ensure_band_camp_data(
     week_start, week_end, deadline, finalize_after = central_week_boundaries(now)
 
     central_today = now.astimezone(CENTRAL).date()
-    season = session.scalar(
-        select(Season).where(
-            Season.status == "active",
-            contest_season_clause(),
-            Season.starts_on <= central_today,
-            (Season.ends_on.is_(None) | (Season.ends_on >= central_today)),
-        ).order_by(Season.starts_on.desc())
-    )
+    try:
+        season = season_covering_date(session, central_today)
+        if season is None:
+            definition = canonical_definition_for_date(central_today)
+            if definition is not None:
+                create_missing_season(session, definition)
+                season = season_covering_date(session, central_today)
+    except SeasonConfigurationError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
     if season is None:
-        season = session.scalar(select(Season).where(
-            Season.key == BAND_CAMP_KEY,
-            Season.status == "active",
-        ))
-    if season is None:
-        existing_legacy = session.scalar(
-            select(Season.id).where(Season.key == BAND_CAMP_KEY)
-        )
-        if existing_legacy is not None:
-            raise HTTPException(
-                status_code=409,
-                detail="No active Band Camp season covers the current date.",
-            )
-        season = Season(
-            key=BAND_CAMP_KEY,
-            name=BAND_CAMP_NAME,
-            timezone=CENTRAL_TIMEZONE,
-            starts_on=BAND_CAMP_START,
-            status="active",
-        )
-        session.add(season)
-        session.flush()
-
-    if (
-        central_today < season.starts_on
-        or (season.ends_on is not None and central_today > season.ends_on)
+        raise HTTPException(status_code=409, detail="No active season covers the current date.")
+    if week_start < season.starts_on or (
+        season.ends_on is not None and week_end > season.ends_on + timedelta(days=1)
     ):
-        raise HTTPException(
-            status_code=409,
-            detail="No active Band Camp season covers the current date.",
-        )
+        raise HTTPException(status_code=409, detail="Contest week crosses a season boundary.")
 
     contests = ensure_contest_definitions(session)
 
@@ -392,6 +373,8 @@ def ensure_band_camp_data(
         )
     )
     if contest_week is None:
+        if session.scalar(select(ContestWeek.id).where(ContestWeek.week_start == week_start)) is not None:
+            raise HTTPException(status_code=409, detail="Existing week belongs to another season; explicit repair required.")
         contest_week = ContestWeek(
             season_id=season.id,
             week_start=week_start,
@@ -401,9 +384,15 @@ def ensure_band_camp_data(
             status="open",
         )
         session.add(contest_week)
+    elif contest_week.week_end != week_end:
+        raise HTTPException(status_code=409, detail="Existing contest week has conflicting boundaries.")
 
     session.commit()
     return season, contests, contest_week
+
+
+# Existing integrations can keep importing the old name; bootstrap is now generic.
+ensure_band_camp_data = ensure_current_contest_data
 
 
 def normalize_instrument(instrument: str) -> tuple[str, str]:
@@ -827,11 +816,7 @@ def student_camp_point_totals(
         raise ValueError("The current time must be timezone-aware.")
     central_now = now.astimezone(CENTRAL)
     if season is None:
-        season = session.scalar(select(Season).where(
-            Season.status == "active",
-            Season.starts_on <= central_now.date(),
-            (Season.ends_on.is_(None) | (Season.ends_on >= central_now.date())),
-        ).order_by(Season.starts_on.desc()))
+        season = season_covering_date(session, central_now.date())
     if season is not None and contest_week is None:
         contest_week = session.scalar(select(ContestWeek).where(
             ContestWeek.season_id == season.id,
@@ -913,10 +898,7 @@ def create_camp_point_award(
 
 def _active_team_id_for_event(session: Session, profile_id: int, now: datetime) -> int | None:
     """Snapshot team attribution at the earning event; legacy awards remain null."""
-    season = session.scalar(select(Season).where(
-        Season.status == "active",
-        Season.starts_on <= now.astimezone(CENTRAL).date(),
-    ).order_by(Season.starts_on.desc()))
+    season = season_covering_date(session, now.astimezone(CENTRAL).date())
     if season is None:
         return None
     membership = session.scalar(select(TeamMembership).where(
@@ -2086,10 +2068,7 @@ def _current_team_member_ids(
     # Match the existing team-membership authority: a temporary display
     # entitlement follows the active current season, not the season in which
     # a lifetime medal was earned.
-    active_season = session.scalar(select(Season).where(
-        Season.status == "active",
-        Season.starts_on <= now_utc.astimezone(CENTRAL).date(),
-    ).order_by(Season.starts_on.desc()))
+    active_season = season_covering_date(session, now_utc.astimezone(CENTRAL).date())
     if active_season is None:
         return set()
     team_query = select(Team.id).where(
@@ -2582,7 +2561,7 @@ def current_contests_payload(
     now: datetime,
     current_profile_id: int,
 ) -> dict[str, object]:
-    season, contests, contest_week = ensure_band_camp_data(session, now=now)
+    season, contests, contest_week = ensure_current_contest_data(session, now=now)
     standings = weekly_practice_by_instrument(
         session,
         contest_week=contest_week,

@@ -47,7 +47,7 @@
   </section>
 
   <div class="board-layout">
-    <section class="board-contests" aria-label="Back to School activities">
+    <section class="board-contests" aria-label="{{ board_season.title }} activities">
       <details id="camp-hours-activity" class="board-contest-card board-activity board-locker">
         <summary>
           <span>Rehearsal / Lesson</span>
@@ -154,7 +154,7 @@
       >
         <header class="scoreboard-header">
           <p class="scoreboard-kicker">Live competition board</p>
-          <h3 id="band-camp-standings-title">Back to School Standings</h3>
+          <h3 id="band-camp-standings-title">{{ board_season.title }} Standings</h3>
           <p class="board-standings-week">
             <span id="contest-week-range">Current week</span>
             <span id="contest-week-status" class="scoreboard-status">Loading</span>
@@ -162,7 +162,7 @@
         </header>
 
         <p id="contest-standings-loading" class="scoreboard-notice" role="status">
-          Loading Back to School standings…
+          Loading {{ board_season.title }} standings…
         </p>
         <div
           id="contest-standings-error"
@@ -286,7 +286,7 @@
           Sign in to view the Medal Board of Past Winners.
         </div>
         <div id="past-winners-empty" class="medal-board-state hidden">
-          Medals will appear after a Band Camp week is finalized.
+          Medals will appear after a contest week is finalized.
         </div>
         <div id="past-winners-error" class="medal-board-state hidden" role="alert">
           <p>The Medal Board of Past Winners could not be loaded.</p>

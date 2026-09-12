@@ -26,11 +26,11 @@ from .contest_seasons import (
 )
 from .contests import (
     CENTRAL,
-    contest_season_clause,
     finalize_contest_week,
     utc_iso,
 )
 from .db import SessionLocal
+from .seasons import season_covering_date
 from .models import (
     ContestWeek,
     ProfileCapability,
@@ -80,13 +80,8 @@ def require_contest_admin(request: Request) -> None:
     request.session[ADMIN_SESSION_KEY] = expected
 
 
-def _active_season(session: Session) -> Season | None:
-    return session.scalar(
-        select(Season).where(
-            Season.status == "active",
-            contest_season_clause(),
-        ).order_by(Season.starts_on.desc())
-    )
+def _active_season(session: Session, now: datetime) -> Season | None:
+    return season_covering_date(session, now.astimezone(CENTRAL).date())
 
 
 def _current_week(session: Session, season: Season | None, now: datetime) -> ContestWeek | None:
@@ -100,13 +95,17 @@ def _current_week(session: Session, season: Season | None, now: datetime) -> Con
             ContestWeek.week_end > central_today,
         ).order_by(ContestWeek.week_start.desc())
     )
-    if week is not None:
-        return week
-    return session.scalar(
-        select(ContestWeek).where(ContestWeek.season_id == season.id).order_by(
-            ContestWeek.week_start.desc()
-        )
-    )
+    return week
+
+
+def _finalization_week(session: Session, now: datetime) -> ContestWeek | None:
+    """Keep the operational last-week fallback, without calling an expired season current."""
+    current = _current_week(session, _active_season(session, now), now)
+    if current is not None:
+        return current
+    return session.scalar(select(ContestWeek).join(Season).where(
+        Season.status == "active", ContestWeek.week_start <= now.astimezone(CENTRAL).date(),
+    ).order_by(ContestWeek.week_start.desc(), ContestWeek.id))
 
 
 def _week_reason(week: ContestWeek | None, now: datetime) -> str | None:
@@ -126,19 +125,20 @@ def _week_reason(week: ContestWeek | None, now: datetime) -> str | None:
 
 def admin_status(session: Session, *, now: datetime) -> dict[str, object]:
     readiness = season_status_payload(session, now=now)
-    season = _active_season(session)
+    season = _active_season(session, now)
     week = _current_week(session, season, now)
-    reason = _week_reason(week, now)
+    finalization_week = _finalization_week(session, now)
+    reason = _week_reason(finalization_week, now)
+    def week_summary(row):
+        return None if row is None else {
+            "week_start": row.week_start.isoformat(), "week_end": row.week_end.isoformat(),
+            "status": row.status, "verification_deadline_at": utc_iso(row.verification_deadline_at),
+            "finalize_after": utc_iso(row.finalize_after), "finalized_at": utc_iso(row.finalized_at),
+        }
     return {
         **readiness,
-        "current_week": None if week is None else {
-            "week_start": week.week_start.isoformat(),
-            "week_end": week.week_end.isoformat(),
-            "status": week.status,
-            "verification_deadline_at": utc_iso(week.verification_deadline_at),
-            "finalize_after": utc_iso(week.finalize_after),
-            "finalized_at": utc_iso(week.finalized_at),
-        },
+        "current_week": week_summary(week),
+        "finalization_week": week_summary(finalization_week),
         "finalization_due": reason is None,
         "finalization_blocking_reason": reason,
         "latest_job_outcome": latest_finalize_outcome(),
@@ -299,8 +299,7 @@ def finalize_current_week(request: Request):
     try:
         with SessionLocal() as session:
             with session.begin():
-                season = _active_season(session)
-                week = _current_week(session, season, now)
+                week = _finalization_week(session, now)
                 reason = _week_reason(week, now)
                 if week is None or reason is not None:
                     raise SeasonRolloverError(

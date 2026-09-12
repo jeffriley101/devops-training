@@ -19,8 +19,8 @@ from .models import (
     StudentVerifierConnection,
     TrustedVerifier,
     TeamMembership,
-    Season,
 )
+from .seasons import season_covering_date
 from .verifiers import validate_email
 from .practice_charts import (
     create_practice_chart_verification_request,
@@ -355,7 +355,7 @@ def create_student_practice_chart(
                 ))
                 if email_preset is None:
                     raise HTTPException(status_code=400, detail="Choose one of your saved email recipients.")
-            active_season = session.scalar(select(Season).where(Season.status == "active"))
+            active_season = season_covering_date(session, datetime.now(CENTRAL).date())
             team_membership = (
                 session.scalar(select(TeamMembership).where(
                     TeamMembership.profile_id == profile.id,
@@ -490,10 +490,7 @@ def create_student_pristine_practice_chart(
                 detail="Student sign-in is required.",
             )
         try:
-            active_season = session.scalar(select(Season).where(
-                Season.status == "active",
-                Season.starts_on <= datetime.now(CENTRAL).date(),
-            ).order_by(Season.starts_on.desc()))
+            active_season = season_covering_date(session, datetime.now(CENTRAL).date())
             team_membership = (
                 session.scalar(select(TeamMembership).where(
                     TeamMembership.profile_id == profile.id,

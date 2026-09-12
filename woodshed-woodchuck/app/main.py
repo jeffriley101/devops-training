@@ -51,7 +51,8 @@ from .history_mystery import (
     history_mystery_questions_for_date,
 )
 from .models import WoodchuckState
-from .board_seasons import board_season_for_date
+from .board_seasons import board_season_presentation
+from .seasons import season_covering_date
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -370,10 +371,10 @@ def pristine_practice(request: Request):
 @app.get("/quest")
 def quest(request: Request):
     member_since = None
-    board_season = board_season_for_date(
-        datetime.now(ZoneInfo("America/Chicago")).date()
-    )
     with SessionLocal() as session:
+        board_season = board_season_presentation(season_covering_date(
+            session, datetime.now(ZoneInfo("America/Chicago")).date()
+        ))
         profile = current_profile(request, session)
         if profile is not None:
             created_at = profile.created_at

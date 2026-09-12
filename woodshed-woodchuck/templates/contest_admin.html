@@ -10,7 +10,7 @@
   <main class="contest-admin-shell">
     <header class="contest-admin-header">
       <p class="scoreboard-kicker">Protected operations</p>
-      <h1>Band Camp Contest Administration</h1>
+      <h1>Contest Administration</h1>
       <p>Finalization and season rollover only. Historical results cannot be edited here.</p>
     </header>
 
@@ -34,19 +34,21 @@
           <div><dt>Total weeks</dt><dd>{{ status.active_season.total_weeks }}</dd></div>
         </dl>
         {% else %}
-        <p>No active Band Camp season.</p>
+        <p>No active season covers today.</p>
         {% endif %}
       </article>
 
       <article class="contest-admin-card">
         <h2>Current Contest Week</h2>
-        {% if status.current_week %}
+        {% set shown_week = status.current_week or status.finalization_week %}
+        {% if not status.current_week and shown_week %}<p>No current week. Prior week available for finalization:</p>{% endif %}
+        {% if shown_week %}
         <dl class="contest-admin-facts">
-          <div><dt>Week</dt><dd>{{ status.current_week.week_start }} – {{ status.current_week.week_end }}</dd></div>
-          <div><dt>Status</dt><dd>{{ status.current_week.status }}</dd></div>
-          <div><dt>Verification deadline</dt><dd>{{ status.current_week.verification_deadline_at }}</dd></div>
-          <div><dt>Finalize after</dt><dd>{{ status.current_week.finalize_after }}</dd></div>
-          <div><dt>Finalized at</dt><dd>{{ status.current_week.finalized_at or "Not finalized" }}</dd></div>
+          <div><dt>Week</dt><dd>{{ shown_week.week_start }} – {{ shown_week.week_end }}</dd></div>
+          <div><dt>Status</dt><dd>{{ shown_week.status }}</dd></div>
+          <div><dt>Verification deadline</dt><dd>{{ shown_week.verification_deadline_at }}</dd></div>
+          <div><dt>Finalize after</dt><dd>{{ shown_week.finalize_after }}</dd></div>
+          <div><dt>Finalized at</dt><dd>{{ shown_week.finalized_at or "Not finalized" }}</dd></div>
           <div><dt>Finalization due</dt><dd>{{ "Yes" if status.finalization_due else "No" }}</dd></div>
         </dl>
         {% else %}
@@ -56,6 +58,7 @@
 
       <article class="contest-admin-card">
         <h2>Rollover Readiness</h2>
+        {% if status.rollover_source %}<p>Source season: {{ status.rollover_source.name }}</p>{% endif %}
         <p><strong>{{ "Allowed" if status.rollover_allowed else "Blocked" }}</strong></p>
         {% if status.blocking_reasons %}
         <ul>
@@ -159,7 +162,7 @@
       <p>Rollover closes the active season only after all safety checks pass. Type <strong>ROLL OVER</strong> to confirm.</p>
       <form class="contest-admin-rollover-form" method="post" action="/contests/admin/rollover">
         <label>Source season key
-          <input name="source_key" required value="{{ status.active_season.key if status.active_season else '' }}" autocomplete="off" />
+          <input name="source_key" required value="{{ status.rollover_source.key if status.rollover_source else '' }}" autocomplete="off" />
         </label>
         <label>Next season key
           <input name="next_key" required placeholder="band-camp-2027" autocomplete="off" />

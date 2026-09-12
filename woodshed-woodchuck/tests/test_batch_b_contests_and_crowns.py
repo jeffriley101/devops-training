@@ -94,7 +94,7 @@ def test_batch_b_markup_and_privacy_hooks() -> None:
     assert "Band Camp Hours Bonus" not in board
     assert "Actual practice time comes from submitted P-Charts" in board
     assert "Weekly Gold, Silver, and Bronze winners" in board
-    assert "Medals will appear after a Band Camp week is finalized." in board
+    assert "Medals will appear after a contest week is finalized." in board
     assert "This Week’s Practice" in book and "Career Practice" in book
     for category in (
         "Practice Crown", "Band Camp Crown", "Trivia Crown",

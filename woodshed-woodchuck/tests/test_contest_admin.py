@@ -113,11 +113,11 @@ def test_admin_page_requires_valid_token_and_is_not_in_student_navigation(
     response = authenticate(client)
 
     assert response.status_code == 200
-    assert "Band Camp Contest Administration" in response.text
+    assert "Contest Administration" in response.text
     board = client.get("/quest").text
     shop = client.get("/store").text
     assert 'href="/contests/admin"' not in board + shop
-    assert "Back to School Standings" in board
+    assert "Standings" in board  # Season heading comes from this database, not a static calendar.
     assert "The GOAT Tracker" in shop
     assert "Your Permanent Crown" not in shop
 

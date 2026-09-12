@@ -10,7 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .account_routes import current_profile
-from .contests import CENTRAL, central_week_boundaries, ensure_band_camp_data
+from .contests import CENTRAL, central_week_boundaries, ensure_current_contest_data
 from .db import SessionLocal
 from .models import (
     ProfileCapability,
@@ -230,7 +230,7 @@ def create_director_team(
 
 
 def selection_payload(session: Session, *, profile: WoodchuckProfile, now: datetime) -> dict[str, object]:
-    season, _, week = ensure_band_camp_data(session, now=now)
+    season, _, week = ensure_current_contest_data(session, now=now)
     membership = active_membership(session, profile_id=profile.id, season_id=season.id)
     teams = session.scalars(select(Team).where(
         Team.season_id == season.id,
@@ -393,7 +393,7 @@ def authenticated_context(request: Request, session: Session, now: datetime | No
     if profile is None:
         raise HTTPException(status_code=401, detail="Student sign-in is required.")
     moment = now or datetime.now(timezone.utc)
-    season, _, _ = ensure_band_camp_data(session, now=moment)
+    season, _, _ = ensure_current_contest_data(session, now=moment)
     return profile, season, moment
 
 

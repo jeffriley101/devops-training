@@ -193,7 +193,7 @@ def test_duplicate_key_and_conflicting_dates_are_rejected_safely(
     ))
     session.commit()
 
-    with pytest.raises(SeasonRolloverError, match="key already exists"):
+    with pytest.raises(SeasonRolloverError, match="configuration conflicts"):
         rollover_season(
             session, source_key=source.key, next_key="band-camp-existing",
             next_name="Duplicate", next_starts_on=date(2026, 8, 24),
@@ -389,7 +389,8 @@ def test_status_payload_is_privacy_safe(
 
     assert payload["rollover_allowed"] is True
     assert payload["blocking_reasons"] == []
-    assert payload["active_season"]["total_weeks"] == 1
+    assert payload["active_season"] is None  # Expired is not current.
+    assert payload["rollover_source"]["total_weeks"] == 1
     serialized = repr(payload).casefold()
     for private in (
         "profile_id", "account_id", "woodchuck_id", "pin", "email",
@@ -419,5 +420,5 @@ def test_status_endpoint_requires_authentication_and_returns_safe_data(
         contest_routes.contest_season_status(request())
     assert getattr(unauthorized.value, "status_code", None) == 401
     payload = contest_routes.contest_season_status(request(student.id))
-    assert payload["active_season"]["key"] == "band-camp-2026"
+    assert payload["rollover_source"]["key"] == "band-camp-2026"
     assert "profile_id" not in repr(payload).casefold()

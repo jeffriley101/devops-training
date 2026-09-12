@@ -719,7 +719,7 @@ def test_endpoint_requires_authentication_and_exposes_no_private_data(
         "timezone": "America/Chicago",
         "status": "active",
         "starts_on": "2026-07-27",
-        "ends_on": None,
+        "ends_on": "2026-08-23",
     }
 
 

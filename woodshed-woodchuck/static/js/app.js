@@ -2987,7 +2987,7 @@
     function positionMessage(division, position, campPoints = false) {
       if (!position || position.has_score !== true) {
         if (campPoints) {
-          return "No Board Activity Points yet · Complete a Back to School activity to join the board.";
+          return "No Board Activity Points yet · Complete a BOARD activity to join the board.";
         }
         return division === "verified"
           ? "No verified minutes yet · Approved P-Charts appear here."
@@ -3165,11 +3165,11 @@
           headers: { Accept: "application/json" },
         });
         if (response.status === 401) {
-          showError("Sign in to view the current Back to School standings.");
+          showError("Sign in to view the current standings.");
           return;
         }
         if (!response.ok) {
-          showError("Back to School standings are unavailable right now.");
+          showError("Current standings are unavailable right now.");
           return;
         }
 
@@ -3205,7 +3205,7 @@
           campPointsThisWeek < 0 ||
           campPointsSeason < campPointsThisWeek
         ) {
-          showError("Back to School standings could not be read.");
+          showError("Current standings could not be read.");
           return;
         }
 
@@ -3260,7 +3260,7 @@
         if (weekStatusEl) weekStatusEl.classList.add("hidden");
         root.setAttribute("aria-busy", "false");
       } catch (_error) {
-        showError("Back to School standings are unavailable right now.");
+        showError("Current standings are unavailable right now.");
       } finally {
         requestInFlight = false;
         if (refreshQueued) {

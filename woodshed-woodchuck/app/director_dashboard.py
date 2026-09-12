@@ -9,7 +9,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from .account_routes import current_profile
-from .contests import CENTRAL, central_week_boundaries, ensure_band_camp_data
+from .contests import CENTRAL, central_week_boundaries, ensure_current_contest_data
 from .db import SessionLocal
 from .models import (
     DirectorTeamContest,
@@ -129,7 +129,7 @@ def dashboard_payload(
     session: Session, *, request: Request, profile: WoodchuckProfile,
     team_id: int | None, now: datetime,
 ) -> dict[str, object]:
-    season, _, contest_week = ensure_band_camp_data(session, now=now)
+    season, _, contest_week = ensure_current_contest_data(session, now=now)
     management = director_team_payload(
         session, profile=profile, season=season, team_id=team_id
     )

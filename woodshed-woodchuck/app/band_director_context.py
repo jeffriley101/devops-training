@@ -6,10 +6,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .contests import (
-    CENTRAL, central_week_boundaries, contest_season_clause,
+    CENTRAL, central_week_boundaries,
     weekly_camp_points, weekly_student_points,
 )
 from .models import Contest, ContestResult, ContestWeek, Season, Team, TeamWeekMembershipSnapshot
+from .seasons import season_covering_date
 from .teams import active_membership, membership_at, public_team_identity
 
 
@@ -33,11 +34,7 @@ def _contest_week_emblem(session: Session, *, profile_id: int, week: ContestWeek
 def current_roster_period(session: Session, *, today: date):
     # Do not use ensure_band_camp_data(): a dashboard read must not create or
     # commit seasons, weeks, or contest definitions.
-    season = session.scalar(select(Season).where(
-        Season.status == "active", contest_season_clause(),
-        Season.starts_on <= today,
-        (Season.ends_on.is_(None) | (Season.ends_on >= today)),
-    ).order_by(Season.starts_on.desc()))
+    season = season_covering_date(session, today)
     if season is None:
         return None, None
     start, _, _, _ = central_week_boundaries(datetime.combine(today, time.min, CENTRAL))

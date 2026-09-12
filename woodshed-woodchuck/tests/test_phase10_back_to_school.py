@@ -6,7 +6,8 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from app.board_seasons import BOARD_SEASONS, board_season_for_date
+from app.board_seasons import board_season_presentation
+from app.models import Season
 from app.contest_seasons import SEASON_KEY_PATTERN
 from app.contests import (
     EXPANDED_TRIVIA_START,
@@ -25,13 +26,12 @@ CSS = (ROOT / "static/css/styles.css").read_text(encoding="utf-8")
 
 
 def test_back_to_school_is_season_two_board_content() -> None:
-    assert [season.key for season in BOARD_SEASONS[:2]] == [
-        "band-camp", "back-to-school",
-    ]
-    assert board_season_for_date(date(2026, 8, 2)).title == "Band Camp"
-    assert board_season_for_date(date(2026, 8, 3)).title == "Back to School"
+    # BOARD only presents the supplied durable record; canonical boundary
+    # and rendered route coverage lives in test_canonical_seasons.py.
+    season = Season(key="back-to-school-2026", name="Back to School")
+    assert board_season_presentation(season).title == "Back to School"
+    assert board_season_presentation(season).key == season.key
     assert SEASON_KEY_PATTERN.fullmatch("back-to-school-2026")
-    assert TestClient(app).get("/quest").text.count('aria-label="Back to School"') == 1
 
 
 def test_four_normal_activities_are_collapsed_mobile_safe_lockers() -> None:
