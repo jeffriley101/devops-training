@@ -47,6 +47,7 @@ from app.models import (
     Season,
     Team,
     TeamMembership,
+    TeamWeekMembershipSnapshot,
     WoodchuckProfile,
     WoodchuckState,
 )
@@ -245,6 +246,7 @@ def test_camp_point_activities_persist_once_and_aggregate_separately(
     assert standings["open"] == [{
         "rank": 1,
         "display_name": "Student WC-CAMP-A",
+        "emblem_key": None,
         "total_points": 4,
         "is_current_user": True,
     }]
@@ -766,6 +768,7 @@ def test_student_points_rankings_and_current_user_position(
     assert standings["open"][-1] == {
         "rank": 6,
         "display_name": "Foxtrot Chuck",
+        "emblem_key": None,
         "total_minutes": 20,
         "is_current_user": True,
     }
@@ -780,11 +783,126 @@ def test_student_points_rankings_and_current_user_position(
     assert standings["current_user_position"]["verified"]["total_minutes"] == 10
     assert all(
         set(row) == {
-            "rank", "display_name", "total_minutes", "is_current_user"
+            "rank", "display_name", "emblem_key", "total_minutes", "is_current_user"
         }
         for division in ("open", "verified")
         for row in standings[division]
     )
+
+
+def test_student_standings_include_live_week_team_emblems_and_no_team_null(
+    database: tuple[Session, sessionmaker[Session]],
+) -> None:
+    session, _ = database
+    season, _, contest_week = ensure_band_camp_data(session, now=NOW)
+    teammate = add_student(
+        session, woodchuck_id="WC-EMBLEM-TEAM", instrument="Flute"
+    )
+    unteamed = add_student(
+        session, woodchuck_id="WC-EMBLEM-NONE", instrument="Clarinet"
+    )
+    team = Team(
+        season_id=season.id, display_name="Lion Team",
+        normalized_name="lion team", emblem_key="emoji:lion",
+        creator_profile_id=teammate.id,
+    )
+    session.add(team)
+    session.flush()
+    session.add(TeamMembership(
+        season_id=season.id, team_id=team.id, profile_id=teammate.id,
+        selected_week_start=contest_week.week_start, started_at=NOW,
+    ))
+    add_chart(
+        session, profile=teammate, practice_date=date(2026, 7, 29),
+        minutes=30, verification_status="approved",
+    )
+    pristine_chart = add_chart(
+        session, profile=unteamed, practice_date=date(2026, 7, 29), minutes=20,
+    )
+    pristine_chart.source = "pristine"
+    pristine_chart.detected_playing_seconds = 1200
+    for profile in (teammate, unteamed):
+        session.add(CampPointAward(
+            profile_id=profile.id, activity_type="care", points_awarded=1,
+            occurred_at=NOW, duplicate_key=f"emblem-live:{profile.id}",
+        ))
+    session.commit()
+
+    practice = weekly_student_points(
+        session, contest_week=contest_week, current_profile_id=teammate.id
+    )
+    activity_rows = weekly_camp_points(
+        session, contest_week=contest_week, current_profile_id=teammate.id
+    )["open"]
+
+    assert {row["display_name"]: row["emblem_key"] for row in practice["open"]} == {
+        teammate.display_name: "emoji:lion",
+        unteamed.display_name: None,
+    }
+    assert practice["verified"][0]["emblem_key"] == "emoji:lion"
+    assert practice["pristine"][0]["emblem_key"] is None
+    assert {row["display_name"]: row["emblem_key"] for row in activity_rows} == {
+        teammate.display_name: "emoji:lion",
+        unteamed.display_name: None,
+    }
+
+
+def test_student_standings_use_finalized_week_membership_snapshot(
+    database: tuple[Session, sessionmaker[Session]],
+) -> None:
+    session, _ = database
+    season, _, contest_week = ensure_band_camp_data(session, now=NOW)
+    student = add_student(
+        session, woodchuck_id="WC-EMBLEM-SNAPSHOT", instrument="Trumpet"
+    )
+    old_team = Team(
+        season_id=season.id, display_name="Snapshot Goats",
+        normalized_name="snapshot goats", emblem_key="emoji:goat",
+        creator_profile_id=student.id,
+    )
+    new_team = Team(
+        season_id=season.id, display_name="Current Lions",
+        normalized_name="current lions", emblem_key="emoji:lion",
+    )
+    session.add_all([old_team, new_team])
+    session.flush()
+    old_membership = TeamMembership(
+        season_id=season.id, team_id=old_team.id, profile_id=student.id,
+        selected_week_start=contest_week.week_start, started_at=NOW,
+        ended_at=FINAL_NOW,
+    )
+    session.add(old_membership)
+    session.flush()
+    session.add_all([
+        TeamMembership(
+            season_id=season.id, team_id=new_team.id, profile_id=student.id,
+            selected_week_start=date(2026, 8, 3), started_at=FINAL_NOW,
+        ),
+        TeamWeekMembershipSnapshot(
+            contest_week_id=contest_week.id, profile_id=student.id,
+            team_id=old_team.id, membership_id=old_membership.id,
+            snapshot_at=datetime(2026, 8, 3, 5, tzinfo=timezone.utc),
+        ),
+    ])
+    contest_week.status = "finalized"
+    add_chart(
+        session, profile=student, practice_date=date(2026, 7, 29), minutes=25
+    )
+    session.add(CampPointAward(
+        profile_id=student.id, activity_type="care", points_awarded=1,
+        occurred_at=NOW, duplicate_key="emblem-snapshot",
+    ))
+    session.commit()
+
+    practice_row = weekly_student_points(
+        session, contest_week=contest_week, current_profile_id=student.id
+    )["open"][0]
+    activity_row = weekly_camp_points(
+        session, contest_week=contest_week, current_profile_id=student.id
+    )["open"][0]
+
+    assert practice_row["emblem_key"] == "emoji:goat"
+    assert activity_row["emblem_key"] == "emoji:goat"
 
 
 def test_student_points_use_olympic_ties_and_separate_divisions(
@@ -894,6 +1012,7 @@ def test_points_api_exposes_only_public_leaderboard_fields(
     assert points["open"][0] == {
         "rank": 1,
         "display_name": "Public Chuck",
+        "emblem_key": None,
         "total_minutes": 25,
         "is_current_user": True,
     }

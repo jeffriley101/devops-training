@@ -3040,6 +3040,9 @@
             row.display_name.trim() &&
             Number.isInteger(campPoints ? row.total_points : row.total_minutes) &&
             (campPoints ? row.total_points : row.total_minutes) >= 0 &&
+            (row.emblem_key === null || (
+              typeof row.emblem_key === "string" && row.emblem_key.trim()
+            )) &&
             typeof row.is_current_user === "boolean"
           ))
         : [];
@@ -3063,8 +3066,15 @@
         rank.className = "contest-rank-badge";
         rank.textContent = String(row.rank);
         const subject = document.createElement("span");
-        subject.className = "contest-ranked-subject";
-        subject.textContent = publicName;
+        subject.className = "contest-ranked-subject team-ranked-subject";
+        if (row.emblem_key !== null) {
+          const emblem = document.createElement("span");
+          renderTeamEmblem(emblem, row.emblem_key);
+          subject.append(emblem);
+        }
+        const studentName = document.createElement("span");
+        studentName.textContent = publicName;
+        subject.append(studentName);
         const score = document.createElement("strong");
         score.className = "contest-ranked-score";
         score.textContent = String(scoreValue);

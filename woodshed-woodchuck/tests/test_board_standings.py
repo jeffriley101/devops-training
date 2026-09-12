@@ -236,6 +236,24 @@ def test_team_board_renders_each_configured_emblem_key_instead_of_a_generic_icon
     assert 'return { kind: "emoji", value, key: `emoji:${value}` };' in javascript
 
 
+def test_student_boards_render_team_emblems_without_a_no_team_fallback() -> None:
+    javascript = (TEMPLATE_PATH.parents[1] / "static" / "js" / "app.js").read_text(
+        encoding="utf-8"
+    )
+    renderer = javascript[
+        javascript.index("function renderPointsDivision"):
+        javascript.index("function renderTeamBoards")
+    ]
+    conditional = renderer[
+        renderer.index("if (row.emblem_key !== null) {"):
+        renderer.index("const studentName", renderer.index("if (row.emblem_key !== null) {"))
+    ]
+    assert "renderTeamEmblem(emblem, row.emblem_key)" in conditional
+    assert "subject.append(emblem)" in conditional
+    assert "subject.append(studentName)" in renderer
+    assert "subject.append(emblem, studentName)" not in renderer
+
+
 def test_board_contains_collapsed_lifetime_hall_states_and_target() -> None:
     markup = board_template()
 

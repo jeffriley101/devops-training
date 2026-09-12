@@ -501,6 +501,7 @@ def student_score_rows(
     current_profile_id: int,
     score_key: str,
     behind_key: str,
+    emblem_keys: dict[int, str | None] | None = None,
 ) -> tuple[list[dict[str, object]], dict[str, object]]:
     ordered = sorted(
         scores.items(),
@@ -521,6 +522,7 @@ def student_score_rows(
             {
                 "rank": rank,
                 "display_name": public_woodchuck_name(profiles.get(profile_id)),
+                "emblem_key": (emblem_keys or {}).get(profile_id),
                 score_key: score,
                 "is_current_user": profile_id == current_profile_id,
             }
@@ -565,6 +567,7 @@ def student_points_rows(
     profiles: dict[int, WoodchuckProfile],
     *,
     current_profile_id: int,
+    emblem_keys: dict[int, str | None] | None = None,
 ) -> tuple[list[dict[str, object]], dict[str, object]]:
     return student_score_rows(
         scores,
@@ -572,6 +575,7 @@ def student_points_rows(
         current_profile_id=current_profile_id,
         score_key="total_points",
         behind_key="points_behind_leader",
+        emblem_keys=emblem_keys,
     )
 
 
@@ -580,6 +584,7 @@ def student_minutes_rows(
     profiles: dict[int, WoodchuckProfile],
     *,
     current_profile_id: int,
+    emblem_keys: dict[int, str | None] | None = None,
 ) -> tuple[list[dict[str, object]], dict[str, object]]:
     return student_score_rows(
         scores,
@@ -587,7 +592,59 @@ def student_minutes_rows(
         current_profile_id=current_profile_id,
         score_key="total_minutes",
         behind_key="minutes_behind_leader",
+        emblem_keys=emblem_keys,
     )
+
+
+def _student_emblem_keys_for_week(
+    session: Session,
+    *,
+    contest_week: ContestWeek,
+    profile_ids: set[int],
+) -> dict[int, str | None]:
+    if not profile_ids:
+        return {}
+
+    team_ids_by_profile: dict[int, int | None] = {}
+    if contest_week.status == "finalized":
+        snapshots = session.scalars(select(TeamWeekMembershipSnapshot).where(
+            TeamWeekMembershipSnapshot.contest_week_id == contest_week.id,
+            TeamWeekMembershipSnapshot.profile_id.in_(profile_ids),
+        )).all()
+        team_ids_by_profile = {
+            snapshot.profile_id: snapshot.team_id for snapshot in snapshots
+        }
+    else:
+        at = datetime.combine(
+            contest_week.week_end, time.min, CENTRAL
+        ).astimezone(timezone.utc)
+        memberships = session.scalars(select(TeamMembership).where(
+            TeamMembership.profile_id.in_(profile_ids),
+            TeamMembership.season_id == contest_week.season_id,
+            TeamMembership.started_at <= at,
+        ).order_by(
+            TeamMembership.profile_id,
+            TeamMembership.started_at.desc(),
+        )).all()
+        for membership in memberships:
+            if membership.profile_id in team_ids_by_profile:
+                continue
+            if membership.ended_at is None or aware_utc(membership.ended_at) > at:
+                team_ids_by_profile[membership.profile_id] = membership.team_id
+
+    team_ids = {
+        team_id for team_id in team_ids_by_profile.values() if team_id is not None
+    }
+    teams = {
+        team.id: team
+        for team in session.scalars(select(Team).where(Team.id.in_(team_ids))).all()
+    } if team_ids else {}
+    return {
+        profile_id: (
+            public_team_emblem(teams.get(team_id)) if team_id is not None else None
+        )
+        for profile_id, team_id in team_ids_by_profile.items()
+    }
 
 
 def weekly_student_points(
@@ -627,6 +684,9 @@ def weekly_student_points(
         ).all()
     } if profile_ids else {}
     active_ids = set(profiles)
+    emblem_keys = _student_emblem_keys_for_week(
+        session, contest_week=contest_week, profile_ids=active_ids
+    )
     open_scores = {key: value for key, value in open_scores.items() if key in active_ids}
     verified_scores = {
         key: value for key, value in verified_scores.items() if key in active_ids
@@ -638,16 +698,19 @@ def weekly_student_points(
         open_scores,
         profiles,
         current_profile_id=current_profile_id,
+        emblem_keys=emblem_keys,
     )
     verified_rows, verified_position = student_minutes_rows(
         verified_scores,
         profiles,
         current_profile_id=current_profile_id,
+        emblem_keys=emblem_keys,
     )
     pristine_rows, pristine_position = student_minutes_rows(
         pristine_scores,
         profiles,
         current_profile_id=current_profile_id,
+        emblem_keys=emblem_keys,
     )
     return {
         "open": open_rows,
@@ -736,8 +799,14 @@ def weekly_camp_points(
         ).all()
     } if scores else {}
     scores = {key: value for key, value in scores.items() if key in profiles}
+    emblem_keys = _student_emblem_keys_for_week(
+        session, contest_week=contest_week, profile_ids=set(profiles)
+    )
     rows, position = student_points_rows(
-        scores, profiles, current_profile_id=current_profile_id
+        scores,
+        profiles,
+        current_profile_id=current_profile_id,
+        emblem_keys=emblem_keys,
     )
     return {
         "open": rows,
