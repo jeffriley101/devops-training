@@ -45,7 +45,7 @@ from .content import (
     SAX_VIKING_WELCOME,
     SHOP_SHARE_URL,
 )
-from .instruments import instrument_definition_payloads, shed_artwork_url
+from .instruments import instrument_definition_payloads, shed_artwork_url, shed_character_url
 from .history_mystery import (
     history_mystery_central_date,
     history_mystery_questions_for_date,
