@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% macro arrow(value) -%}
+<span class="bd-trend bd-trend-{{ value.direction }}" role="img" aria-label="{{ value.label }}">{{ value.arrow }}</span>
+{%- endmacro %}
+{% block content %}
+<section class="card bd-dashboard" aria-label="Band Director Dashboard">
+  <header class="bd-heading">
+    <h1>{{ verifier_name }}</h1>
+    <p id="program-rating-label">PROGRAM RATING</p>
+    <div class="bd-rating-row">
+      <div class="bd-rating" aria-labelledby="program-rating-label">
+        <span>{{ '%.1f' | format(program_rating) }}</span>
+      </div>
+      {{ arrow(program_trend) }}
+    </div>
+    <form class="bd-week" action="/band-director/dashboard" method="get">
+      <label for="bd-week">Week</label>
+      <div class="bd-week-controls">
+        {% if previous_week %}<a href="?week={{ previous_week }}" aria-label="Previous week">←</a>{% else %}<span aria-hidden="true">←</span>{% endif %}
+        <select id="bd-week" name="week" onchange="this.form.requestSubmit()">
+          {% for week in weeks %}<option value="{{ week }}"{% if week == selected_week %} selected{% endif %}>{{ week.strftime('%b %d, %Y') }}</option>{% endfor %}
+        </select>
+        {% if next_week %}<a href="?week={{ next_week }}" aria-label="Next week">→</a>{% else %}<span aria-hidden="true">→</span>{% endif %}
+      </div>
+    </form>
+  </header>
+  {% if students %}
+  <div class="bd-table-scroll" role="region" aria-label="Student practice roster" tabindex="0">
+    <table data-director-table>
+      <caption>Connected students ·
+        {% if selected_week.year == week_end.year and selected_week.month == week_end.month %}
+        {{ selected_week.strftime('%b %-d') }}–{{ week_end.strftime('%-d, %Y') }}
+        {% elif selected_week.year == week_end.year %}
+        {{ selected_week.strftime('%b %-d') }}–{{ week_end.strftime('%b %-d, %Y') }}
+        {% else %}
+        {{ selected_week.strftime('%b %-d, %Y') }}–{{ week_end.strftime('%b %-d, %Y') }}
+        {% endif %}
+      </caption>
+      <thead><tr>
+        {% for label in ['Name', 'Rating', 'Trend', 'Total Min Wk', 'Verified Min Wk', 'Pristine Min Wk', 'Total Min Life', 'Verified Min Life', 'Pristine Min Life', 'Charts Wk', 'Charts Life', 'Team'] %}
+        <th scope="col" aria-sort="none"><button type="button" data-sort="{{ 'text' if loop.first or loop.last else 'number' }}">{{ label }}</button></th>
+        {% endfor %}
+      </tr></thead>
+      <tbody>
+        {% for student in students %}
+        <tr>
+          <th scope="row" data-sort-value="{{ student.display_name }}">{{ student.display_name }}</th>
+          <td data-sort-value="{{ student.rating }}">{{ '%.1f' | format(student.rating) }}</td>
+          <td data-sort-value="{{ student.trend.delta }}">{{ arrow(student.trend) }}</td>
+          {% for value in [student.weekly.total, student.weekly.verified, student.weekly.pristine, student.lifetime.total, student.lifetime.verified, student.lifetime.pristine, student.weekly.charts, student.lifetime.charts] %}
+          <td data-sort-value="{{ value }}">{{ value }}</td>
+          {% endfor %}
+          <td data-sort-value="{{ student.team.name if student.team else 'No team' }}">
+            {% if student.team %}
+            {% set emblem = student.team.emblem %}
+            <span class="team-emblem-visual team-emblem-{{ emblem.kind }}{% if emblem.kind == 'shield' %} team-emblem-shield-{{ emblem.value | lower }}{% endif %}" role="img" aria-label="{{ emblem.value }} {{ emblem.kind }} emblem">{% if emblem.kind != 'shield' %}{{ emblem.value }}{% endif %}</span>
+            {{ student.team.name }}{% else %}No team{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="bd-sort-feedback" data-sort-feedback role="status" aria-live="polite"></p>
+  {% else %}
+  <p>No Band Director students are connected yet.</p>
+  <p>Ask your students to invite you with the Band director role. They will appear here after you accept their invitations.</p>
+  {% endif %}
+  <p><a class="btn btn-secondary" href="/trusted-verifiers/dashboard">Trusted Verifier Dashboard · Review P-Charts</a></p>
+</section>
+{% endblock %}
+{% block page_scripts %}
+<link rel="stylesheet" href="/static/css/band-director-dashboard.css?v=1">
+<script src="/static/js/band-director-dashboard.js?v=2"></script>
+{% endblock %}

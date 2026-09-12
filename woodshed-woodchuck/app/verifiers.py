@@ -39,6 +39,33 @@ VERIFIER_ROLES = frozenset(
 ACTIVE_CONNECTION_STATUSES = ("pending", "accepted")
 
 
+def band_director_students(
+    session: Session, *, verifier_id: int
+) -> list[dict[str, str | int]]:
+    """Return safe roster basics for this verifier's accepted director links."""
+    rows = session.execute(
+        select(
+            WoodchuckProfile.id.label("profile_id"),
+            WoodchuckProfile.display_name,
+            WoodchuckProfile.instrument,
+            WoodchuckProfile.level,
+            WoodchuckProfile.goal,
+        )
+        .join(
+            StudentVerifierConnection,
+            StudentVerifierConnection.profile_id == WoodchuckProfile.id,
+        )
+        .where(
+            StudentVerifierConnection.verifier_id == verifier_id,
+            StudentVerifierConnection.status == "accepted",
+            StudentVerifierConnection.role == "band_director",
+            WoodchuckProfile.status == "active",
+        )
+        .order_by(WoodchuckProfile.display_name, WoodchuckProfile.id)
+    ).mappings().all()
+    return [dict(row) for row in rows]
+
+
 @dataclass(frozen=True)
 class CreatedInvitation:
     invitation: TrustedVerifierInvitation

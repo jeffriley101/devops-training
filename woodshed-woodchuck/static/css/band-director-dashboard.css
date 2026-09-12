@@ -1,0 +1,40 @@
+.band-director-page .app-shell { max-width: 1500px; }
+.band-director-page .content-wrap { min-width: 0; }
+.bd-dashboard { min-width: 0; text-align: left; }
+.bd-heading h1 { margin: 0 0 1rem; font-size: 1.6rem; }
+.bd-heading > p { font-size: .8rem; font-weight: 700; letter-spacing: .12em; }
+.bd-rating-row { display: flex; align-items: center; gap: .7rem; }
+.bd-rating { display: flex; align-items: center; justify-content: center; gap: .4rem; width: 150px; height: 150px; border: 4px solid #426745; border-radius: 50%; background: #fff9e9; font-size: 2.6rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.bd-trend { font-weight: 700; font-size: 1.4em; }
+.bd-rating-row > .bd-trend { font-size: 2.2rem; }
+.bd-trend-up { color: #27613b; }
+.bd-trend-down { color: #ad3333; }
+.bd-trend-steady { color: #706e68; }
+.bd-week { margin: 1rem 0 1.5rem; }
+.bd-week label { display: block; margin-bottom: .3rem; }
+.bd-week-controls { display: flex; align-items: center; gap: .5rem; }
+.bd-week-controls select { width: auto; min-width: 0; }
+.bd-week-controls button, .bd-week-controls a, .bd-week-controls > span { padding: .5rem; }
+.bd-week-controls > span { color: #999; }
+.bd-table-scroll { overflow-x: auto; max-width: 100%; border: 1px solid #cbb68e; border-radius: .4rem; }
+.bd-table-scroll table { width: 100%; min-width: 1150px; border-collapse: collapse; font-size: .85rem; font-variant-numeric: tabular-nums; }
+.bd-table-scroll caption { text-align: left; padding: .7rem; color: #58452e; }
+.bd-table-scroll th, .bd-table-scroll td { padding: .55rem .5rem; border-bottom: 1px solid #dfcfac; text-align: center; }
+.bd-table-scroll thead th { background: #e7e8cf; vertical-align: bottom; }
+.bd-table-scroll thead button { display: inline-flex; align-items: center; justify-content: center; border: 0; background: transparent; color: #354c32; font: inherit; font-weight: 700; cursor: pointer; padding: .35rem 0; text-align: inherit; white-space: nowrap; }
+.bd-table-scroll thead button::after { content: ' ↕'; opacity: .45; }
+.bd-table-scroll [aria-sort=ascending] button::after { content: ' ↑'; opacity: 1; }
+.bd-table-scroll [aria-sort=descending] button::after { content: ' ↓'; opacity: 1; }
+.bd-table-scroll tbody tr:nth-child(even) { background: #f7ecd5; }
+.bd-table-scroll tr > :first-child { position: sticky; left: 0; z-index: 1; background: #fff4dd; text-align: left; min-width: 145px; max-width: 190px; overflow-wrap: anywhere; }
+.bd-table-scroll tr > :first-child button, .bd-table-scroll tr > :last-child button { justify-content: flex-start; }
+.bd-table-scroll thead tr > :first-child { background: #e7e8cf; }
+.bd-table-scroll tr > :nth-child(3) { width: 42px; text-align: center; }
+.bd-table-scroll tr > :last-child { text-align: left; color: #675b46; min-width: 120px; }
+.bd-table-scroll .team-emblem-visual { width: 22px; height: 22px; font-size: 1rem; vertical-align: middle; }
+.bd-sort-feedback { font-size: .8rem; min-height: 1.2em; }
+@media (max-width: 480px) {
+  .band-director-page .app-shell { padding: .5rem; }
+  .bd-dashboard { padding: .75rem; }
+  .bd-table-scroll tr > :first-child { min-width: 110px; max-width: 135px; }
+}

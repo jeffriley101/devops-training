@@ -1,6 +1,6 @@
 import os
 import base64
-from datetime import datetime
+from datetime import date, datetime
 from io import BytesIO
 from pathlib import Path
 from urllib.parse import quote
@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 import qrcode
 import qrcode.image.svg
 
-from fastapi import FastAPI, Form, Request
+from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -24,6 +24,8 @@ from .verifier_routes import (
     router as verifier_router,
 )
 from .practice_chart_routes import router as practice_chart_router
+from .band_director_dashboard import dashboard_metrics
+from .verifiers import band_director_students
 from .contests import router as contest_router
 from .contest_admin import router as contest_admin_router
 from .director_dashboard import router as director_router
@@ -217,12 +219,40 @@ def trusted_verifier_dashboard_page(request: Request):
                 status_code=303,
             )
 
+        has_director_students = bool(band_director_students(session, verifier_id=verifier.id))
+
     return _render(
         request,
         "trusted_verifier_dashboard.html",
         title="Trusted Verifier Dashboard",
         active_nav=None,
+        has_director_students=has_director_students,
     )
+
+
+@app.get("/band-director/dashboard")
+def band_director_dashboard_page(request: Request, week: date | None = None):
+    with SessionLocal() as session:
+        verifier = current_verifier(request, session)
+        if verifier is None:
+            return RedirectResponse(url="/trusted-verifiers/login", status_code=303)
+        try:
+            metrics = dashboard_metrics(session, verifier_id=verifier.id, selected_week=week)
+        except ValueError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+        # Adult pages must not bootstrap an unrelated signed-in player account.
+        return templates.TemplateResponse(
+            request=request,
+            name="band_director_dashboard.html",
+            context={
+                "title": "Band Director Dashboard",
+                "verifier_name": verifier.display_name,
+                "verifier_email": verifier.email,
+                "page_class": "band-director-page",
+                **metrics,
+            },
+            headers={"Cache-Control": "no-store"},
+        )
 
 
 @app.get("/trusted-verifiers/accept/{token}")
