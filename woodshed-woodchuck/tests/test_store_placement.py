@@ -125,7 +125,7 @@ def test_placing_and_moving_update_the_same_owned_copy(placement_database) -> No
         assert (owned.placement_x, owned.placement_y) == (0.65, 0.75)
 
 
-@pytest.mark.parametrize("size", ["medium", "large", "xlarge"])
+@pytest.mark.parametrize("size", ["small", "medium", "large", "xlarge"])
 def test_discrete_size_persists_across_inventory_reload(
     placement_database, size: str
 ) -> None:
@@ -233,7 +233,7 @@ def test_unknown_decoration_size_is_rejected(placement_database) -> None:
         assert owned.placement_size == "medium"
 
 
-def test_supported_placement_sizes_remain_medium_large_and_extra_large() -> None:
+def test_supported_placement_sizes_include_small_through_extra_large() -> None:
     assert PLACEMENT_SIZES == ("small", "medium", "large", "xlarge")
 
 

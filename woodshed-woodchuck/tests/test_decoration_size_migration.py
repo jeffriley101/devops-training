@@ -95,3 +95,54 @@ def test_new_size_migration_remaps_small_and_downgrades_xlarge_safely(
         assert connection.execute(text(
             "SELECT placement_size FROM owned_item_copies ORDER BY id"
         )).scalars().all() == ["medium", "medium", "large"]
+
+
+def test_restore_small_size_migration_round_trip(
+    tmp_path, monkeypatch,
+) -> None:
+    database = tmp_path / "restored-small-decoration-size.db"
+    url = f"sqlite:///{database}"
+    monkeypatch.setenv("DATABASE_URL", url)
+    config = Config(str(ROOT / "alembic.ini"))
+    command.upgrade(config, "k1f2a3b4c5d6")
+
+    engine = create_engine(url)
+    with engine.begin() as connection:
+        connection.execute(text("""
+            INSERT INTO woodchuck_profiles
+              (id, woodchuck_id, display_name, pin_hash, instrument, level, goal,
+               created_at, updated_at)
+            VALUES
+              (1, 'WC-RESTORE-SMALL', 'Restore Small', 'private', 'Flute',
+               'Beginner', 'Practice', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """))
+        connection.execute(text("""
+            INSERT INTO owned_item_copies
+              (id, profile_id, item_key, acquisition_source, acquisition_key,
+               purchase_price, placement_x, placement_y, placement_size,
+               acquired_at, created_at, updated_at)
+            VALUES
+              (1, 1, 'candle', 'store', NULL, 25, 0.3, 0.4, 'medium',
+               CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """))
+    engine.dispose()
+
+    command.upgrade(config, "l2g3h4i5j6k7")
+    reloaded_engine = create_engine(url)
+    with reloaded_engine.begin() as connection:
+        connection.execute(text(
+            "UPDATE owned_item_copies SET placement_size = 'small' WHERE id = 1"
+        ))
+    with reloaded_engine.connect() as connection:
+        assert connection.scalar(text(
+            "SELECT placement_size FROM owned_item_copies WHERE id = 1"
+        )) == "small"
+    reloaded_engine.dispose()
+
+    command.downgrade(config, "k1f2a3b4c5d6")
+    downgraded_engine = create_engine(url)
+    with downgraded_engine.connect() as connection:
+        assert connection.scalar(text(
+            "SELECT placement_size FROM owned_item_copies WHERE id = 1"
+        )) == "medium"
+    downgraded_engine.dispose()

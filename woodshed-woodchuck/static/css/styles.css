@@ -533,7 +533,6 @@ select {
 }
 
 .shed-decoration-inventory-emoji { font-size: 1.5rem; }
-.shed-decoration-action { min-height: 44px; }
 .shed-decoration-error { color: #9f1d1d; font-weight: 800; }
 
 @media (max-width: 480px) {
