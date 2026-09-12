@@ -190,7 +190,7 @@ class OwnedItemCopy(Base):
             name="ck_owned_item_copy_placement_y",
         ),
         CheckConstraint(
-            "placement_size IN ('medium', 'large', 'xlarge')",
+            "placement_size IN ('small', 'medium', 'large', 'xlarge')",
             name="ck_owned_item_copy_placement_size",
         ),
     )
@@ -284,7 +284,7 @@ class RewardInventoryPlacement(Base):
             name="ck_reward_inventory_placement_y",
         ),
         CheckConstraint(
-            "placement_size IN ('medium', 'large', 'xlarge')",
+            "placement_size IN ('small', 'medium', 'large', 'xlarge')",
             name="ck_reward_inventory_placement_size",
         ),
     )
@@ -340,7 +340,7 @@ class TravelingCupPlacement(Base):
             name="ck_traveling_cup_placement_y",
         ),
         CheckConstraint(
-            "placement_size IN ('medium', 'large', 'xlarge')",
+            "placement_size IN ('small', 'medium', 'large', 'xlarge')",
             name="ck_traveling_cup_placement_size",
         ),
     )

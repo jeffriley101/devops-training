@@ -7251,16 +7251,18 @@ select {
   grid-template-areas:
     "identity displayed"
     "controls controls";
-  align-content: space-between;
+  grid-template-rows: auto 1fr auto;
+  align-content: stretch;
   justify-items: stretch;
   min-width: 0;
-  min-height: 12.5rem;
+  min-height: 9.5rem;
+  row-gap: 0.65rem;
   padding: 0.75rem;
 }
 
 .shed-decoration-inventory-identity {
   display: grid;
-  grid-template-columns: 3rem minmax(0, 1fr);
+  grid-template-columns: 2.5rem minmax(0, 1fr);
   align-items: center;
   justify-content: start;
   width: 100%;
@@ -7295,6 +7297,8 @@ select {
   grid-area: controls;
   gap: 0.5rem;
   width: 100%;
+  margin-top: auto;
+  align-self: end;
 }
 
 .shed-decoration-display-toggle {
@@ -7315,16 +7319,9 @@ select {
   flex: 0 0 auto;
 }
 
-.shed-decoration-card-controls .shed-decoration-action {
-  width: 100%;
-  min-width: 0;
-  justify-self: stretch;
-  white-space: normal;
-}
-
 .shed-decoration-size-controls {
   display: grid;
-  grid-template-columns: repeat(3, minmax(44px, 1fr));
+  grid-template-columns: repeat(4, minmax(44px, 1fr));
   gap: 0.3rem;
 }
 
@@ -7343,6 +7340,13 @@ select {
   color: #fff8e8;
   background: #76502d;
   box-shadow: inset 0 0 0 2px #f4d35e;
+}
+
+.shed-decoration-size-small {
+  width: 10%;
+  height: 10cqw;
+  aspect-ratio: 1 / 1;
+  font-size: 9cqw;
 }
 
 .shed-decoration-size-medium {

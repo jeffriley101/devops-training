@@ -38,7 +38,7 @@ class OwnedItemAccessError(ValueError):
     pass
 
 
-PLACEMENT_SIZES = ("medium", "large", "xlarge")
+PLACEMENT_SIZES = ("small", "medium", "large", "xlarge")
 CROWN_EMOJI = "👑"
 CROWN_NAMES = {
     "weekly-points-leaders": "Practice Crown",
@@ -291,10 +291,8 @@ def _normalized_coordinate(value: float) -> float:
 
 
 def _normalized_size(value: str) -> str:
-    if value == "small":
-        return "medium"
     if value not in PLACEMENT_SIZES:
-        raise ValueError("Decoration size must be medium, large, or extra large.")
+        raise ValueError("Decoration size must be small, medium, large, or extra large.")
     return value
 
 

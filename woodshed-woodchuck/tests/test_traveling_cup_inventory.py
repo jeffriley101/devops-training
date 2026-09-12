@@ -410,6 +410,7 @@ def test_traveling_cup_inventory_uses_existing_stickerbook_controls() -> None:
         javascript.index("  function wireShedSecret() {")
     ]
     assert '"traveling-cup": "Current traveling cup"' in wiring
-    assert 'const PLACEMENT_SIZES = ["medium", "large", "xlarge"]' in wiring
+    assert 'const PLACEMENT_SIZES = ["small", "medium", "large", "xlarge"]' in wiring
     assert "data-decoration-size" in wiring
-    assert "data-decoration-action" in wiring
+    assert "data-decoration-action" not in wiring
+    assert "data-decoration-display-toggle" in wiring

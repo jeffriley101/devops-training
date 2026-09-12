@@ -505,8 +505,9 @@
     if (control.dataset.decorateWired === "true") return;
     control.dataset.decorateWired = "true";
 
-    const PLACEMENT_SIZES = ["medium", "large", "xlarge"];
+    const PLACEMENT_SIZES = ["small", "medium", "large", "xlarge"];
     const PLACEMENT_SIZE_LABELS = {
+      small: {short: "S", title: "Small"},
       medium: {short: "M", title: "Medium"},
       large: {short: "L", title: "Large"},
       xlarge: {short: "XL", title: "Extra Large"},
@@ -522,7 +523,6 @@
     }
 
     function itemSize(item) {
-      if (item.placement_size === "small") return "medium";
       return PLACEMENT_SIZES.includes(item.placement_size)
         ? item.placement_size
         : "medium";
@@ -569,7 +569,7 @@
       });
     }
 
-    function makeInventoryRow(item, action, actionLabel) {
+    function makeInventoryRow(item) {
       const row = document.createElement("div");
       row.className = "shed-decoration-inventory-item";
       const identity = document.createElement("span");
@@ -624,15 +624,6 @@
         sizeGroup.append(sizeButton);
       });
       controls.append(sizeGroup);
-      const button = document.createElement("button");
-      button.className = "btn btn-secondary shed-decoration-action";
-      button.type = "button";
-      button.dataset.decorationAction = action;
-      button.dataset.ownedCopyId = String(item.id);
-      button.textContent = placementRequests.has(itemId(item)) ? "Saving…" : actionLabel;
-      button.setAttribute("aria-label", `${actionLabel} ${itemLabel(item)}`);
-      button.disabled = placementRequests.has(itemId(item));
-      controls.append(button);
       row.append(identity, displayToggle, controls);
       return row;
     }
@@ -640,12 +631,7 @@
     function renderInventory() {
       inventoryEl.replaceChildren();
       ownedItems.forEach((item) => {
-        const displayed = isPlaced(item);
-        inventoryEl.append(makeInventoryRow(
-          item,
-          displayed ? "remove" : "place",
-          displayed ? "Return to Inventory" : "Place"
-        ));
+        inventoryEl.append(makeInventoryRow(item));
       });
     }
 
@@ -788,9 +774,7 @@
     });
     closeButton.addEventListener("click", closeDecorateMode);
     panel.addEventListener("click", function (event) {
-      const button = event.target.closest(
-        "[data-decoration-action], [data-decoration-size]"
-      );
+      const button = event.target.closest("[data-decoration-size]");
       if (!button) return;
       const ownedCopyId = button.dataset.ownedCopyId;
       const item = ownedItems.find((candidate) => itemId(candidate) === ownedCopyId);
@@ -806,8 +790,6 @@
         }
         return;
       }
-      if (button.dataset.decorationAction === "place") void placeFromInventory(item);
-      if (button.dataset.decorationAction === "remove") void removePlacement(item);
     });
     panel.addEventListener("change", function (event) {
       const checkbox = event.target.closest("[data-decoration-display-toggle]");

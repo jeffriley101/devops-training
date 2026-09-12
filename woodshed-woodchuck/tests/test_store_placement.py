@@ -234,7 +234,7 @@ def test_unknown_decoration_size_is_rejected(placement_database) -> None:
 
 
 def test_supported_placement_sizes_remain_medium_large_and_extra_large() -> None:
-    assert PLACEMENT_SIZES == ("medium", "large", "xlarge")
+    assert PLACEMENT_SIZES == ("small", "medium", "large", "xlarge")
 
 
 def test_removing_clears_placement_without_deleting_ownership(placement_database) -> None:

@@ -29,7 +29,7 @@ def test_decorate_mode_has_a_dedicated_scene_layer_and_inventory_panel() -> None
     assert 'aria-label="Open Stickerbook"' in decorate_button
     assert '<span class="room-object-icon" aria-hidden="true">🎨</span>' in decorate_button
     assert "<span>Decorate</span>" not in decorate_button
-    assert "Return to Inventory" in DECORATIONS
+    assert "Return to Inventory" not in DECORATIONS
     panel = HOME[HOME.index('id="shed-decorate-panel"'):HOME.index('id="xp-panel"')]
     assert 'id="shed-stickerbook-title">Stickerbook</h2>' in panel
     assert "Tap an inventory item" not in panel
@@ -50,9 +50,9 @@ def test_stickerbook_cards_show_identity_source_size_and_required_actions() -> N
     assert 'displayCheckbox.checked = isPlaced(item)' in rows
     assert 'displayText.textContent = "Displayed above"' in rows
     assert 'if (isPlaced(item)) {' not in rows
-    assert 'button.setAttribute("aria-label", `${actionLabel} ${itemLabel(item)}`)' in rows
-    assert '"Place"' in DECORATIONS
-    assert '"Return to Inventory"' in DECORATIONS
+    assert "shed-decoration-action" not in rows
+    assert '"Place"' not in DECORATIONS
+    assert '"Return to Inventory"' not in DECORATIONS
     assert "placed in the SHED" not in DECORATIONS
     assert "returned to inventory" not in DECORATIONS
 
@@ -66,8 +66,9 @@ def test_owned_inventory_and_placed_items_render_from_server_copies() -> None:
     ]
     assert "ownedItems.forEach" in inventory
     assert "ownedItems.filter" not in inventory
-    assert 'displayed ? "remove" : "place"' in inventory
-    assert 'displayed ? "Return to Inventory" : "Place"' in inventory
+    assert "makeInventoryRow(item)" in inventory
+    assert '"Return to Inventory"' not in inventory
+    assert '"Place"' not in inventory
     assert "decoration.dataset.ownedCopyId = String(item.id)" in DECORATIONS
     assert "decoration.textContent = item.emoji" in DECORATIONS
     assert "item.name" in DECORATIONS
@@ -75,7 +76,7 @@ def test_owned_inventory_and_placed_items_render_from_server_copies() -> None:
 
 
 def test_tapping_inventory_places_and_dragging_moves_normalized_coordinates() -> None:
-    assert "data-decoration-action" in DECORATIONS
+    assert "data-decoration-display-toggle" in DECORATIONS
     assert "placeFromInventory(item)" in DECORATIONS
     assert "nextOpenPlacement()" in DECORATIONS
     assert "body: JSON.stringify({ x, y, size })" in DECORATIONS
@@ -149,9 +150,9 @@ def test_stickerbook_grid_and_size_controls_are_phone_safe() -> None:
     assert ".shed-decoration-inventory {" in CSS
     assert "repeat(auto-fill, minmax(min(16rem, 100%), 1fr))" in CSS
     assert "grid-auto-rows: 1fr" in CSS
-    assert "min-height: 12.5rem" in CSS
+    assert "min-height: 9.5rem" in CSS
     assert ".shed-decoration-size-controls" in CSS
-    assert "grid-template-columns: repeat(3, minmax(44px, 1fr))" in CSS
+    assert "grid-template-columns: repeat(4, minmax(44px, 1fr))" in CSS
     assert "min-height: 44px" in CSS
     mobile = CSS[
         CSS.index("@media (max-width: 640px)", CSS.index(".shed-decoration-size-xlarge")):
@@ -160,7 +161,7 @@ def test_stickerbook_grid_and_size_controls_are_phone_safe() -> None:
     assert "grid-template-columns: minmax(0, 1fr)" in mobile
     for size in ("medium", "large", "xlarge"):
         assert f".shed-decoration-size-{size}" in CSS
-    assert ".shed-decoration-size-small" not in CSS
+    assert ".shed-decoration-size-small" in CSS
     assert 'medium: {short: "M", title: "Medium"}' in DECORATIONS
     assert 'large: {short: "L", title: "Large"}' in DECORATIONS
     assert 'xlarge: {short: "XL", title: "Extra Large"}' in DECORATIONS
@@ -235,9 +236,9 @@ def test_unified_stickerbook_cards_keep_one_consistent_layout() -> None:
     ]
     assert '"identity displayed"' in card
     assert '"controls controls"' in card
-    assert "min-height: 12.5rem" in card
+    assert "min-height: 9.5rem" in card
     assert ".shed-decoration-display-toggle" in stickerbook
-    assert ".shed-decoration-card-controls .shed-decoration-action" in stickerbook
+    assert ".shed-decoration-card-controls .shed-decoration-action" not in stickerbook
 
 def test_decorate_panel_overrides_the_wide_mentor_card_layout() -> None:
     wide = CSS[CSS.index("@media (min-width: 860px)"):CSS.index(".woodshed-page", CSS.index("@media (min-width: 860px)"))]

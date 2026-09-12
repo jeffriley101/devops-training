@@ -36,13 +36,13 @@ class StorePlacementSubmission(BaseModel):
 
     x: float = Field(ge=0, le=1)
     y: float = Field(ge=0, le=1)
-    size: Literal["medium", "large", "xlarge"] | None = None
+    size: Literal["small", "medium", "large", "xlarge"] | None = None
 
 
 class StoreSizeSubmission(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    size: Literal["medium", "large", "xlarge"]
+    size: Literal["small", "medium", "large", "xlarge"]
 
 
 class MumSnackSubmission(BaseModel):
