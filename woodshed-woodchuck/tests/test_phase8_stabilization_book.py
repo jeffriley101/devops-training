@@ -131,6 +131,20 @@ def test_book_history_uses_accessible_verified_and_pristine_badges() -> None:
     assert "formatDetectedPlayingTime(entry.detectedPlayingSeconds)" in formatter
 
 
+def test_book_history_shows_bounded_pagination_and_positive_practice_days() -> None:
+    script = (ROOT / "static/js/app.js").read_text(encoding="utf-8")
+    template = (ROOT / "templates/p_book.html").read_text(encoding="utf-8")
+    renderer = script[script.index("function renderEntries"):script.index("async function loadPracticeTotals")]
+    assert 'slice(0, visibleEntryCount)' in renderer
+    assert 'Showing ${shown} of ${allEntries.length} P-Charts using actual values.' in renderer
+    assert 'visibleEntryCount += 10' in script
+    assert 'visibleEntryCount = 10' in script
+    assert '.filter((entry) => Number(entry.minutes) > 0)' in script
+    assert 'id="p-book-history-controls"' in template
+    assert 'id="p-book-show-more"' in template
+    assert 'id="p-book-show-less"' in template
+
+
 def test_book_asset_versions_are_advanced() -> None:
     base = (ROOT / "templates/base.html").read_text(encoding="utf-8")
     assert "/static/css/styles.css?v=119" in base

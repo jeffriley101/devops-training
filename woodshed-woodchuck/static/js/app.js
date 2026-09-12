@@ -4312,6 +4312,10 @@
     const feedbackEl = document.getElementById("p-book-feedback");
     const deliveryStatusEl = document.getElementById("p-book-email-delivery-status");
     const entriesEl = document.getElementById("p-book-entries");
+    const historyControlsEl = document.getElementById("p-book-history-controls");
+    const historyCountEl = document.getElementById("p-book-history-count");
+    const showMoreEl = document.getElementById("p-book-show-more");
+    const showLessEl = document.getElementById("p-book-show-less");
     const verifierSelectEl = document.getElementById("p-book-verifier");
     const includeContestsEl = document.getElementById("p-book-include-contests");
     const includeTeamEl = document.getElementById("p-book-include-team");
@@ -4336,6 +4340,7 @@
     const careerPracticeEl = document.getElementById("p-book-career-practice");
     const practiceDaysEl = document.getElementById("p-book-practice-days");
     const pagesCountEl = document.getElementById("p-book-pages-count");
+    let visibleEntryCount = 10;
 
     const requiredElements = [dateEl, minutesEl, noteEl, errorEl, feedbackEl, submitBtn];
     if (requiredElements.some((element) => !element)) {
@@ -4995,7 +5000,8 @@
     function renderEntries(s) {
       if (!entriesEl) return;
 
-      const entries = Array.isArray(s.practiceLog) ? s.practiceLog.slice(0, 10) : [];
+      const allEntries = Array.isArray(s.practiceLog) ? s.practiceLog : [];
+      const entries = allEntries.slice(0, visibleEntryCount);
 
       if (!entries.length) {
         entriesEl.innerHTML = "<p>No practice pages logged yet.</p>";
@@ -5005,16 +5011,39 @@
       entriesEl.innerHTML = entries
         .map((entry) => `<p>${formatEntry(entry)}</p>`)
         .join("");
+
+      if (historyControlsEl) {
+        const shown = Math.min(visibleEntryCount, allEntries.length);
+        historyControlsEl.hidden = allEntries.length <= 10;
+        if (historyCountEl && allEntries.length > 10) {
+          historyCountEl.textContent = `Showing ${shown} of ${allEntries.length} P-Charts using actual values.`;
+        }
+        if (showMoreEl) showMoreEl.hidden = shown >= allEntries.length;
+        if (showLessEl) showLessEl.hidden = shown <= 10;
+      }
     }
 
     function renderPBookSummary(s) {
       const entries = Array.isArray(s.practiceLog) ? s.practiceLog : [];
-      const practiceDays = new Set(entries.map((entry) => entry.dateKey).filter(Boolean)).size;
+      const practiceDays = new Set(entries
+        .filter((entry) => Number(entry.minutes) > 0)
+        .map((entry) => entry.dateKey)
+        .filter(Boolean)).size;
       const pagesCount = entries.length;
 
       if (practiceDaysEl) practiceDaysEl.textContent = String(practiceDays);
       if (pagesCountEl) pagesCountEl.textContent = String(pagesCount);
     }
+
+    if (showMoreEl) showMoreEl.addEventListener("click", () => {
+      visibleEntryCount += 10;
+      renderEntries(stateApi.getState());
+    });
+    if (showLessEl) showLessEl.addEventListener("click", () => {
+      visibleEntryCount = 10;
+      renderEntries(stateApi.getState());
+      entriesEl?.scrollIntoView({behavior: "smooth", block: "nearest"});
+    });
 
     async function loadPracticeTotals() {
       if (!weekPracticeEl && !careerPracticeEl) return;
