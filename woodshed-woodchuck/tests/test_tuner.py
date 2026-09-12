@@ -79,7 +79,7 @@ def test_tuner_is_full_screen_minimal_and_uses_locked_state_colors():
     assert ".tuner-state-good" not in CSS
     assert "background: #1769d2" in CSS[CSS.index(".tuner-state-pristine"):]
     assert "/static/js/tuner.js?v=2" in BASE
-    assert BASE.index("/static/js/tuner.js?v=2") < BASE.index("/static/js/app.js?v=79")
+    assert BASE.index("/static/js/tuner.js?v=2") < BASE.index("/static/js/app.js?v=")
 
 
 def test_tuner_requests_microphone_smooths_results_and_releases_resources():
