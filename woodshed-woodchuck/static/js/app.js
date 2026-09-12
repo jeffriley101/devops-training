@@ -1936,6 +1936,12 @@
     let tapTimes = [];
     const visualTimers = new Set();
 
+    function setPracticeSway(active) {
+      window.dispatchEvent(new CustomEvent("woodshed:practice-sway", {
+        detail: { active: Boolean(active) },
+      }));
+    }
+
     function clampBpm(value) {
       const numericValue = Number(value);
 
@@ -2100,6 +2106,7 @@
         window.clearInterval(schedulerTimer);
       }
       isRunning = true;
+      setPracticeSway(true);
       nextBeatTime = audioContext.currentTime + 0.05;
 
       scheduler();
@@ -2116,6 +2123,7 @@
 
     function stopMetronome() {
       isRunning = false;
+      setPracticeSway(false);
 
       if (schedulerTimer !== null) {
         window.clearInterval(schedulerTimer);
@@ -2138,14 +2146,12 @@
     }
 
     function toggleMetronome() {
-      const contextIsRunning = audioContext && (
-        typeof audioContext.state !== "string" || audioContext.state === "running"
-      );
-      if (isRunning && contextIsRunning) {
+      if (isRunning) {
         stopMetronome();
       } else {
         startMetronome().catch(function () {
           isRunning = false;
+          setPracticeSway(false);
           if (schedulerTimer !== null) {
             window.clearInterval(schedulerTimer);
             schedulerTimer = null;
@@ -3996,6 +4002,43 @@
     renderStore(ensureInventoryShape(state));
   }
 
+  function wireShopDandelionBalance() {
+    const control = document.getElementById("dandelion-object");
+    const count = document.getElementById("credits-value");
+    if (!control || !count || control.dataset.dandelionRevealWired === "true") return;
+
+    control.dataset.dandelionRevealWired = "true";
+    control.setAttribute("role", "button");
+    control.setAttribute("tabindex", "0");
+    control.setAttribute(
+      "aria-label",
+      `${count.textContent.trim() || "0"} dandelions. Show balance.`
+    );
+
+    function revealBalance() {
+      document.querySelector(".shop-dandelion-balance-burst")?.remove();
+
+      const burst = document.createElement("div");
+      burst.className = "shop-dandelion-balance-burst";
+      burst.setAttribute("aria-hidden", "true");
+      burst.textContent = count.textContent.trim() || "0";
+      document.body.appendChild(burst);
+
+      window.dispatchEvent(new CustomEvent("woodshed:celebrate"));
+
+      window.setTimeout(function () {
+        burst.remove();
+      }, 1400);
+    }
+
+    control.addEventListener("click", revealBalance);
+    control.addEventListener("keydown", function (event) {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      revealBalance();
+    });
+  }
+
   function wireShopPolish() {
     const dialog = document.getElementById("shop-feature-dialog");
     const closeButton = document.getElementById("shop-dialog-close");
@@ -5329,210 +5372,7 @@
   wireAuthenticatedLogout();
   wirePersonalCrownProgress();
   wireStore(state);
+  wireShopDandelionBalance();
   wireShopPolish();
   wirePBook(state);
 })();
-
-/* === TEMP SHED GRID + SHOP DANDELION STAGE === */
-
-(function () {
-  function stageShedGrid() {
-    if (window.location.pathname !== "/home") return;
-
-    const foreground = document.querySelector(".woodshed-foreground");
-    if (!foreground || foreground.dataset.wwGridStaged === "true") return;
-
-    const leftSelectors = [
-      "#woodchuck-name-value",
-      "#instrument-object",
-      "#shed-team-button",
-      "#shed-decorate-button",
-      "#mum-open-button",
-    ];
-
-    const rightSelectors = [
-      "#level-value",
-      "#xp-level-control",
-      "#metronome-open-button",
-      "#tuner-open-button",
-      ".shed-sound-effects-controls",
-    ];
-
-    const left = document.createElement("div");
-    left.className =
-      "ww-shed-control-column ww-shed-control-left";
-
-    const right = document.createElement("div");
-    right.className =
-      "ww-shed-control-column ww-shed-control-right";
-
-    leftSelectors.forEach((selector) => {
-      const element = document.querySelector(selector);
-      if (element) left.appendChild(element);
-    });
-
-    rightSelectors.forEach((selector) => {
-      const element = document.querySelector(selector);
-      if (element) right.appendChild(element);
-    });
-
-    foreground.replaceChildren(left, right);
-    foreground.classList.add("ww-shed-grid");
-    foreground.dataset.wwGridStaged = "true";
-  }
-
-
-  function stageShopDandelion() {
-    if (window.location.pathname !== "/store") return;
-
-    const control = document.getElementById("dandelion-object");
-    const count = document.getElementById("credits-value");
-
-    if (!control || !count || control.dataset.wwBurstWired === "true") return;
-
-    control.dataset.wwBurstWired = "true";
-    control.setAttribute("role", "button");
-    control.setAttribute("tabindex", "0");
-    control.setAttribute(
-      "aria-label",
-      `${count.textContent.trim() || "0"} dandelions. Show balance.`
-    );
-
-    function revealBalance() {
-      document.querySelector(".shop-dandelion-balance-burst")?.remove();
-
-      const burst = document.createElement("div");
-      burst.className = "shop-dandelion-balance-burst";
-      burst.setAttribute("aria-hidden", "true");
-      burst.textContent = count.textContent.trim() || "0";
-
-      document.body.appendChild(burst);
-
-      /*
-       * Reuse Woodshed's existing celebration/confetti system.
-       */
-      window.dispatchEvent(new CustomEvent("woodshed:celebrate"));
-
-      window.setTimeout(() => {
-        burst.remove();
-      }, 1400);
-    }
-
-    control.addEventListener("click", revealBalance);
-
-    control.addEventListener("keydown", (event) => {
-      if (event.key !== "Enter" && event.key !== " ") return;
-
-      event.preventDefault();
-      revealBalance();
-    });
-  }
-
-
-  function stageUi() {
-    stageShedGrid();
-    stageShopDandelion();
-  }
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", stageUi, { once: true });
-  } else {
-    stageUi();
-  }
-})();
-
-/* === END TEMP SHED GRID + SHOP DANDELION STAGE === */
-
-/* === TEMP SHED INLINE POSITION FIX === */
-(function () {
-  function forceShedPositions() {
-    if (window.location.pathname !== "/home") return;
-
-    const foreground = document.querySelector(".woodshed-foreground");
-    const left = document.querySelector(".ww-shed-control-left");
-    const right = document.querySelector(".ww-shed-control-right");
-
-    if (!foreground || !left || !right) return;
-
-    function imp(el, prop, value) {
-      el.style.setProperty(prop, value, "important");
-    }
-
-    imp(foreground, "position", "absolute");
-    imp(foreground, "inset", "0");
-    imp(foreground, "width", "100%");
-    imp(foreground, "height", "100%");
-    imp(foreground, "padding", "0");
-    imp(foreground, "display", "block");
-    imp(foreground, "pointer-events", "none");
-    imp(foreground, "z-index", "10");
-
-    for (const [column, side] of [[left, "left"], [right, "right"]]) {
-      imp(column, "position", "absolute");
-      imp(column, "top", "4%");
-      imp(column, "bottom", "4%");
-      imp(column, side, "0.65rem");
-      imp(column, "width", "3.5rem");
-      imp(column, "height", "auto");
-
-      imp(column, "display", "grid");
-      imp(column, "grid-template-rows", "repeat(5, 1fr)");
-      imp(column, "align-items", "center");
-
-      // The Name has a wider readable minimum than the emoji controls. Keep
-      // that overflow from widening the left grid track and pulling the whole
-      // left stack inward; the right stack already fits its fixed lane.
-      if (column === left) {
-        imp(column, "grid-template-columns", "minmax(0, 1fr)");
-      }
-
-      imp(column, "justify-items", "center");
-
-      for (const child of column.children) {
-        imp(child, "position", "static");
-        imp(child, "inset", "auto");
-        imp(child, "top", "auto");
-        imp(child, "right", "auto");
-        imp(child, "bottom", "auto");
-        imp(child, "left", "auto");
-        imp(child, "margin", "0");
-        imp(child, "transform", "none");
-        imp(child, "align-self", "center");
-        imp(child, "pointer-events", "auto");
-
-        imp(child, "justify-self", "center");
-      }
-    }
-
-    const audio = document.querySelector(".shed-sound-effects-controls");
-    const audioButton = document.getElementById("sound-effects-button");
-
-    if (audio) {
-      imp(audio, "display", "block");
-      imp(audio, "visibility", "visible");
-      imp(audio, "opacity", "1");
-    }
-
-    if (audioButton) {
-      imp(audioButton, "display", "inline-flex");
-      imp(audioButton, "visibility", "visible");
-      imp(audioButton, "opacity", "1");
-      imp(audioButton, "font-size", "2rem");
-    }
-  }
-
-  function run() {
-    forceShedPositions();
-
-    /* Run again after the rest of app.js has hydrated the SHED. */
-    setTimeout(forceShedPositions, 100);
-    setTimeout(forceShedPositions, 500);
-  }
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", run, { once: true });
-  } else {
-    run();
-  }
-})();
-/* === END TEMP SHED INLINE POSITION FIX === */

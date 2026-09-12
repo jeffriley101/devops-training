@@ -26,6 +26,7 @@ from app.instruments import (
     canonical_instrument_key,
     normalize_supported_instrument,
     shed_artwork_url,
+    shed_character_url,
 )
 from app.models import (
     PracticeChart,
@@ -251,8 +252,9 @@ def test_instrument_endpoint_requires_authentication() -> None:
     assert getattr(raised.value, "status_code", None) == 401
 
 
+@pytest.mark.parametrize("updated_instrument", ["Trumpet", "Percussion", "Tuba"])
 def test_authenticated_instrument_api_returns_only_public_instrument_data(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, updated_instrument: str,
 ) -> None:
     engine = create_engine(
         "sqlite://",
@@ -287,18 +289,20 @@ def test_authenticated_instrument_api_returns_only_public_instrument_data(
     )
     payload = change_profile_instrument(
         request,
-        InstrumentUpdate(instrument="Tuba"),
+        InstrumentUpdate(instrument=updated_instrument),
     )
 
     assert set(payload) == {
-        "updated", "instrument", "instrument_definition", "shed_artwork_url"
+        "updated", "instrument", "instrument_definition", "shed_artwork_url",
+        "shed_character_url",
     }
-    assert payload["instrument"] == "Tuba"
+    assert payload["instrument"] == updated_instrument
     assert payload["shed_artwork_url"] == "/static/img/shed-cabin-new.png"
+    assert payload["shed_character_url"] == shed_character_url(updated_instrument)
     with factory() as session:
         persisted = session.get(WoodchuckProfile, profile_id)
         assert persisted is not None
-        assert persisted.instrument == "Tuba"
+        assert persisted.instrument == updated_instrument
     serialized = repr(payload).casefold()
     for private_value in (
         "wc-private",

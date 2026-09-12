@@ -82,7 +82,7 @@ def test_shared_placement_keeps_page_content_and_accessibility_intact() -> None:
     assert 'aria-label="Open Bulletin Board"' not in templates["SHED"]
     assert 'class="sound-effects-controls shed-sound-effects-controls"' in templates["SHED"]
     right = templates["SHED"][templates["SHED"].index("woodshed-object-column-right"):templates["SHED"].index("id=\"shed-decorate-panel\"")]
-    assert right.index('id="xp-level-control"') < right.index('id="sound-effects-button"')
+    assert right.index('id="shed-team-button"') < right.index('id="sound-effects-button"')
     assert 'aria-label="Audio settings. Sound Effects On."' in templates["SHED"]
     assert 'title="Audio settings. Sound Effects On."' in templates["SHED"]
     assert "practice-timer" in templates["BOOK"] and "Submit" in templates["BOOK"]
@@ -95,58 +95,38 @@ def test_shared_placement_keeps_page_content_and_accessibility_intact() -> None:
 
 
 def test_mobile_shed_columns_center_controls_without_changing_their_vertical_flow() -> None:
-    mobile_start = CSS.index("/* Mobile SHED: full-height left/right control columns */")
-    mobile = CSS[mobile_start:CSS.index("/* Mobile SHED fine-tuning */", mobile_start)]
-    assert mobile.count("align-items: center") == 2
-    assert ".woodshed-object-column-left > *," in mobile
+    mobile_start = CSS.index("/* Production mobile SHED 5×2 control grid. */")
+    mobile = CSS[mobile_start:]
+    assert "grid-template-rows: repeat(5, minmax(0, 1fr))" in mobile
+    assert "align-items: center" in mobile
+    assert "justify-items: center" in mobile
     assert "align-self: center" in mobile
-    assert "margin-left: 0" in mobile
+    assert "justify-self: center" in mobile
 
 
-def test_staged_mobile_shed_controls_use_shared_centered_lanes() -> None:
-    start = CSS.index("/* === TEMP SHED 5X2 CONTROL GRID === */")
-    staged = CSS[start:]
-
-    assert ".ww-shed-control-column {" in staged
-    assert "width: 3.5rem" in staged
-    assert ".ww-shed-control-left {" in staged
-    assert "left: 0.65rem !important" in staged
-    assert ".ww-shed-control-right {" in staged
-    assert "right: 0.65rem !important" in staged
-
-    centered = staged[
-        staged.index(".woodshed-foreground.ww-shed-grid .ww-shed-control-column > * {"):
-        staged.index("#sound-effects-button {", staged.index(".woodshed-foreground.ww-shed-grid .ww-shed-control-column > * {"))
-    ]
-    assert "left: 50% !important" in centered
-    assert "right: auto !important" in centered
-    assert "transform: translate(-50%, -50%) !important" in centered
-
+def test_production_mobile_shed_controls_use_shared_centered_lanes() -> None:
+    start = CSS.index("/* Production mobile SHED 5×2 control grid. */")
+    layout = CSS[start:]
     app = (ROOT / "static/js/app.js").read_text(encoding="utf-8")
-    layout = app[app.index("function forceShedPositions"):app.index("function run()", app.index("function forceShedPositions"))]
-    assert '"grid-template-rows", "repeat(5, 1fr)"' in layout
-    assert 'imp(column, "justify-items", "center")' in layout
-    assert 'imp(child, "justify-self", "center")' in layout
-    assert 'imp(column, "width", "3.5rem")' in layout
-    assert 'imp(column, "width", "42%")' not in layout
-    assert 'imp(column, side, "0.65rem")' in layout
-    assert 'if (column === left)' in layout
-    assert 'imp(column, "grid-template-columns", "minmax(0, 1fr)")' in layout
-    assert '"justify-items", "start"' not in layout
-    assert '"justify-items", "end"' not in layout
-    assert '"justify-self", "start"' not in layout
-    assert '"justify-self", "end"' not in layout
+    assert ".woodshed-foreground > .woodshed-object-column-left" in layout
+    assert ".woodshed-foreground > .woodshed-object-column-right" in layout
+    assert "top: 4% !important" in layout
+    assert "bottom: 4% !important" in layout
+    assert "width: 3.5rem" in layout
+    assert "grid-template-columns: minmax(0, 1fr)" in layout
+    assert "grid-template-rows: repeat(5, minmax(0, 1fr))" in layout
+    assert "stageShedGrid" not in app
+    assert "forceShedPositions" not in app
+    assert "function imp(" not in app
+    assert "el.style.setProperty" not in app
 
-    audio_panel = staged[staged.index(
-        ".shed-sound-effects-controls .sound-effects-panel {"
-    ):]
-    assert "right: calc(100% + 0.5rem) !important" in audio_panel
-    assert "bottom: 0 !important" in audio_panel
-    assert "z-index: 7 !important" in audio_panel
-    trigger = staged[staged.index("#sound-effects-button {"):staged.index(
-        ".shed-sound-effects-controls .sound-effects-panel {"
-    )]
-    assert "z-index: 8 !important" in trigger
+    audio_panel_start = layout.index(".sound-effects-panel {")
+    audio_panel = layout[audio_panel_start:]
+    assert "right: calc(100% + 0.5rem)" in audio_panel
+    assert "bottom: 0" in audio_panel
+    assert "z-index: 7" in audio_panel
+    trigger = layout[layout.index("#sound-effects-button {"):audio_panel_start]
+    assert "z-index: 8" in trigger
 
 
 def test_shed_audio_control_uses_headphones_while_preserving_settings_behavior() -> None:

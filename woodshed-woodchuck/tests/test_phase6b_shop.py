@@ -155,3 +155,39 @@ def test_mobile_shop_keeps_both_vertical_columns_over_the_scene() -> None:
     assert 'class="shop-dandelion-count"' in left
     assert 'aria-label="Shop rewards and community"' in markup
     assert 'aria-label="Shop shelves, sharing, and rooms"' in markup
+
+
+def test_shop_dandelion_balance_reveal_is_maintained_application_behavior() -> None:
+    markup = shop_markup()
+    css = (ROOT / "static/css/styles.css").read_text(encoding="utf-8")
+    javascript = (ROOT / "static/js/app.js").read_text(encoding="utf-8")
+    wiring = javascript[
+        javascript.index("function wireShopDandelionBalance"):
+        javascript.index("function wireShopPolish")
+    ]
+
+    assert 'id="dandelion-object"' in markup
+    assert 'id="credits-value" class="shop-dandelion-count"' in markup
+    count_rule = css[css.index(".shop-dandelion-count {"):css.index(
+        "#dandelion-object {"
+    )]
+    assert "display: none" in count_rule
+    assert 'control.addEventListener("click", revealBalance)' in wiring
+    assert 'control.addEventListener("keydown"' in wiring
+    assert 'burst.className = "shop-dandelion-balance-burst"' in wiring
+    assert 'burst.textContent = count.textContent.trim() || "0"' in wiring
+    assert 'new CustomEvent("woodshed:celebrate")' in wiring
+    assert "}, 1400);" in wiring
+
+    burst = css[css.index(".shop-dandelion-balance-burst {"):css.index(
+        "@keyframes shop-dandelion-balance-fly"
+    )]
+    assert "position: fixed" in burst
+    assert "left: 50%" in burst and "top: 48%" in burst
+    assert "1250ms" in burst
+    assert "scale(0.35)" in burst
+    keyframes = css[css.index("@keyframes shop-dandelion-balance-fly"):]
+    assert "scale(0.85)" in keyframes
+    assert "scale(1.25)" in keyframes
+    assert "scale(1.8)" in keyframes
+    assert "TEMP SHED" not in css + javascript

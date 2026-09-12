@@ -319,11 +319,11 @@ def setup_submit(
 @app.get("/home")
 def home(request: Request):
     member_since = None
-    artwork_url = shed_artwork_url(None)
+    character_url = shed_character_url(None)
     with SessionLocal() as session:
         profile = current_profile(request, session)
         if profile is not None:
-            artwork_url = shed_artwork_url(profile.instrument)
+            character_url = shed_character_url(profile.instrument)
             created_at = profile.created_at
             member_since = {
                 "timestamp": created_at.isoformat(),
@@ -340,7 +340,8 @@ def home(request: Request):
         instruments=INSTRUMENT_OPTIONS,
         levels=LEVEL_OPTIONS,
         member_since=member_since,
-        shed_artwork_url=artwork_url,
+        shed_cabin_background_url=shed_artwork_url(None),
+        shed_character_url=character_url,
     )
 
 

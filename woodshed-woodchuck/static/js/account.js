@@ -420,11 +420,9 @@
           );
           instrumentObject.title = "Change instrument";
         }
-        if (payload.shed_artwork_url) {
-          const scene = document.querySelector(".woodshed-scene");
-          const fallbackArtwork = document.querySelector(".woodshed-character-art");
-          if (scene) scene.style.backgroundImage = `url("${payload.shed_artwork_url}")`;
-          if (fallbackArtwork) fallbackArtwork.src = payload.shed_artwork_url;
+        if (payload.shed_character_url) {
+          const character = document.querySelector(".woodshed-character-art");
+          if (character) character.src = payload.shed_character_url;
         }
         feedback.textContent = `Instrument changed to ${payload.instrument}.`;
         submitButton.classList.add("is-confirmed-success");

@@ -65,6 +65,13 @@ SHED_ARTWORK_BY_INSTRUMENT_KEY: dict[str, str] = {
     "percussion": "/static/img/shed/instruments/percussion.png",
 }
 
+_DEFAULT_SHED_CHARACTER_URL = "/static/img/woodchuck-sax-prototype.png"
+SHED_CHARACTER_BY_INSTRUMENT_KEY: dict[str, str] = {
+    "saxophone": "/static/img/woodchuck-sax-prototype.png",
+    "trumpet": "/static/img/woodchuck-trumpet-prototype.png",
+    "percussion": "/static/img/woodchuck-percussion.png",
+}
+
 
 def shed_artwork_url(instrument_value: str | None) -> str:
     """Resolve one optional cabin asset from a canonical instrument key."""
@@ -73,6 +80,15 @@ def shed_artwork_url(instrument_value: str | None) -> str:
     except ValueError:
         return _DEFAULT_SHED_ARTWORK_URL
     return SHED_ARTWORK_BY_INSTRUMENT_KEY.get(key, _DEFAULT_SHED_ARTWORK_URL)
+
+
+def shed_character_url(instrument_value: str | None) -> str:
+    """Resolve a standalone character asset safe for the moving SHED layer."""
+    try:
+        key = canonical_instrument_key(instrument_value or "")
+    except ValueError:
+        return _DEFAULT_SHED_CHARACTER_URL
+    return SHED_CHARACTER_BY_INSTRUMENT_KEY.get(key, _DEFAULT_SHED_CHARACTER_URL)
 
 
 INSTRUMENT_OPTIONS = [item["label"] for item in INSTRUMENT_DEFINITIONS]

@@ -69,15 +69,17 @@ def test_level_control_is_centered_with_full_accessible_dynamic_label() -> None:
     assert "levelEl.textContent" not in hydrate
 
 
-def test_shop_dandelion_count_is_visible_unboxed_and_uses_shared_hydration() -> None:
+def test_shop_dandelion_count_is_hidden_unboxed_and_uses_shared_hydration() -> None:
     store = source("templates/store.html")
     css = source("static/css/styles.css")
     javascript = source("static/js/app.js")
     assert '<strong id="credits-value" class="shop-dandelion-count">0</strong>' in store
     assert 'id="dandelion-object"' in store
-    block = css[css.index(".shop-dandelion-control"):css.index(".shop-feature-dialog")]
-    assert "flex-direction: row" in block
-    assert "background" not in block and "border" not in block
+    control = css[css.index(".shop-dandelion-control"):css.index(".shop-dandelion-count")]
+    count = css[css.index(".shop-dandelion-count"):css.index("#dandelion-object")]
+    assert "flex-direction: row" in control
+    assert "background" not in control and "border" not in control
+    assert "display: none" in count
     hydrate = javascript[javascript.index("function hydrateHome"):javascript.index("function wireShedSecret")]
     assert 'document.getElementById("credits-value")' in hydrate
     assert "creditsEl.textContent = String(dandelions)" in hydrate

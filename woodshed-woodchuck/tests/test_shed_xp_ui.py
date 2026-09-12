@@ -19,26 +19,27 @@ def xp_javascript() -> str:
 def test_shed_controls_use_requested_left_and_right_columns() -> None:
     left_column = HOME.index("woodshed-object-column-left")
     center_column = HOME.index("woodshed-object-column-center", left_column)
-    instrument = HOME.index("id=\"instrument-object\"", left_column)
-    team = HOME.index("id=\"shed-team-button\"", instrument)
-    stickerbook = HOME.index("id=\"shed-decorate-button\"", team)
+    name = HOME.index("id=\"woodchuck-name-value\"", left_column)
+    instrument = HOME.index("id=\"instrument-object\"", name)
+    xp_control = HOME.index("id=\"xp-level-control\"", instrument)
+    stickerbook = HOME.index("id=\"shed-decorate-button\"", xp_control)
     mum = HOME.index("id=\"mum-open-button\"", stickerbook)
     right_column = HOME.index("woodshed-object-column-right", center_column)
-    profile_level = HOME.index("id=\"level-value\"", right_column)
-    xp_control = HOME.index("id=\"xp-level-control\"", profile_level)
+    team = HOME.index("id=\"shed-team-button\"", right_column)
+    profile_level = HOME.index("id=\"level-value\"", team)
     metronome = HOME.index("id=\"metronome-open-button\"", xp_control)
     tuner = HOME.index("id=\"tuner-open-button\"", metronome)
     audio = HOME.index("id=\"sound-effects-button\"", tuner)
 
-    assert left_column < instrument < team < stickerbook < mum < center_column < right_column
-    assert right_column < profile_level < xp_control < metronome < tuner < audio
+    assert left_column < name < instrument < xp_control < stickerbook < mum < center_column
+    assert center_column < right_column < team < profile_level < metronome < tuner < audio
     assert "aria-controls=\"xp-panel\"" in HOME[xp_control:metronome]
     assert HOME.count("id=\"xp-level-control\"") == 1
     assert HOME.count("id=\"level-value\"") == 1
-    xp_markup = HOME[xp_control:metronome]
+    xp_markup = HOME[xp_control:stickerbook]
     assert '<span class="xp-level-symbol" aria-hidden="true">⭐</span>' in xp_markup
     assert 'id="xp-level-number" class="sr-only"' in xp_markup
-    level_markup = HOME[profile_level:xp_control]
+    level_markup = HOME[profile_level:metronome]
     assert '<span class="room-object-icon" aria-hidden="true">🏅</span>' in level_markup
 
 
@@ -100,14 +101,19 @@ def test_profile_skill_level_editor_remains_separate() -> None:
     assert "const control = document.getElementById(\"xp-level-control\");" in xp_javascript()
 
 
-def test_mobile_shed_controls_keep_requested_rows_after_side_swap() -> None:
-    stage_start = APP.index("function stageShedGrid")
-    stage_end = APP.index("function stageShopDandelion", stage_start)
-    stage = APP[stage_start:stage_end]
-    assert stage.index('"#shed-team-button"') < stage.index('"#shed-decorate-button"')
-    assert stage.index('"#level-value"') < stage.index('"#xp-level-control"')
-    assert '"grid-template-rows", "repeat(5, 1fr)"' in APP
-    assert 'imp(column, "width", "3.5rem")' in APP
+def test_mobile_shed_controls_use_static_five_row_columns() -> None:
+    start = CSS.index("/* Production mobile SHED 5×2 control grid. */")
+    layout = CSS[start:]
+
+    assert "grid-template-rows: repeat(5, minmax(0, 1fr))" in layout
+    assert "width: 3.5rem" in layout
+    assert "left: 0.65rem !important" in layout
+    assert "right: 0.65rem !important" in layout
+    assert "position: static !important" in layout
+    assert "pointer-events: auto" in layout
+    assert "stageShedGrid" not in APP
+    assert "forceShedPositions" not in APP
+    assert "ww-shed-grid" not in APP + CSS + HOME
 
 def test_xp_level_uses_an_emoji_token_without_the_old_coin_treatment() -> None:
     badge = CSS[CSS.index(".xp-level-control {"):CSS.index(".xp-panel {")]

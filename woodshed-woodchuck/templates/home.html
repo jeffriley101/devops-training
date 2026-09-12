@@ -2,13 +2,13 @@
 
 {% block content %}
 <section class="card woodshed-page">
-  <div class="woodshed-scene" aria-label="Interactive Woodshed room" style="background-image: url('{{ shed_artwork_url }}');">
+  <div class="woodshed-scene" aria-label="Interactive Woodshed room" style="background-image: url('{{ shed_cabin_background_url }}');">
     <button id="shed-secret-button" class="shed-secret-button" type="button" aria-controls="shed-secret-panel" aria-expanded="false" aria-label="Open secret passcode">.</button>
     <div class="woodshed-character-layer" aria-label="Woodchuck holding selected instrument">
       <img
         class="character-art woodshed-character-art"
-        src="{{ shed_artwork_url }}"
-        alt="Woodchuck holding an instrument in the Woodshed"
+        src="{{ shed_character_url }}"
+        alt="Woodchuck"
       />
     </div>
 
@@ -40,8 +40,17 @@
           ♪
         </button>
 
-        <button id="shed-team-button" class="room-object dandelion-object" type="button" aria-controls="shed-team-panel" aria-expanded="false" aria-label="Choose a team" title="Choose a team">
-          <span id="shed-team-emblem" class="room-object-icon" aria-hidden="true">⬡</span>
+        <button
+          id="xp-level-control"
+          class="xp-level-control"
+          type="button"
+          aria-controls="xp-panel"
+          aria-expanded="false"
+          aria-label="XP Level. Loading."
+          title="XP Level"
+        >
+          <span class="xp-level-symbol" aria-hidden="true">⭐</span>
+          <span id="xp-level-number" class="sr-only">1</span>
         </button>
 
         <button
@@ -75,6 +84,10 @@
       ></div>
 
       <div class="woodshed-object-column woodshed-object-column-right">
+        <button id="shed-team-button" class="room-object dandelion-object" type="button" aria-controls="shed-team-panel" aria-expanded="false" aria-label="Choose a team" title="Choose a team">
+          <span id="shed-team-emblem" class="room-object-icon" aria-hidden="true">⬡</span>
+        </button>
+
         <button
           id="level-value"
           class="room-object shed-profile-field"
@@ -86,20 +99,6 @@
         >
           <span class="room-object-icon" aria-hidden="true">🏅</span>
         </button>
-
-        <button
-          id="xp-level-control"
-          class="xp-level-control"
-          type="button"
-          aria-controls="xp-panel"
-          aria-expanded="false"
-          aria-label="XP Level. Loading."
-          title="XP Level"
-        >
-          <span class="xp-level-symbol" aria-hidden="true">⭐</span>
-          <span id="xp-level-number" class="sr-only">1</span>
-        </button>
-
 
         <button
           id="metronome-open-button"
