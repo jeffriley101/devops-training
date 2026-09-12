@@ -28,12 +28,25 @@ from app.models import WoodchuckProfile
 ROOT = Path(__file__).resolve().parents[1]
 SAX_ART = "/static/img/shed-cabin-new.png"
 CHARACTER_ART = {
-    "Saxophone": "/static/img/woodchuck-sax-prototype.png",
-    "Trumpet": "/static/img/woodchuck-trumpet-prototype.png",
+    "Flute": "/static/img/woodchuck-flute.png",
+    "Clarinet": "/static/img/woodchuck-clarinet.png",
+    "Oboe": "/static/img/woodchuck-oboe.png",
+    "Bassoon": "/static/img/woodchuck-bassoon.png",
+    "Saxophone": "/static/img/woodchuck-saxophone.png",
+    "Trumpet": "/static/img/woodchuck-trumpet.png",
+    "French Horn": "/static/img/woodchuck-french-horn.png",
+    "Trombone": "/static/img/woodchuck-trombone.png",
+    "Baritone": "/static/img/woodchuck-baritone.png",
+    "Tuba": "/static/img/woodchuck-tuba.png",
     "Percussion": "/static/img/woodchuck-percussion.png",
+    "Violin": "/static/img/woodchuck-violin.png",
+    "Guitar": "/static/img/woodchuck-guitar.png",
+    "Banjo": "/static/img/woodchuck-banjo.png",
+    "Piano / Keyboard": "/static/img/woodchuck-keys.png",
+    "Vocals": "/static/img/woodchuck-vocals.png",
 }
 CHARACTER_FREE_CABIN_SHA256 = (
-    "564e4107ca665de3703ae9eaa6c9a01dcc11908a44c1aa4aa2d27d53e8cc31d6"
+    "4a238ad9914ad0b103c1a08501bfb372ca05fbccc03b737f05e5e75873465721"
 )
 INSTRUMENT_ART = {
     "Flute": "/static/img/shed/instruments/flute.png",
@@ -70,7 +83,7 @@ def test_production_cabin_is_the_approved_character_free_replacement():
     cabin = ROOT / "static/img/shed-cabin-new.png"
     data = cabin.read_bytes()
     assert data.startswith(b"\x89PNG\r\n\x1a\n")
-    assert data[16:24] == bytes.fromhex("0000040000000600")
+    assert data[16:24] == bytes.fromhex("000003ad00000688")
     assert hashlib.sha256(data).hexdigest() == CHARACTER_FREE_CABIN_SHA256
 
 
@@ -87,9 +100,7 @@ def test_approved_standalone_character_mapping(instrument, character):
 def test_character_fallback_never_uses_flattened_scene_artwork():
     flattened_scenes = {
         "/static/img/woodchuck-home.png",
-        "/static/img/woodchuck-trumpet.png",
         "/static/img/woodchuck-drum.png",
-        "/static/img/woodchuck-guitar.png",
         *INSTRUMENT_ART.values(),
     }
     for instrument in (*INSTRUMENT_OPTIONS, None, "Unknown Instrument"):
@@ -189,35 +200,34 @@ def test_future_artwork_mapping_has_one_authoritative_canonical_key_path():
     assert {canonical_instrument_key(instrument) for instrument in INSTRUMENT_OPTIONS} == {
         "flute",
         "clarinet",
+        "oboe",
+        "bassoon",
         "saxophone",
         "trumpet",
+        "french-horn",
         "trombone",
+        "baritone",
         "tuba",
         "percussion",
-        "drum-major",
-        "color-guard",
         "violin",
         "guitar",
         "banjo",
         "piano-keyboard",
-        "accordion",
-        "harp",
         "vocals",
-        "auxiliary-percussion",
     }
     assert {
         "flute", "clarinet", "saxophone", "trumpet", "trombone", "tuba",
-        "percussion", "vocals",
+        "percussion", "vocals", "oboe", "bassoon", "french-horn", "baritone",
     }.issubset({canonical_instrument_key(instrument) for instrument in INSTRUMENT_OPTIONS})
     source = (ROOT / "app/instruments.py").read_text(encoding="utf-8")
-    assert "woodchuck-trumpet.png" not in source
+    assert "woodchuck-sax-prototype.png" not in source
+    assert "woodchuck-trumpet-prototype.png" not in source
     assert "woodchuck-drum.png" not in source
-    assert "woodchuck-guitar.png" not in source
     asset = ROOT / "static" / SAX_ART.removeprefix("/static/")
     assert asset.is_file() and asset.stat().st_size > 0
 
 
-def test_character_mapping_contains_only_the_three_approved_assets():
+def test_character_mapping_contains_only_the_approved_production_assets():
     assert SHED_CHARACTER_BY_INSTRUMENT_KEY == {
         canonical_instrument_key(instrument): character
         for instrument, character in CHARACTER_ART.items()

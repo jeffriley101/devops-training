@@ -430,8 +430,8 @@ def test_instrument_standings_use_collective_team_labels() -> None:
     ]
     assert 'renderLifetimeLeaders("Instruments"' not in hall
     for team_label in (
-        "The Clarinets", "The Tubas", "The Percussion",
-        "The Drum Majors", "The Color Guard", "The Vocals",
+        "The Clarinets", "The Oboes", "The Bassoons", "The French Horns",
+        "The Baritones", "The Tubas", "The Percussion", "The Vocals",
     ):
         assert f'team_label="{team_label}"' in instruments
     assert all(

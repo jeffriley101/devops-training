@@ -29,8 +29,8 @@ def test_motion_layer_preserves_the_server_selected_standalone_character():
     # Motion decorates the existing element; it must not replace the selected art.
     assert "art.src =" not in MOTION_JS
     assert "woodchuck-home.png" not in MOTION_JS
-    assert (ROOT / "static" / "img" / "woodchuck-sax-prototype.png").exists()
-    assert (ROOT / "static" / "img" / "woodchuck-trumpet-prototype.png").exists()
+    assert (ROOT / "static" / "img" / "woodchuck-saxophone.png").exists()
+    assert (ROOT / "static" / "img" / "woodchuck-trumpet.png").exists()
     assert (ROOT / "static" / "img" / "woodchuck-percussion.png").exists()
 
 
@@ -152,7 +152,7 @@ def test_motion_script_runs_without_replacing_character_source():
       const art = eventTarget({
         classList: new ClassList(),
         offsetWidth: 240,
-        src: "/static/img/woodchuck-trumpet-prototype.png",
+        src: "/static/img/woodchuck-trumpet.png",
       });
       const attributes = {};
       const controlIds = [
@@ -216,7 +216,7 @@ def test_motion_script_runs_without_replacing_character_source():
       if (art.classList.contains("is-practice-sway")) throw new Error("sway did not stop");
       windowListeners["woodshed:celebrate"]();
       if (!art.classList.contains("is-achievement-hop")) throw new Error("success failed");
-      if (art.src !== "/static/img/woodchuck-trumpet-prototype.png") {
+      if (art.src !== "/static/img/woodchuck-trumpet.png") {
         throw new Error("character source changed");
       }
     '''

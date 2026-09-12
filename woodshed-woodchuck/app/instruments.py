@@ -31,9 +31,13 @@ INSTRUMENT_DEFINITIONS = (
         team_label="The Clarinets",
         image_url="/static/img/instruments/clarinet.svg",
     ),
+    instrument("oboe", "Oboe", "♪", team_label="The Oboes"),
+    instrument("bassoon", "Bassoon", "♫", team_label="The Bassoons"),
     instrument("saxophone", "Saxophone", "🎷", team_label="The Saxophones"),
     instrument("trumpet", "Trumpet", "🎺", team_label="The Trumpets"),
+    instrument("french-horn", "French Horn", "📯", team_label="The French Horns"),
     instrument("trombone", "Trombone", "🪊", team_label="The Trombones"),
+    instrument("baritone", "Baritone", "♫", team_label="The Baritones"),
     instrument(
         "tuba",
         "Tuba",
@@ -42,16 +46,26 @@ INSTRUMENT_DEFINITIONS = (
         image_url="/static/img/instruments/tuba.svg",
     ),
     instrument("percussion", "Percussion", "🥁", team_label="The Percussion"),
-    instrument("drum-major", "Drum Major", "🫡", team_label="The Drum Majors"),
-    instrument("color-guard", "Color Guard", "🚩", team_label="The Color Guard"),
     instrument("violin", "Violin", "🎻", team_label="The Violins"),
     instrument("guitar", "Guitar", "🎸", team_label="The Guitars"),
     instrument("banjo", "Banjo", "🪕", team_label="The Banjos"),
     instrument("piano-keyboard", "Piano / Keyboard", "🎹", team_label="The Pianos & Keyboards"),
+    instrument("vocals", "Vocals", "🎤", team_label="The Vocals"),
+)
+
+# Retired choices remain recognizable for existing profiles, P-Charts, and
+# historical standings, but are deliberately excluded from selectable options.
+_LEGACY_INSTRUMENT_DEFINITIONS = (
+    instrument("drum-major", "Drum Major", "🫡", team_label="The Drum Majors"),
+    instrument("color-guard", "Color Guard", "🚩", team_label="The Color Guard"),
     instrument("accordion", "Accordion", "🪗", team_label="The Accordions"),
     instrument("harp", "Harp", "🪉", team_label="The Harps"),
-    instrument("vocals", "Vocals", "🎤", team_label="The Vocals"),
-    instrument("auxiliary-percussion", "Auxiliary Percussion", "🪇", team_label="The Auxiliary Percussion"),
+    instrument(
+        "auxiliary-percussion",
+        "Auxiliary Percussion",
+        "🪇",
+        team_label="The Auxiliary Percussion",
+    ),
 )
 
 _DEFAULT_SHED_ARTWORK_URL = "/static/img/shed-cabin-new.png"
@@ -65,11 +79,24 @@ SHED_ARTWORK_BY_INSTRUMENT_KEY: dict[str, str] = {
     "percussion": "/static/img/shed/instruments/percussion.png",
 }
 
-_DEFAULT_SHED_CHARACTER_URL = "/static/img/woodchuck-sax-prototype.png"
+_DEFAULT_SHED_CHARACTER_URL = "/static/img/woodchuck-saxophone.png"
 SHED_CHARACTER_BY_INSTRUMENT_KEY: dict[str, str] = {
-    "saxophone": "/static/img/woodchuck-sax-prototype.png",
-    "trumpet": "/static/img/woodchuck-trumpet-prototype.png",
+    "flute": "/static/img/woodchuck-flute.png",
+    "clarinet": "/static/img/woodchuck-clarinet.png",
+    "oboe": "/static/img/woodchuck-oboe.png",
+    "bassoon": "/static/img/woodchuck-bassoon.png",
+    "saxophone": "/static/img/woodchuck-saxophone.png",
+    "trumpet": "/static/img/woodchuck-trumpet.png",
+    "french-horn": "/static/img/woodchuck-french-horn.png",
+    "trombone": "/static/img/woodchuck-trombone.png",
+    "baritone": "/static/img/woodchuck-baritone.png",
+    "tuba": "/static/img/woodchuck-tuba.png",
     "percussion": "/static/img/woodchuck-percussion.png",
+    "violin": "/static/img/woodchuck-violin.png",
+    "guitar": "/static/img/woodchuck-guitar.png",
+    "banjo": "/static/img/woodchuck-banjo.png",
+    "piano-keyboard": "/static/img/woodchuck-keys.png",
+    "vocals": "/static/img/woodchuck-vocals.png",
 }
 
 
@@ -92,8 +119,12 @@ def shed_character_url(instrument_value: str | None) -> str:
 
 
 INSTRUMENT_OPTIONS = [item["label"] for item in INSTRUMENT_DEFINITIONS]
-INSTRUMENTS_BY_LABEL = {
+_SELECTABLE_INSTRUMENTS_BY_LABEL = {
     item["label"].casefold(): item for item in INSTRUMENT_DEFINITIONS
+}
+INSTRUMENTS_BY_LABEL = {
+    item["label"].casefold(): item
+    for item in (*INSTRUMENT_DEFINITIONS, *_LEGACY_INSTRUMENT_DEFINITIONS)
 }
 
 _PIANO_KEYBOARD_ALIASES = frozenset({
@@ -103,6 +134,10 @@ _LEGACY_CANONICAL_ALIASES = {
     # Historical profiles and P-Charts keep their original display text, but
     # retired Hand Percussion records aggregate with current Percussion data.
     "hand percussion": "percussion",
+    **{
+        re.sub(r"[\s/_-]+", " ", str(item["label"]).strip().casefold()): str(item["key"])
+        for item in _LEGACY_INSTRUMENT_DEFINITIONS
+    },
 }
 
 
@@ -129,11 +164,16 @@ def canonical_instrument_key(value: str) -> str:
 def normalize_supported_instrument(value: str) -> str:
     if not isinstance(value, str):
         raise ValueError("Choose a supported instrument.")
-    definition = INSTRUMENTS_BY_LABEL.get(" ".join(value.split()).casefold())
+    definition = _SELECTABLE_INSTRUMENTS_BY_LABEL.get(
+        " ".join(value.split()).casefold()
+    )
     if definition is None:
         raise ValueError("Choose a supported instrument.")
     return definition["label"]
 
 
 def instrument_definition_payloads() -> list[dict[str, object]]:
-    return [dict(item) for item in INSTRUMENT_DEFINITIONS]
+    return [
+        dict(item)
+        for item in (*INSTRUMENT_DEFINITIONS, *_LEGACY_INSTRUMENT_DEFINITIONS)
+    ]

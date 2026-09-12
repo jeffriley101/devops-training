@@ -121,7 +121,7 @@ def test_piano_keyboard_bonus_configuration_is_approved_copy() -> None:
     }
 
 
-def test_supported_instruments_without_specific_config_use_general_fallback() -> None:
+def test_canonical_instruments_without_specific_config_use_general_fallback() -> None:
     fallback = contests.configured_bonus_challenges("Accordion")
     assert fallback == [{
         "id": "general-difficult-passage-slow-evenly",
@@ -137,15 +137,15 @@ def test_supported_instruments_without_specific_config_use_general_fallback() ->
 def test_fallback_instances_are_canonical_and_instrument_specific(
     quest_database,
 ) -> None:
-    with TestClient(app) as accordion:
-        create_student(accordion, instrument="Accordion")
-        accordion_current = accordion.get("/contests/bonus-challenge/current").json()["challenge"]
-        assert accordion_current["task"] == "Practice a difficult passage slowly and evenly."
-        assert accordion_current["target_minutes"] == 10
-        assert ":accordion:general-difficult-passage-slow-evenly" in accordion_current["instance_key"]
-        completed = accordion.post("/contests/bonus-challenge/progress", json={
-            "activity_date": accordion_current["activity_date"],
-            "challenge_instance": accordion_current["instance_key"],
+    with TestClient(app) as baritone:
+        create_student(baritone, instrument="Baritone")
+        baritone_current = baritone.get("/contests/bonus-challenge/current").json()["challenge"]
+        assert baritone_current["task"] == "Practice a difficult passage slowly and evenly."
+        assert baritone_current["target_minutes"] == 10
+        assert ":baritone:general-difficult-passage-slow-evenly" in baritone_current["instance_key"]
+        completed = baritone.post("/contests/bonus-challenge/progress", json={
+            "activity_date": baritone_current["activity_date"],
+            "challenge_instance": baritone_current["instance_key"],
         })
         assert completed.status_code == 200
         assert completed.json()["completed"] is True
@@ -155,7 +155,7 @@ def test_fallback_instances_are_canonical_and_instrument_specific(
         create_student(banjo, instrument="Banjo")
         banjo_current = banjo.get("/contests/bonus-challenge/current").json()["challenge"]
         assert ":banjo:general-difficult-passage-slow-evenly" in banjo_current["instance_key"]
-        assert banjo_current["instance_key"] != accordion_current["instance_key"]
+        assert banjo_current["instance_key"] != baritone_current["instance_key"]
 
 
 def test_full_completion_route_persists_reward_once_and_returns_authority(

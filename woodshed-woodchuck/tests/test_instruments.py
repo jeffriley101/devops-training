@@ -57,7 +57,7 @@ def test_every_supported_instrument_is_accepted(instrument: str) -> None:
     assert normalize_supported_instrument(f"  {instrument.lower()}  ") == instrument
 
 
-@pytest.mark.parametrize("instrument", ["", "Oboe", "Kazoo", "Sax", None])
+@pytest.mark.parametrize("instrument", ["", "Accordion", "Kazoo", "Sax", None])
 def test_unsupported_instruments_are_rejected(instrument: object) -> None:
     with pytest.raises(ValueError, match="supported instrument"):
         normalize_supported_instrument(instrument)  # type: ignore[arg-type]
@@ -71,7 +71,7 @@ def test_account_creation_rejects_an_unsupported_instrument(
             session,
             display_name="Public Chuck",
             pin="1234",
-            instrument="Oboe",
+            instrument="Accordion",
             level="Beginner",
             goal="Practice",
         )
@@ -161,13 +161,15 @@ def test_instrument_change_preserves_account_state_and_history(
 def test_instrument_definitions_and_shed_assets_are_complete() -> None:
     definitions = {item["label"]: item for item in INSTRUMENT_DEFINITIONS}
     assert list(definitions) == INSTRUMENT_OPTIONS
-    assert len(definitions) == 17
+    assert list(definitions) == [
+        "Flute", "Clarinet", "Oboe", "Bassoon", "Saxophone", "Trumpet",
+        "French Horn", "Trombone", "Baritone", "Tuba", "Percussion",
+        "Violin", "Guitar", "Banjo", "Piano / Keyboard", "Vocals",
+    ]
+    assert len(definitions) == 16
     assert definitions["Clarinet"]["image_url"].endswith("clarinet.svg")
     assert definitions["Tuba"]["image_url"].endswith("tuba.svg")
-    assert definitions["Drum Major"]["image_url"] is None
-    assert definitions["Drum Major"]["fallback_symbol"] == "🫡"
-    assert definitions["Color Guard"]["image_url"] is None
-    assert definitions["Color Guard"]["fallback_symbol"] == "🚩"
+    assert definitions["French Horn"]["fallback_symbol"] == "📯"
     assert definitions["Vocals"]["fallback_symbol"] == "🎤"
     assert "Hand Percussion" not in definitions
 
@@ -189,6 +191,25 @@ def test_hand_percussion_is_legacy_only_and_vocals_is_selectable() -> None:
     assert canonical_instrument_key("Hand Percussion") == "percussion"
     assert canonical_instrument_key("hand-percussion") == "percussion"
     assert shed_artwork_url("Hand Percussion") == "/static/img/shed/instruments/percussion.png"
+
+
+@pytest.mark.parametrize(
+    ("label", "key"),
+    [
+        ("Drum Major", "drum-major"),
+        ("Color Guard", "color-guard"),
+        ("Accordion", "accordion"),
+        ("Harp", "harp"),
+        ("Auxiliary Percussion", "auxiliary-percussion"),
+    ],
+)
+def test_retired_instruments_are_legacy_only(label: str, key: str) -> None:
+    assert label not in INSTRUMENT_OPTIONS
+    with pytest.raises(ValueError, match="supported instrument"):
+        normalize_supported_instrument(label)
+    assert canonical_instrument_key(label) == key
+    assert normalize_instrument(label) == (key, label)
+    assert shed_character_url(label) == "/static/img/woodchuck-saxophone.png"
 
 
 def test_historical_hand_percussion_p_chart_remains_readable(
