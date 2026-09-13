@@ -264,6 +264,7 @@ def test_password_and_token_are_absent_from_failure_logs(mail_database, monkeypa
     assert response.json()["invitation_token"] not in logs
 
 
+@pytest.mark.skip(reason="ordinary Practice Book email workflow removed")
 def test_ordinary_practice_book_email_uses_owned_preset_and_is_idempotent(mail_database) -> None:
     with TestClient(app) as client:
         profile_id = create_student(client)
@@ -299,6 +300,7 @@ def test_ordinary_practice_book_email_uses_owned_preset_and_is_idempotent(mail_d
         assert "not a verification request" in message.get_body(preferencelist=("plain",)).get_content().lower()
 
 
+@pytest.mark.skip(reason="ordinary Practice Book email workflow removed")
 def test_owned_preset_deletion_is_idempotent_and_preserves_chart(mail_database) -> None:
     with TestClient(app) as owner:
         create_student(owner)
@@ -340,14 +342,13 @@ def test_book_draft_return_and_separate_delivery_status_contracts() -> None:
     assert 'P_BOOK_DRAFT_KEY = "woodshed:p-book:verifier-draft:v1"' in app_js
     for field in (
         "minutes", "practiceDate", "note", "practiceDetails", "includeContests",
-        "includeTeam", "emailCopy", "requestValidation", "emailPresetId", "verifierId",
+        "includeTeam", "verifierId",
     ):
         assert field in app_js
     assert "P_BOOK_DRAFT_MAX_AGE_MS = 30 * 60 * 1000" in app_js
     assert "sessionStorage.removeItem(P_BOOK_DRAFT_KEY)" in app_js
-    assert '"ordinary_email"' in routes and '"verification_email"' in routes
+    assert '"verification_email"' in routes
     assert '"not_requested"' in routes
-    assert "ordinaryStatus.code === \"sent\"" in app_js
     assert "verificationStatus.code === \"sent\"" in app_js
 
 
@@ -359,7 +360,7 @@ def test_confirmation_ui_is_status_only_and_original_controls_remain() -> None:
     chart_routes = (ROOT / "app/practice_chart_routes.py").read_text(encoding="utf-8")
     invitation_routes = (ROOT / "app/verifier_routes.py").read_text(encoding="utf-8")
 
-    assert 'id="p-book-email-delivery-status"' in pbook
+    assert 'id="p-book-email-delivery-status"' not in pbook
     for redundant in (
         "p-book-review-link", "p-book-copy-review-link",
         "p-book-open-review-email", "p-book-resend-review-email",
@@ -377,6 +378,7 @@ def test_confirmation_ui_is_status_only_and_original_controls_remain() -> None:
     assert 'id="trusted-verifier-invite-form"' in invitations
     assert 'id="trusted-verifier-copy-link"' in invitations
     assert "deliveryMessages" in app_js
+    assert "Practice Book email" not in app_js
     assert "email_delivery?.message" in app_js + verifier_js
     assert '@router.post("/verifications/{verification_id}/resend-email")' in chart_routes
     assert '@router.post("/invitations/{invitation_id}/resend-email")' in invitation_routes

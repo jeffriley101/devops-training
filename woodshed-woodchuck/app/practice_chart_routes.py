@@ -132,7 +132,6 @@ class PracticeChartCreate(BaseModel):
     submission_key: str | None = Field(default=None, min_length=1, max_length=64)
     include_contests: StrictBool = True
     include_team_contests: StrictBool = True
-    ordinary_email_preset_id: int | None = Field(default=None, gt=0)
 
 
 class PristinePracticeChartCreate(BaseModel):
@@ -276,7 +275,6 @@ def student_practice_totals(request: Request):
         return practice_totals_payload(session, profile.id)
 
 
-@router.get("/email-presets")
 def list_practice_email_presets(request: Request):
     with SessionLocal() as session:
         profile = current_profile(request, session)
@@ -291,7 +289,6 @@ def list_practice_email_presets(request: Request):
         ]}
 
 
-@router.post("/email-presets", status_code=201)
 def create_practice_email_preset(request: Request, submitted: PracticeEmailPresetCreate):
     with SessionLocal() as session:
         profile = current_profile(request, session)
@@ -315,7 +312,6 @@ def create_practice_email_preset(request: Request, submitted: PracticeEmailPrese
         return {"created": True, "preset": {"id": row.id, "display_name": row.display_name, "email": row.email}}
 
 
-@router.delete("/email-presets/{preset_id}")
 def delete_practice_email_preset(request: Request, preset_id: int):
     with SessionLocal() as session:
         profile = current_profile(request, session)
@@ -347,14 +343,6 @@ def create_student_practice_chart(
             )
 
         try:
-            email_preset = None
-            if submitted.ordinary_email_preset_id is not None:
-                email_preset = session.scalar(select(PracticeEmailPreset).where(
-                    PracticeEmailPreset.id == submitted.ordinary_email_preset_id,
-                    PracticeEmailPreset.profile_id == profile.id,
-                ))
-                if email_preset is None:
-                    raise HTTPException(status_code=400, detail="Choose one of your saved email recipients.")
             active_season = season_covering_date(session, datetime.now(CENTRAL).date())
             team_membership = (
                 session.scalar(select(TeamMembership).where(
@@ -379,7 +367,6 @@ def create_student_practice_chart(
                 include_contests=submitted.include_contests,
                 include_team_contests=submitted.include_team_contests,
                 team_id=team_membership.team_id if team_membership else None,
-                ordinary_email_preset_id=email_preset.id if email_preset else None,
             )
         except ValueError as error:
             raise HTTPException(
@@ -406,7 +393,6 @@ def create_student_practice_chart(
         )
 
         delivery = None
-        ordinary_delivery = None
         review_url = None
         verifier_role = None
         if created.verification is not None and verifier is not None:
@@ -428,27 +414,6 @@ def create_student_practice_chart(
                 )
                 record_verification_delivery(session, created.verification, delivery)
 
-        if created.created and email_preset is not None:
-            now = datetime.now(timezone.utc)
-            today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-            attempts = session.scalar(select(func.count()).select_from(PracticeChart).where(
-                PracticeChart.profile_id == profile.id,
-                PracticeChart.ordinary_email_attempted_at >= today_start,
-            )) or 0
-            if attempts >= DAILY_EMAIL_CAP:
-                ordinary_delivery = DeliveryResult(False, "daily_limit")
-            else:
-                ordinary_delivery = EmailService().send_practice_book_copy(
-                    recipient=email_preset.email, student_name=profile.display_name,
-                    practice_date=created.chart.practice_date.isoformat(), minutes=created.chart.minutes,
-                    instrument=created.chart.instrument, note=created.chart.note or "",
-                    practice_details=list(created.chart.practice_details or []),
-                )
-            created.chart.ordinary_email_attempted_at = now
-            created.chart.ordinary_email_sent_at = now if ordinary_delivery.sent else None
-            created.chart.ordinary_email_error_code = None if ordinary_delivery.sent else ordinary_delivery.code
-            session.commit(); session.refresh(created.chart)
-
         return {
             "created": created.created,
             "streak": profile_practice_streak(session, profile.id),
@@ -460,15 +425,6 @@ def create_student_practice_chart(
             "review_url": review_url,
             "verifier_role": verifier_role,
             "email_delivery": email_delivery_payload(delivery, verifier.email) if delivery and verifier else None,
-            "ordinary_email_delivery": (
-                email_delivery_payload(ordinary_delivery, email_preset.email)
-                if ordinary_delivery and email_preset else None
-            ),
-            "ordinary_email": requested_delivery_payload(
-                ordinary_delivery,
-                requested=email_preset is not None,
-                email=email_preset.email if email_preset else None,
-            ),
             "verification_email": requested_delivery_payload(
                 delivery,
                 requested=created.verification is not None,

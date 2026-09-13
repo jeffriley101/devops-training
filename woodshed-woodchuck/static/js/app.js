@@ -4310,7 +4310,6 @@
     const timerFeedbackEl = document.getElementById("practice-timer-feedback");
     const errorEl = document.getElementById("p-book-error");
     const feedbackEl = document.getElementById("p-book-feedback");
-    const deliveryStatusEl = document.getElementById("p-book-email-delivery-status");
     const entriesEl = document.getElementById("p-book-entries");
     const historyControlsEl = document.getElementById("p-book-history-controls");
     const historyCountEl = document.getElementById("p-book-history-count");
@@ -4319,11 +4318,6 @@
     const verifierSelectEl = document.getElementById("p-book-verifier");
     const includeContestsEl = document.getElementById("p-book-include-contests");
     const includeTeamEl = document.getElementById("p-book-include-team");
-    const emailCopyEl = document.getElementById("p-book-email-copy");
-    const requestValidationEl = document.getElementById("p-book-request-validation");
-    const emailPresetEl = document.getElementById("p-book-email-preset");
-    const presetListEl = document.getElementById("p-book-preset-list");
-    const verifierHelpEl = document.getElementById("p-book-verifier-help");
     const verifierManageLink = document.getElementById("p-book-verifier-manage");
     const submitBtn = form.querySelector("button[type='submit']");
     const missingDialog = document.getElementById("p-book-missing-selection");
@@ -4375,9 +4369,6 @@
         practiceDetails: practiceDetailEls.filter((item) => item.checked).map((item) => item.value),
         includeContests: includeContestsEl?.checked === true,
         includeTeam: includeTeamEl?.checked === true,
-        emailCopy: emailCopyEl?.checked === true,
-        requestValidation: requestValidationEl?.checked === true,
-        emailPresetId: emailPresetEl?.value || "",
         verifierId: verifierSelectEl?.value || "",
         teamId: currentTeam?.id || null,
       };
@@ -4425,11 +4416,6 @@
             )
           );
 
-          if (verifierHelpEl) {
-            verifierHelpEl.textContent =
-              "Sign in to your Woodchuck account to send a " +
-              "P-Chart to a trusted verifier.";
-          }
 
           return;
         }
@@ -4473,11 +4459,6 @@
         verifierSelectEl.disabled = false;
         if (restoredDraft?.verifierId) verifierSelectEl.value = String(restoredDraft.verifierId);
 
-        if (verifierHelpEl) {
-          verifierHelpEl.textContent = connections.length
-            ? "Select a trusted verifier, or leave this Open."
-            : "";
-        }
       } catch (error) {
         verifierSelectEl.replaceChildren(
           new Option(
@@ -4487,11 +4468,6 @@
         );
         verifierSelectEl.disabled = false;
 
-        if (verifierHelpEl) {
-          verifierHelpEl.textContent =
-            error.message ||
-            "Trusted verifiers could not be loaded.";
-        }
       }
     }
 
@@ -4524,78 +4500,6 @@
       }
     }
 
-    async function loadEmailPresets() {
-      if (!emailPresetEl) return;
-      try {
-        const response = await fetch("/practice-charts/email-presets", {credentials: "same-origin", cache: "no-store"});
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload.detail || "Email presets could not be loaded.");
-        const selectedBeforeLoad = restoredDraft?.emailPresetId || emailPresetEl.value;
-        emailPresetEl.replaceChildren(new Option("Choose a saved recipient", ""));
-        if (presetListEl) presetListEl.replaceChildren();
-        const presets = Array.isArray(payload.presets) ? payload.presets : [];
-        if (!presets.length) {
-          emailPresetEl.options[0].textContent = "No saved recipients yet";
-        }
-        presets.forEach((preset) => {
-          emailPresetEl.append(new Option(`${preset.display_name} — ${preset.email}`, String(preset.id)));
-          if (presetListEl) {
-            const row = document.createElement("div");
-            row.className = "p-book-preset-row";
-            const text = document.createElement("span");
-            text.textContent = `${preset.display_name} — ${preset.email}`;
-            const remove = document.createElement("button");
-            remove.type = "button";
-            remove.className = "btn btn-secondary p-book-delete-preset";
-            remove.textContent = "Delete";
-            remove.addEventListener("click", async function () {
-              if (!window.confirm(`Delete the saved address ${preset.email}?`)) return;
-              remove.disabled = true;
-              try {
-                const deleted = await fetch(`/practice-charts/email-presets/${preset.id}`, {
-                  method: "DELETE", credentials: "same-origin",
-                });
-                const result = await deleted.json();
-                if (!deleted.ok) throw new Error(result.detail || "Preset could not be deleted.");
-                if (emailPresetEl.value === String(preset.id)) emailPresetEl.value = "";
-                await loadEmailPresets();
-              } catch (error) {
-                errorEl.textContent = error.message || "Preset could not be deleted.";
-                remove.disabled = false;
-              }
-            });
-            row.append(text, remove);
-            presetListEl.append(row);
-          }
-        });
-        if (selectedBeforeLoad && presets.some((preset) => String(preset.id) === String(selectedBeforeLoad))) {
-          emailPresetEl.value = String(selectedBeforeLoad);
-        }
-      } catch (error) {
-        emailPresetEl.replaceChildren(new Option("Saved recipients unavailable", ""));
-        emailPresetEl.disabled = false;
-        errorEl.textContent = error.message || "Email presets could not be loaded.";
-      }
-    }
-
-    const savePresetBtn = document.getElementById("p-book-save-preset");
-    if (savePresetBtn) savePresetBtn.addEventListener("click", async function () {
-      savePresetBtn.disabled = true; errorEl.textContent = "";
-      try {
-        const response = await fetch("/practice-charts/email-presets", {
-          method: "POST", credentials: "same-origin", headers: {"Content-Type": "application/json"},
-          body: JSON.stringify({
-            display_name: document.getElementById("p-book-preset-name").value,
-            email: document.getElementById("p-book-preset-email").value,
-          }),
-        });
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload.detail || "Preset could not be saved.");
-        await loadEmailPresets(); emailPresetEl.value = String(payload.preset.id);
-      } catch (error) { errorEl.textContent = error.message; }
-      finally { savePresetBtn.disabled = false; }
-    });
-
     async function createPersistentPracticeChart({
       verifierId,
       dateKey,
@@ -4606,7 +4510,6 @@
       submissionKey,
       includeContests,
       includeTeamContests,
-      ordinaryEmailPresetId,
     }) {
       const response = await fetch(
         "/practice-charts",
@@ -4627,7 +4530,6 @@
             submission_key: submissionKey,
             include_contests: includeContests,
             include_team_contests: includeTeamContests,
-            ordinary_email_preset_id: ordinaryEmailPresetId,
           }),
         }
       );
@@ -5100,8 +5002,6 @@
       practiceDetailEls.forEach((checkbox) => { checkbox.checked = restoredDetails.has(checkbox.value); });
       if (includeContestsEl) includeContestsEl.checked = restoredDraft.includeContests !== false;
       if (includeTeamEl) includeTeamEl.checked = restoredDraft.includeTeam !== false;
-      if (emailCopyEl) emailCopyEl.checked = restoredDraft.emailCopy !== false;
-      if (requestValidationEl) requestValidationEl.checked = restoredDraft.requestValidation !== false;
     }
     renderEntries(state);
     renderPBookSummary(state);
@@ -5120,16 +5020,15 @@
     initializeFeature(wirePracticeTimer, "The practice timer could not be started.");
     initializeFeature(loadVerifierOptions, "Trusted verifiers could not be loaded.");
     initializeFeature(loadTeams, "Teams could not be loaded.");
-    initializeFeature(loadEmailPresets, "Saved recipients could not be loaded.");
     initializeFeature(loadPersistentPracticeCharts, "Practice history could not be loaded.");
     initializeFeature(loadPracticeTotals, "Practice totals could not be loaded.");
 
     function updateSubmitGlow() {
-      const glowing = [includeContestsEl, includeTeamEl, requestValidationEl]
+      const glowing = [includeContestsEl, includeTeamEl]
         .every((checkbox) => checkbox && checkbox.checked);
       submitBtn.classList.toggle("p-book-submit-gold", glowing);
     }
-    [includeContestsEl, includeTeamEl, requestValidationEl].forEach((checkbox) => {
+    [includeContestsEl, includeTeamEl].forEach((checkbox) => {
       if (checkbox) checkbox.addEventListener("change", updateSubmitGlow);
     });
     updateSubmitGlow();
@@ -5170,7 +5069,7 @@
         dateKey
       );
 
-      const verifierId = requestValidationEl?.checked && verifierSelectEl
+      const verifierId = verifierSelectEl
         ? Number(verifierSelectEl.value)
         : 0;
 
@@ -5181,15 +5080,10 @@
           : "";
       const includeContests = includeContestsEl ? includeContestsEl.checked : true;
       const includeTeamContests = Boolean(includeTeamEl?.checked);
-      const ordinaryEmailPresetId = emailCopyEl?.checked ? Number(emailPresetEl?.value) : 0;
 
       const missing = includeTeamContests && !currentTeam
         ? {message: "Choose a team, or continue without Team Competition.", choose: "Choose a Team", without: "Submit Without Team Competition", navigate: "/home#shed-team-panel", checkbox: includeTeamEl}
-        : emailCopyEl?.checked && !ordinaryEmailPresetId
-          ? {message: "Choose a saved recipient, or continue without emailing.", choose: "Choose a Recipient", without: "Submit Without Emailing", target: emailPresetEl, checkbox: emailCopyEl}
-          : requestValidationEl?.checked && !verifierId
-            ? {message: "Choose a connected parent or mentor, or continue without validation.", choose: "Choose a Parent or Mentor", without: "Submit Without Validation Request", target: verifierSelectEl, checkbox: requestValidationEl}
-            : null;
+        : null;
       if (missing && missingDialog) {
         missingMessageEl.textContent = missing.message;
         chooseMissingBtn.textContent = missing.choose;
@@ -5214,13 +5108,10 @@
       }
 
       if (!confirmationApproved && finalDialog) {
-        const presetText = ordinaryEmailPresetId && emailPresetEl.selectedOptions.length
-          ? emailPresetEl.selectedOptions[0].textContent : "Not sent";
         confirmValuesEl.replaceChildren();
         [
           `Band Camp contest: ${includeContests ? "Included" : "Not included"}`,
           `Team Competition: ${includeTeamContests && currentTeam ? `${currentTeam.emblem.value} ${currentTeam.name}` : "Not included"}`,
-          `Practice Book email: ${presetText}`,
           `Validation request: ${verifierId ? verifierName : "Not requested"}`,
         ].forEach((text) => { const item = document.createElement("li"); item.textContent = text; confirmValuesEl.append(item); });
         finalDialog.showModal();
@@ -5248,7 +5139,6 @@
           submissionKey: pendingSubmissionKey,
           includeContests,
           includeTeamContests,
-          ordinaryEmailPresetId: ordinaryEmailPresetId || null,
         });
         const serverChart = createdPayload && createdPayload.chart;
         if (!serverChart || !Number.isInteger(serverChart.id)) {
@@ -5286,17 +5176,7 @@
               `+${dandelionsEarned} dandelions added.`
             );
         const deliveryMessages = [];
-        const ordinaryStatus = createdPayload.ordinary_email || createdPayload.ordinary_email_delivery;
         const verificationStatus = createdPayload.verification_email || createdPayload.email_delivery;
-        if (ordinaryStatus?.code && ordinaryStatus.code !== "not_requested") {
-          deliveryMessages.push(
-            ordinaryStatus.code === "sent"
-              ? "Practice Book email sent."
-              : ordinaryStatus.code === "not_configured"
-                ? "Practice Book email was not sent because the email service is not configured."
-                : "Practice Book email could not be delivered."
-          );
-        }
         if (verificationStatus?.code && verificationStatus.code !== "not_requested") {
           deliveryMessages.push(
             verificationStatus.code === "sent"
@@ -5305,10 +5185,6 @@
                 ? "Validation request was saved, but its email was not sent because the email service is not configured."
                 : "Validation request was saved, but its email could not be delivered."
           );
-        }
-        if (deliveryStatusEl && deliveryMessages.length) {
-          deliveryStatusEl.hidden = false;
-          deliveryStatusEl.textContent = deliveryMessages.join(" · ");
         }
 
         if (createdPayload.created === true) {
@@ -5345,8 +5221,6 @@
         });
         if (includeContestsEl) includeContestsEl.checked = true;
         if (includeTeamEl) includeTeamEl.checked = true;
-        if (emailCopyEl) emailCopyEl.checked = true;
-        if (requestValidationEl) requestValidationEl.checked = true;
         updateSubmitGlow();
 
         pendingSubmissionKey = null;
