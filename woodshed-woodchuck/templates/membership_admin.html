@@ -2,8 +2,8 @@
 {% macro fields(action, member_id=none) %}<input type="hidden" name="csrf" value="{{ csrf }}">
 <input type="hidden" name="action" value="{{ action }}">{% if member_id %}<input type="hidden" name="membership_id" value="{{ member_id }}">{% endif %}{% endmacro %}
 {% block content %}
-<h1>Membership administration</h1>
-<form action="/admin/logout" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-secondary">Sign out of administration</button></form>
+<h1>Site Admin — Memberships</h1>
+<form action="/admin/logout" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-secondary">Sign out of Site Admin</button></form>
 <section class="card"><h2>Find an account</h2>
 <form method="get" class="stack-form"><label for="search">Name, Woodchuck ID, or adult email</label><input id="search" name="q" value="{{ q }}" maxlength="100">
 {% if selected %}<input type="hidden" name="membership_id" value="{{ selected.membership.id }}">{% endif %}<button class="btn btn-secondary">Search</button></form>

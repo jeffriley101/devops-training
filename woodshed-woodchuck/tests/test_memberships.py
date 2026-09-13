@@ -18,7 +18,7 @@ from app.models import (WoodchuckProfile, TrustedVerifier, StudentVerifierConnec
 from app.billing_config import BillingConfig, PLANS, available_plans, new_subscription_plan
 from app import billing_providers as providers
 from app.billing_providers import provision_initial_subscription
-from app.email_service import DeliveryResult
+from app.email_service import EmailService
 
 NOW = datetime(2026, 9, 13, tzinfo=timezone.utc)
 ADMIN = m.Actor("admin")
@@ -39,7 +39,6 @@ def db(tmp_path, monkeypatch):
     for key in ("PUBLIC_SUBSCRIPTIONS_ENABLED", "PAYPAL_BILLING_ENABLED", "STRIPE_BILLING_ENABLED", "LAUNCH_SALE_ENABLED"):
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv("SITE_ADMIN_TOKEN", "test-site-admin")
-    monkeypatch.setattr(routes.EmailService, "send_membership_invitation", lambda *a, **k: DeliveryResult(True, "sent"))
     with factory() as session:
         session.add_all([WoodchuckProfile(id=i, woodchuck_id=f"WC-MEMBER{i}", display_name=f"Student {i}",
             pin_hash="not-shown", instrument="Trumpet", level="Beginner", goal="Practice") for i in range(1, 10)])
@@ -313,6 +312,8 @@ def test_admin_search_and_owner_views_use_names(db):
     admin = client()
     csrf = page_csrf(admin, "/admin/login")
     admin.post("/admin/login", data={"csrf": csrf, "token": "test-site-admin"})
+    assert "Site Admin — Memberships" in admin.get("/admin/membership").text
+    assert "Sign out of Site Admin" in admin.get("/admin/membership").text
     page = admin.get("/admin/membership?q=Adult&membership_id=" + str(member))
     assert page.status_code == 200
     assert "Adult 1" in page.text and "Inspect membership" in page.text
@@ -349,7 +350,7 @@ def test_owner_routes_privacy_csrf_and_actor_selection(db):
     attacker = client("adult", 2)
     csrf = page_csrf(attacker)
     assert attacker.post("/membership/actions", data={"csrf": csrf, "as_account": "adult", "action": "invite", "membership_id": member,
-        "email": "x@example.test"}).status_code == 404
+        "email": "x@example.test"}).status_code == 409
     assert attacker.post("/membership/actions", data={"action": "remove"}).status_code == 403
     assert attacker.get("/membership?as_account=student").status_code == 403
 
@@ -363,7 +364,8 @@ def test_student_owner_seat_is_labeled_and_cannot_be_removed(db):
     assert "Members: 1 of 5" in page.text
     assert "Student 1 — You" in page.text
     assert "Complimentary Full membership · Active" in page.text
-    assert "Email address" in page.text and "Invite student" in page.text
+    assert 'name="woodchuck_id"' in page.text and "Woodchuck ID" in page.text
+    assert "Invite student" not in page.text and "Outstanding invitations" not in page.text
     assert page.text.count("name=\"action\" value=\"remove\"") == 0
     csrf = page_csrf(student)
     with db() as session:
@@ -373,15 +375,41 @@ def test_student_owner_seat_is_labeled_and_cannot_be_removed(db):
     assert response.status_code == 409
 
 
+def test_owner_assigns_existing_student_immediately_by_woodchuck_id(db, monkeypatch):
+    member = grant(db, kind="student")
+    student = client("student")
+    monkeypatch.setattr(EmailService, "send_membership_invitation",
+                        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("email sent")))
+    csrf = page_csrf(student)
+    response = student.post("/membership/actions", data={"csrf": csrf, "as_account": "student",
+        "membership_id": member, "action": "add", "woodchuck_id": " wc-member2 "})
+    assert response.status_code == 200
+    with db() as session:
+        assert len(m.active_seats(session, member)) == 2
+        assert m.student_has_full_access(session, 2)
+        assert session.scalar(select(func.count()).select_from(MembershipSeatInvitation)) == 0
+    page = student.get("/membership")
+    assert "Members: 2 of 5" in page.text
+    assert "Student 2" in page.text
+
+
+def test_owner_assignment_rejects_unknown_duplicate_and_other_membership_student(db):
+    member = grant(db, kind="student")
+    other = grant(db, kind="adult", owner_id=2)
+    with db() as session:
+        m.add_seat(session, other, 3, ADMIN)
+        session.commit()
+    student = client("student")
+    csrf = page_csrf(student)
+    base = {"csrf": csrf, "as_account": "student", "membership_id": member, "action": "add"}
+    assert student.post("/membership/actions", data={**base, "woodchuck_id": "missing"}).status_code == 404
+    assert student.post("/membership/actions", data={**base, "woodchuck_id": "WC-MEMBER1"}).status_code == 409
+    assert student.post("/membership/actions", data={**base, "woodchuck_id": "WC-MEMBER3"}).status_code == 409
+
+
 def test_email_invitation_route_and_claim(db):
     member = grant(db)
-    owner = client("adult")
-    csrf = page_csrf(owner)
-    response = owner.post("/membership/actions", data={"csrf": csrf, "as_account": "adult", "action": "invite",
-        "membership_id": member, "email": "recipient@example.test"})
-    assert response.status_code == 200 and "Invitation sent." in response.text
     with db() as session:
-        assert "invitation_sent" in set(session.scalars(select(MembershipAuditEvent.action)))
         _, token = m.invite_student(session, member, "second@example.test", m.Actor("adult", 1))
         session.commit()
     student = client("student", 3)

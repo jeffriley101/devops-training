@@ -16,7 +16,6 @@ from . import memberships as service
 from .billing_config import BillingConfig, PLANS, available_plans
 from .billing_providers import BillingUnavailable, checkout, process_webhook
 from .site_admin import csrf_token, check_csrf, sign_in_site_admin, require_site_admin
-from .email_service import EmailService, public_link
 
 
 class PrivateRoute(APIRoute):
@@ -122,30 +121,16 @@ async def membership_action(request: Request):
         try:
             membership_id = integer(form, "membership_id")
             action = form.get("action")
-            delivery = None
             if action == "add":
-                service.add_seat(session, membership_id, integer(form, "profile_id"), actor)
+                service.add_seat_by_woodchuck_id(session, membership_id, form.get("woodchuck_id"), actor)
             elif action == "remove":
                 service.remove_seat(session, membership_id, integer(form, "seat_id"), actor)
-            elif action == "invite":
-                invitation, token = service.invite_student(session, membership_id, str(form.get("email", "")), actor)
-                delivery = (invitation.id, invitation.email, token)
             elif action == "cancel_invitation":
                 service.cancel_invitation(session, membership_id, integer(form, "invitation_id"), actor)
             else:
                 raise ValueError("Unknown membership action.")
             session.commit()
             request.session["membership_message"] = "Membership updated."
-            if delivery:
-                invitation_id, email, token = delivery
-                result = EmailService().send_membership_invitation(recipient=email, acceptance_url=public_link(
-                    f"/membership/invitations/{token}", local_base_url=str(request.base_url)))
-                service.audit(session, session.get(Membership, membership_id), actor,
-                              "invitation_sent" if result.sent else "invitation_delivery_failed",
-                              invitation_id=invitation_id, delivery_code=result.code)
-                session.commit()
-                request.session["membership_message"] = ("Invitation sent." if result.sent else
-                    "Invitation saved, but email could not be sent. Cancel it and try again when email is available.")
         except LookupError as error:
             session.rollback()
             raise HTTPException(404, str(error)) from error

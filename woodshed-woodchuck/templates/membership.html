@@ -30,16 +30,9 @@
 {% for seat, name in item.seats %}<div class="membership-line"><span>{{ name }}{% if actor.kind == 'student' and actor.id == item.owner_profile_id and seat.profile_id == actor.id %} — You{% endif %}</span>
 {% if not (actor.kind == 'student' and actor.id == item.owner_profile_id and seat.profile_id == actor.id) %}<form method="post" action="/membership/actions">{{ fields(member, 'remove') }}<input type="hidden" name="seat_id" value="{{ seat.id }}"><button class="btn btn-secondary">Remove</button></form>{% endif %}</div>{% endfor %}
 {% if item.active and item.seats|length < 5 %}<h3>Add a student</h3>
-{% if connected %}<form method="post" action="/membership/actions" class="stack-form">{{ fields(member, 'add') }}
-<label for="student-{{ member.id }}">Choose someone already connected to you:</label>
-<select id="student-{{ member.id }}" name="profile_id" required>{% for student in connected %}<option value="{{ student.profile_id }}">{{ student.display_name }}</option>{% endfor %}</select>
-<button class="btn btn-primary">Add student</button></form><p>or</p>{% endif %}
-<form method="post" action="/membership/actions" class="stack-form">{{ fields(member, 'invite') }}
-<label for="email-{{ member.id }}">Email address</label><input id="email-{{ member.id }}" type="email" name="email" maxlength="320" required>
-<button class="btn btn-primary">Invite student</button></form>{% endif %}
-{% if item.invitations %}<h3>Outstanding invitations</h3>{% for invitation in item.invitations %}
-<div class="membership-line"><span>{{ invitation.email }} · Expires {{ invitation.expires_at.strftime('%b %d, %Y') }}</span>
-<form method="post" action="/membership/actions">{{ fields(member, 'cancel_invitation') }}<input type="hidden" name="invitation_id" value="{{ invitation.id }}"><button class="btn btn-secondary">Cancel invitation</button></form></div>{% endfor %}{% endif %}
+<form method="post" action="/membership/actions" class="stack-form">{{ fields(member, 'add') }}
+<label for="woodchuck-id-{{ member.id }}">Woodchuck ID</label><input id="woodchuck-id-{{ member.id }}" type="text" name="woodchuck_id" maxlength="32" required autocomplete="off">
+<button class="btn btn-primary">Add student</button></form>{% endif %}
 </section>{% endfor %}
 {% if not memberships %}<section class="card"><h2>Full Access for up to five students</h2>
 {% for plan in plans %}<p>{{ plan.label }}</p>{% endfor %}

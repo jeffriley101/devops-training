@@ -10,6 +10,7 @@ from sqlalchemy import select, update
 from .models import (BillingAccount, Membership, MembershipSeat, MembershipSeatInvitation,
                      MembershipAuditEvent, WoodchuckProfile, TrustedVerifier)
 from .security import generate_invitation_token, hash_invitation_token
+from .accounts import normalize_woodchuck_id
 from .verifiers import accepted_active_verifier_students, band_director_students, normalize_email, validate_email
 
 
@@ -132,6 +133,26 @@ def add_seat(session, membership_id, profile_id, actor, at=None):
     if not allowed:
         raise LookupError("Connected student not found. Use a seat invitation instead.")
     return _add_seat(session, membership, profile_id, actor, utc(at or clock()))
+
+
+def add_seat_by_woodchuck_id(session, membership_id, woodchuck_id, actor, at=None):
+    """Assign an existing active student by exact Woodchuck ID."""
+    membership = owned_membership(session, membership_id, actor, lock=True)
+    normalized_id = normalize_woodchuck_id(str(woodchuck_id or ""))
+    profile = session.scalar(select(WoodchuckProfile).where(
+        WoodchuckProfile.woodchuck_id == normalized_id,
+        WoodchuckProfile.status == "active",
+    ))
+    if profile is None:
+        raise LookupError("No active student was found with that Woodchuck ID.")
+    existing = session.scalar(select(MembershipSeat).where(
+        MembershipSeat.membership_id == membership.id,
+        MembershipSeat.profile_id == profile.id,
+        MembershipSeat.removed_at.is_(None),
+    ))
+    if existing:
+        raise ValueError("That student is already a member of this membership.")
+    return _add_seat(session, membership, profile.id, actor, utc(at or clock()))
 
 
 def remove_seat(session, membership_id, seat_id, actor, at=None):
