@@ -20,8 +20,46 @@ def check_csrf(request, supplied):
     if not expected or not isinstance(supplied, str) or not hmac.compare_digest(expected, supplied):
         raise HTTPException(403, "Please reload the page and try again.")
     origin = request.headers.get("origin")
-    if origin and urlsplit(origin).netloc != request.url.netloc:
-        raise HTTPException(403, "Invalid request origin.")
+    if origin:
+        origin_endpoint = _origin_endpoint(origin)
+        scheme = urlsplit(origin).scheme.lower()
+        if origin_endpoint != _request_host_endpoint(request, scheme):
+            raise HTTPException(403, "Invalid request origin.")
+
+
+def _origin_endpoint(origin):
+    """Return a normalized (hostname, port) endpoint for an Origin header."""
+    try:
+        parsed = urlsplit(origin)
+        hostname = parsed.hostname
+        if not parsed.scheme or not hostname:
+            return None
+        port = parsed.port
+    except ValueError:
+        return None
+    if port is None:
+        port = 443 if parsed.scheme.lower() == "https" else 80 if parsed.scheme.lower() == "http" else None
+    return (hostname.lower(), port)
+
+
+def _request_host_endpoint(request, scheme=""):
+    """Resolve the browser-facing host, including a narrowly scoped proxy fallback."""
+    host = request.headers.get("host")
+    if not host:
+        forwarded = request.headers.get("x-forwarded-host", "").split(",", 1)[0].strip()
+        host = forwarded or None
+    if not host:
+        return None
+    try:
+        parsed = urlsplit(f"//{host}")
+        if not parsed.hostname:
+            return None
+        port = parsed.port
+        if port is None:
+            port = 443 if scheme == "https" else 80 if scheme == "http" else None
+        return (parsed.hostname.lower(), port)
+    except ValueError:
+        return None
 
 
 def _fingerprint(token):
