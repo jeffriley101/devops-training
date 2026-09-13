@@ -49,19 +49,19 @@ def test_left_controls_preserve_rewards_and_community_actions() -> None:
     assert 'href="{{ public_site_url }}"' in markup
 
 
-def test_right_controls_and_donation_link_are_unique() -> None:
+def test_right_controls_and_full_access_link_are_unique() -> None:
     markup = shop_markup()
     right_start = markup.index("shop-object-column-right")
     right = markup[right_start:markup.index("</div>\n  </div>", right_start)]
-    controls = ["🎒", "🐛", "🔗", "💝", "🗿"]
+    controls = ["🎒", "🐛", "🔗", "🔑", "🗿"]
     assert [right.index(item) for item in controls] == sorted(right.index(item) for item in controls)
     assert "Open Spectrogram" in markup
     assert 'href="/practice/pristine" aria-label="Open Pristine Practice"' in markup
     assert "Clothing Shelf, coming soon" not in markup
     assert "Gear Shelf, coming soon" not in markup
     assert "direct file upload" not in markup
-    assert markup.count("venmo.com/u/jeffriley101") == 1
-    assert markup.count('aria-label="Donate"') == 1
+    assert 'href="/membership?as_account=student"' in markup
+    assert markup.count('aria-label="Unlock Full Access"') == 1
 
 
 def test_shop_dialogs_and_keyboard_focus_behavior_are_wired() -> None:
@@ -73,7 +73,7 @@ def test_shop_dialogs_and_keyboard_focus_behavior_are_wired() -> None:
     for label in (
         "Open Crown Progress", "Open The GOAT Tracker", "Open Practice Definition",
         "Share Woodshed", "Open Gear Shelf", "Open Little Buddy Shelf",
-        "Open Practice Room", "Open Artist instructions", "Donate",
+        "Open Practice Room", "Open Artist instructions", "Unlock Full Access",
     ):
         assert f'aria-label="{label}' in markup
     assert "dialog.showModal()" in javascript
@@ -150,7 +150,7 @@ def test_mobile_shop_keeps_both_vertical_columns_over_the_scene() -> None:
     ]
     for control in ("🌼", "👑", "🐐", "📬", "🚪"):
         assert control in left
-    for control in ("🎒", "🐛", "🔗", "💝", "🗿"):
+    for control in ("🎒", "🐛", "🔗", "🔑", "🗿"):
         assert control in right
     assert 'class="shop-dandelion-count"' in left
     assert 'aria-label="Shop rewards and community"' in markup

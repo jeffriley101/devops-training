@@ -131,8 +131,8 @@ def test_donate_moved_once_to_shop_and_qr_is_accessible() -> None:
     home = (ROOT / "templates/home.html").read_text(encoding="utf-8")
     store = (ROOT / "templates/store.html").read_text(encoding="utf-8")
     assert "venmo.com/u/jeffriley101" not in home
-    assert store.count("venmo.com/u/jeffriley101") == 1
-    assert 'aria-label="Donate"' in store
+    assert 'href="/membership?as_account=student"' in store
+    assert 'aria-label="Unlock Full Access"' in store
     assert 'alt="QR code for the public Woodshed Woodchuck website at {{ public_site_url }}"' in store
     assert "Open the Woodshed website" not in store
     assert 'data-public-site-url="{{ public_site_url }}"' in store

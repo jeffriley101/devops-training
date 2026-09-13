@@ -487,12 +487,12 @@ def test_initial_provisioning_rejects_invalid_plan_and_rolls_back(db):
         assert session.scalar(select(func.count()).select_from(Membership)) == 0
 
 
-def test_unauthenticated_membership_redirect_and_nav_link(tmp_path, monkeypatch):
+def test_unauthenticated_membership_redirect_and_student_key_link(tmp_path, monkeypatch):
     response = TestClient(main.app).get("/membership", follow_redirects=False)
     assert response.status_code == 303 and response.headers["location"] == "/login"
     template = Path("templates/base.html").read_text()
-    assert 'class="nav-pill{% if active_nav == \'membership\' %} active{% endif %}"' in template
-    assert 'href="/membership?as_account=student"' in template
+    assert 'class="nav-pill{% if active_nav == \'membership\' %} active{% endif %}"' not in template
+    assert 'href="/membership?as_account=student"' in Path("templates/store.html").read_text()
 
 
 def test_terminated_subscription_cannot_reactivate_or_inherit_price(db, monkeypatch):

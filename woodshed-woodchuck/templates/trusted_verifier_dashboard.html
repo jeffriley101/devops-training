@@ -11,12 +11,10 @@
 
   <div id="verifier-student-list" data-connection-id="{{ student.connection_id if student else '' }}">
     {% if student %}
-    <section class="verifier-identity" aria-labelledby="verifier-student-name">
-      <p class="verifier-eyebrow">Your musician</p>
+    <section class="verifier-identity"{% if connections|length == 1 %} aria-labelledby="verifier-student-name"{% else %} aria-label="Selected student"{% endif %}>
       {% if connections|length > 1 %}
       <form method="get" action="/trusted-verifiers/dashboard" id="verifier-student-selector">
-        <label for="verifier-connection">Student</label>
-        <select id="verifier-connection" name="connection_id">
+        <select id="verifier-connection" name="connection_id" aria-label="Student">
           {% for connection in connections %}
           <option value="{{ connection.connection_id }}"{% if student.connection_id == connection.connection_id %} selected{% endif %}>{{ connection.display_name }}</option>
           {% endfor %}
@@ -24,9 +22,8 @@
         <noscript><button type="submit" class="btn btn-secondary">View student</button></noscript>
       </form>
       {% endif %}
-      <h2 id="verifier-student-name">{{ student.display_name }}</h2>
+      {% if connections|length == 1 %}<h2 id="verifier-student-name">{{ student.display_name }}</h2>{% endif %}
       <p>{{ student.instrument }} <span aria-hidden="true">·</span> {{ student.level }}</p>
-      <p class="verifier-muted">Your relationship: {{ student.role|replace('_', ' ')|title }}</p>
     </section>
 
     <p id="verifier-review-notice" class="verifier-review-notice" aria-live="polite" hidden><a href="#verifier-reviews"></a></p>
