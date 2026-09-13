@@ -26,9 +26,8 @@ MAX_VERIFIERS_PER_STUDENT = 3
 INVITATION_LIFETIME = timedelta(days=7)
 
 VERIFIER_ROLE_LABELS = {
-    "parent": "Parent",
+    "verifier": "Verifier",
     "band_director": "Band Director",
-    "mentor": "Mentor",
 }
 VERIFIER_ROLES = frozenset(VERIFIER_ROLE_LABELS)
 
@@ -45,6 +44,7 @@ def accepted_active_verifier_students(session: Session, *, verifier_id: int) -> 
     ).join(WoodchuckProfile, WoodchuckProfile.id == StudentVerifierConnection.profile_id).where(
         StudentVerifierConnection.verifier_id == verifier_id,
         StudentVerifierConnection.status == "accepted", WoodchuckProfile.status == "active",
+        StudentVerifierConnection.role == "verifier",
     ).order_by(WoodchuckProfile.display_name, WoodchuckProfile.id)).mappings()]
 
 
@@ -165,6 +165,7 @@ def count_reserved_verifier_slots(
         .select_from(StudentVerifierConnection)
         .where(
             StudentVerifierConnection.profile_id == profile_id,
+            StudentVerifierConnection.role == "verifier",
             StudentVerifierConnection.status.in_(
                 ACTIVE_CONNECTION_STATUSES
             ),
@@ -176,12 +177,30 @@ def count_reserved_verifier_slots(
         .select_from(TrustedVerifierInvitation)
         .where(
             TrustedVerifierInvitation.profile_id == profile_id,
+            TrustedVerifierInvitation.role == "verifier",
             TrustedVerifierInvitation.status == "pending",
             TrustedVerifierInvitation.expires_at > now,
         )
     ) or 0
 
     return int(connected_count) + int(pending_count)
+
+
+def has_reserved_band_director_slot(session: Session, *, profile_id: int, now: datetime | None = None) -> bool:
+    now = now or _utc_now()
+    return bool(
+        session.scalar(select(StudentVerifierConnection.id).where(
+            StudentVerifierConnection.profile_id == profile_id,
+            StudentVerifierConnection.role == "band_director",
+            StudentVerifierConnection.status.in_(ACTIVE_CONNECTION_STATUSES),
+        ))
+        or session.scalar(select(TrustedVerifierInvitation.id).where(
+            TrustedVerifierInvitation.profile_id == profile_id,
+            TrustedVerifierInvitation.role == "band_director",
+            TrustedVerifierInvitation.status == "pending",
+            TrustedVerifierInvitation.expires_at > now,
+        ))
+    )
 
 
 def create_trusted_verifier_invitation(
@@ -216,7 +235,7 @@ def create_trusted_verifier_invitation(
 
     if existing_connection is not None:
         raise ValueError(
-            "That verifier is already connected to this student."
+            "That person is already connected to this student."
         )
 
     pending_invitation = session.scalar(
@@ -239,10 +258,14 @@ def create_trusted_verifier_invitation(
         now=now,
     )
 
-    if reserved_slots >= MAX_VERIFIERS_PER_STUDENT:
+    if normalized_role == "verifier" and reserved_slots >= MAX_VERIFIERS_PER_STUDENT:
         raise ValueError(
             "A student may have no more than three trusted verifiers."
         )
+    if normalized_role == "band_director" and has_reserved_band_director_slot(
+        session, profile_id=profile.id, now=now
+    ):
+        raise ValueError("A student may have only one Band Director.")
 
     token = generate_invitation_token()
 
@@ -411,11 +434,21 @@ def accept_trusted_verifier_invitation(
             )
         ) or 0
 
-        if connected_count >= MAX_VERIFIERS_PER_STUDENT:
+        if invitation.role == "verifier" and count_reserved_verifier_slots(
+            session, profile_id=invitation.profile_id, now=now
+        ) >= MAX_VERIFIERS_PER_STUDENT:
             session.rollback()
             raise ValueError(
                 "This student already has three trusted verifiers."
             )
+        existing_director = session.scalar(select(StudentVerifierConnection.id).where(
+            StudentVerifierConnection.profile_id == invitation.profile_id,
+            StudentVerifierConnection.role == "band_director",
+            StudentVerifierConnection.status.in_(ACTIVE_CONNECTION_STATUSES),
+        ))
+        if invitation.role == "band_director" and existing_director is not None:
+            session.rollback()
+            raise ValueError("This student already has a Band Director.")
 
         connection = StudentVerifierConnection(
             profile_id=invitation.profile_id,

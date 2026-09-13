@@ -124,7 +124,7 @@ def test_missing_configuration_is_controlled(monkeypatch) -> None:
     assert result.sent is False and result.code == "not_configured"
 
 
-@pytest.mark.parametrize("role", ["parent", "mentor"])
+@pytest.mark.parametrize("role", ["verifier", "band_director"])
 def test_invitation_without_smtp_persists_and_local_link_accepts(
     mail_database, monkeypatch, role,
 ) -> None:
@@ -165,7 +165,7 @@ def test_invitation_without_smtp_persists_and_local_link_accepts(
 def test_invitation_and_pchart_send_after_persistence_and_resend_without_duplicates(mail_database, monkeypatch) -> None:
     with TestClient(app) as student:
         profile_id = create_student(student)
-        invitation_response = student.post("/trusted-verifiers/invitations", data={"email": "adult+music@example.test", "role": "band_director"})
+        invitation_response = student.post("/trusted-verifiers/invitations", data={"email": "adult+music@example.test", "role": "verifier"})
         assert invitation_response.status_code == 200
         invitation_payload = invitation_response.json()
         assert invitation_payload["email_delivery"]["sent"] is True
@@ -256,7 +256,7 @@ def test_password_and_token_are_absent_from_failure_logs(mail_database, monkeypa
     monkeypatch.setattr(email_service.smtplib, "SMTP", FailingSMTP)
     with caplog.at_level(logging.WARNING), TestClient(app) as client:
         create_student(client)
-        response = client.post("/trusted-verifiers/invitations", data={"email": "adult@example.test", "role": "parent"})
+        response = client.post("/trusted-verifiers/invitations", data={"email": "adult@example.test", "role": "verifier"})
     assert response.status_code == 200
     assert response.json()["email_delivery"] == {"sent": False, "code": "authentication_failed", "message": "Saved, but email could not be sent"}
     logs = caplog.text

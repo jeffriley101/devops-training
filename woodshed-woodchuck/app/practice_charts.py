@@ -148,6 +148,21 @@ def create_practice_chart_verification_request(
         practice_details
     )
 
+    if verifier_id is not None:
+        connection = session.scalar(
+            select(StudentVerifierConnection).where(
+                StudentVerifierConnection.profile_id == profile.id,
+                StudentVerifierConnection.verifier_id == verifier_id,
+                StudentVerifierConnection.status == "accepted",
+                StudentVerifierConnection.role == "verifier",
+            )
+        )
+
+        if connection is None:
+            raise ValueError(
+                "Choose an accepted Verifier connection for this student."
+            )
+
     if submission_key is not None:
         if not isinstance(submission_key, str):
             raise ValueError("The P-Chart submission key must be text.")
@@ -177,20 +192,6 @@ def create_practice_chart_verification_request(
                 chart=existing_chart,
                 verification=existing_verification,
                 created=False,
-            )
-
-    if verifier_id is not None:
-        connection = session.scalar(
-            select(StudentVerifierConnection).where(
-                StudentVerifierConnection.profile_id == profile.id,
-                StudentVerifierConnection.verifier_id == verifier_id,
-                StudentVerifierConnection.status == "accepted",
-            )
-        )
-
-        if connection is None:
-            raise ValueError(
-                "That trusted verifier is not connected to this student."
             )
 
     instrument = profile.instrument.strip()
@@ -357,6 +358,7 @@ def respond_to_practice_chart_verification(
             StudentVerifierConnection.profile_id == chart.profile_id,
             StudentVerifierConnection.verifier_id == verifier.id,
             StudentVerifierConnection.status == "accepted",
+            StudentVerifierConnection.role == "verifier",
         )
     )
 

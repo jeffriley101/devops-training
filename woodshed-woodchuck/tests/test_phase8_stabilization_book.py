@@ -12,7 +12,7 @@ def test_removed_preset_elements_cannot_abort_book_initialization() -> None:
     assert "const initializeFeature" in script
     for initializer in (
         "wirePracticeTimer", "loadVerifierOptions", "loadTeams",
-        "loadEmailPresets", "loadPersistentPracticeCharts", "loadPracticeTotals",
+        "loadPersistentPracticeCharts", "loadPracticeTotals",
     ):
         assert f"initializeFeature({initializer}" in script
 
@@ -32,9 +32,9 @@ def test_book_wiring_is_idempotent_and_timer_is_independent() -> None:
 def test_book_loaders_resolve_empty_and_failure_states() -> None:
     script = (ROOT / "static/js/app.js").read_text(encoding="utf-8")
     assert 'currentEl.textContent = "No team selected"' in script
-    assert "No saved recipients yet" in script
+    assert "No verification request" in script
     assert "No connected parent or mentor yet." not in script
-    assert "Saved recipients unavailable" in script
+    assert "email-presets" not in script
     assert "Teams could not be loaded." in script
     assert "Trusted verifiers unavailable" in script
 
@@ -45,8 +45,8 @@ def test_book_team_section_is_compact_and_shed_owned() -> None:
     assert "Include this chart in the Team Competition" in template
     assert "Uncheck to prevent being added to this contest." in template
     assert 'id="p-book-current-team"' in template
-    assert 'href="/home#shed-team-panel"' in template
-    assert "Choose a Team in SHED" in template
+    assert 'id="p-book-team-shed-link"' not in template
+    assert "Choose or Change Team in SHED" not in template + script
     for removed in (
         'id="p-book-team-options"', 'id="p-book-new-team-name"',
         'id="p-book-team-emblem"', 'id="p-book-create-team"',
@@ -89,8 +89,7 @@ def test_practice_book_title_and_work_disclosure_copy() -> None:
 def test_submission_keeps_warnings_confirmation_and_single_clipboard_attempt() -> None:
     script = (ROOT / "static/js/app.js").read_text(encoding="utf-8")
     for label in (
-        "Submit Without Team Competition", "Submit Without Emailing",
-        "Submit Without Validation Request", "Submit this P-Chart",
+        "Submit Without Team Competition", "Submit this P-Chart",
     ):
         assert label in script or label in (ROOT / "templates/p_book.html").read_text(encoding="utf-8")
     assert "if (submissionInFlight) return" in script
@@ -149,7 +148,7 @@ def test_book_asset_versions_are_advanced() -> None:
     base = (ROOT / "templates/base.html").read_text(encoding="utf-8")
     assert "/static/css/styles.css?v=119" in base
     assert "/static/js/character-reaction.js?v=3" in base
-    assert "/static/js/app.js?v=82" in base
+    assert "/static/js/app.js?v=83" in base
     assert "styles.css?v=68" not in base
     assert "app.js?v=34" not in base
 

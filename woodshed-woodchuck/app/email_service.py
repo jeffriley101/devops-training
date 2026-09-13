@@ -111,14 +111,14 @@ class EmailService:
         role_text = role.replace("_", " ").title()
         plain = (
             "Woodshed Woodchuck\n\n"
-            f"{student_name} invited you to be their trusted verifier.\n"
+            f"{student_name} invited you to connect as their {role_text}.\n"
             f"Verifier role: {role_text}\n\nAccept the invitation: {acceptance_url}\n\n"
             "The invitation link may expire and can only be used as currently defined. "
             "Please do not forward this private link."
         )
         safe_name, safe_role, safe_url = html.escape(student_name), html.escape(role_text), html.escape(acceptance_url, quote=True)
         body = (
-            f"<h1>Woodshed Woodchuck</h1><p><strong>{safe_name}</strong> invited you to be their trusted verifier.</p>"
+            f"<h1>Woodshed Woodchuck</h1><p><strong>{safe_name}</strong> invited you to connect as their {safe_role}.</p>"
             f"<p>Verifier role: {safe_role}</p><p><a href=\"{safe_url}\">Accept the invitation</a></p>"
             "<p>The invitation link may expire and can only be used as currently defined. Please do not forward this private link.</p>"
         )

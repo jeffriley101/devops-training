@@ -1,147 +1,48 @@
 {% extends "base.html" %}
-
 {% block content %}
-<section class="card">
+<section class="card trusted-verifier-relationships">
   <div class="section-head">
     <p class="chip">Student account</p>
-    <h2>Trusted Verifiers</h2>
-    <p class="body-copy">
-      Connect up to three parents, guardians, teachers, coaches,
-      or other trusted adults to your Woodchuck.
-    </p>
+    <h2>Verifiers &amp; Band Director</h2>
+    <p class="body-copy">Connect up to three people across these relationships. Each uses their own email address and four-digit PIN.</p>
   </div>
-
   <div class="setup-layout">
-    <section>
-      <h3>Invite a Trusted Verifier</h3>
-
-      <form
-        id="trusted-verifier-invite-form"
-        class="stack-form"
-        novalidate
-      >
-        <label for="trusted-verifier-email">
-          Adult's email address
-        </label>
-
-        <input
-          id="trusted-verifier-email"
-          name="email"
-          type="email"
-          maxlength="320"
-          placeholder="adult@example.com"
-          autocomplete="email"
-          required
-        />
-
-        <label for="trusted-verifier-role">
-          Their role
-        </label>
-
-        <select
-          id="trusted-verifier-role"
-          name="role"
-          required
-        >
-          <option value="">Choose a role</option>
-          {% for role, label in verifier_role_labels.items() %}
-          <option value="{{ role }}">{{ label }}</option>
-          {% endfor %}
-        </select>
-
-        <p
-          id="trusted-verifier-invite-error"
-          class="error-text"
-          aria-live="polite"
-        ></p>
-
-        <button class="btn btn-primary" type="submit">
-          Create Invitation
-        </button>
+    <section aria-labelledby="verifiers-heading">
+      <h3 id="verifiers-heading">Verifiers</h3>
+      <p>Choose one connected Verifier when you want a P-Chart reviewed.</p>
+      <div id="trusted-verifier-connection-list" aria-live="polite">Loading Verifiers…</div>
+      <div id="trusted-verifier-invitation-list" aria-live="polite"></div>
+      <form id="trusted-verifier-invite-form" class="stack-form" data-relationship-invite>
+        <input type="hidden" name="role" value="verifier" />
+        <label for="trusted-verifier-email">Verifier email address</label>
+        <input id="trusted-verifier-email" name="email" type="email" maxlength="320" autocomplete="email" required />
+        <button class="btn btn-primary" type="submit">Add Verifier</button>
+        <p class="error-text relationship-form-error" aria-live="polite"></p>
       </form>
-
-      <section
-        id="trusted-verifier-invite-success"
-        class="success-callout mt-md"
-        aria-live="polite"
-        hidden
-      >
-        <h3>Invitation Created</h3>
-
-        <p id="trusted-verifier-delivery-status"></p>
-
-        <p>
-          If the email app does not open, copy the link below
-          and send it manually.
-        </p>
-
-        <p>
-          <a
-            id="trusted-verifier-invite-link"
-            href="#"
-            target="_blank"
-            rel="noopener noreferrer"
-          ></a>
-        </p>
-
-        <button
-          id="trusted-verifier-copy-link"
-          class="btn btn-secondary"
-          type="button"
-        >
-          Copy Invitation Link
-        </button>
-        <p
-          id="trusted-verifier-copy-feedback"
-          class="body-copy"
-        ></p>
-      </section>
     </section>
-
-    <aside class="mentor-card">
-      <div>
-        <p class="chip">How verification works</p>
-        <h3>One adult can validate a P-Chart</h3>
-
-        <p>
-          A student may connect up to three trusted verifiers.
-          One connected verifier is enough to validate a
-          practice chart unless a future contest says otherwise.
-        </p>
-
-        <p>
-          Verifiers use their own email address and four-digit PIN.
-        </p>
-      </div>
-    </aside>
+    <section aria-labelledby="band-director-heading">
+      <h3 id="band-director-heading">Band Director</h3>
+      <p>Connect with your Band Director to appear on their practice dashboard.</p>
+      <p>Please discuss with your Band Director before sending them this email invitation.</p>
+      <div id="band-director-connection-list" aria-live="polite">Loading Band Director connections…</div>
+      <div id="band-director-invitation-list" aria-live="polite"></div>
+      <form id="band-director-invite-form" class="stack-form" data-relationship-invite>
+        <input type="hidden" name="role" value="band_director" />
+        <label for="band-director-email">Band Director email address</label>
+        <input id="band-director-email" name="email" type="email" maxlength="320" autocomplete="email" required />
+        <button class="btn btn-primary" type="submit">Connect Band Director</button>
+        <p class="error-text relationship-form-error" aria-live="polite"></p>
+      </form>
+    </section>
   </div>
-
-  <hr class="section-divider" />
-
-  <section>
-    <h3>Connected Adults</h3>
-
-    <div
-      id="trusted-verifier-connection-list"
-      aria-live="polite"
-    >
-      <p class="body-copy">Loading connected adults...</p>
-    </div>
+  <section id="trusted-verifier-invite-success" class="success-callout mt-md" aria-live="polite" hidden>
+    <h3>Invitation Created</h3>
+    <p id="trusted-verifier-delivery-status"></p>
+    <p>You can also copy this private invitation link and send it directly.</p>
+    <p><a id="trusted-verifier-invite-link" href="#" target="_blank" rel="noopener noreferrer"></a></p>
+    <button id="trusted-verifier-copy-link" class="btn btn-secondary" type="button">Copy Invitation Link</button>
+    <p id="trusted-verifier-copy-feedback" class="body-copy"></p>
   </section>
-
-  <hr class="section-divider" />
-
-  <section>
-    <h3>Invitations</h3>
-
-    <div
-      id="trusted-verifier-invitation-list"
-      aria-live="polite"
-    >
-      <p class="body-copy">Loading invitations...</p>
-    </div>
-  </section>
-
   <div class="button-row">
     <a id="trusted-verifier-return-link" class="btn btn-secondary" href="{% if return_to_p_book %}/p-book?restore_draft=1{% else %}/home{% endif %}">
       {% if return_to_p_book %}Back to Practice Book{% else %}Back to the Woodshed{% endif %}
@@ -149,7 +50,6 @@
   </div>
 </section>
 {% endblock %}
-
 {% block page_scripts %}
-<script src="/static/js/trusted-verifiers.js?v=9"></script>
+<script src="/static/js/trusted-verifiers.js?v=10"></script>
 {% endblock %}

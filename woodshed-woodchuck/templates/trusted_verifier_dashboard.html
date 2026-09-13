@@ -3,6 +3,7 @@
 <link rel="stylesheet" href="/static/css/trusted-verifier-dashboard.css?v=2" />
 <section class="verifier-dashboard">
   <header class="verifier-account">
+    <h1>Verifier Dashboard</h1>
     <p id="verifier-dashboard-title">{{ verifier_name }}’s Musicians</p>
     {% if has_director_students %}<a href="/band-director/dashboard">Band Director Dashboard</a>{% endif %}
   </header>
@@ -29,7 +30,6 @@
 
     <p id="verifier-review-notice" class="verifier-review-notice" aria-live="polite" hidden><a href="#verifier-reviews"></a></p>
 
-    {% if student.rating is defined %}
     <section class="verifier-rating-card" aria-labelledby="verifier-rating-heading">
       <h3 id="verifier-rating-heading">Practice Rating</h3>
       <div class="verifier-rating">
@@ -42,19 +42,17 @@
       <p class="verifier-muted">Based on the most recently completed week</p>
     </section>
 
-    {% endif %}
     <section class="verifier-panel" aria-labelledby="verifier-week-heading">
       <h3 id="verifier-week-heading">This Week</h3>
       <dl class="verifier-metrics verifier-week-metrics">
         {% for label, value, unit in [
           ('Minutes this week', student.weekly.total, ''),
-          ('P-Charts this week' if student.weekly.charts is defined else 'Practice days this week', student.weekly.charts if student.weekly.charts is defined else student.weekly.days, ''),
+          ('P-Charts this week', student.weekly.charts, ''),
           ('Practice streak', student.practice_streak, 'day' if student.practice_streak == 1 else 'days')
         ] %}
         <div><dt>{{ label }}</dt><dd>{{ value }}{% if unit %} <small>{{ unit }}</small>{% endif %}</dd></div>
         {% endfor %}
       </dl>
-      {% if student.lifetime is defined %}
       {% if student.lifetime.charts == 0 %}<p class="verifier-muted">A little practice is a great place to start.</p>{% endif %}
       <section class="verifier-quality" aria-labelledby="verifier-quality-heading">
         <h4 id="verifier-quality-heading">Practice quality</h4>
@@ -63,10 +61,8 @@
           <div><dt>Pristine minutes this week</dt><dd>{{ student.weekly.pristine }}</dd></div>
         </dl>
       </section>
-      {% endif %}
     </section>
 
-    {% if student.lifetime is defined %}
     <section class="verifier-panel verifier-season" aria-labelledby="verifier-season-heading">
       <h3 id="verifier-season-heading">Current season</h3>
       {% if student.season %}
@@ -107,7 +103,6 @@
       </ul>
       {% else %}<p class="verifier-muted">Every practice is a step forward. Earned achievements will be celebrated here.</p>{% endif %}
     </section>
-    {% endif %}
     {% else %}
     <section class="verifier-panel"><h2>Your musicians</h2><p>No musicians are connected to this account yet.</p></section>
     {% endif %}

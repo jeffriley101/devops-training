@@ -105,7 +105,7 @@ def test_accepted_verifier_still_creates_pending_request(
         StudentVerifierConnection(
             profile_id=student.id,
             verifier_id=verifier.id,
-            role="teacher",
+            role="verifier",
             status="accepted",
         )
     )
@@ -140,7 +140,7 @@ def test_invalid_or_disconnected_verifier_is_rejected(
         session.add(verifier)
         session.commit()
 
-    with pytest.raises(ValueError, match="not connected"):
+    with pytest.raises(ValueError, match="accepted Verifier"):
         create_practice_chart_verification_request(
             session,
             profile=student,

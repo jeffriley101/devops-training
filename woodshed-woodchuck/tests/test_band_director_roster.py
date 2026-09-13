@@ -464,26 +464,14 @@ def assigned_review(factory, *, reviewer=1, role="band_director", status="pendin
 
 
 @pytest.mark.parametrize("decision", ["approved", "rejected"])
-def test_director_reviews_assigned_pending_chart_through_existing_handler(roster_db, decision):
+def test_director_cannot_review_historical_assigned_chart(roster_db, decision):
     review_id, _ = assigned_review(roster_db)
     client = signed_client()
-    endpoint = f"/trusted-verifiers/practice-charts/{review_id}/respond"
-    assert 'href="/trusted-verifiers/dashboard"' in client.get("/band-director/dashboard").text
-    assert client.get("/trusted-verifiers/practice-charts").json()["pending_charts"][0]["verification_id"] == review_id
-    response = client.post(endpoint, json={"decision": decision, "response_note": "  Keep it up  "})
-    assert response.status_code == 200
-    assert response.json()["verification"]["status"] == decision
-    assert response.json()["verification"]["response_note"] == "Keep it up"
-    assert response.json()["verification"]["responded_at"]
-    html = client.get("/band-director/dashboard").text
     assert client.get("/trusted-verifiers/practice-charts").json()["pending_charts"] == []
-    assert "Keep it up" not in html
-    assert "data-band-director-review" not in html
-    again = client.post(endpoint, json={"decision": "rejected", "response_note": "Overwrite"})
-    assert again.status_code == 400
+    assert client.post(f"/trusted-verifiers/practice-charts/{review_id}/respond",
+                       json={"decision": decision}).status_code == 400
     with roster_db() as session:
-        review = session.get(PracticeChartVerification, review_id)
-        assert review.status == decision and review.response_note == "Keep it up"
+        assert session.get(PracticeChartVerification, review_id).status == "pending"
 
 
 def test_roster_membership_does_not_allow_review_of_another_verifiers_assignment(roster_db):
@@ -509,7 +497,7 @@ def test_other_verifier_and_unauthenticated_requests_cannot_review(roster_db):
 
 def test_disconnect_after_page_load_revokes_review_authority(roster_db):
     from sqlalchemy import select
-    review_id, student_id = assigned_review(roster_db)
+    review_id, student_id = assigned_review(roster_db, role="verifier")
     client = signed_client()
     assert client.get("/trusted-verifiers/practice-charts").json()["pending_charts"][0]["verification_id"] == review_id
     with roster_db() as session:
@@ -522,7 +510,7 @@ def test_disconnect_after_page_load_revokes_review_authority(roster_db):
     assert "Review Musician" not in client.get("/band-director/dashboard").text
 
 
-@pytest.mark.parametrize("role", ["parent", "guardian", "private_teacher"])
+@pytest.mark.parametrize("role", ["verifier"])
 def test_non_director_review_stays_in_original_workflow(roster_db, role):
     review_id, _ = assigned_review(roster_db, role=role)
     client = signed_client()

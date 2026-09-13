@@ -23,7 +23,6 @@ def test_book_option_groups_enclose_their_existing_controls() -> None:
         "p-book-include-contests",
         "p-book-include-team",
         "p-book-current-team",
-        "p-book-team-shed-link",
     ):
         assert f'id="{control}"' in team
     for control in (
@@ -36,14 +35,22 @@ def test_book_option_groups_enclose_their_existing_controls() -> None:
     assert "border: 2px solid #527a58" in CSS
     assert ".p-book-option-group .p-book-option-detail" in CSS
     assert "Email your Practice Book" not in BOOK
-    assert 'id="p-book-verifier" name="p-book-verifier" aria-label="Trusted verifier"' in BOOK
+    assert 'id="p-book-verifier" name="p-book-verifier" aria-label="Verifier"' in BOOK
 
 
 def test_verification_section_has_compact_copy_and_manager() -> None:
     verification = group("p-book-verification-option-group")
-    assert "Verification &amp; Band Director Access" in verification
-    assert "Manage Trusted Verifiers" in verification
+    assert "Verification (optional)" in verification
+    assert "Manage Verifiers" in verification
     assert "No verification request" in BOOK
+    management = (ROOT / "templates/trusted_verifiers.html").read_text()
+    warning = "Please discuss with your Band Director"
+    assert warning not in BOOK
+    assert warning in management.split('id="band-director-heading"')[1]
+    assert 'name="role" value="verifier"' in management
+    assert 'name="role" value="band_director"' in management
+    assert 'id="trusted-verifier-role"' not in management
+    assert 'id="p-book-team-shed-link"' not in BOOK
 
 
 def test_closed_board_activity_body_is_removed_from_desktop_layout() -> None:

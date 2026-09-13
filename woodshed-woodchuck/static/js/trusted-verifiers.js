@@ -7,9 +7,19 @@
     return;
   }
 
-  const errorText = document.querySelector(
-    "#trusted-verifier-invite-error"
-  );
+  const relationshipError = (source) => {
+    if (!source || typeof source.closest !== "function") {
+      return null;
+    }
+    return source.closest("section")?.querySelector(".relationship-form-error") || null;
+  };
+
+  const reportError = (source, message) => {
+    const target = relationshipError(source);
+    if (target) {
+      target.textContent = message;
+    }
+  };
   const successPanel = document.querySelector(
     "#trusted-verifier-invite-success"
   );
@@ -29,6 +39,9 @@
   const invitationList = document.querySelector(
     "#trusted-verifier-invitation-list"
   );
+
+  const directorConnections = document.querySelector("#band-director-connection-list");
+  const directorInvitations = document.querySelector("#band-director-invitation-list");
 
   let currentInvitationUrl = "";
   const returnToBook = new URLSearchParams(window.location.search).get("return_to") === "p-book";
@@ -116,12 +129,12 @@
     invitationRole
   ) => {
     const subject =
-      "Woodshed Woodchuck Trusted Verifier Invitation";
+      "Woodshed Woodchuck Invitation";
 
     const message = [
       "Hello,",
       "",
-      "You have been invited to become a trusted verifier for a Woodshed Woodchuck student.",
+      `You have been invited to connect as a ${roleLabel(invitationRole)} for a Woodshed Woodchuck student.`,
       "",
       `Verifier role: ${roleLabel(invitationRole)}`,
       "",
@@ -157,7 +170,7 @@
     }
 
     button.disabled = true;
-    errorText.textContent = "";
+    reportError(button, "");
 
     try {
       const response = await fetch(path, {
@@ -184,8 +197,7 @@
 
       await loadVerifiers();
     } catch (error) {
-      errorText.textContent =
-        error.message || "The change could not be completed.";
+      reportError(button, error.message || "The change could not be completed.");
     } finally {
       button.disabled = false;
     }
@@ -204,7 +216,7 @@
     }
 
     button.disabled = true;
-    errorText.textContent = "";
+    reportError(button, "");
     copyFeedback.textContent = "";
 
     try {
@@ -239,9 +251,7 @@
 
       await loadVerifiers();
     } catch (error) {
-      errorText.textContent =
-        error.message ||
-        "The invitation email could not be resent.";
+      reportError(button, error.message || "The invitation email could not be resent.");
     } finally {
       button.disabled = false;
     }
@@ -264,21 +274,23 @@
 
     if (!response.ok) {
       throw new Error(
-        payload.detail || "Could not load trusted verifiers."
+        payload.detail || "Could not load Verifiers."
       );
     }
 
+    clearElement(directorConnections);
+    clearElement(directorInvitations);
     clearElement(connectionList);
     clearElement(invitationList);
 
     const activeConnections = payload.connections.filter(
-      (connection) => connection.status === "accepted"
+      (connection) => connection.status === "accepted" && ["verifier", "band_director"].includes(connection.role)
     );
 
     if (activeConnections.length === 0) {
       addEmptyMessage(
         connectionList,
-        "No trusted adults are connected yet."
+        "No Verifiers are connected yet."
       );
     } else {
       activeConnections.forEach((connection) => {
@@ -286,7 +298,7 @@
           connection.verifier.display_name;
 
         addRecord(
-          connectionList,
+          connection.role === "band_director" ? directorConnections : connectionList,
           verifierName,
           `${roleLabel(connection.role)} · Connected`,
           {
@@ -309,8 +321,15 @@
       });
     }
 
+    if (!activeConnections.some(row => row.role === "verifier") && activeConnections.length) {
+      addEmptyMessage(connectionList, "No Verifiers are connected yet.");
+    }
+    if (!activeConnections.some(row => row.role === "band_director")) {
+      addEmptyMessage(directorConnections, "No Band Director connected yet.");
+    }
+
     const pendingInvitations = payload.invitations.filter(
-      (invitation) => invitation.status === "pending"
+      (invitation) => invitation.status === "pending" && ["verifier", "band_director"].includes(invitation.role)
     );
 
     if (pendingInvitations.length === 0) {
@@ -321,7 +340,7 @@
     } else {
       pendingInvitations.forEach((invitation) => {
         addRecord(
-          invitationList,
+          invitation.role === "band_director" ? directorInvitations : invitationList,
           invitation.email,
           `${roleLabel(invitation.role)} · Pending`,
           [
@@ -356,10 +375,16 @@
     }
   };
 
-  form.addEventListener("submit", async (event) => {
+  document.querySelectorAll("[data-relationship-invite]").forEach((inviteForm) => inviteForm.addEventListener("submit", async (event) => {
+    const form = event.currentTarget;
     event.preventDefault();
 
-    errorText.textContent = "";
+    const formError = form.querySelector
+      ? form.querySelector(".relationship-form-error")
+      : relationshipError(form);
+    if (formError) {
+      formError.textContent = "";
+    }
     copyFeedback.textContent = "";
     successPanel.hidden = true;
 
@@ -389,6 +414,8 @@
         );
       }
 
+      // Keep invitation success feedback beside the form that created it.
+      form.appendChild(successPanel);
       showInvitationLink(payload);
       form.reset();
 
@@ -397,10 +424,11 @@
         window.location.assign("/p-book?restore_draft=1");
       }
     } catch (error) {
-      errorText.textContent =
-        error.message || "Could not create the invitation.";
+      if (formError) {
+        formError.textContent = error.message || "Could not create the invitation.";
+      }
     }
-  });
+  }));
 
   copyButton.addEventListener("click", async () => {
     if (!currentInvitationUrl) {
@@ -422,7 +450,7 @@
 
   loadVerifiers().catch((error) => {
     connectionList.textContent =
-      error.message || "Could not load trusted verifiers.";
+      error.message || "Could not load Verifiers.";
 
     invitationList.textContent = "";
   });

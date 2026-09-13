@@ -51,6 +51,12 @@
         `${payload.verifier.display_name} is now connected as ` +
         `${payload.connection.role.replaceAll("_", " ")}.`;
 
+      const dashboardLink = document.querySelector("#adult-dashboard-link");
+      if (dashboardLink) {
+        const director = payload.connection.role === "band_director";
+        dashboardLink.href = director ? "/band-director/dashboard" : "/trusted-verifiers/dashboard";
+        dashboardLink.textContent = director ? "Band Director Dashboard" : "Verifier Dashboard";
+      }
       successPanel.hidden = false;
       form.hidden = true;
     } catch (error) {

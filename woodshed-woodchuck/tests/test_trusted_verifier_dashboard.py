@@ -12,8 +12,13 @@ from app.band_director_dashboard import dashboard_metrics
 from app.models import (CrownAward, PracticeChart, PracticeChartVerification, RewardGrant, Season,
                         StudentVerifierConnection, WoodchuckProfile)
 from app.trusted_verifier_dashboard import verifier_dashboard_snapshot
-from test_band_director_roster import (roster_db, add_student, add_chart, signed_client,
+from test_band_director_roster import (roster_db, add_student as add_roster_student, add_chart, signed_client,
                                       contest_roster, join_roster_team)
+
+def add_student(factory, name, **kwargs):
+    kwargs.setdefault("role", "verifier")
+    return add_roster_student(factory, name, **kwargs)
+
 
 TODAY = date(2026, 9, 9)
 
@@ -40,7 +45,7 @@ def snapshot(factory, **kwargs):
         return result
 
 
-@pytest.mark.parametrize("role", ["parent", "band_director"])
+@pytest.mark.parametrize("role", ["verifier"])
 def test_all_accepted_roles_have_free_snapshot(roster_db, role):
     add_student(roster_db, "Musician", role=role)
     response = signed_client().get("/trusted-verifiers/dashboard")
@@ -64,8 +69,8 @@ def test_all_accepted_roles_have_free_snapshot(roster_db, role):
 
 
 def test_selector_and_cross_verifier_isolation(roster_db):
-    first = add_student(roster_db, "Alpha", role="parent")
-    second = add_student(roster_db, "Beta", role="guardian")
+    first = add_student(roster_db, "Alpha", role="verifier")
+    second = add_student(roster_db, "Beta", role="verifier")
     hidden = add_student(roster_db, "Secret Other Child", verifier_id=2)
     add_chart(roster_db, first, TODAY, 11)
     add_chart(roster_db, second, TODAY, 23)
@@ -90,7 +95,7 @@ def test_selector_and_cross_verifier_isolation(roster_db):
     (20.0, "down", "20", "Declining"),
 ])
 def test_rating_presentation_only(roster_db, monkeypatch, rating, direction, display, label):
-    add_student(roster_db, "Presentation", role="parent")
+    add_student(roster_db, "Presentation", role="verifier")
     original = main.verifier_dashboard_snapshot
     def presentation(*args, **kwargs):
         data = original(*args, **kwargs)
@@ -138,7 +143,9 @@ def test_shared_metrics_completed_rating_and_private_note_isolation(roster_db):
         session.flush()
         session.add(PracticeChartVerification(practice_chart_id=pristine.id, verifier_id=2, status="approved"))
         session.commit()
-        director = dashboard_metrics(session, verifier_id=1, today=TODAY)["students"][0]
+        session.add(StudentVerifierConnection(profile_id=student, verifier_id=2, role="band_director", status="accepted"))
+        session.commit()
+        director = dashboard_metrics(session, verifier_id=2, today=TODAY)["students"][0]
     parent = snapshot(roster_db)["student"]
     for key in ("weekly", "lifetime", "rating", "trend"):
         assert parent[key] == director[key]
@@ -173,7 +180,7 @@ def test_central_week_and_positive_practice_streak(roster_db, monkeypatch):
 
 
 def test_durable_season_team_and_bounded_earned_events(contest_roster):
-    student = add_student(contest_roster, "Season Child", role="parent")
+    student = add_student(contest_roster, "Season Child", role="verifier")
     other = add_student(contest_roster, "Other Child", verifier_id=2)
     join_roster_team(contest_roster, student, "Current Team")
     join_roster_team(contest_roster, student, "Old Team")
@@ -212,8 +219,8 @@ def test_durable_season_team_and_bounded_earned_events(contest_roster):
 
 
 def test_selected_review_queue_preserves_assignment_authorization(roster_db):
-    first = add_student(roster_db, "First", role="parent")
-    second = add_student(roster_db, "Second", role="guardian")
+    first = add_student(roster_db, "First", role="verifier")
+    second = add_student(roster_db, "Second", role="verifier")
     add_chart(roster_db, first, TODAY, 10, status="pending")
     add_chart(roster_db, first, TODAY, 20, status="pending", reviewer=2)
     add_chart(roster_db, second, TODAY, 30, status="pending")
@@ -237,7 +244,7 @@ def test_selected_review_queue_preserves_assignment_authorization(roster_db):
 
 
 def test_adult_only_render_ignores_unrelated_student_session(roster_db, monkeypatch):
-    own = add_student(roster_db, "Authorized Child", role="parent")
+    own = add_student(roster_db, "Authorized Child", role="verifier")
     unrelated = add_student(roster_db, "Unrelated Signed In Player", connected=False)
     client = TestClient(main.app)
     assert client.get("/trusted-verifiers/dashboard", follow_redirects=False).status_code == 303
@@ -271,8 +278,8 @@ def test_rendered_dashboard_mobile_and_desktop(roster_db, tmp_path, width):
     chrome = shutil.which("google-chrome")
     if not chrome or not shutil.which("node"):
         pytest.skip("Chromium and Node required")
-    student_id = add_student(roster_db, "First Musician", role="parent")
-    add_student(roster_db, "Second Musician", role="guardian")
+    student_id = add_student(roster_db, "First Musician", role="verifier")
+    add_student(roster_db, "Second Musician", role="verifier")
     add_chart(roster_db, student_id, date(2026, 8, 31), 120, status="approved")
     add_chart(roster_db, student_id, date(2026, 9, 8), 20, status="approved")
     add_chart(roster_db, student_id, TODAY, 30)

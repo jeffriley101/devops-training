@@ -7,10 +7,10 @@
   data-invitation-token="{{ invitation_token }}"
 >
   <div class="section-head">
-    <p class="chip">Trusted Verifier Invitation</p>
+    <p class="chip">Verifier Invitation</p>
     <h2>Connect to a Woodchuck</h2>
     <p class="body-copy">
-      Create or unlock your trusted-verifier account using your
+      Create or unlock your adult account using your
       name and four-digit PIN.
     </p>
   </div>
@@ -63,10 +63,10 @@
     <aside class="mentor-card">
       <div>
         <p class="chip">Your role</p>
-        <h3>Help confirm practice</h3>
+        <h3>Connect with your musician</h3>
         <p>
-          Connected verifiers may later review and validate practice
-          charts and verified contest entries.
+          Verifiers review requested P-Charts. Band Directors see connected
+          students on their practice dashboard.
         </p>
       </div>
     </aside>
@@ -84,7 +84,7 @@
     <div class="button-row">
       <a
         class="btn btn-primary"
-        href="/trusted-verifiers/dashboard"
+        id="adult-dashboard-link" href="/trusted-verifiers/dashboard"
       >
         Open Verifier Dashboard
       </a>
@@ -94,5 +94,5 @@
 {% endblock %}
 
 {% block page_scripts %}
-<script src="/static/js/trusted-verifier-accept.js?v=1"></script>
+<script src="/static/js/trusted-verifier-accept.js?v=2"></script>
 {% endblock %}

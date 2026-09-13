@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import pytest
+
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import create_engine, text
@@ -11,7 +13,8 @@ from app.models import (TrustedVerifier, TrustedVerifierInvitation, PracticeChar
 from test_band_director_roster import add_student
 
 
-def test_role_migration_preserves_all_other_data(tmp_path, monkeypatch):
+@pytest.mark.parametrize("target", ["m3h4i5j6k7l8", "n4i5j6k7l8m9"])
+def test_role_migration_preserves_all_other_data(tmp_path, monkeypatch, target):
     url = f"sqlite:///{tmp_path / 'roles.db'}"
     monkeypatch.setenv("DATABASE_URL", url)
     config = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
@@ -43,24 +46,35 @@ def test_role_migration_preserves_all_other_data(tmp_path, monkeypatch):
             return {table: [dict(row) for row in connection.execute(text(
                 f"SELECT * FROM {table} ORDER BY id")).mappings()] for table in tables}
     before = snapshot()
-    command.upgrade(config, "head")
+    command.upgrade(config, target)
     after = snapshot()
     for table in tables:
         expected = [dict(row) for row in before[table]]
         for row in expected:
-            if row.get("role") in roles[:4]:
-                row["role"] = "mentor"
+            if row.get("role") in (roles[:4] if target == "m3h4i5j6k7l8" else (*roles[:4], "parent", "mentor")):
+                row["role"] = "mentor" if target == "m3h4i5j6k7l8" else "verifier"
         assert after[table] == expected
-    command.upgrade(config, "head")
+    command.upgrade(config, target)
     assert snapshot() == after
+    if target == "n4i5j6k7l8m9":
+        command.downgrade(config, "m3h4i5j6k7l8")
+        rolled_back = snapshot()
+        for table in tables:
+            expected = [dict(row) for row in after[table]]
+            for row in expected:
+                if row.get("role") == "verifier":
+                    row["role"] = "mentor"
+            assert rolled_back[table] == expected
+        command.upgrade(config, target)
+        assert snapshot() == after
     command.downgrade(config, "l2g3h4i5j6k7")
     downgraded = snapshot()
     for table in tables:
         expected = [dict(row) for row in after[table]]
         for row in expected:
-            if row.get("role") == "mentor":
+            if row.get("role") in ("mentor", "verifier"):
                 row["role"] = "other_trusted_adult"
         assert downgraded[table] == expected
-    command.upgrade(config, "head")
+    command.upgrade(config, target)
     assert snapshot() == after
     engine.dispose()

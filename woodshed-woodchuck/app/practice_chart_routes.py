@@ -400,6 +400,7 @@ def create_student_practice_chart(
                 StudentVerifierConnection.profile_id == profile.id,
                 StudentVerifierConnection.verifier_id == verifier.id,
                 StudentVerifierConnection.status == "accepted",
+                StudentVerifierConnection.role == "verifier",
             ))
             verifier_role = connection.role if connection else "trusted_verifier"
             review_url = public_link(
@@ -497,6 +498,7 @@ def resend_practice_chart_email(request: Request, verification_id: int):
                 PracticeChart.profile_id == profile.id,
                 StudentVerifierConnection.profile_id == profile.id,
                 StudentVerifierConnection.status == "accepted",
+                StudentVerifierConnection.role == "verifier",
             )
         ).first()
         if row is None:

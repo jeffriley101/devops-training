@@ -4433,13 +4433,14 @@
           ? payload.connections.filter(
               (connection) =>
                 connection.status === "accepted" &&
+                connection.role === "verifier" &&
                 connection.verifier
             )
           : [];
 
         verifierSelectEl.replaceChildren(
           new Option(
-            "Do not request verification",
+            "No verification request",
             ""
           )
         );
@@ -4473,8 +4474,7 @@
 
     async function loadTeams() {
       const currentEl = document.getElementById("p-book-current-team");
-      const shedLink = document.getElementById("p-book-team-shed-link");
-      if (!currentEl || !shedLink) return;
+      if (!currentEl) return;
       try {
         const response = await fetch("/teams", {credentials: "same-origin", cache: "no-store"});
         const payload = await response.json();
@@ -4490,10 +4490,8 @@
           name.textContent = currentTeam.name;
           publicTeam.append(visual, name);
           currentEl.replaceChildren(prefix, publicTeam);
-          shedLink.textContent = "Choose or Change Team in SHED";
         } else {
           currentEl.textContent = "No team selected";
-          shedLink.textContent = "Choose a Team in SHED";
         }
       } catch (error) {
         currentEl.textContent = error.message || "Teams could not be loaded.";

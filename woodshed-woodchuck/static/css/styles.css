@@ -175,6 +175,7 @@ body {
 
 .setup-layout { display: grid; gap: 1rem; }
 @media (min-width: 860px) { .setup-layout { grid-template-columns: 1.4fr 1fr; align-items: start; } }
+.trusted-verifier-relationships .setup-layout { grid-template-columns: minmax(0, 1fr); }
 
 .stack-form { display: grid; gap: 0.72rem; }
 label { font-weight: 800; }

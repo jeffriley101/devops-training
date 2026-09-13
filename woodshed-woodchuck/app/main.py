@@ -205,7 +205,7 @@ def trusted_verifier_login_page(request: Request):
     return _render(
         request,
         "trusted_verifier_login.html",
-        title="Trusted Verifier Sign In",
+        title="Verifier Sign In",
         active_nav=None,
     )
 
@@ -229,7 +229,7 @@ def trusted_verifier_dashboard_page(request: Request, connection_id: int | None 
                                 headers={"Cache-Control": "no-store"}) from error
         return templates.TemplateResponse(
             request=request, name="trusted_verifier_dashboard.html",
-            context={"title": "Trusted Verifier Dashboard", "verifier_name": verifier.display_name,
+            context={"title": "Verifier Dashboard", "verifier_name": verifier.display_name,
                      "verifier_email": verifier.email, **snapshot},
             headers={"Cache-Control": "no-store"},
         )
@@ -275,7 +275,7 @@ def trusted_verifier_accept_page(
     return _render(
         request,
         "trusted_verifier_accept.html",
-        title="Accept Trusted Verifier Invitation",
+        title="Accept Adult Invitation",
         active_nav=None,
         invitation_token=token,
     )
@@ -295,7 +295,7 @@ def trusted_verifiers_page(request: Request):
     return _render(
         request,
         "trusted_verifiers.html",
-        title="Trusted Verifiers",
+        title="Verifiers & Band Director",
         verifier_role_labels=VERIFIER_ROLE_LABELS,
         active_nav="home",
         return_to_p_book=(request.query_params.get("return_to") == "p-book"),

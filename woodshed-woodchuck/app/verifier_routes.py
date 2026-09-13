@@ -555,7 +555,7 @@ def verifier_me(request: Request):
                         "display_name": profile.display_name,
                         "instrument": profile.instrument,
                         "level": profile.level,
-                        **({"goal": profile.goal} if connection.role in {"parent", "band_director"} else {}),
+                        "goal": profile.goal,
                     },
                 }
                 for connection, profile in connection_rows
@@ -648,6 +648,7 @@ def list_verifier_practice_charts(request: Request, response: Response, connecti
                 StudentVerifierConnection.verifier_id
                 == verifier.id,
                 StudentVerifierConnection.status == "accepted",
+                StudentVerifierConnection.role == "verifier",
                 WoodchuckProfile.status == "active",
                 PracticeChart.profile_id == selected_profile_id if selected_profile_id is not None else True,
             )
