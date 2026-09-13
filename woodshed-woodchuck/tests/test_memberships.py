@@ -342,7 +342,7 @@ def test_owner_routes_privacy_csrf_and_actor_selection(db):
         session.commit()
     student = client("student")
     page = student.get("/membership")
-    assert "Full Access — provided through a membership" in page.text
+    assert "Full Access" in page.text
     assert "payer1@" not in page.text and "Outstanding invitations" not in page.text
     assert page.headers["cache-control"] == "no-store"
     assert "Which account" in client(both=True).get("/membership").text
@@ -352,6 +352,25 @@ def test_owner_routes_privacy_csrf_and_actor_selection(db):
         "email": "x@example.test"}).status_code == 404
     assert attacker.post("/membership/actions", data={"action": "remove"}).status_code == 403
     assert attacker.get("/membership?as_account=student").status_code == 403
+
+
+def test_student_owner_seat_is_labeled_and_cannot_be_removed(db):
+    member = grant(db, kind="student")
+    student = client("student")
+    page = student.get("/membership")
+    assert "✓ Full Access" in page.text
+    assert "Your account has Full Access." in page.text
+    assert "Members: 1 of 5" in page.text
+    assert "Student 1 — You" in page.text
+    assert "Complimentary Full membership · Active" in page.text
+    assert "Email address" in page.text and "Invite student" in page.text
+    assert page.text.count("name=\"action\" value=\"remove\"") == 0
+    csrf = page_csrf(student)
+    with db() as session:
+        seat = m.active_seats(session, member)[0]
+    response = student.post("/membership/actions", data={"csrf": csrf, "as_account": "student",
+        "membership_id": member, "action": "remove", "seat_id": seat.id})
+    assert response.status_code == 409
 
 
 def test_email_invitation_route_and_claim(db):

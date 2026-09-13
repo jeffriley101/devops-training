@@ -20,23 +20,23 @@
 <section class="card"><h2>Which account would you like to use?</h2>
 {% for choice, name in choices %}<p><a href="/membership?as_account={{ choice.kind }}">{{ name }} — {{ choice.kind|title }} account</a></p>{% endfor %}</section>
 {% else %}
-{% if actor.kind == 'student' %}<section class="card"><h2>{{ 'Full Access' if full else 'Open Access' }}</h2>
-{% if full %}<p>Full Access — provided through a membership.</p>{% endif %}</section>{% endif %}
+{% if actor.kind == 'student' %}<section class="card"><h2>{{ '✓ Full Access' if full else 'Open Access' }}</h2>
+{% if full %}<p>Your account has Full Access.</p>{% endif %}</section>{% endif %}
 {% for item in memberships %}{% set member = item.membership %}
-<section class="card"><h2>Full Access membership</h2><p>{{ item.plan_label }} · {{ member.source|title }} · {{ member.status|title }}</p>
+<section class="card"><h2>Manage membership</h2><p>{{ item.plan_label }} · {{ member.status|title }}</p>
 {% if not item.active %}<p>This membership is not currently providing Full Access.</p>{% endif %}
 {% if member.access_until %}<p>Access until {{ member.access_until.strftime('%b %d, %Y') }} (UTC)</p>{% endif %}
-<h3>{{ item.seats|length }} of 5 student spots used</h3>
-{% for seat, name in item.seats %}<div class="membership-line"><span>{{ name }}</span>
-<form method="post" action="/membership/actions">{{ fields(member, 'remove') }}<input type="hidden" name="seat_id" value="{{ seat.id }}"><button class="btn btn-secondary">Remove</button></form></div>{% endfor %}
+<h3>Members: {{ item.seats|length }} of 5</h3>
+{% for seat, name in item.seats %}<div class="membership-line"><span>{{ name }}{% if actor.kind == 'student' and actor.id == item.owner_profile_id and seat.profile_id == actor.id %} — You{% endif %}</span>
+{% if not (actor.kind == 'student' and actor.id == item.owner_profile_id and seat.profile_id == actor.id) %}<form method="post" action="/membership/actions">{{ fields(member, 'remove') }}<input type="hidden" name="seat_id" value="{{ seat.id }}"><button class="btn btn-secondary">Remove</button></form>{% endif %}</div>{% endfor %}
 {% if item.active and item.seats|length < 5 %}<h3>Add a student</h3>
 {% if connected %}<form method="post" action="/membership/actions" class="stack-form">{{ fields(member, 'add') }}
 <label for="student-{{ member.id }}">Choose someone already connected to you:</label>
 <select id="student-{{ member.id }}" name="profile_id" required>{% for student in connected %}<option value="{{ student.profile_id }}">{{ student.display_name }}</option>{% endfor %}</select>
 <button class="btn btn-primary">Add student</button></form><p>or</p>{% endif %}
 <form method="post" action="/membership/actions" class="stack-form">{{ fields(member, 'invite') }}
-<label for="email-{{ member.id }}">Invite another student:</label><input id="email-{{ member.id }}" type="email" name="email" maxlength="320" required>
-<button class="btn btn-primary">Send Invite</button></form>{% endif %}
+<label for="email-{{ member.id }}">Email address</label><input id="email-{{ member.id }}" type="email" name="email" maxlength="320" required>
+<button class="btn btn-primary">Invite student</button></form>{% endif %}
 {% if item.invitations %}<h3>Outstanding invitations</h3>{% for invitation in item.invitations %}
 <div class="membership-line"><span>{{ invitation.email }} · Expires {{ invitation.expires_at.strftime('%b %d, %Y') }}</span>
 <form method="post" action="/membership/actions">{{ fields(member, 'cancel_invitation') }}<input type="hidden" name="invitation_id" value="{{ invitation.id }}"><button class="btn btn-secondary">Cancel invitation</button></form></div>{% endfor %}{% endif %}

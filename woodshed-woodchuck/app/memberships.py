@@ -140,6 +140,9 @@ def remove_seat(session, membership_id, seat_id, actor, at=None):
         MembershipSeat.membership_id == membership.id, MembershipSeat.removed_at.is_(None)))
     if seat is None:
         raise LookupError("Student spot not found.")
+    account = session.get(BillingAccount, membership.billing_account_id)
+    if actor.kind == "student" and account and account.profile_id == seat.profile_id:
+        raise ValueError("The membership owner seat cannot be removed.")
     seat.removed_at = utc(at or clock())
     audit(session, membership, actor, "seat_removed", seat_id=seat.id, profile_id=seat.profile_id)
     session.flush()

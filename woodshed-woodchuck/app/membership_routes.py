@@ -78,7 +78,8 @@ def detail(session, membership):
         MembershipSeatInvitation.membership_id == membership.id,
         MembershipSeatInvitation.status == "pending", MembershipSeatInvitation.expires_at > service.clock()
     ).order_by(MembershipSeatInvitation.created_at.desc())).all()
-    return {"membership": membership, "seats": seats, "invitations": invitations,
+    owner_profile_id = session.scalar(select(BillingAccount.profile_id).where(BillingAccount.id == membership.billing_account_id))
+    return {"membership": membership, "seats": seats, "owner_profile_id": owner_profile_id, "invitations": invitations,
             "active": service.membership_is_active(membership),
             "plan_label": PLANS[membership.plan_code].label if membership.plan_code in PLANS else "Complimentary Full membership"}
 
