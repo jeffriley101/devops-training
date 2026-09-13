@@ -555,7 +555,7 @@ def verifier_me(request: Request):
                         "display_name": profile.display_name,
                         "instrument": profile.instrument,
                         "level": profile.level,
-                        "goal": profile.goal,
+                        **({"goal": profile.goal} if connection.role in {"parent", "band_director"} else {}),
                     },
                 }
                 for connection, profile in connection_rows

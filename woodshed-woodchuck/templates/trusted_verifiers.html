@@ -44,14 +44,9 @@
           required
         >
           <option value="">Choose a role</option>
-          <option value="parent">Parent</option>
-          <option value="guardian">Guardian</option>
-          <option value="band_director">Band director</option>
-          <option value="private_teacher">Private teacher</option>
-          <option value="coach">Coach</option>
-          <option value="other_trusted_adult">
-            Other trusted adult
-          </option>
+          {% for role, label in verifier_role_labels.items() %}
+          <option value="{{ role }}">{{ label }}</option>
+          {% endfor %}
         </select>
 
         <p

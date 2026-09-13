@@ -124,15 +124,16 @@ def test_missing_configuration_is_controlled(monkeypatch) -> None:
     assert result.sent is False and result.code == "not_configured"
 
 
+@pytest.mark.parametrize("role", ["parent", "mentor"])
 def test_invitation_without_smtp_persists_and_local_link_accepts(
-    mail_database, monkeypatch,
+    mail_database, monkeypatch, role,
 ) -> None:
     for key in SMTP_ENV:
         monkeypatch.delenv(key, raising=False)
     with TestClient(app) as student:
         profile_id = create_student(student)
         response = student.post("/trusted-verifiers/invitations", data={
-            "email": "local-adult@example.test", "role": "parent",
+            "email": "local-adult@example.test", "role": role,
         })
         assert response.status_code == 200
         payload = response.json()

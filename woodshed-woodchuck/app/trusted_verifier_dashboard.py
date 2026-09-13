@@ -8,7 +8,7 @@ from .contests import CENTRAL
 from .models import CrownAward, PracticeChart, PracticeChartVerification, RewardGrant, Team
 from .practice_chart_routes import profile_practice_streak
 from .store_inventory import crown_name, PLACEABLE_REWARD_TYPES
-from .student_practice_metrics import practice_totals, student_practice_snapshot
+from .student_practice_metrics import WEEK, week_start, practice_totals, student_practice_snapshot
 from .teams import active_membership, public_team_identity
 from .verifiers import accepted_active_verifier_students, select_verifier_student
 
@@ -46,6 +46,21 @@ def verifier_dashboard_snapshot(session, *, verifier_id: int, connection_id=None
     if student is None:
         return result
     profile_id = student["profile_id"]
+    # Scope permissions to this relationship. Legacy/unknown roles fail closed.
+    if student["role"] not in {"parent", "band_director"}:
+        start = week_start(today)
+        charts = session.scalars(select(PracticeChart).where(
+            PracticeChart.profile_id == profile_id,
+            PracticeChart.practice_date >= start, PracticeChart.practice_date < start + WEEK,
+        )).all()
+        totals = practice_totals(charts, set())
+        result["student"] = {k: v for k, v in student.items() if k != "profile_id"}
+        result["student"]["role"] = "mentor"
+        result["student"].update(
+            weekly={"total": totals["total"], "days": totals["days"]},
+            practice_streak=profile_practice_streak(session, profile_id=profile_id, today=today),
+        )
+        return result
     charts = session.scalars(select(PracticeChart).where(PracticeChart.profile_id == profile_id)).all()
     approved = set(session.scalars(select(PracticeChartVerification.practice_chart_id).join(
         PracticeChart, PracticeChart.id == PracticeChartVerification.practice_chart_id,

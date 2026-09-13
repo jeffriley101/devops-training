@@ -26,6 +26,7 @@ from .verifier_routes import (
 from .practice_chart_routes import router as practice_chart_router
 from .band_director_dashboard import dashboard_metrics, dashboard_csv
 from .trusted_verifier_dashboard import verifier_dashboard_snapshot
+from .verifiers import VERIFIER_ROLE_LABELS
 from .contests import router as contest_router
 from .contest_admin import router as contest_admin_router
 from .director_dashboard import router as director_router
@@ -295,6 +296,7 @@ def trusted_verifiers_page(request: Request):
         request,
         "trusted_verifiers.html",
         title="Trusted Verifiers",
+        verifier_role_labels=VERIFIER_ROLE_LABELS,
         active_nav="home",
         return_to_p_book=(request.query_params.get("return_to") == "p-book"),
         # This page already shared SHED's fixed navigation and lower sound

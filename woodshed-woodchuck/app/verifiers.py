@@ -25,16 +25,12 @@ from .security import (
 MAX_VERIFIERS_PER_STUDENT = 3
 INVITATION_LIFETIME = timedelta(days=7)
 
-VERIFIER_ROLES = frozenset(
-    {
-        "parent",
-        "guardian",
-        "band_director",
-        "private_teacher",
-        "coach",
-        "other_trusted_adult",
-    }
-)
+VERIFIER_ROLE_LABELS = {
+    "parent": "Parent",
+    "band_director": "Band Director",
+    "mentor": "Mentor",
+}
+VERIFIER_ROLES = frozenset(VERIFIER_ROLE_LABELS)
 
 ACTIVE_CONNECTION_STATUSES = ("pending", "accepted")
 

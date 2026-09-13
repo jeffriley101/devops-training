@@ -30,7 +30,7 @@ def test_csv_requires_verifier_login(roster_db):
 
 def test_csv_authorized_roster_only_and_no_private_fields(contest_roster):
     add_student(contest_roster, 'Zoë, "音楽"')
-    for role in ("parent", "guardian", "private_teacher", "coach", "other_trusted_adult"):
+    for role in ("parent", "mentor", "guardian", "private_teacher", "coach", "other_trusted_adult"):
         add_student(contest_roster, f"Excluded {role}", role=role)
     for status in ("pending", "rejected", "disconnected"):
         add_student(contest_roster, f"Excluded {status}", status=status)

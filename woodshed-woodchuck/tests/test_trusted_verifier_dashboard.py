@@ -40,8 +40,7 @@ def snapshot(factory, **kwargs):
         return result
 
 
-@pytest.mark.parametrize("role", ["parent", "guardian", "private_teacher", "band_director",
-                                  "coach", "other_trusted_adult"])
+@pytest.mark.parametrize("role", ["parent", "band_director"])
 def test_all_accepted_roles_have_free_snapshot(roster_db, role):
     add_student(roster_db, "Musician", role=role)
     response = signed_client().get("/trusted-verifiers/dashboard")

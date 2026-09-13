@@ -83,7 +83,7 @@ def test_accepted_director_roster_and_safe_basics(roster_db):
     assert set(rows[0]) == {"profile_id", "display_name", "instrument", "level", "goal"}
 
 
-@pytest.mark.parametrize("role", ["parent", "guardian", "private_teacher", "coach", "other_trusted_adult"])
+@pytest.mark.parametrize("role", ["parent", "mentor", "guardian", "private_teacher", "coach", "other_trusted_adult"])
 def test_other_roles_are_excluded_for_same_verifier(roster_db, role):
     add_student(roster_db, "Visible Musician")
     add_student(roster_db, "Excluded Musician", role=role)
