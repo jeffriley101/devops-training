@@ -1,0 +1,20 @@
+/* Shared framing only; each dashboard retains its own content layout. */
+.ww-dashboard-shell { width: 100%; max-width: 1024px; margin: 0 auto; padding: 1rem; overflow-wrap: anywhere; }
+.ww-dashboard-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; padding: clamp(1rem, 3vw, 1.5rem); margin-bottom: 1rem; border: 1px solid #dec89d; border-radius: var(--radius-xl); background: var(--panel-parchment); color: var(--text-ink); }
+.ww-dashboard-heading { min-width: 0; flex: 1 1 18rem; overflow-wrap: anywhere; }
+.ww-dashboard-header .ww-dashboard-kicker { margin: 0 0 .4rem; font-size: .75rem; letter-spacing: .1em; text-transform: uppercase; font-weight: 800; color: var(--accent-forest-dark); }
+.ww-dashboard-header h1 { margin: 0; font-size: clamp(1.6rem, 4vw, 2.1rem); line-height: 1.2; }
+.ww-dashboard-header .ww-dashboard-identity { margin: .5rem 0 0; line-height: 1.5; }
+.ww-dashboard-actions { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+.ww-dashboard-actions form { margin: 0; }
+.ww-dashboard-actions a, .ww-dashboard-actions button { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: .5rem .8rem; border: 1px solid var(--accent-forest-dark); border-radius: var(--radius-md); background: var(--accent-forest-dark); color: #fff7e9; font: inherit; font-weight: 700; text-decoration: none; cursor: pointer; overflow-wrap: anywhere; }
+.ww-dashboard-actions :is(a, button):focus-visible { outline: 3px solid var(--accent-brass-dark); outline-offset: 3px; }
+.ww-dashboard-actions :is(a, button):hover { filter: brightness(1.1); }
+.ww-dashboard-shell > .card { margin-block: 1rem; }
+.ww-dashboard-shell input, .ww-dashboard-shell select { min-width: 0; max-width: 100%; }
+.ww-dashboard-shell .account-danger-zone { margin-top: 2rem; padding: 1rem; border-radius: var(--radius-lg); }
+.ww-dashboard-shell .account-danger-zone .btn { white-space: normal; min-height: 44px; }
+@media (max-width: 480px) {
+  .ww-dashboard-actions { width: 100%; }
+  .ww-dashboard-shell { padding: .75rem; }
+}

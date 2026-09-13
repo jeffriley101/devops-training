@@ -53,6 +53,8 @@ def test_all_accepted_roles_have_free_snapshot(roster_db, role):
     assert response.headers["cache-control"] == "no-store"
     assert response.context["student"]["display_name"] == "Musician"
     assert response.context["student"]["role"] == role
+    assert '<h1>Verifier Dashboard</h1>' in response.text
+    assert 'class="ww-dashboard-header"' in response.text
     assert 'id="verifier-student-selector"' not in response.text
     for label in ("Practice streak", "Lifetime P-Charts", "Verified minutes this week",
                   "Pristine minutes this week", "A little practice is a great place to start.",

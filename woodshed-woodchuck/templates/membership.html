@@ -1,19 +1,17 @@
 {% extends "membership_base.html" %}
+{% from "dashboard_header.html" import dashboard_header %}
 {% macro fields(member, action) %}
 <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="as_account" value="{{ actor.kind }}">
 <input type="hidden" name="membership_id" value="{{ member.id }}"><input type="hidden" name="action" value="{{ action }}">
 {% endmacro %}
 {% block content %}
-<header class="membership-header card">
-  <h1>Membership</h1>
-{% if not signed_out and not choose_account %}
-  <p class="membership-account-name">{% for choice, name in choices if choice.kind == actor.kind %}{{ name }}{% endfor %}</p>
-  <nav class="membership-header-actions" aria-label="Membership navigation">
-    <a class="membership-header-link" href="{{ '/home' if actor.kind == 'student' else '/trusted-verifiers/dashboard' }}">Back to {{ 'SHED' if actor.kind == 'student' else 'your dashboard' }}</a>
-    {% if choices|length > 1 %}<a class="membership-header-link" href="/membership">Switch account</a>{% endif %}
-  </nav>
-{% endif %}
-</header>
+{% set account_name %}{% if not signed_out and not choose_account %}{% for choice, name in choices if choice.kind == actor.kind %}{{ name }}{% endfor %}{% endif %}{% endset %}
+{% call dashboard_header('Access', 'Membership', account_name) %}
+  {% if not signed_out and not choose_account %}
+    <a href="{{ '/home' if actor.kind == 'student' else '/trusted-verifiers/dashboard' }}">Back to {{ 'SHED' if actor.kind == 'student' else 'your dashboard' }}</a>
+    {% if choices|length > 1 %}<a href="/membership">Switch account</a>{% endif %}
+  {% endif %}
+{% endcall %}
 {% if signed_out %}
 <section class="card"><p>Sign in to view your membership.</p><a href="/login">Student sign-in</a> · <a href="/trusted-verifiers/login">Verifier / Band Director sign-in</a></section>
 {% elif choose_account %}

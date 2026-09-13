@@ -316,6 +316,7 @@ def test_admin_search_and_owner_views_use_names(db):
     csrf = page_csrf(admin, "/admin/login")
     admin.post("/admin/login", data={"csrf": csrf, "token": "test-site-admin"})
     assert "Site Admin — Memberships" in admin.get("/admin/membership").text
+    assert 'class="ww-dashboard-header"' in admin.get("/admin/membership").text
     assert "Sign out of Site Admin" in admin.get("/admin/membership").text
     page = admin.get("/admin/membership?q=Adult&membership_id=" + str(member))
     assert page.status_code == 200
@@ -370,6 +371,8 @@ def test_student_owner_seat_is_labeled_and_cannot_be_removed(db):
     assert "Your account has Full Access." in page.text
     assert "Members: 1 of 5" in page.text
     assert "Student 1 — You" in page.text
+    assert '<h1>Membership</h1>' in page.text
+    assert 'class="ww-dashboard-header"' in page.text
     assert "Complimentary Full membership · Active" in page.text
     assert 'name="woodchuck_id"' in page.text and "Woodchuck ID" in page.text
     assert "Invite student" not in page.text and "Outstanding invitations" not in page.text

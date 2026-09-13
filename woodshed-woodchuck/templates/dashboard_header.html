@@ -1,0 +1,10 @@
+{% macro dashboard_header(kicker, title, identity='', title_id='', identity_id='') -%}
+<header class="ww-dashboard-header">
+  <div class="ww-dashboard-heading">
+    <p class="ww-dashboard-kicker">{{ kicker }}</p>
+    <h1{% if title_id %} id="{{ title_id }}"{% endif %}>{{ title }}</h1>
+    {% if identity %}<p class="ww-dashboard-identity"{% if identity_id %} id="{{ identity_id }}"{% endif %}>{{ identity }}</p>{% endif %}
+  </div>
+  {% if caller is defined %}<div class="ww-dashboard-actions">{{ caller() }}</div>{% endif %}
+</header>
+{%- endmacro %}

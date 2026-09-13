@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block dashboard_title %}{{ title }}{% endblock %} · Woodshed Woodchuck</title>
+  <link rel="stylesheet" href="/static/css/styles.css?v=119">
+  <link rel="stylesheet" href="/static/css/dashboard.css?v=1">
+  {% block dashboard_styles %}{% endblock %}
+</head>
+<body class="{% block dashboard_body_class %}{% endblock %}">
+<main class="ww-dashboard-shell {% block dashboard_shell_class %}{% endblock %}">
+  {% block dashboard_notice %}{% endblock %}
+  {% block content %}{% endblock %}
+</main>
+</body>
+</html>

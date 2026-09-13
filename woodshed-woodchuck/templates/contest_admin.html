@@ -1,18 +1,10 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Contest Administration · Woodshed Woodchuck</title>
-  <link rel="stylesheet" href="/static/css/styles.css?v=119" />
-</head>
-<body class="contest-admin-page">
-  <main class="contest-admin-shell">
-    <header class="contest-admin-header">
-      <p class="scoreboard-kicker">Protected operations</p>
-      <h1>Contest Administration</h1>
-      <p>Finalization and season rollover only. Historical results cannot be edited here.</p>
-    </header>
+{% extends "dashboard_base.html" %}
+{% from "dashboard_header.html" import dashboard_header %}
+{% block dashboard_title %}Contest Administration{% endblock %}
+{% block dashboard_body_class %}contest-admin-page{% endblock %}
+{% block dashboard_shell_class %}contest-admin-shell{% endblock %}
+{% block content %}
+    {{ dashboard_header('Contest Admin', 'Contest Operations', 'Protected Administration · Finalization and season rollover only. Historical results cannot be edited here.') }}
 
     {% if flash %}
     <div class="contest-admin-message contest-admin-message-{{ flash.kind }}" role="status">
@@ -183,6 +175,4 @@
         <button class="btn btn-primary" type="submit">Run season rollover</button>
       </form>
     </section>
-  </main>
-</body>
-</html>
+{% endblock %}

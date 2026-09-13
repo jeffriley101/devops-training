@@ -75,6 +75,8 @@ def test_accepted_director_roster_and_safe_basics(roster_db):
     for text in ("Band Director Dashboard", "Director One",
                  "Musician Alpha", "Musician Beta", "PROGRAM RATING"):
         assert text in response.text
+    assert '<h1>Band Director Dashboard</h1>' in response.text
+    assert 'class="ww-dashboard-header"' in response.text
     assert "WC-Musician" not in response.text
     assert "private-pin-hash" not in response.text
     with roster_db() as session:

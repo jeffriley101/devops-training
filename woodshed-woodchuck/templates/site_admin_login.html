@@ -1,5 +1,8 @@
-{% extends "membership_base.html" %}{% block content %}<section class="card">
-<h1>Site administration</h1><form method="post" class="stack-form">
+{% extends "membership_base.html" %}
+{% from "dashboard_header.html" import dashboard_header %}
+{% block content %}
+{{ dashboard_header('Site Admin', 'Site Admin Sign In', 'Protected Site Administration') }}
+<section class="card"><form method="post" class="stack-form">
 <input type="hidden" name="csrf" value="{{ csrf }}"><label for="admin-token">Administrator token</label>
 <input id="admin-token" type="password" name="token" autocomplete="current-password" required>
 <button class="btn btn-primary">Sign in</button></form></section>{% endblock %}

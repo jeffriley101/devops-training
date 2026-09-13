@@ -114,6 +114,10 @@ def test_admin_page_requires_valid_token_and_is_not_in_student_navigation(
 
     assert response.status_code == 200
     assert "Contest Administration" in response.text
+    assert '<h1>Contest Operations</h1>' in response.text
+    assert response.text.count('<main ') == 1
+    assert 'class="ww-dashboard-header"' in response.text
+    assert 'account-state-bootstrap' not in response.text
     board = client.get("/quest").text
     shop = client.get("/store").text
     assert 'href="/contests/admin"' not in board + shop

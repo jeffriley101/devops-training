@@ -1,13 +1,13 @@
 {% extends "base.html" %}
+{% from "dashboard_header.html" import dashboard_header %}
+{% block dashboard_styles %}<link rel="stylesheet" href="/static/css/dashboard.css?v=1">{% endblock %}
 {% block content %}
 <link rel="stylesheet" href="/static/css/trusted-verifier-dashboard.css?v=2" />
 <section class="verifier-dashboard">
-  <header class="verifier-account">
-    <h1>Verifier Dashboard</h1>
+  {% call dashboard_header('Verifier', 'Verifier Dashboard', verifier_name, identity_id='verifier-dashboard-title') %}
     <a href="/membership?as_account=adult">Membership</a>
-    <p id="verifier-dashboard-title">{{ verifier_name }}’s Musicians</p>
     {% if has_director_students %}<a href="/band-director/dashboard">Band Director Dashboard</a>{% endif %}
-  </header>
+  {% endcall %}
 
   <div id="verifier-student-list" data-connection-id="{{ student.connection_id if student else '' }}">
     {% if student %}

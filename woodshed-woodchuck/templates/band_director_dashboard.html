@@ -1,12 +1,16 @@
 {% extends "base.html" %}
+{% from "dashboard_header.html" import dashboard_header %}
+{% block dashboard_styles %}<link rel="stylesheet" href="/static/css/dashboard.css?v=1">{% endblock %}
 {% macro arrow(value) -%}
 <span class="bd-trend bd-trend-{{ value.direction }}" role="img" aria-label="{{ value.label }}">{{ value.arrow }}</span>
 {%- endmacro %}
 {% block content %}
 <section class="card bd-dashboard" aria-label="Band Director Dashboard">
-  <header class="bd-heading">
+  {% call dashboard_header('Band Director', 'Band Director Dashboard', verifier_name) %}
+    <a href="/trusted-verifiers/dashboard">Verifier Dashboard · Review P-Charts</a>
     <a href="/membership?as_account=adult">Membership</a>
-    <h1>{{ verifier_name }}</h1>
+  {% endcall %}
+  <header class="bd-heading">
     <p id="program-rating-label">PROGRAM RATING</p>
     <div class="bd-rating-row">
       <div class="bd-rating" aria-labelledby="program-rating-label">
@@ -88,7 +92,6 @@
   <p>No Band Director students are connected yet.</p>
   <p>Ask your students to invite you with the Band director role. They will appear here after you accept their invitations.</p>
   {% endif %}
-  <p><a class="btn btn-secondary" href="/trusted-verifiers/dashboard">Trusted Verifier Dashboard · Review P-Charts</a></p>
 </section>
 {% endblock %}
 {% block page_scripts %}

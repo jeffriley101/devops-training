@@ -124,7 +124,8 @@ def test_dashboard_route_authorization_six_cards_and_multi_team_selector(
     page = director.get("/director")
     assert page.status_code == 200
     assert page.text.count('class="director-metric-card"') == 6
-    assert "Director Dashboard" in page.text and "My Woodshed" in page.text
+    assert 'id="director-dashboard-title">Team Director Dashboard</h1>' in page.text
+    assert 'class="ww-dashboard-header"' in page.text and "My Woodshed" in page.text
     assert "leaderboard" not in page.text.casefold()
     payload = director.get(f"/director/dashboard?team_id={second.id}").json()
     assert payload["team"]["id"] == second.id
