@@ -309,6 +309,9 @@ def test_site_admin_independent_of_contest_admin_and_token_rotation(db, monkeypa
 
 def test_admin_search_and_owner_views_use_names(db):
     member = grant(db)
+    with db() as session:
+        m.add_seat(session, member, 2, ADMIN)
+        session.commit()
     admin = client()
     csrf = page_csrf(admin, "/admin/login")
     admin.post("/admin/login", data={"csrf": csrf, "token": "test-site-admin"})
@@ -317,6 +320,10 @@ def test_admin_search_and_owner_views_use_names(db):
     page = admin.get("/admin/membership?q=Adult&membership_id=" + str(member))
     assert page.status_code == 200
     assert "Adult 1" in page.text and "Inspect membership" in page.text
+    assert "Remove student" in page.text
+    assert "End Subscription" in page.text
+    assert "Ending this subscription will immediately remove Full Access from every student on this membership." in page.text
+    assert "End this subscription? All students on this membership will immediately lose Full Access." in page.text
     page = admin.get("/admin/membership?q=Student&membership_id=" + str(member))
     assert "Student 1" in page.text and "Add to selected membership" in page.text
     assert admin.get("/admin/membership?membership_id=999").status_code == 404

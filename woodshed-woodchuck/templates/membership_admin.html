@@ -22,7 +22,7 @@
 <p>{{ selected.seats|length }} of 5 student spots used</p>
 {% if member.access_until %}<p>Access until {{ member.access_until }}</p>{% endif %}
 {% for seat, name in selected.seats %}<div class="membership-line"><span>{{ name }}</span><form method="post">{{ fields('remove', member.id) }}<input type="hidden" name="seat_id" value="{{ seat.id }}"><button class="btn btn-secondary">Remove student</button></form></div>{% endfor %}
-{% if member.source == 'manual' and member.status != 'revoked' %}<form method="post">{{ fields('revoke', member.id) }}<button class="btn btn-red">Revoke complimentary membership</button></form>{% endif %}
 {% if subscription %}<p>{{ subscription.provider }} · {{ subscription.external_subscription_id }} · {{ subscription.provider_status }}</p>{% endif %}
 <h3>Audit history</h3>{% for event in history %}<p>{{ event.created_at }} · {{ event.action }} · {{ event.actor_type }} {{ event.actor_id or '' }}</p>{% endfor %}
+{% if member.source == 'manual' and member.status != 'revoked' %}<section class="account-danger-zone" aria-labelledby="membership-danger-title"><h2 id="membership-danger-title">End Subscription</h2><p>Ending this subscription will immediately remove Full Access from every student on this membership.</p><form method="post" onsubmit="return window.confirm('End this subscription? All students on this membership will immediately lose Full Access.');">{{ fields('revoke', member.id) }}<button class="btn btn-red" type="submit">End Subscription</button></form></section>{% endif %}
 </section>{% endif %}{% endblock %}
