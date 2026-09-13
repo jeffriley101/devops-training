@@ -33,6 +33,12 @@
 .bd-table-scroll tr > :last-child { text-align: left; color: #675b46; min-width: 120px; }
 .bd-table-scroll .team-emblem-visual { width: 22px; height: 22px; font-size: 1rem; vertical-align: middle; }
 .bd-sort-feedback { font-size: .8rem; min-height: 1.2em; }
+.bd-filters { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 1rem; }
+.bd-filters label { flex: 1 1 180px; min-width: 0; }
+.bd-filters input, .bd-filters select { display: block; width: 100%; min-width: 0; min-height: 44px; margin-top: .3rem; }
+.bd-export-note, .bd-filter-feedback { font-size: .85rem; color: #675b46; }
+.bd-heading > .bd-export-note { font-weight: normal; letter-spacing: normal; }
+.bd-table-scroll tr[hidden] { display: none; }
 @media (max-width: 480px) {
   .band-director-page .app-shell { padding: .5rem; }
   .bd-dashboard { padding: .75rem; }

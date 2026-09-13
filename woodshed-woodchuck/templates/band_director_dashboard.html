@@ -23,8 +23,29 @@
         {% if next_week %}<a href="?week={{ next_week }}" aria-label="Next week">→</a>{% else %}<span aria-hidden="true">→</span>{% endif %}
       </div>
     </form>
+    <a class="btn btn-secondary" href="/band-director/dashboard.csv?week={{ selected_week }}">Export CSV</a>
+    <p class="bd-export-note">Exports the full roster for the selected week.</p>
   </header>
   {% if students %}
+  <div class="bd-filters">
+    <label for="bd-name-search">Search students
+      <input id="bd-name-search" type="search" placeholder="Student name" autocomplete="off">
+    </label>
+    {% set filter = namespace(teams=[]) %}
+    {% for student in students %}
+      {% set team = student.team.name if student.team else 'No team' %}
+      {% if team not in filter.teams %}{% set filter.teams = filter.teams + [team] %}{% endif %}
+    {% endfor %}
+    {% if filter.teams | length > 1 %}
+    <label for="bd-team-filter">Team
+      <select id="bd-team-filter">
+        <option value="">All teams</option>
+        {% for team in filter.teams | sort %}<option value="{{ team }}">{{ team }}</option>{% endfor %}
+      </select>
+    </label>
+    {% endif %}
+  </div>
+  <p class="bd-filter-feedback" data-filter-feedback role="status" aria-live="polite"></p>
   <div class="bd-table-scroll" role="region" aria-label="Student practice roster" tabindex="0">
     <table data-director-table>
       <caption>Connected students ·
@@ -70,6 +91,6 @@
 </section>
 {% endblock %}
 {% block page_scripts %}
-<link rel="stylesheet" href="/static/css/band-director-dashboard.css?v=1">
-<script src="/static/js/band-director-dashboard.js?v=2"></script>
+<link rel="stylesheet" href="/static/css/band-director-dashboard.css?v=2">
+<script src="/static/js/band-director-dashboard.js?v=3"></script>
 {% endblock %}

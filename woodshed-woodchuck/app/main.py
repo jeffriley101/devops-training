@@ -10,7 +10,7 @@ import qrcode
 import qrcode.image.svg
 
 from fastapi import FastAPI, Form, HTTPException, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
@@ -24,7 +24,7 @@ from .verifier_routes import (
     router as verifier_router,
 )
 from .practice_chart_routes import router as practice_chart_router
-from .band_director_dashboard import dashboard_metrics
+from .band_director_dashboard import dashboard_metrics, dashboard_csv
 from .trusted_verifier_dashboard import verifier_dashboard_snapshot
 from .contests import router as contest_router
 from .contest_admin import router as contest_admin_router
@@ -235,6 +235,7 @@ def trusted_verifier_dashboard_page(request: Request, connection_id: int | None 
 
 
 @app.get("/band-director/dashboard")
+@app.get("/band-director/dashboard.csv")
 def band_director_dashboard_page(request: Request, week: date | None = None):
     with SessionLocal() as session:
         verifier = current_verifier(request, session)
@@ -244,6 +245,12 @@ def band_director_dashboard_page(request: Request, week: date | None = None):
             metrics = dashboard_metrics(session, verifier_id=verifier.id, selected_week=week)
         except ValueError as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
+        if request.url.path.endswith("/dashboard.csv"):
+            return Response(
+                content=dashboard_csv(metrics), media_type="text/csv; charset=utf-8",
+                headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff",
+                         "Content-Disposition": f'attachment; filename="woodshed-band-director-{metrics["selected_week"]}.csv"'},
+            )
         # Adult pages must not bootstrap an unrelated signed-in player account.
         return templates.TemplateResponse(
             request=request,

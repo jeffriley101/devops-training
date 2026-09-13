@@ -1,6 +1,8 @@
 """Read-only, roster-scoped dashboard metrics; never contest scores or rewards."""
 
 from collections import defaultdict
+import csv
+from io import StringIO
 from datetime import date, datetime, timedelta
 
 from sqlalchemy import select
@@ -62,7 +64,8 @@ def dashboard_metrics(session: Session, *, verifier_id: int,
         snapshot = student_practice_snapshot(history, approved, today=today, selected_week=selected_week)
         for index, score in enumerate(snapshot.pop("rating_week_values")):
             program_week_sums[index] += score
-        students.append({"display_name": student["display_name"], **snapshot,
+        students.append({"display_name": student["display_name"],
+                         "instrument": student["instrument"], "level": student["level"], **snapshot,
                          "team": teams.get(profile_id)})
     count = len(students)
     # All five weeks use the currently authorized cohort, including zeros.
@@ -79,3 +82,31 @@ def dashboard_metrics(session: Session, *, verifier_id: int,
         "previous_week": selected_week - WEEK if selected_week > earliest else None,
         "next_week": selected_week + WEEK if selected_week < current_week else None,
     }
+
+
+CSV_COLUMNS = (
+    "Student", "Instrument", "Level", "Team", "Week Start", "Week End",
+    "Practice Minutes", "Practice Days", "Practice Rating", "Trend",
+    "Verified Minutes", "Pristine Minutes",
+)
+
+
+def dashboard_csv(metrics: dict) -> str:
+    """Export only public snapshot fields; no fresh queries or calculations."""
+    def text_cell(value):
+        value = str(value)
+        # CSV quoting handles delimiters, but not spreadsheet formula execution.
+        return "'" + value if value.lstrip().startswith(("=", "+", "-", "@")) or value.startswith(("\t", "\r", "\n")) else value
+
+    output = StringIO(newline="")
+    writer = csv.writer(output)
+    writer.writerow(CSV_COLUMNS)
+    for student in metrics["students"]:
+        writer.writerow([
+            *map(text_cell, (student["display_name"], student["instrument"], student["level"],
+                            student["team"]["name"] if student["team"] else "No team")),
+            metrics["selected_week"].isoformat(), metrics["week_end"].isoformat(),
+            student["weekly"]["total"], student["weekly"]["days"], student["rating"],
+            student["trend"]["label"], student["weekly"]["verified"], student["weekly"]["pristine"],
+        ])
+    return output.getvalue()

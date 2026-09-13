@@ -4,6 +4,24 @@
   const headers = Array.from(table.querySelectorAll("thead th"));
   const body = table.tBodies[0];
   const feedback = document.querySelector("[data-sort-feedback]");
+  const search = document.querySelector("#bd-name-search");
+  const team = document.querySelector("#bd-team-filter");
+  const filterFeedback = document.querySelector("[data-filter-feedback]");
+  function filterRows() {
+    const query = (search?.value || "").trim().toLocaleLowerCase();
+    const selectedTeam = team?.value || "";
+    let shown = 0;
+    for (const row of body.rows) {
+      row.hidden = !row.cells[0].dataset.sortValue.toLocaleLowerCase().includes(query)
+        || (selectedTeam !== "" && row.cells[row.cells.length - 1].dataset.sortValue !== selectedTeam);
+      if (!row.hidden) shown++;
+    }
+    if (filterFeedback) filterFeedback.textContent = shown
+      ? `Showing ${shown} of ${body.rows.length} students.` : "No students match these filters.";
+  }
+  search?.addEventListener("input", filterRows);
+  team?.addEventListener("change", filterRows);
+  filterRows();
   headers.forEach((header, index) => {
     const button = header.querySelector("button");
     button.addEventListener("click", () => {
