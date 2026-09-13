@@ -1,0 +1,6 @@
+{% extends "membership_base.html" %}{% block content %}
+<section class="card"><h1>Full Access invitation</h1>
+{% if student_name %}<p>Claim a student spot for {{ student_name }}.</p>
+<form method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-primary">Claim my spot</button></form>
+{% else %}<p>Sign in to your Woodchuck student account, then reopen this invitation to claim your spot.</p><a href="/login">Student sign-in</a>{% endif %}
+</section>{% endblock %}

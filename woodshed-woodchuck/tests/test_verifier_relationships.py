@@ -82,7 +82,9 @@ def test_other_roles_cannot_select_verifier_snapshot(roster_db, role):
     assert client.get("/trusted-verifiers/dashboard").context["student"] is None
     for endpoint in ("dashboard", "practice-charts"):
         assert client.get(f"/trusted-verifiers/{endpoint}?connection_id={connection}&role=verifier").status_code == 404
-    assert client.get("/trusted-verifiers/me").json()["student_connections"] == []
+    connections = client.get("/trusted-verifiers/me").json()["student_connections"]
+    assert [row["id"] for row in connections] == [connection]
+    assert connections[0]["role"] == role
 
 @pytest.mark.parametrize("recipient_role", [None, "verifier", "band_director"])
 def test_chart_recipient_enforced_on_post_and_notification(roster_db, monkeypatch, recipient_role):

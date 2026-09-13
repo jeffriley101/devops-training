@@ -63,6 +63,7 @@
       {% for item in nav_items %}
       <a class="nav-pill {% if item.key == active_nav %}active{% endif %}" href="{{ item.href }}">{{ item.label }}</a>
       {% endfor %}
+      {% if authenticated_profile %}<a class="nav-pill{% if active_nav == 'membership' %} active{% endif %}" href="/membership?as_account=student">MEMBERSHIP</a>{% endif %}
       {% if authenticated_profile and authenticated_profile.band_director %}
       <a class="nav-pill{% if page_class and 'director-dashboard-page' in page_class %} active{% endif %}" href="/director">DIRECTOR</a>
       {% endif %}

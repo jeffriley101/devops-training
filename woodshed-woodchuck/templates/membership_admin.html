@@ -1,0 +1,28 @@
+{% extends "membership_base.html" %}
+{% macro fields(action, member_id=none) %}<input type="hidden" name="csrf" value="{{ csrf }}">
+<input type="hidden" name="action" value="{{ action }}">{% if member_id %}<input type="hidden" name="membership_id" value="{{ member_id }}">{% endif %}{% endmacro %}
+{% block content %}
+<h1>Membership administration</h1>
+<form action="/admin/logout" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-secondary">Sign out of administration</button></form>
+<section class="card"><h2>Find an account</h2>
+<form method="get" class="stack-form"><label for="search">Name, Woodchuck ID, or adult email</label><input id="search" name="q" value="{{ q }}" maxlength="100">
+{% if selected %}<input type="hidden" name="membership_id" value="{{ selected.membership.id }}">{% endif %}<button class="btn btn-secondary">Search</button></form>
+{% for kind, results in [('student', students), ('adult', adults)] %}{% for owner in results %}
+<article><h3>{{ owner.display_name }} — {{ kind|title }}</h3><p>{{ owner.woodchuck_id if kind == 'student' else owner.email }}</p>
+{% for id in found_memberships[(kind, owner.id)] %}<p><a href="?membership_id={{ id }}">Inspect membership {{ id }}</a></p>{% endfor %}
+<form method="post">{{ fields('grant') }}<input type="hidden" name="owner_kind" value="{{ kind }}"><input type="hidden" name="owner_id" value="{{ owner.id }}">
+<button class="btn btn-primary">Grant complimentary Full membership</button></form>
+{% if selected and kind == 'student' %}<form method="post">{{ fields('add', selected.membership.id) }}<input type="hidden" name="profile_id" value="{{ owner.id }}"><button class="btn btn-secondary">Add to selected membership</button></form>{% endif %}
+</article>{% endfor %}{% endfor %}</section>
+<section class="card"><h2>Recent memberships</h2>{% for member in rows %}
+<p><a href="?membership_id={{ member.id }}">Membership {{ member.id }}</a> · {{ member.source }} · {{ member.status }}</p>{% else %}<p>No memberships yet.</p>{% endfor %}</section>
+{% if selected %}{% set member = selected.membership %}<section class="card">
+<h2>Membership {{ member.id }}</h2><p>Billing account {{ account.id }} · {{ selected.plan_label }} · {{ member.source }} · {{ member.status }}</p>
+<p>Owner: {{ 'student' if account.profile_id else 'adult' }} {{ account.profile_id or account.verifier_id }}</p>
+<p>{{ selected.seats|length }} of 5 student spots used</p>
+{% if member.access_until %}<p>Access until {{ member.access_until }}</p>{% endif %}
+{% for seat, name in selected.seats %}<div class="membership-line"><span>{{ name }}</span><form method="post">{{ fields('remove', member.id) }}<input type="hidden" name="seat_id" value="{{ seat.id }}"><button class="btn btn-secondary">Remove student</button></form></div>{% endfor %}
+{% if member.source == 'manual' and member.status != 'revoked' %}<form method="post">{{ fields('revoke', member.id) }}<button class="btn btn-red">Revoke complimentary membership</button></form>{% endif %}
+{% if subscription %}<p>{{ subscription.provider }} · {{ subscription.external_subscription_id }} · {{ subscription.provider_status }}</p>{% endif %}
+<h3>Audit history</h3>{% for event in history %}<p>{{ event.created_at }} · {{ event.action }} · {{ event.actor_type }} {{ event.actor_id or '' }}</p>{% endfor %}
+</section>{% endif %}{% endblock %}

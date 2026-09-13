@@ -1,0 +1,9 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ title }} · Woodshed Woodchuck</title>
+<link rel="stylesheet" href="/static/css/styles.css?v=119">
+<link rel="stylesheet" href="/static/css/membership.css?v=1"></head>
+<body><main class="membership-shell">
+{% if message %}<p role="status" class="card">{{ message }}</p>{% endif %}
+{% block content %}{% endblock %}
+</main></body></html>

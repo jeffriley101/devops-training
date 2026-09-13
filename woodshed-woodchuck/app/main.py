@@ -19,6 +19,7 @@ from .account_routes import (
     current_profile,
     router as account_router,
 )
+from .membership_routes import router as membership_router
 from .verifier_routes import (
     current_verifier,
     router as verifier_router,
@@ -75,6 +76,7 @@ app.add_middleware(
     https_only=SESSION_COOKIE_SECURE,
 )
 app.include_router(account_router)
+app.include_router(membership_router)
 app.include_router(verifier_router)
 app.include_router(practice_chart_router)
 app.include_router(contest_router)
