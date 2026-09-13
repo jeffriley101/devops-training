@@ -13,6 +13,25 @@ The approved calendar is centralized in `CANONICAL_SEASONS`; the 2027 Band Camp
 has an approved start only, so its end remains null pending a later calendar decision.
 BOARD presentation accepts a resolved durable season and owns no dates.
 
+## One-time 2026 development/testing transition
+
+Accumulated Band Camp history is intentionally preserved, including finalized
+team results, snapshots, rewards and crowns in the August 24 and August 31 weeks.
+For this launch/testing year only, Band Camp runs July 27–September 13, 2026.
+Back to School launches September 14 and ends September 27, 2026. Existing weeks
+1–7 remain Band Camp records, including the September 7–14 exclusive-boundary week.
+The production-shaped repair must report `reparent_weeks: []`; it creates only the
+missing Back-to-School weeks September 14–21 and September 21–28.
+
+Later boundaries are unchanged: Halloween September 28–November 1; Holiday
+November 2–January 10, 2027; Hibernaculum January 11–March 7; Spring March 8–May 9;
+Beach May 10–July 4; the next Band Camp begins July 5, 2027. Future full cycles use
+their intended calendar, not a recurring “Band Camp ends September 13” rule.
+
+The earlier proposed August 23/24 boundary is superseded. A database already
+repaired to that proposal is a conflicting configuration and still fails closed;
+this patch does not automatically reverse ownership changes or rewrite history.
+
 ## Bootstrap versus repair
 
 Normal contest setup (`ensure_current_contest_data`; old import name retained for
@@ -37,6 +56,8 @@ not implicit startup changes.
 
 1. Run `.venv/bin/python -m app.season_maintenance repair` against the intended
    database with no `--apply`. Review the complete dependency/ownership report.
+   For the 2026 production transition, require `reparent_weeks: []` and existing
+   weeks 1–7 still owned by Band Camp. Any different plan needs human review.
 2. If `safe` is false, **stop**. Do not delete results, clear snapshots, rename teams,
    or move memberships to make it pass. Resolve ambiguous history with its owner.
 3. Schedule a maintenance window, pause web writers and finalization jobs, and take

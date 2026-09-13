@@ -22,8 +22,10 @@ class SeasonDefinition:
 
 
 CANONICAL_SEASONS = (
-    SeasonDefinition("band-camp-2026", "Band Camp", date(2026, 7, 27), date(2026, 8, 23)),
-    SeasonDefinition("back-to-school-2026", "Back to School", date(2026, 8, 24), date(2026, 9, 27)),
+    # One-time 2026 launch/testing transition: retain accumulated Band Camp
+    # history through Sep 13. Future cycles must NOT inherit this extended span.
+    SeasonDefinition("band-camp-2026", "Band Camp", date(2026, 7, 27), date(2026, 9, 13)),
+    SeasonDefinition("back-to-school-2026", "Back to School", date(2026, 9, 14), date(2026, 9, 27)),
     SeasonDefinition("halloween-2026", "Halloween", date(2026, 9, 28), date(2026, 11, 1)),
     SeasonDefinition("holiday-2026", "Holiday", date(2026, 11, 2), date(2027, 1, 10)),
     SeasonDefinition("hibernaculum-2027", "Hibernaculum", date(2027, 1, 11), date(2027, 3, 7)),

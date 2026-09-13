@@ -20,7 +20,7 @@ from app.contests import (contest_week_schedule, current_contests_payload, ensur
 from app.db import Base
 from app.models import (Season, ContestWeek, Contest, ContestResult, Team, TeamMembership,
                         TeamWeekMembershipSnapshot, RewardGrant, CrownAward, CrownProgress,
-                        WoodchuckProfile)
+                        WoodchuckProfile, CampPointAward, PracticeChart)
 from app.seasons import (CANONICAL_SEASONS, SeasonConfigurationError, bootstrap_canonical_seasons,
                          season_covering_date)
 from app.season_maintenance import apply_calendar_plan, calendar_plan
@@ -29,6 +29,7 @@ from app.trusted_verifier_dashboard import verifier_dashboard_snapshot
 from test_band_director_roster import roster_db, add_student, signed_client
 
 NOW = datetime(2026, 9, 12, 18, tzinfo=timezone.utc)
+BACK_TO_SCHOOL_NOW = datetime(2026, 9, 19, 18, tzinfo=timezone.utc)
 
 
 @pytest.fixture
@@ -44,12 +45,12 @@ def database():
     engine.dispose()
 
 
-def legacy_data(session):
+def legacy_data(session, *, week_count=7):
     season = Season(key="band-camp-2026", name="Band Camp", starts_on=date(2026, 7, 27), status="active")
     session.add(season)
     session.flush()
     weeks = []
-    for n in range(7):
+    for n in range(week_count):
         start = season.starts_on + timedelta(weeks=n)
         end, deadline, finalizes = contest_week_schedule(start)
         week = ContestWeek(season_id=season.id, week_start=start, week_end=end, status="open",
@@ -61,8 +62,9 @@ def legacy_data(session):
 
 
 @pytest.mark.parametrize("day,key", [
-    ("2026-08-23", "band-camp-2026"), ("2026-08-24", "back-to-school-2026"),
-    ("2026-09-12", "back-to-school-2026"), ("2026-09-27", "back-to-school-2026"),
+    ("2026-08-23", "band-camp-2026"), ("2026-08-24", "band-camp-2026"),
+    ("2026-09-12", "band-camp-2026"), ("2026-09-13", "band-camp-2026"),
+    ("2026-09-14", "back-to-school-2026"), ("2026-09-27", "back-to-school-2026"),
     ("2026-09-28", "halloween-2026"), ("2026-11-01", "halloween-2026"),
     ("2026-11-02", "holiday-2026"), ("2027-01-10", "holiday-2026"),
     ("2027-01-11", "hibernaculum-2027"), ("2027-03-07", "hibernaculum-2027"),
@@ -112,16 +114,14 @@ def test_dry_run_is_read_only_repair_keeps_week_ids_and_creates_missing_once(dat
     assert not calendar_plan(session)["safe"]  # Safe bootstrap cannot truncate legacy history.
     plan = calendar_plan(session, repair=True)
     assert plan["safe"] and not session.dirty and not session.new
-    assert [w["id"] for w in plan["reparent_weeks"]] == [w.id for w in weeks[4:]]
+    assert plan["reparent_weeks"] == []
     assert len(plan["create_weeks"]) == 2
     assert source.ends_on is None
     apply_calendar_plan(session, repair=True)
     session.commit()
-    assert source.ends_on == date(2026, 8, 23)
+    assert source.ends_on == date(2026, 9, 13)
     assert [(w.id, w.week_start, w.week_end, w.verification_deadline_at, w.finalize_after) for w in weeks] == before
-    target = season_covering_date(session, NOW.date())
-    assert all(w.season_id == target.id for w in weeks[4:])
-    assert all(w.season_id == source.id for w in weeks[:4])
+    assert all(w.season_id == source.id for w in weeks)
     apply_calendar_plan(session, repair=True)
     session.commit()
     assert session.scalar(select(func.count()).select_from(ContestWeek)) == 9
@@ -133,10 +133,10 @@ def test_dry_run_is_read_only_repair_keeps_week_ids_and_creates_missing_once(dat
 
 
 def add_history(session, week):
-    student = WoodchuckProfile(woodchuck_id="WC-SEASON-HISTORY", display_name="History", pin_hash="hash",
+    student = WoodchuckProfile(woodchuck_id=f"WC-SEASON-HISTORY-{week.id}", display_name="History", pin_hash="hash",
                               instrument="Tuba", level="Beginner", goal="Practice")
-    contest = Contest(key="weekly-points-leaders", name="Practice", metric_type="practice_minutes",
-                      subject_type="student")
+    contest = session.scalar(select(Contest).where(Contest.key == "weekly-points-leaders")) or Contest(
+        key="weekly-points-leaders", name="Practice", metric_type="practice_minutes", subject_type="student")
     session.add_all([student, contest])
     session.flush()
     snapshot = TeamWeekMembershipSnapshot(contest_week_id=week.id, profile_id=student.id, snapshot_at=NOW)
@@ -159,8 +159,10 @@ def add_history(session, week):
 
 def test_safe_reparent_preserves_frozen_results_snapshots_and_reward_crown_links(database):
     session, _ = database
-    _, weeks = legacy_data(session)
-    history = add_history(session, weeks[4])
+    # Synthetic out-of-range history, NOT the production weeks 1–7. Keep the
+    # existing generic repair/dependency contract covered beyond the new cutoff.
+    _, weeks = legacy_data(session, week_count=9)
+    history = add_history(session, weeks[7])
     # Every persisted column of dependent history must survive unchanged.
     def columns(row):
         return {c.name: getattr(row, c.name) for c in row.__table__.columns}
@@ -173,13 +175,13 @@ def test_safe_reparent_preserves_frozen_results_snapshots_and_reward_crown_links
     apply_calendar_plan(session, repair=True)
     session.commit()
     assert [columns(row) for row in history] == before
-    assert weeks[4].status == "finalized" and weeks[4].finalized_at == NOW
+    assert weeks[7].status == "finalized" and weeks[7].finalized_at == NOW
 
 
 def test_old_teams_memberships_preserved_and_frozen_old_team_aborts(database):
     session, _ = database
-    source, weeks = legacy_data(session)
-    student, snapshot, *_ = add_history(session, weeks[4])
+    source, weeks = legacy_data(session, week_count=9)
+    student, snapshot, *_ = add_history(session, weeks[7])
     team = Team(season_id=source.id, display_name="Historical team", normalized_name="historical team", emblem_key="emoji:lion")
     session.add(team)
     session.flush()
@@ -222,15 +224,15 @@ def test_rollover_reuses_preseeded_canonical_season_and_weeks(database):
     bootstrap_canonical_seasons(session)
     source, _, week = ensure_current_contest_data(session, now=datetime(2026, 8, 18, tzinfo=timezone.utc))
     week.status, week.finalized_at = "finalized", NOW
-    target, _, existing_week = ensure_current_contest_data(session, now=NOW)
+    target, _, existing_week = ensure_current_contest_data(session, now=BACK_TO_SCHOOL_NOW)
     target_id, week_id = target.id, existing_week.id
     result = rollover_season(session, source_key=source.key, next_key=target.key, next_name=target.name,
-                             next_starts_on=target.starts_on, next_ends_on=target.ends_on, now=NOW)
+                             next_starts_on=target.starts_on, next_ends_on=target.ends_on, now=BACK_TO_SCHOOL_NOW)
     session.commit()
-    assert result.weeks_created == 4
+    assert result.weeks_created == 1
     assert target.id == target_id and existing_week.id == week_id
     assert source.status == "closed"
-    assert season_covering_date(session, NOW.date()).id == target_id
+    assert season_covering_date(session, BACK_TO_SCHOOL_NOW.date()).id == target_id
 
 
 def test_all_consumers_agree_and_board_has_no_calendar(roster_db, monkeypatch):
@@ -240,7 +242,7 @@ def test_all_consumers_agree_and_board_has_no_calendar(roster_db, monkeypatch):
         apply_calendar_plan(session, repair=True)
         session.commit()
         season, week = current_roster_period(session, today=NOW.date())
-        assert season.key == "back-to-school-2026"
+        assert season.key == "band-camp-2026"
         assert week.week_start == date(2026, 9, 7)
         assert verifier_dashboard_snapshot(session, verifier_id=1, today=NOW.date())["student"]["season"]["name"] == season.name
         assert dashboard_metrics(session, verifier_id=1, today=NOW.date())["students"][0]["team"] is None
@@ -258,8 +260,8 @@ def test_all_consumers_agree_and_board_has_no_calendar(roster_db, monkeypatch):
     monkeypatch.setattr(main, "datetime", Clock)
     response = signed_client().get("/quest")
     assert response.status_code == 200
-    assert response.text.count('aria-label="Back to School"') == 1
-    assert 'Back to School Standings' in response.text
+    assert response.text.count('aria-label="Band Camp"') == 1
+    assert 'Band Camp Standings' in response.text
     assert set(f.name for f in fields(BoardSeason)) == {"key", "title"}
     # Presentation follows the DB even when it differs from bootstrap metadata.
     with roster_db() as session:
@@ -289,8 +291,8 @@ def test_current_membership_helpers_ignore_expired_and_future_teams(roster_db):
         assert _active_team_id_for_event(session, profile_id, NOW) == teams[target.id].id
         champion = {"_normalized_name": "shared identity", "_owner_profile_id": None}
         assert _current_team_member_ids(session, champion, now=NOW) == {profile_id}
-        assert dashboard_metrics(session, verifier_id=1, today=NOW.date())["students"][0]["team"]["name"] == "Back to School"
-        assert verifier_dashboard_snapshot(session, verifier_id=1, today=NOW.date())["student"]["team"]["name"] == "Back to School"
+        assert dashboard_metrics(session, verifier_id=1, today=NOW.date())["students"][0]["team"]["name"] == "Band Camp"
+        assert verifier_dashboard_snapshot(session, verifier_id=1, today=NOW.date())["student"]["team"]["name"] == "Band Camp"
         target.status = "closed"
         session.flush()
         assert _active_team_id_for_event(session, profile_id, NOW) is None
@@ -312,7 +314,7 @@ def test_existing_durable_dates_and_names_are_runtime_truth(database):
 
 def test_lazy_bootstrap_later_season(database):
     session, _ = database
-    season, _, _ = ensure_current_contest_data(session, now=NOW)
+    season, _, _ = ensure_current_contest_data(session, now=BACK_TO_SCHOOL_NOW)
     assert season.key == "back-to-school-2026"
     assert session.scalar(select(func.count()).select_from(Season)) == 1
     halloween = datetime(2026, 9, 28, 18, tzinfo=timezone.utc)
@@ -324,19 +326,19 @@ def test_admin_expired_source_is_not_current_and_future_week_not_selected(databa
     source, weeks = legacy_data(session)
     apply_calendar_plan(session, repair=True)
     session.commit()
-    status = admin_status(session, now=NOW)
+    status = admin_status(session, now=BACK_TO_SCHOOL_NOW)
     assert status["active_season"]["key"] == "back-to-school-2026"
-    assert status["current_week"]["week_start"] == "2026-09-07"
+    assert status["current_week"]["week_start"] == "2026-09-14"
     assert status["rollover_source"]["key"] == source.key
 
 
 @pytest.mark.parametrize("problem", ["duplicate", "partial_week", "unknown_result", "overlap"])
 def test_ambiguous_repair_is_read_only_and_aborts(database, problem):
     session, _ = database
-    source, weeks = legacy_data(session)
+    source, weeks = legacy_data(session, week_count=9)
     if problem == "duplicate":
         end, deadline, finalizes = contest_week_schedule(weeks[4].week_start)
-        target = Season(key="back-to-school-2026", name="Back to School", starts_on=date(2026, 8, 24),
+        target = Season(key="back-to-school-2026", name="Back to School", starts_on=date(2026, 9, 14),
                         ends_on=date(2026, 9, 27), status="active")
         session.add(target)
         session.flush()
@@ -345,7 +347,7 @@ def test_ambiguous_repair_is_read_only_and_aborts(database, problem):
     elif problem == "partial_week":
         weeks[4].week_end -= timedelta(days=1)
     elif problem == "unknown_result":
-        _, _, result, *_ = add_history(session, weeks[4])
+        _, _, result, *_ = add_history(session, weeks[7])
         session.get(Contest, result.contest_id).key = "unknown-season-score"
     else:
         session.add(Season(key="conflicting-season", name="Conflict", starts_on=NOW.date(), status="active"))
@@ -360,14 +362,124 @@ def test_ambiguous_repair_is_read_only_and_aborts(database, problem):
 
 def test_normal_bootstrap_refuses_to_recreate_misowned_week(database):
     session, _ = database
-    source, weeks = legacy_data(session)
-    source.ends_on = date(2026, 8, 23)
+    source, weeks = legacy_data(session, week_count=9)
+    source.ends_on = date(2026, 9, 13)
     session.commit()
     with pytest.raises(HTTPException) as error:
-        ensure_current_contest_data(session, now=NOW)
+        ensure_current_contest_data(session, now=BACK_TO_SCHOOL_NOW)
     assert error.value.status_code == 409
     assert "explicit repair" in error.value.detail
     session.rollback()
     assert session.scalar(select(func.count()).select_from(Season)) == 1
-    assert session.scalar(select(func.count()).select_from(ContestWeek)) == 7
+    assert session.scalar(select(func.count()).select_from(ContestWeek)) == 9
     assert weeks[6].season_id == source.id
+
+
+def test_production_transition_preserves_all_accumulated_history(database, monkeypatch, capsys):
+    session, factory = database
+    source, weeks = legacy_data(session)
+    assert [week.id for week in weeks] == list(range(1, 8))
+    team = Team(season_id=source.id, display_name="Band Camp History", normalized_name="band camp history",
+                emblem_key="emoji:lion")
+    team_contest = Contest(key="team-weekly-practice", name="Team Practice",
+                           metric_type="practice_minutes", subject_type="team")
+    session.add_all([team, team_contest])
+    session.flush()
+    for week in weeks[4:6]:
+        student, snapshot, _, _, _, _ = add_history(session, week)
+        member = TeamMembership(season_id=source.id, team_id=team.id, profile_id=student.id,
+                                selected_week_start=weeks[0].week_start,
+                                started_at=datetime(2026, 7, 28, tzinfo=timezone.utc))
+        session.add(member)
+        session.flush()
+        snapshot.team_id, snapshot.membership_id = team.id, member.id
+        result = ContestResult(contest_week_id=week.id, contest_id=team_contest.id, division="open",
+                               subject_type="team", subject_key=str(team.id), team_id=team.id,
+                               display_name_snapshot=team.display_name, score=50, rank=1, medal="gold")
+        session.add(result)
+        session.flush()
+        session.add(RewardGrant(profile_id=student.id, contest_result_id=result.id,
+                                source_key=f"contest:{week.id}:team-win", reward_type="trophy", amount=1))
+        session.add(CampPointAward(profile_id=student.id, team_id=team.id, activity_type="contest-placement",
+                                  points_awarded=3, occurred_at=NOW,
+                                  duplicate_key=f"contest:{week.id}:team-win:camp-points"))
+        session.add(PracticeChart(profile_id=student.id, team_id=team.id, practice_date=week.week_start,
+                                  minutes=50, instrument="Tuba", source="p-book", include_team_contests=True))
+    session.commit()
+
+    def history_state():
+        # Query persisted rows, not cached ORM objects: every historical column,
+        # including IDs, ownership, timestamps, scores and source keys must match.
+        saved = {}
+        for table in Base.metadata.sorted_tables:
+            if table.name == "seasons":
+                continue
+            query = select(table).order_by(*table.primary_key.columns)
+            if table.name == "contest_weeks":
+                query = query.where(table.c.id <= 7)
+            saved[table.name] = session.execute(query).all()
+        return saved
+
+    before = history_state()
+    monkeypatch.setattr(season_maintenance, "SessionLocal", factory)
+    assert season_maintenance.main(["repair"]) == 0  # CLI is dry-run by default.
+    import json
+    plan = json.loads(capsys.readouterr().out)
+    assert plan["applied"] is False and plan["safe"] is True and plan["blockers"] == []
+    assert plan["reparent_weeks"] == []
+    assert plan["update_seasons"] == [{"id": source.id, "key": source.key, "ends_on": "2026-09-13"}]
+    assert "back-to-school-2026" in plan["create_seasons"]
+    assert plan["create_weeks"] == [
+        {"season": "back-to-school-2026", "start": "2026-09-14"},
+        {"season": "back-to-school-2026", "start": "2026-09-21"},
+    ]
+    assert history_state() == before and source.ends_on is None
+    assert plan["preserved_band_camp"]["teams"] == 1
+    assert plan["preserved_band_camp"]["team_memberships"] == 2
+    for _ in range(2):
+        apply_calendar_plan(session, repair=True)
+        session.commit()
+        session.expire_all()
+        assert history_state() == before
+        assert all(week.season_id == source.id for week in weeks)
+        assert [week.status for week in weeks[4:]] == ["finalized", "finalized", "open"]
+        assert session.scalar(select(func.count()).select_from(ContestWeek)) == 9
+        assert session.scalar(select(func.count()).select_from(Season)) == 8
+    target = season_covering_date(session, date(2026, 9, 14))
+    assert (target.key, target.starts_on, target.ends_on) == (
+        "back-to-school-2026", date(2026, 9, 14), date(2026, 9, 27))
+    assert [(week.week_start, week.week_end) for week in session.scalars(
+        select(ContestWeek).where(ContestWeek.season_id == target.id).order_by(ContestWeek.week_start))] == [
+            (date(2026, 9, 14), date(2026, 9, 21)), (date(2026, 9, 21), date(2026, 9, 28))]
+    repeat = calendar_plan(session, repair=True)
+    assert repeat["safe"] and all(not repeat[key] for key in (
+        "reparent_weeks", "update_seasons", "create_seasons", "create_weeks"))
+
+
+def test_previous_calendar_repair_is_not_silently_rewritten(database):
+    session, _ = database
+    source, weeks = legacy_data(session)
+    source.ends_on = date(2026, 8, 23)  # Superseded proposal, not an open-ended source.
+    session.commit()
+    assert not calendar_plan(session, repair=True)["safe"]
+    with pytest.raises(SeasonConfigurationError, match="conflicts"):
+        apply_calendar_plan(session, repair=True)
+    session.rollback()
+    assert source.ends_on == date(2026, 8, 23)
+    assert all(week.season_id == source.id for week in weeks)
+
+
+@pytest.mark.parametrize("now,name", [(NOW, "Band Camp"), (BACK_TO_SCHOOL_NOW, "Back to School")])
+def test_runtime_consumers_follow_launch_transition(roster_db, now, name):
+    profile_id = add_student(roster_db, "Launch Student")
+    with roster_db() as session:
+        legacy_data(session)
+        apply_calendar_plan(session, repair=True)
+        session.commit()
+        season, _ = current_roster_period(session, today=now.date())
+        assert season.name == name
+        assert board_season_presentation(season).title == name
+        assert verifier_dashboard_snapshot(session, verifier_id=1, today=now.date())["student"]["season"]["name"] == name
+        assert current_contests_payload(session, now=now, current_profile_id=profile_id)["season"]["name"] == name
+        assert selection_payload(session, profile=session.get(WoodchuckProfile, profile_id), now=now)["season"]["name"] == name
+        assert admin_status(session, now=now)["active_season"]["name"] == name
