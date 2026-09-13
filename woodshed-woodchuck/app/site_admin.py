@@ -22,8 +22,13 @@ def check_csrf(request, supplied):
     origin = request.headers.get("origin")
     if origin:
         origin_endpoint = _origin_endpoint(origin)
-        scheme = urlsplit(origin).scheme.lower()
-        if origin_endpoint != _request_host_endpoint(request, scheme):
+        configured = os.getenv("PUBLIC_BASE_URL", "").strip() or os.getenv("RENDER_EXTERNAL_URL", "").strip()
+        if configured:
+            expected_endpoint = _origin_endpoint(configured)
+        else:
+            scheme = urlsplit(origin).scheme.lower()
+            expected_endpoint = _request_host_endpoint(request, scheme)
+        if origin_endpoint is None or expected_endpoint is None or origin_endpoint != expected_endpoint:
             raise HTTPException(403, "Invalid request origin.")
 
 
@@ -32,7 +37,7 @@ def _origin_endpoint(origin):
     try:
         parsed = urlsplit(origin)
         hostname = parsed.hostname
-        if not parsed.scheme or not hostname:
+        if parsed.scheme.lower() not in {"http", "https"} or not hostname or parsed.username or parsed.password:
             return None
         port = parsed.port
     except ValueError:
@@ -43,11 +48,8 @@ def _origin_endpoint(origin):
 
 
 def _request_host_endpoint(request, scheme=""):
-    """Resolve the browser-facing host, including a narrowly scoped proxy fallback."""
+    """Resolve the request Host for local/development origin checks."""
     host = request.headers.get("host")
-    if not host:
-        forwarded = request.headers.get("x-forwarded-host", "").split(",", 1)[0].strip()
-        host = forwarded or None
     if not host:
         return None
     try:
