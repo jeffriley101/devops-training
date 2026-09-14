@@ -17,7 +17,6 @@ from app.models import (WoodchuckProfile, TrustedVerifier, StudentVerifierConnec
     ProviderSubscription, BillingProviderEvent)
 from app.billing_config import BillingConfig, PLANS, available_plans, new_subscription_plan
 from app import billing_providers as providers
-from app.billing_providers import provision_initial_subscription
 from app.email_service import EmailService
 
 NOW = datetime(2026, 9, 13, tzinfo=timezone.utc)
@@ -36,7 +35,7 @@ def db(tmp_path, monkeypatch):
     monkeypatch.setattr(routes, "SessionLocal", factory)
     monkeypatch.setattr(m, "clock", lambda: NOW)
     monkeypatch.setattr(providers, "clock", lambda: NOW)
-    for key in ("PUBLIC_SUBSCRIPTIONS_ENABLED", "PAYPAL_BILLING_ENABLED", "STRIPE_BILLING_ENABLED", "LAUNCH_SALE_ENABLED"):
+    for key in ("PUBLIC_SUBSCRIPTIONS_ENABLED", "PAYPAL_BILLING_ENABLED", "STRIPE_BILLING_ENABLED", "LAUNCH_SALE_ENABLED", "CHECKOUT_VALIDITY_SECONDS"):
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv("SITE_ADMIN_TOKEN", "test-site-admin")
     with factory() as session:
@@ -459,7 +458,7 @@ class FakeProvider:
         self.checkouts = []
     def create_checkout(self, **kwargs):
         self.checkouts.append(kwargs)
-        return "https://billing.invalid/test-checkout"
+        return providers.CheckoutResult("https://billing.invalid/test-checkout", kwargs["idempotency_key"])
     def cancel_subscription(self, **kwargs):
         self.cancelled = kwargs
     def create_portal_session(self, **kwargs):
@@ -473,11 +472,11 @@ class FakeProvider:
 def test_fake_provider_server_pricing(db, monkeypatch):
     fake = FakeProvider()
     monkeypatch.setitem(providers.PROVIDERS, "stripe", fake)
+    url = providers.checkout(db, m.Actor("student", 1), "stripe", "full_annual_49",
+        config=BillingConfig(True, False, True, False, 600))
+    assert url.endswith("test-checkout")
+    assert fake.checkouts[0]["plan"].amount_cents == 4900
     with db() as session:
-        url = providers.checkout(session, m.Actor("student", 1), "stripe", "full_annual_49",
-            idempotency_key="test", config=BillingConfig(True, False, True, False))
-        assert url.endswith("test-checkout")
-        assert fake.checkouts[0]["plan"].amount_cents == 4900
         assert session.scalar(select(func.count()).select_from(Membership)) == 0
 
 
@@ -486,6 +485,7 @@ def test_provider_event_once_paid_through_and_immutable_launch_plan(db, monkeypa
     with db() as session:
         membership = session.get(Membership, member)
         membership.source, membership.plan_code = "stripe", "friendship_annual_30"
+        membership.access_until = NOW + timedelta(days=365)
         session.add(ProviderSubscription(membership_id=member, provider="stripe", external_subscription_id="sub-a",
             plan_code="friendship_annual_30", amount_cents=3000, currency="USD", interval="year", provider_status="active"))
         session.commit()
@@ -494,11 +494,9 @@ def test_provider_event_once_paid_through_and_immutable_launch_plan(db, monkeypa
     monkeypatch.setitem(providers.PROVIDERS, "stripe", fake)
     config = BillingConfig(False, False, True, False)
     with db() as session:
-        first, fresh = providers.process_webhook(session, "stripe", b"signed-body", {"x-test-signature": "valid"}, config=config)
-        session.commit()
+        first, fresh = providers.process_webhook(db, "stripe", b"signed-body", {"x-test-signature": "valid"}, config=config)
         assert fresh and first.status == "processed"
-        again, fresh = providers.process_webhook(session, "stripe", b"signed-body", {"x-test-signature": "valid"}, config=config)
-        session.commit()
+        again, fresh = providers.process_webhook(db, "stripe", b"signed-body", {"x-test-signature": "valid"}, config=config)
         assert not fresh and again.id == first.id
         assert session.scalar(select(func.count()).select_from(BillingProviderEvent)) == 1
         assert session.scalar(select(func.count()).select_from(MembershipAuditEvent).where(MembershipAuditEvent.action == "provider_status_changed")) == 1
@@ -507,41 +505,7 @@ def test_provider_event_once_paid_through_and_immutable_launch_plan(db, monkeypa
         sub = session.scalar(select(ProviderSubscription))
         assert (sub.plan_code, sub.amount_cents) == ("friendship_annual_30", 3000)
         with pytest.raises(ValueError):
-            providers.process_webhook(session, "stripe", b"different-body", {"x-test-signature": "valid"}, config=config)
-
-
-@pytest.mark.parametrize("kind,owner_id,expected_seats", [("student", 1, 1), ("adult", 1, 0)])
-def test_initial_verified_subscription_provisions_atomic_membership(db, kind, owner_id, expected_seats):
-    event = providers.SubscriptionEvent("initial-1", "sub-initial", NOW, "active", NOW, NOW + timedelta(days=365))
-    with db() as session:
-        record, membership = provision_initial_subscription(
-            session, m.Actor(kind, owner_id), "stripe", "full_annual_49", event,
-            config=BillingConfig(False, False, True, False), payload_hash="payload-1")
-        session.commit()
-        assert record.status == "processed"
-        assert membership.plan_code == "full_annual_49"
-        assert membership.source == "stripe"
-        assert session.scalar(select(ProviderSubscription.amount_cents)) == 4900
-        assert len(m.active_seats(session, membership.id)) == expected_seats
-    with db() as session:
-        duplicate, no_membership = provision_initial_subscription(
-            session, m.Actor(kind, owner_id), "stripe", "full_annual_49", event,
-            config=BillingConfig(False, False, True, False), payload_hash="payload-1")
-        session.commit()
-        assert duplicate.id == record.id and no_membership is None
-        assert session.scalar(select(func.count()).select_from(Membership)) == 1
-        assert session.scalar(select(func.count()).select_from(ProviderSubscription)) == 1
-
-
-def test_initial_provisioning_rejects_invalid_plan_and_rolls_back(db):
-    event = providers.SubscriptionEvent("initial-bad", "sub-bad", NOW, "active", NOW, NOW + timedelta(days=30))
-    with db() as session:
-        with pytest.raises(ValueError):
-            provision_initial_subscription(session, m.Actor("student", 1), "stripe", "friendship_annual_30", event,
-                                           config=BillingConfig(False, False, True, False))
-        session.rollback()
-        assert session.scalar(select(func.count()).select_from(BillingAccount)) == 0
-        assert session.scalar(select(func.count()).select_from(Membership)) == 0
+            providers.process_webhook(db, "stripe", b"different-body", {"x-test-signature": "valid"}, config=config)
 
 
 def test_unauthenticated_membership_redirect_and_student_key_link(tmp_path, monkeypatch):
@@ -557,6 +521,7 @@ def test_terminated_subscription_cannot_reactivate_or_inherit_price(db, monkeypa
     with db() as session:
         membership = session.get(Membership, member)
         membership.source, membership.plan_code = "stripe", "friendship_annual_30"
+        membership.access_until = NOW + timedelta(days=1)
         session.add(ProviderSubscription(membership_id=member, provider="stripe", external_subscription_id="old-sub",
             plan_code="friendship_annual_30", amount_cents=3000, currency="USD", interval="year", provider_status="active"))
         session.commit()
@@ -565,15 +530,13 @@ def test_terminated_subscription_cannot_reactivate_or_inherit_price(db, monkeypa
     monkeypatch.setitem(providers.PROVIDERS, "stripe", fake)
     config = BillingConfig(False, False, True, False)
     with db() as session:
-        providers.process_webhook(session, "stripe", b"ended", {"x-test-signature": "valid"}, config=config)
-        session.commit()
+        providers.process_webhook(db, "stripe", b"ended", {"x-test-signature": "valid"}, config=config)
         assert m.student_has_full_access(session, 1)
         assert not m.student_has_full_access(session, 1, NOW + timedelta(days=1))
         fake.event = providers.SubscriptionEvent("new-event", "old-sub", NOW + timedelta(days=2), "active",
                         NOW + timedelta(days=2), NOW + timedelta(days=367))
-        event, _ = providers.process_webhook(session, "stripe", b"new-event", {"x-test-signature": "valid"}, config=config)
-        session.commit()
-        assert event.status == "ignored" and event.error_code == "subscription_terminated"
+        event, _ = providers.process_webhook(db, "stripe", b"new-event", {"x-test-signature": "valid"}, config=config)
+        assert event.status == "failed" and event.error_code == "subscription_terminated"
         assert not m.student_has_full_access(session, 1, NOW + timedelta(days=2))
         with pytest.raises(ValueError):
             new_subscription_plan("friendship_annual_30", config)

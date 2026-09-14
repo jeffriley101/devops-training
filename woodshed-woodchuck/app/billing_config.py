@@ -10,11 +10,17 @@ class BillingConfig:
     paypal_billing_enabled: bool = False
     stripe_billing_enabled: bool = False
     launch_sale_enabled: bool = False
+    checkout_validity_seconds: int | None = None
 
     @classmethod
     def from_environment(cls):
-        return cls(**{key: os.getenv(key.upper(), "false").strip().lower() in {"true", "1", "yes"}
-                      for key in cls.__dataclass_fields__})
+        flags = {key: os.getenv(key.upper(), "false").strip().lower() in {"true", "1", "yes"}
+                 for key in cls.__dataclass_fields__ if key != "checkout_validity_seconds"}
+        value = os.getenv("CHECKOUT_VALIDITY_SECONDS", "")
+        # No product hold duration has been selected. Missing/invalid configuration
+        # fails closed at checkout; tests may explicitly supply a bounded value.
+        validity = int(value) if value.isascii() and value.isdigit() and len(value) < 10 else None
+        return cls(**flags, checkout_validity_seconds=validity if validity and validity > 0 else None)
 
     def provider_enabled(self, provider):
         return {"paypal": self.paypal_billing_enabled, "stripe": self.stripe_billing_enabled}.get(provider, False)

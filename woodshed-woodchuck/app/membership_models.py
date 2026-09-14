@@ -41,6 +41,8 @@ class Membership(Timestamps, Base):
     source: Mapped[str] = mapped_column(String(20))
     plan_code: Mapped[str | None] = mapped_column(String(50))
     starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    # Paid memberships: confirmed entitlement only, never provider period metadata.
+    # Manual complimentary memberships may have an optional administrator-set end.
     access_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     max_student_seats: Mapped[int] = mapped_column(Integer, default=5)
@@ -128,3 +130,50 @@ class MembershipAuditEvent(Base):
     actor_id: Mapped[int | None] = mapped_column(Integer)
     details: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class CheckoutAttempt(Timestamps, Base):
+    __tablename__ = "checkout_attempts"
+    __table_args__ = (
+        CheckConstraint("provider IN ('paypal', 'stripe')", name="ck_checkout_provider"),
+        CheckConstraint("status IN ('pending', 'completed', 'expired', 'failed', 'recoverable')", name="ck_checkout_status"),
+        CheckConstraint("expires_at > created_at", name="ck_checkout_expiry"),
+        CheckConstraint("amount_cents > 0", name="ck_checkout_amount"),
+        CheckConstraint("interval IN ('month', 'year')", name="ck_checkout_interval"),
+    )
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    reference: Mapped[str] = mapped_column(String(64), unique=True)
+    billing_account_id: Mapped[int] = mapped_column(ForeignKey("billing_accounts.id", ondelete="RESTRICT"), index=True)
+    provider: Mapped[str] = mapped_column(String(20))
+    plan_code: Mapped[str] = mapped_column(String(50))
+    amount_cents: Mapped[int] = mapped_column(Integer)
+    currency: Mapped[str] = mapped_column(String(3))
+    interval: Mapped[str] = mapped_column(String(10))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    status: Mapped[str] = mapped_column(String(20), default="pending")
+    provider_checkout_id: Mapped[str | None] = mapped_column(String(255))
+    subscription_id: Mapped[int | None] = mapped_column(ForeignKey("provider_subscriptions.id", ondelete="RESTRICT"), unique=True)
+
+
+class BillingEventApplication(Base):
+    """Minimal verified facts for explicit retry; never raw payment payloads."""
+    __tablename__ = "billing_event_applications"
+    __table_args__ = (CheckConstraint("status IN ('pending', 'recoverable', 'processed')", name="ck_event_application_status"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    event_id: Mapped[int] = mapped_column(ForeignKey("billing_provider_events.id", ondelete="RESTRICT"), unique=True)
+    external_subscription_id: Mapped[str] = mapped_column(String(255), index=True)
+    checkout_reference: Mapped[str | None] = mapped_column(String(64), index=True)
+    facts: Mapped[dict] = mapped_column(JSON)
+    status: Mapped[str] = mapped_column(String(20), default="pending")
+    error_code: Mapped[str | None] = mapped_column(String(40))
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class BillingPaymentEffect(Base):
+    __tablename__ = "billing_payment_effects"
+    __table_args__ = (UniqueConstraint("subscription_id", "payment_reference", name="uq_subscription_payment_effect"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    subscription_id: Mapped[int] = mapped_column(ForeignKey("provider_subscriptions.id", ondelete="RESTRICT"))
+    payment_reference: Mapped[str] = mapped_column(String(255))
+    paid_through: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    event_id: Mapped[int] = mapped_column(ForeignKey("billing_provider_events.id", ondelete="RESTRICT"))

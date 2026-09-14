@@ -21,7 +21,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 from .db import Base
 from .membership_models import (BillingAccount, Membership, MembershipSeat,
                                 MembershipSeatInvitation, ProviderSubscription,
-                                BillingProviderEvent, MembershipAuditEvent)
+                                BillingProviderEvent, MembershipAuditEvent, CheckoutAttempt,
+                                BillingEventApplication, BillingPaymentEffect)
 
 
 def utc_now() -> datetime:

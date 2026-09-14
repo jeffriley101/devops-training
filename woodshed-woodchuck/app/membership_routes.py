@@ -168,17 +168,17 @@ async def membership_checkout(request: Request):
     form = await request.form()
     check_csrf(request, form.get("csrf"))
     # Reject unexpected fields, including client-supplied prices.
-    if set(form) - {"csrf", "as_account", "plan_code", "provider"}:
+    if set(form) - {"csrf", "as_account", "plan_code", "provider", "checkout_reference", "new_attempt"}:
         raise HTTPException(400, "Only a plan and provider may be selected.")
     with SessionLocal() as session:
         actor = actor_for(request, session, form.get("as_account"))
-        try:
-            url = checkout(session, actor, form.get("provider"), form.get("plan_code"),
-                           idempotency_key=f"{actor.kind}:{actor.id}:{csrf_token(request)}")
-            session.commit()
-        except (BillingUnavailable, ValueError) as error:
-            session.rollback()
-            raise HTTPException(503 if isinstance(error, BillingUnavailable) else 400, str(error)) from error
+    if form.get("new_attempt", "false") not in {"true", "false"}:
+        raise HTTPException(400, "Invalid checkout selection.")
+    try:
+        url = checkout(SessionLocal, actor, form.get("provider"), form.get("plan_code"),
+                       reference=form.get("checkout_reference"), new_attempt=form.get("new_attempt") == "true")
+    except (BillingUnavailable, ValueError) as error:
+        raise HTTPException(503 if isinstance(error, BillingUnavailable) else 400, str(error)) from error
     return RedirectResponse(url, 303)
 
 
@@ -192,10 +192,8 @@ async def provider_webhook(request: Request, provider: str):
         body = await request.body()
         if len(body) > 256_000:
             raise HTTPException(413, "Event too large.")
-        with SessionLocal() as session:
-            record, fresh = process_webhook(session, provider, body, dict(request.headers), config=config)
-            session.commit()
-            return {"received": True, "duplicate": not fresh}
+        record, fresh = process_webhook(SessionLocal, provider, body, dict(request.headers), config=config)
+        return {"received": True, "duplicate": not fresh, "processed": record.status == "processed"}
     except BillingUnavailable as error:
         raise HTTPException(503, str(error)) from error
     except (ValueError, IntegrityError) as error:

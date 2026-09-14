@@ -19,12 +19,14 @@ serialize seat assignment; seat removals retain history and free spots immediate
 Expired memberships do not confer access, even before their old reservations are
 retired. A new assignment retires an expired prior reservation transactionally.
 
-Student owners occupy the first spot on creation. Adult owners occupy no spot.
-Accepted active Verifier and Band Director rosters supply the adult's convenience
-picker. The picker is reauthorized on submission. Membership ownership and seat
-occupancy never grant access to student analytics or P-Chart review permissions.
+Student owners occupy the first spot on creation and cannot remove themselves
+through owner seat management. Adult owners occupy no spot. Owners add students
+by exact Woodchuck ID, immediately assigning access without email or acceptance.
+There is no public student directory. Membership ownership and seat occupancy
+never grant access to student analytics or P-Chart review permissions.
 
-Email invitations use separate rows, a SHA256 hash of a random token, seven-day
+Legacy email invitation infrastructure remains for compatibility, not the current
+owner assignment UI. It uses separate rows, a SHA256 hash of a random token, seven-day
 expiry and authenticated student claims. Email is a delivery destination only.
 Claims recheck active membership, capacity and the student's existing seat. Pending
 invitations are bounded by currently free spots, but do not reserve an active
@@ -72,15 +74,95 @@ The test adapter exists only in tests. Checkout derives pricing on the server,
 and never grants access or treats a browser return as payment proof.
 
 The event processor accepts only adapter-verified normalized events. Event IDs
-are unique per provider, payloads are hashed, duplicate content is applied once,
-out-of-order events are ignored, and unknown subscriptions cannot create access.
+are unique per provider, payloads are hashed, and duplicate effects are applied
+once. Unknown subscriptions retain verified facts for explicit retry; they can
+provision only with a valid durable checkout and confirmed paid entitlement.
 Provider details and audit history are visible only to site administration.
 
-Real adapter integration must implement verified checkout completion and initial
-membership provisioning, provider signature validation, customer/plan mapping,
+Real adapter integration must implement provider signature validation, customer/plan mapping,
 network retry/idempotency behavior, cancellation/portal UX and reconciliation.
 It must test actual provider event ordering and cancellation semantics before
 enabling purchasing. Test callbacks are not production payment support.
+
+## Phase A1 checkout and entitlement contract
+
+`authorize_checkout()` persists a server-generated random reference, billing
+owner, provider and immutable authorized plan/amount/currency/interval snapshot.
+Concurrent ordinary submissions reuse the owner's valid pending attempt for the
+same provider/plan. An explicit reference retries only that authorized owner's
+attempt. `new_attempt=True` requests a distinct authorization when allowed;
+recoverable paid checkouts block another purchase pending review. Expired pending
+authorizations do not permanently reserve a checkout slot. The reference, not
+CSRF/session material, is the provider idempotency/correlation key.
+
+An unprocessed payment in the durable inbox also blocks a new purchase, even if
+a database failure prevented marking its checkout recoverable. Checkout states
+support `pending`, `completed`, `expired`, `failed`, and `recoverable`; validity
+is checked against `expires_at` even without a background expiration worker.
+
+`CHECKOUT_VALIDITY_SECONDS` has **no default**. A positive server-configured
+duration must be selected before checkout can run. The 600-second values in
+tests are fixtures, not a product hold policy. All four existing flags still
+default false, and neither live adapter implements transport.
+
+`checkout()` commits authorization, closes the transaction, then invokes the
+adapter. A subsequent transaction records the returned provider checkout ID.
+If transport fails with an unknown outcome, retry uses the same opaque reference;
+future adapters must honor idempotency and authorization expiry remotely.
+
+The normalized event optionally includes `paid_through` and `payment_reference`.
+Together these assert adapter-verified payment entitlement. The adapter must
+verify the authorized provider product/amount/currency/interval, environment,
+subscription ownership and payment before supplying them. Neither lifecycle
+status, billing period nor browser checkout completion proves payment.
+`Membership.access_until` is the exclusive confirmed paid-through boundary for
+paid memberships. Manual complimentary semantics remain unchanged.
+
+`process_webhook()` verifies outside transactions, commits a minimal event inbox,
+then separately calls `apply_verified_event()`. `BillingEventApplication` stores
+normalized facts, correlation, attempts and `pending`/`recoverable`/`processed`
+state. A savepoint prevents partial membership/subscription/seat/audit writes.
+An unresolved payment leaves the parent event `failed`, with no `processed_at`,
+and the checkout `recoverable`; an operator can retry `apply_verified_event()`
+in a new transaction after correlation or the conflict is resolved. No retry
+sends another payment/checkout request. No worker or scheduler is installed.
+If ingestion cannot commit, delivery fails and must be retried by the provider;
+database durability cannot be promised during database unavailability.
+
+Initial provisioning serializes on the owner identity/account before creating
+membership state. Existing-subscription processing locks the subscription then
+membership without first locking the owner identity, avoiding an inversion with
+student-seat management. If an initial provisioner discovers another worker has
+already created the subscription, it releases its savepoint locks and leaves a
+recoverable retry. Checkout correlation is refreshed rather than trusting cached
+ORM state. SQLite tests do not prove PostgreSQL deadlock freedom.
+
+Launch fulfillment reads the stored snapshot rather than today's sale flag.
+Automatic initial application requires both payment occurrence and initial
+receipt within the checkout validity window. Evidence arriving outside that
+window remains recoverable for review, without granting access or inferring a
+refund. A timely received payment may finish local recovery after the window
+closes. Provider-specific delayed-delivery reconciliation remains future work.
+
+Confirmed entitlement advances monotonically. A unique subscription/payment
+reference records each payment effect; reuse with conflicting entitlement facts
+requires review. Different events at equal timestamps can still apply distinct
+payments. Conflicting lifecycle facts at equal timestamps are retained for
+reconciliation without undoing paid entitlement. Older lifecycle events cannot
+overwrite newer metadata or suppress older independent payment effects. Refunds
+and reversals never reduce entitlement in A1. New payments after terminal
+subscription state remain recoverable rather than silently restoring launch
+pricing. The adapter must map actual provider payment identities to this hook.
+
+Deferred to A2/integration: normalizing expired-but-`active` owned memberships
+before replacement purchase, remote pending-checkout cancellation, provider
+environment/account verification, operator reconciliation tooling, PostgreSQL
+concurrency/deadlock integration testing, and refund/grace/cancellation policies.
+There is no inferred team, relationship, payer-privacy or feature-gating change.
+
+Revision `p6k7l8m9n0o1` follows `o5j6k7l8m9n0` and adds only
+`checkout_attempts`, `billing_event_applications`, and `billing_payment_effects`.
+Downgrade removes only these additions; it does not rewrite existing history.
 
 ## Migration and testing
 
