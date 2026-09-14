@@ -19,23 +19,24 @@
       loop: true,
     },
     thirds: {
-      url: "/static/audio/arcade/gerry-4.wav?v=1",
-      loop: true,
+      url: "/static/audio/arcade/gerry-4.mp3?v=1",
+      // This export already contains four repetitions; play the file once.
+      loop: false,
     },
     "dressed-to-the-nines": {
-      url: "/static/audio/arcade/sand-drop.mp3?v=1",
+      url: "/static/audio/arcade/sand-drop.mp3?v=2",
       loop: true,
     },
     "wheel-of-woodchuck": {
-      url: "/static/audio/arcade/mudslide.mp3?v=1",
+      url: "/static/audio/arcade/mudslide.mp3?v=2",
       loop: true,
     },
     "interval-basic-training": {
-      url: "/static/audio/arcade/black-hole-rappelling.mp3?v=1",
+      url: "/static/audio/arcade/black-hole-rappelling.mp3?v=2",
       loop: true,
     },
     "history-mystery": {
-      url: "/static/audio/arcade/thunderpants.mp3?v=1",
+      url: "/static/audio/arcade/thunderpants.mp3?v=2",
       loop: true,
     },
   });
@@ -175,7 +176,8 @@
     }, delayMs);
   }
 
-  if (!audio.loop) audio.addEventListener("ended", restartAfterPause);
+  // Delayed replay is opt-in, not a fallback for intentionally one-shot tracks.
+  if (!audio.loop && soundtrack.restartDelayMs > 0) audio.addEventListener("ended", restartAfterPause);
   document.addEventListener("pointerdown", activateFromGesture, true);
   document.addEventListener("keydown", activateFromGesture, true);
   document.addEventListener("woodshed:arcade-soundtrack-run-state", handleRunState);

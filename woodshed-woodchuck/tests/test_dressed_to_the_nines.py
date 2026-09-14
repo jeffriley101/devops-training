@@ -133,9 +133,9 @@ def test_nines_uses_sand_drop_and_shared_arcade_mute() -> None:
     )
     assert 'data-arcade-soundtrack="dressed-to-the-nines"' in TEMPLATE
     assert 'data-arcade-soundtrack-toggle' in TEMPLATE
-    assert '/static/js/arcade-soundtrack.js?v=6' in TEMPLATE
+    assert '/static/js/arcade-soundtrack.js?v=7' in TEMPLATE
     assert '/static/js/dressed-to-the-nines.js?v=2' in TEMPLATE
-    assert 'url: "/static/audio/arcade/sand-drop.mp3?v=1"' in soundtrack
+    assert 'url: "/static/audio/arcade/sand-drop.mp3?v=2"' in soundtrack
 
 
 def test_flat_tonalities_keep_lowercase_accidentals_in_display() -> None:
