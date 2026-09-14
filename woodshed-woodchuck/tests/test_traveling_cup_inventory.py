@@ -10,6 +10,8 @@ from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from tests.team_factory import make_team
+
 from app import account_routes, store_routes
 from app.contests import hall_of_champions_payload
 from app.db import Base
@@ -141,14 +143,14 @@ def build_cup_world(factory):
             status="finalized",
             finalized_at=now,
         )
-        leader_team = Team(
+        leader_team = make_team(session,
             season_id=season.id,
             display_name="Cup Leaders",
             normalized_name="cup leaders",
             emblem_key="shield:gold",
             creator_profile_id=owner.id,
         )
-        runner_team = Team(
+        runner_team = make_team(session,
             season_id=season.id,
             display_name="Cup Runners",
             normalized_name="cup runners",

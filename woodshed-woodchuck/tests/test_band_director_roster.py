@@ -6,6 +6,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from tests.team_factory import make_team
+
 from app import main, verifier_routes
 from app.db import Base
 from app.models import (
@@ -309,7 +311,7 @@ def contest_roster(roster_db, monkeypatch):
         for name, owner, emblem in [("Current Team", season, "emoji:goat"),
                                      ("Old Team", old, "letter:A"),
                                      ("Snapshot Team", season, "shield:blue")]:
-            session.add(Team(season_id=owner.id, display_name=name,
+            session.add(make_team(session, season_id=owner.id, display_name=name,
                              normalized_name=name.lower(), emblem_key=emblem))
         session.commit()
     return roster_db

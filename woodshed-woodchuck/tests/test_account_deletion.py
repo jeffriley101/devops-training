@@ -9,6 +9,8 @@ from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from tests.team_factory import make_team
+
 from app import account_routes, main as main_module, verifier_routes
 from app.account_deletion import DELETED_PUBLIC_NAME, anonymize_woodchuck_account
 from app.accounts import create_woodchuck_profile, normalize_woodchuck_id, retired_identifier_hash
@@ -18,7 +20,7 @@ from app.main import app
 from app.models import (
     CampPointAward, Contest, ContestResult, ContestWeek, CrownProgress,
     PracticeChart, PracticeChartVerification, PracticeEmailPreset, RewardGrant,
-    Season, StudentVerifierConnection, Team, TeamMembership,
+    Season, StudentVerifierConnection, Team, TeamFamily, TeamMembership,
     TrustedVerifier, TrustedVerifierInvitation, WoodchuckProfile, WoodchuckState,
 )
 from app.security import hash_invitation_token, hash_pin
@@ -78,7 +80,7 @@ def seed_history(session: Session):
         starts_on=date(2026, 7, 27), status="active",
     )
     session.add(season); session.flush()
-    team = Team(
+    team = make_team(session,
         season_id=season.id, display_name="Keep Team", normalized_name="keep team",
         emblem_key="emoji:goat", creator_profile_id=deleted.id,
     )
@@ -169,6 +171,7 @@ def test_anonymization_preserves_history_and_removes_private_data(deletion_db) -
             "minutes": chart.minutes, "date": chart.practice_date,
             "team_id": chart.team_id, "score": result.score,
             "rank": result.rank, "medal": result.medal,
+            "family_id": team.family_id,
         }
         anonymize_woodchuck_account(session, profile=deleted, now=NOW)
         session.commit(); session.expire_all()
@@ -189,6 +192,8 @@ def test_anonymization_preserves_history_and_removes_private_data(deletion_db) -
         )
         assert result.display_name_snapshot == DELETED_PUBLIC_NAME
         assert session.get(Team, team.id).creator_profile_id is None
+        assert session.get(Team, team.id).family_id == original["family_id"]
+        assert session.get(TeamFamily, original["family_id"]) is not None
         assert session.scalar(select(TeamMembership).where(
             TeamMembership.profile_id == deleted.id
         )).ended_at.replace(tzinfo=timezone.utc) == NOW

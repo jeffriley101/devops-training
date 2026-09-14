@@ -6,6 +6,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
+from tests.team_factory import make_team
+
 from app.contests import team_leaderboards
 from app.db import Base
 from app.models import (
@@ -85,7 +87,7 @@ def test_tpr_board_is_server_authoritative_private_safe_and_olympic_ranked() -> 
                 pin_hash="hash", instrument="Flute", level="Beginner", goal="Practice",
             )
             session.add(owner); session.flush()
-            team = Team(
+            team = make_team(session,
                 season_id=season.id, display_name=f"Band {index}",
                 normalized_name=f"band {index}", emblem_key=f"letter:{chr(65 + index)}",
                 creator_profile_id=owner.id,

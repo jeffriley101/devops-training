@@ -8,6 +8,8 @@ from sqlalchemy import create_engine, event, func, select
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from tests.team_factory import make_team
+
 from app import main, season_maintenance
 from app.band_director_context import current_roster_period
 from app.band_director_dashboard import dashboard_metrics
@@ -182,7 +184,7 @@ def test_old_teams_memberships_preserved_and_frozen_old_team_aborts(database):
     session, _ = database
     source, weeks = legacy_data(session, week_count=9)
     student, snapshot, *_ = add_history(session, weeks[7])
-    team = Team(season_id=source.id, display_name="Historical team", normalized_name="historical team", emblem_key="emoji:lion")
+    team = make_team(session, season_id=source.id, display_name="Historical team", normalized_name="historical team", emblem_key="emoji:lion")
     session.add(team)
     session.flush()
     member = TeamMembership(season_id=source.id, team_id=team.id, profile_id=student.id,
@@ -280,7 +282,7 @@ def test_current_membership_helpers_ignore_expired_and_future_teams(roster_db):
         target = season_covering_date(session, NOW.date())
         teams = {}
         for season in session.scalars(select(Season)):
-            team = Team(season_id=season.id, display_name=season.name, normalized_name="shared identity", emblem_key="emoji:lion")
+            team = make_team(session, season_id=season.id, display_name=season.name, normalized_name="shared identity", emblem_key="emoji:lion")
             session.add(team)
             session.flush()
             session.add(TeamMembership(season_id=season.id, team_id=team.id, profile_id=profile_id,
@@ -379,7 +381,7 @@ def test_production_transition_preserves_all_accumulated_history(database, monke
     session, factory = database
     source, weeks = legacy_data(session)
     assert [week.id for week in weeks] == list(range(1, 8))
-    team = Team(season_id=source.id, display_name="Band Camp History", normalized_name="band camp history",
+    team = make_team(session, season_id=source.id, display_name="Band Camp History", normalized_name="band camp history",
                 emblem_key="emoji:lion")
     team_contest = Contest(key="team-weekly-practice", name="Team Practice",
                            metric_type="practice_minutes", subject_type="team")

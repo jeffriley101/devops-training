@@ -89,6 +89,24 @@ standings use destination-season teams. All student practice/earning records rem
 
 ## Administrative rollover
 
+### Team identity foundation (H1A)
+
+`Team` remains seasonal. `TeamFamily` is persistent identity only (`id`,
+`created_at`); each Team has a required family, unique together with its season.
+Names, emblems, creator, visibility, director status, join codes and moderation
+remain on Team. H1A assigns one distinct family to every existing Team, without
+inferring historical lineage from names, creators or emblems. It performs no
+cross-season continuation or roster copying. Hall/lifetime grouping is unchanged.
+
+The H1A migration requires paused writers, including old application processes
+that cannot supply `family_id`. SQLite uses the dedicated migration connection
+with foreign-key enforcement off for parent-table batch recreation, then checks
+referential integrity before completion; application FK settings are not changed.
+PostgreSQL locks Teams for the migration. Downgrade refuses if multiple seasonal
+Teams share a family, because removing the identity would lose continuity.
+
+### Existing rollover operation
+
 Existing rollover checks still require an ended source and finalized source weeks,
 reject overlap and partial weeks, and preserve history transactionally. Rollover can
 reuse an exactly configured pre-provisioned destination and its existing weeks.

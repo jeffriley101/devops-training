@@ -16,6 +16,7 @@ from .models import (
     ProfileCapability,
     Season,
     Team,
+    TeamFamily,
     TeamJoinRequest,
     TeamMembership,
     TeamReport,
@@ -157,6 +158,18 @@ def select_team(session: Session, *, profile: WoodchuckProfile, season: Season,
     return membership, True
 
 
+def _create_team_with_new_family(session: Session, **team_fields: object) -> Team:
+    """Create initial identity within the caller's transaction; never commit."""
+    family = TeamFamily(**(
+        {"created_at": team_fields["created_at"]} if "created_at" in team_fields else {}
+    ))
+    session.add(family)
+    session.flush()
+    team = Team(family_id=family.id, **team_fields)
+    session.add(team)
+    return team
+
+
 def create_and_join_team(session: Session, *, profile: WoodchuckProfile,
                          season: Season, name: str, emblem_key: str,
                          now: datetime) -> tuple[Team, TeamMembership]:
@@ -172,18 +185,20 @@ def create_and_join_team(session: Session, *, profile: WoodchuckProfile,
         Team.visibility == "public",
     )):
         raise ValueError("You may create only one team per season.")
-    team = Team(
-        season_id=season.id, display_name=display, normalized_name=normalized,
-        emblem_key=emblem_key, creator_profile_id=profile.id,
-    )
-    session.add(team)
     try:
+        team = _create_team_with_new_family(
+            session, season_id=season.id, display_name=display, normalized_name=normalized,
+            emblem_key=emblem_key, creator_profile_id=profile.id,
+        )
         session.flush()
         membership, _ = select_team(session, profile=profile, season=season, team=team, now=now)
         session.commit(); session.refresh(team); session.refresh(membership)
     except IntegrityError as error:
         session.rollback()
         raise ValueError("That team name or emblem is already in use.") from error
+    except Exception:
+        session.rollback()
+        raise
     return team, membership
 
 
@@ -208,24 +223,27 @@ def create_director_team(
         display, normalized = normalized_team_name(name)
     except InvalidTeamName as error:
         raise ValueError(str(error)) from error
-    team = Team(
-        season_id=season.id,
-        display_name=display,
-        normalized_name=normalized,
-        emblem_key=emblem_key,
-        creator_profile_id=profile.id,
-        visibility="private",
-        director_led=True,
-        join_code=_new_join_code(session),
-        created_at=now.astimezone(timezone.utc),
-    )
-    session.add(team)
     try:
+        team = _create_team_with_new_family(
+            session,
+            season_id=season.id,
+            display_name=display,
+            normalized_name=normalized,
+            emblem_key=emblem_key,
+            creator_profile_id=profile.id,
+            visibility="private",
+            director_led=True,
+            join_code=_new_join_code(session),
+            created_at=now.astimezone(timezone.utc),
+        )
         session.commit()
         session.refresh(team)
     except IntegrityError as error:
         session.rollback()
         raise ValueError("That team name or emblem is already in use.") from error
+    except Exception:
+        session.rollback()
+        raise
     return team
 
 

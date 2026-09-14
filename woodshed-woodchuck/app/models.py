@@ -1126,11 +1126,23 @@ class Season(Base):
     )
 
 
+class TeamFamily(Base):
+    """Persistent identity only; names and all operating state stay seasonal."""
+
+    __tablename__ = "team_families"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
+
+
 class Team(Base):
     __tablename__ = "teams"
     __table_args__ = (
         UniqueConstraint("season_id", "normalized_name", name="uq_team_season_name"),
         UniqueConstraint("season_id", "emblem_key", name="uq_team_season_emblem"),
+        UniqueConstraint("season_id", "family_id", name="uq_team_season_family"),
         Index(
             "uq_team_public_season_creator",
             "season_id", "creator_profile_id", unique=True,
@@ -1156,6 +1168,15 @@ class Team(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     season_id: Mapped[int] = mapped_column(
         ForeignKey("seasons.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    family_id: Mapped[int] = mapped_column(
+        ForeignKey(
+            "team_families.id",
+            name="fk_teams_family_id_team_families",
+            ondelete="RESTRICT",
+        ),
+        nullable=False,
+        index=True,
     )
     display_name: Mapped[str] = mapped_column(String(30), nullable=False)
     normalized_name: Mapped[str] = mapped_column(String(100), nullable=False, index=True)

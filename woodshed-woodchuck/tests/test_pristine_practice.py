@@ -10,6 +10,8 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from tests.team_factory import make_team
+
 from app import account_routes, main, practice_chart_routes
 from app.contests import (
     ensure_band_camp_data,
@@ -132,7 +134,7 @@ def test_pristine_api_persists_exact_time_without_verifier_and_snapshots_team(
         )
         session.add(season)
         session.flush()
-        team = Team(
+        team = make_team(session,
             season_id=season.id,
             display_name="Pristine Team",
             normalized_name="pristine team",

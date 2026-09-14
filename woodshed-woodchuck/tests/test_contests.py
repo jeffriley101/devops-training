@@ -11,6 +11,8 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 from starlette.requests import Request
 
+from tests.team_factory import make_team
+
 from app import contests as contest_module
 from app import practice_chart_routes as practice_chart_routes_module
 from app.account_routes import SESSION_PROFILE_ID
@@ -348,7 +350,7 @@ def test_board_week_and_season_camp_points_share_authoritative_ledger(
     _, _, current_week = ensure_band_camp_data(session, now=current_now)
     student = add_student(session, woodchuck_id="WC-17-PLUS-15", instrument="Flute")
     unrelated = add_student(session, woodchuck_id="WC-NOT-IN-TOTAL", instrument="Oboe")
-    team = Team(
+    team = make_team(session,
         season_id=season.id,
         display_name="Ledger Team",
         normalized_name="ledger team",
@@ -801,7 +803,7 @@ def test_student_standings_include_live_week_team_emblems_and_no_team_null(
     unteamed = add_student(
         session, woodchuck_id="WC-EMBLEM-NONE", instrument="Clarinet"
     )
-    team = Team(
+    team = make_team(session,
         season_id=season.id, display_name="Lion Team",
         normalized_name="lion team", emblem_key="emoji:lion",
         creator_profile_id=teammate.id,
@@ -855,12 +857,12 @@ def test_student_standings_use_finalized_week_membership_snapshot(
     student = add_student(
         session, woodchuck_id="WC-EMBLEM-SNAPSHOT", instrument="Trumpet"
     )
-    old_team = Team(
+    old_team = make_team(session,
         season_id=season.id, display_name="Snapshot Goats",
         normalized_name="snapshot goats", emblem_key="emoji:goat",
         creator_profile_id=student.id,
     )
-    new_team = Team(
+    new_team = make_team(session,
         season_id=season.id, display_name="Current Lions",
         normalized_name="current lions", emblem_key="emoji:lion",
     )
@@ -1858,17 +1860,17 @@ def test_hall_aggregates_students_instruments_divisions_and_prior_seasons(
         )
 
     team_contest = next(c for c in contests if c.key == "team-weekly-practice")
-    old_team = Team(
+    old_team = make_team(session,
         season_id=prior_season.id, display_name="Lifetime Leaders",
         normalized_name="lifetime leaders", emblem_key="shield:gold",
         creator_profile_id=students[0].id,
     )
-    current_team = Team(
+    current_team = make_team(session,
         season_id=current_season.id, display_name="Lifetime Leaders",
         normalized_name="lifetime leaders", emblem_key="shield:gold",
         creator_profile_id=students[0].id,
     )
-    other_team = Team(
+    other_team = make_team(session,
         season_id=current_season.id, display_name="Newcomers",
         normalized_name="newcomers", emblem_key="shield:silver",
         creator_profile_id=students[1].id,
@@ -2186,11 +2188,11 @@ def test_coterie_cup_is_dynamic_team_only_and_uses_current_membership(
     runner_member = add_student(session, woodchuck_id="WC-CUP-RUNNER", instrument="Tuba")
     former_member = add_student(session, woodchuck_id="WC-CUP-FORMER", instrument="Oboe")
     outsider = add_student(session, woodchuck_id="WC-CUP-OUTSIDER", instrument="Horn")
-    leader = Team(
+    leader = make_team(session,
         season_id=season.id, display_name="Cup Leaders", normalized_name="cup leaders",
         emblem_key="shield:gold", creator_profile_id=owner.id,
     )
-    runner = Team(
+    runner = make_team(session,
         season_id=season.id, display_name="Cup Runners", normalized_name="cup runners",
         emblem_key="shield:silver", creator_profile_id=runner_member.id,
     )

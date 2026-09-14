@@ -8,6 +8,8 @@ from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from tests.team_factory import make_team
+
 from app import account_routes, contest_admin, main as main_module, teams
 from app.db import Base
 from app.main import app
@@ -42,11 +44,11 @@ def moderation_db(monkeypatch: pytest.MonkeyPatch):
             instrument="Trumpet", level="Beginner", goal="Practice",
         )
         session.add_all([season, reporter, member]); session.flush()
-        reported = Team(
+        reported = make_team(session,
             season_id=season.id, display_name="Reported Team", normalized_name="reported team",
             emblem_key="emoji:goat", creator_profile_id=member.id,
         )
-        escape = Team(
+        escape = make_team(session,
             season_id=season.id, display_name="Escape Team", normalized_name="escape team",
             emblem_key="letter:E", creator_profile_id=reporter.id,
         )
