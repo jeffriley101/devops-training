@@ -288,8 +288,10 @@ def test_join_code_collision_and_no_automatic_activation(db, monkeypatch):
         assert count(s, Team) == 1
     from pathlib import Path
     for path in Path("app").glob("*.py"):
-        if path.name != "team_continuity.py":
+        # Explicit H2B maintenance is allowed; normal runtime stays dormant.
+        if path.name not in {"team_continuity.py", "team_continuity_repair.py"}:
             assert "apply_team_continuity" not in path.read_text()
+            assert "team_continuity_repair" not in path.read_text()
 
 
 def test_all_historical_attribution_rewards_and_hall_unchanged(db):

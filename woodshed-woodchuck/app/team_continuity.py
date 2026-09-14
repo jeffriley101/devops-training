@@ -215,15 +215,11 @@ def _plan(session, source_id, destination_id, now):
     return ContinuityPlan(source_id, destination_id, boundary, week_start, (), tuple(actions))
 
 
-def apply_team_continuity(session, *, source_season_id, destination_season_id, now=None):
-    """Apply a fresh locked plan; caller commits or rolls back the whole unit.
+def lock_continuity_rows(session, *, source_season_id, destination_season_id):
+    """Shared H1B lock order for apply and reviewed maintenance preconditions.
 
-    Require a clean unit of work, PostgreSQL READ COMMITTED (the project default)
-    and no earlier row locks. Constraint failures abort rather than guessing.
-    No provider calls, auto-activation, history edits, or family creation.
+    Caller owns the transaction. Safe to reacquire within that same transaction.
     """
-    from .teams import _new_join_code
-
     if session.new or session.dirty or session.deleted:
         raise ValueError("Continuity requires a clean unit of work.")
     if (session.get_bind().dialect.name == "postgresql"
@@ -246,6 +242,19 @@ def apply_team_continuity(session, *, source_season_id, destination_season_id, n
         .order_by(WoodchuckProfile.id).with_for_update().execution_options(populate_existing=True)))
     list(session.scalars(select(TeamMembership).where(TeamMembership.id.in_([m.id for m in member_rows]))
         .order_by(TeamMembership.id).with_for_update().execution_options(populate_existing=True)))
+
+
+def apply_team_continuity(session, *, source_season_id, destination_season_id, now=None):
+    """Apply a fresh locked plan; caller commits or rolls back the whole unit.
+
+    Require a clean unit of work, PostgreSQL READ COMMITTED (the project default)
+    and no earlier row locks. Constraint failures abort rather than guessing.
+    No provider calls, auto-activation, history edits, or family creation.
+    """
+    from .teams import _new_join_code
+
+    lock_continuity_rows(session, source_season_id=source_season_id,
+                         destination_season_id=destination_season_id)
     plan = plan_team_continuity(session, source_season_id=source_season_id,
                                 destination_season_id=destination_season_id, now=now)
     applied = []
