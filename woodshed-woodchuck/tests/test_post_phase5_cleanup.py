@@ -94,7 +94,7 @@ def test_shed_book_and_board_cleanup_markup_and_behavior() -> None:
     css = (ROOT / "static/css/styles.css").read_text(encoding="utf-8")
 
     assert "Manage Trusted Verifiers" not in home
-    assert book.index("Manage Trusted Verifiers") > book.index('id="p-book-verifier"')
+    assert book.index("Manage Verifiers") > book.index('id="p-book-verifier"')
     for trigger in ("woodchuck-name-value", "level-value", "instrument-object"):
         assert f'id="{trigger}"' in home
     assert "Submit P-Chart" in book
@@ -103,7 +103,7 @@ def test_shed_book_and_board_cleanup_markup_and_behavior() -> None:
     assert "Submit this P-Chart?" in book
     assert "confirmationApproved" in app_js
     assert "form.requestSubmit()" in app_js
-    assert "Choose a Parent or Mentor" in app_js
+    assert "Sign in to request verification" in app_js
     assert 'method: "POST"' in app_js and "submissionKey" in app_js
     assert "Your Position" not in board
     for title in (

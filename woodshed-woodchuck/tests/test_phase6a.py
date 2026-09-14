@@ -82,7 +82,7 @@ def test_book_phase6a_timer_text_structure_and_stone_hooks() -> None:
     css = (ROOT / "static/css/styles.css").read_text(encoding="utf-8")
     definition = "Practice counts whenever you give your instrument real attention—playing it, cleaning it, fingering through music, or thinking about what you want to improve. Thinking-only time counts as half-minutes. We trust you to keep it honest!"
     assert "Preset email addresses" not in book
-    assert "Do not submit your band director or teacher's email address without talking with them first, please!" in book
+    assert "email your Practice Book" in book
     assert "P-Chart sharing contacts" not in book
     assert "Choose one connected" not in book + javascript
     assert definition not in book and definition in content

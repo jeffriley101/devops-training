@@ -9,7 +9,7 @@ from sqlalchemy import create_engine, event, func, select
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app import account_routes, store_routes
+from app import account_routes, main as app_main, store_routes
 from app.db import Base
 from app.main import app
 from app.models import OwnedItemCopy, WoodchuckProfile, WoodchuckState
@@ -37,6 +37,7 @@ def store_database(monkeypatch: pytest.MonkeyPatch):
     )
     factory = sessionmaker(bind=engine, expire_on_commit=False, autoflush=False)
     Base.metadata.create_all(engine)
+    monkeypatch.setattr(app_main, "SessionLocal", factory)
     monkeypatch.setattr(account_routes, "SessionLocal", factory)
     monkeypatch.setattr(store_routes, "SessionLocal", factory)
     yield factory
