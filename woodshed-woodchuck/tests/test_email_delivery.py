@@ -99,6 +99,20 @@ def test_complete_configuration_and_rfc_multipart_message(monkeypatch) -> None:
     assert "https://example.test/a+b" in message.get_body(preferencelist=("plain",)).get_content()
 
 
+def test_membership_invitation_has_one_html_link_and_plain_url(monkeypatch) -> None:
+    for key, value in SMTP_ENV.items(): monkeypatch.setenv(key, value)
+    service = EmailService(SMTPConfig.from_environment(), CapturingSMTP)
+    url = "https://example.test/membership/invitations/a+b?next=student%26full"
+    assert service.send_membership_invitation(recipient="student@example.test", acceptance_url=url).sent
+    message = CapturingSMTP.messages[-1]
+    html_body = message.get_body(preferencelist=("html",)).get_content()
+    plain_body = message.get_body(preferencelist=("plain",)).get_content()
+    assert html_body.count("href=") == 1
+    assert html_body.count("Claim Full Access") == 1
+    assert plain_body.count(url) == 1
+    assert "Claim your student spot" not in html_body
+
+
 @pytest.mark.parametrize("failure,code", [
     (smtplib.SMTPAuthenticationError(535, b"bad"), "authentication_failed"),
     (smtplib.SMTPRecipientsRefused({"x@example.test": (550, b"no")}), "recipient_rejected"),

@@ -77,13 +77,25 @@ class EmailService:
     def send_membership_invitation(self, *, recipient: str, acceptance_url: str) -> DeliveryResult:
         if self.config is None:
             return DeliveryResult(False, "not_configured")
-        plain = ("You have been invited to a Woodshed Woodchuck Full membership.\n\n"
-                 f"Sign in to your student account to claim a spot: {acceptance_url}\n\n"
-                 "This private invitation expires in seven days. A free spot must still be available. "
-                 "Your student account does not need an email address. Do not forward this link.")
+        plain = ("Woodshed Woodchuck\n\n"
+                 "You've been invited to join a Woodshed Woodchuck Full Access membership.\n\n"
+                 "Full Access gives your student account access to the membership's Full features.\n\n"
+                 f"Claim Full Access: {acceptance_url}\n\n"
+                 "This private invitation expires in seven days.\n"
+                 "A membership spot must still be available.\n"
+                 "Sign in with the student account that should receive Full Access.\n"
+                 "Please do not forward this private invitation.")
+        safe_url = html.escape(acceptance_url, quote=True)
+        body = ("<h1>Woodshed Woodchuck</h1>"
+                "<p>You've been invited to join a Woodshed Woodchuck Full Access membership.</p>"
+                "<p>Full Access gives your student account access to the membership's Full features.</p>"
+                f'<p><a href="{safe_url}">Claim Full Access</a></p>'
+                "<p>This private invitation expires in seven days.<br>"
+                "A membership spot must still be available.<br>"
+                "Sign in with the student account that should receive Full Access.<br>"
+                "Please do not forward this private invitation.</p>")
         return self.send(build_message(to_email=recipient, subject="Your Woodshed Woodchuck Full Access invitation",
-            plain_text=plain, html_body=(f"<p>{html.escape(plain)}</p>"
-                f'<p><a href="{html.escape(acceptance_url, quote=True)}">Claim your student spot</a></p>'), config=self.config))
+            plain_text=plain, html_body=body, config=self.config))
 
     def __init__(self, config: SMTPConfig | None = None,
                  smtp_factory: Callable[..., object] | None = None):
