@@ -12,7 +12,7 @@ from app.models import (CheckoutAttempt, BillingAccount, Membership, ProviderSub
                         MembershipSeat, MembershipAuditEvent, BillingProviderEvent,
                         BillingEventApplication, BillingPaymentEffect)
 
-CONFIG = BillingConfig(True, False, True, True, 600)  # Test only, no product duration.
+CONFIG = BillingConfig(True, False, True, True, 600)  # Short deterministic boundary fixture.
 
 
 def attempt(db, actor=m.Actor("student", 1), plan="full_annual_49", **kwargs):
@@ -222,7 +222,8 @@ def test_checkout_route_no_csrf_transport_and_no_open_transaction(db, monkeypatc
     assert user.post("/membership/checkout", data={**fields, "csrf": "wrong"}).status_code == 403
 
 
-def test_no_default_hold_or_new_sale_reservation(db):
+def test_invalid_explicit_hold_fails_closed(db):
+    assert BillingConfig().checkout_validity_seconds == 3600
     with db() as s:
         with pytest.raises(b.BillingUnavailable, match="validity"):
             b.authorize_checkout(s, m.Actor("student", 1), "stripe", "full_annual_49", config=replace(CONFIG, checkout_validity_seconds=None))
@@ -307,12 +308,18 @@ def test_explicit_reference_retry_after_sale_closes_and_new_attempt_after_expiry
     assert attempt(db).id != row.id
 
 
-@pytest.mark.parametrize("value", [None, "", "yes", "-1", "0", "99999999999999999"])
-def test_duration_environment_fails_closed_without_affecting_flags(monkeypatch, value):
+@pytest.mark.parametrize("value", [None, ""])
+def test_duration_environment_uses_default(monkeypatch, value):
     if value is None:
         monkeypatch.delenv("CHECKOUT_VALIDITY_SECONDS", raising=False)
     else:
         monkeypatch.setenv("CHECKOUT_VALIDITY_SECONDS", value)
+    assert BillingConfig.from_environment().checkout_validity_seconds == 3600
+
+
+@pytest.mark.parametrize("value", ["yes", "-1", "0", "99999999999999999"])
+def test_invalid_duration_environment_fails_closed(monkeypatch, value):
+    monkeypatch.setenv("CHECKOUT_VALIDITY_SECONDS", value)
     assert BillingConfig.from_environment().checkout_validity_seconds is None
 
 

@@ -346,9 +346,17 @@ def test_verified_payment_seat_conflict_retained_and_normal_retry(db, monkeypatc
     assert counts(db) == (2, 1, 2, 1)
 
 
-def test_late_initial_evidence_does_not_bypass_checkout_validity(db, monkeypatch):
+def test_in_time_initial_evidence_can_arrive_after_checkout_expiry(db, monkeypatch):
     row = attempt(db)
     install(monkeypatch, payment(row.reference))
+    monkeypatch.setattr(b, "clock", lambda: NOW + timedelta(seconds=601))
+    assert result(db, inspect(db, "checkout", row.id)) == "applied"
+    assert counts(db) == (1, 1, 1, 1)
+
+
+def test_payment_occurring_at_expiry_remains_recoverable(db, monkeypatch):
+    row = attempt(db)
+    install(monkeypatch, payment(row.reference, occurred_at=row.expires_at))
     monkeypatch.setattr(b, "clock", lambda: NOW + timedelta(seconds=601))
     assert result(db, inspect(db, "checkout", row.id)) == "still_recoverable"
     assert counts(db) == (0, 0, 0, 0)

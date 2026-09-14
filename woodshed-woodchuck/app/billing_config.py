@@ -3,6 +3,8 @@ from dataclasses import dataclass
 import os
 from types import MappingProxyType
 
+DEFAULT_CHECKOUT_VALIDITY_SECONDS = 60 * 60
+
 
 @dataclass(frozen=True)
 class BillingConfig:
@@ -10,16 +12,20 @@ class BillingConfig:
     paypal_billing_enabled: bool = False
     stripe_billing_enabled: bool = False
     launch_sale_enabled: bool = False
-    checkout_validity_seconds: int | None = None
+    checkout_validity_seconds: int | None = DEFAULT_CHECKOUT_VALIDITY_SECONDS
 
     @classmethod
     def from_environment(cls):
         flags = {key: os.getenv(key.upper(), "false").strip().lower() in {"true", "1", "yes"}
                  for key in cls.__dataclass_fields__ if key != "checkout_validity_seconds"}
-        value = os.getenv("CHECKOUT_VALIDITY_SECONDS", "")
-        # No product hold duration has been selected. Missing/invalid configuration
-        # fails closed at checkout; tests may explicitly supply a bounded value.
-        validity = int(value) if value.isascii() and value.isdigit() and len(value) < 10 else None
+        value = os.getenv("CHECKOUT_VALIDITY_SECONDS")
+        # Missing/blank uses the product default. A malformed explicit override
+        # fails closed rather than silently changing the authorization window.
+        if value is None or not value.strip():
+            validity = DEFAULT_CHECKOUT_VALIDITY_SECONDS
+        else:
+            value = value.strip()
+            validity = int(value) if value.isascii() and value.isdigit() and len(value) < 10 else None
         return cls(**flags, checkout_validity_seconds=validity if validity and validity > 0 else None)
 
     def provider_enabled(self, provider):

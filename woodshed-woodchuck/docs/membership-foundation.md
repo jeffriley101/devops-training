@@ -100,10 +100,13 @@ a database failure prevented marking its checkout recoverable. Checkout states
 support `pending`, `completed`, `expired`, `failed`, and `recoverable`; validity
 is checked against `expires_at` even without a background expiration worker.
 
-`CHECKOUT_VALIDITY_SECONDS` has **no default**. A positive server-configured
-duration must be selected before checkout can run. The 600-second values in
-tests are fixtures, not a product hold policy. All four existing flags still
-default false, and neither live adapter implements transport.
+`CHECKOUT_VALIDITY_SECONDS` is the single server-side authorization-duration
+setting and defaults to **3600 seconds (60 minutes)**. Tests may override it
+with shorter deterministic windows. A missing or blank environment value uses
+the default; a malformed explicit value fails closed at checkout. Browser input,
+CSRF/session lifetime and provider metadata cannot alter the duration. All four
+existing billing flags still default false, and neither live adapter implements
+transport.
 
 `checkout()` commits authorization, closes the transaction, then invokes the
 adapter. A subsequent transaction records the returned provider checkout ID.
@@ -138,11 +141,22 @@ trusting cached ORM state. Correlation discovered after lock selection requires
 a new transaction/retry, rather than taking an account lock out of order.
 
 Launch fulfillment reads the stored snapshot rather than today's sale flag.
-Automatic initial application requires both payment occurrence and initial
-receipt within the checkout validity window. Evidence arriving outside that
-window remains recoverable for review, without granting access or inferring a
-refund. A timely received payment may finish local recovery after the window
-closes. Provider-specific delayed-delivery reconciliation remains future work.
+Checkout authorization uses the half-open interval
+`[created_at, expires_at)`: it is valid immediately before `expires_at` and
+expired at or after that boundary. Pending attempts are lazily and idempotently
+marked `expired` under the existing billing-account lock; they remain durable
+history and do not block a clean future checkout.
+
+For initial confirmed entitlement, an adapter must set `occurred_at` to the
+authoritative payment-completion time. A verified payment completed within the
+authorization interval may be received, reconciled and locally applied after
+the attempt expires. A payment completed at or after `expires_at` remains
+recoverable for review and is not automatically applied from stale pricing.
+Webhook receipt and local processing timestamps therefore do not erase a valid
+payment, and they cannot resurrect an expired authorization. The same rule
+applies to stored Launch Sale pricing: an unconsumed expired attempt cannot
+reserve the $30 price, while an in-window verified payment and an already
+established continuous subscription preserve their authorized plan.
 
 Confirmed entitlement advances monotonically. A unique subscription/payment
 reference records each payment effect; reuse with conflicting entitlement facts
@@ -332,9 +346,24 @@ simultaneous inspections, races with A3/normal processing/replacement, stale
 evidence, duplicate webhook/lookup evidence, and transaction rollback/reentry.
 Provider transport, authenticated account/environment mapping and production
 topology verification remain part of actual adapter integration. No network calls,
-financial override, worker, refund policy or checkout hold duration are implemented.
-Phase A5 should settle and configure bounded checkout validity with explicit
-boundary tests; it must not silently relax A1's existing late-payment checks.
+financial override, worker, refund policy or provider-specific payment mapping
+are implemented.
+
+## Phase A5 checkout expiry
+
+Phase A5 completes the provider-neutral authorization boundary with the central
+60-minute default described above. Expiration changes only local checkout reuse:
+it does not grant or revoke provider financial state, Full Access, audit records,
+or durable recovery/reconciliation evidence. Correlated pending/recoverable
+events and unapplied verified payment effects continue to block unsafe replacement
+under Phase A2 even after wall-clock expiry. A clean expired attempt can be
+followed by a new opaque checkout using current plan eligibility and a fresh
+authorization window; it is never reused.
+
+Public purchasing, PayPal, Stripe and the Launch Sale remain disabled by default.
+Actual adapters must prove that their normalized payment-completion timestamp is
+authoritative and map provider checkout expiry/idempotency semantics before any
+provider is enabled.
 
 Revision `o5j6k7l8m9n0` follows `n4i5j6k7l8m9`. It only creates membership/billing
 tables; downgrade drops only those tables. No startup code migrates or repairs

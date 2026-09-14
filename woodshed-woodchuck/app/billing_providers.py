@@ -29,6 +29,8 @@ class RecoverableApplication(ValueError):
 class SubscriptionEvent:
     external_event_id: str
     external_subscription_id: str
+    # For confirmed entitlement, adapters set this to the authoritative payment
+    # completion time. It is not webhook receipt or local processing time.
     occurred_at: datetime
     provider_status: str
     period_start: datetime
@@ -117,6 +119,30 @@ def _lock(session, model, id):
     return session.get(model, id, populate_existing=True)
 
 
+def expire_pending_checkouts(session, account_id, at):
+    """Lazily materialize the inclusive expiry boundary while preserving history.
+
+    The caller owns the BillingAccount lock. This state ends browser checkout
+    authorization; verified payment timing is evaluated independently below.
+    """
+    at = utc(at)
+    changed = []
+    for attempt in session.scalars(select(CheckoutAttempt).where(
+            CheckoutAttempt.billing_account_id == account_id, CheckoutAttempt.status == "pending")):
+        if utc(attempt.expires_at) <= at:
+            attempt.status, attempt.updated_at = "expired", at
+            changed.append(attempt)
+    if changed:
+        session.flush()
+    return changed
+
+
+def payment_within_authorization(attempt, occurred_at):
+    """Provider-verified payment time uses [created_at, expires_at)."""
+    occurred_at = utc(occurred_at)
+    return utc(attempt.created_at) <= occurred_at < utc(attempt.expires_at)
+
+
 def authorize_checkout(session, actor, provider, plan_code, *, config=None, reference=None, new_attempt=False):
     """Local only: duplicate submissions reuse a pending attempt; explicit new
     attempts remain possible. The caller commits before any provider transport.
@@ -128,6 +154,7 @@ def authorize_checkout(session, actor, provider, plan_code, *, config=None, refe
     enabled_provider(provider, config)
     account = billing_account(session, actor, create=True)
     at = utc(clock())
+    expire_pending_checkouts(session, account.id, at)
     if reference:
         attempt = session.scalar(select(CheckoutAttempt).where(
             CheckoutAttempt.reference == reference, CheckoutAttempt.billing_account_id == account.id,
@@ -272,10 +299,10 @@ def _provision(session, record, application, event):
     if attempt is None:
         raise RecoverableApplication("unknown_checkout")
     attempt = _lock(session, CheckoutAttempt, attempt.id)
-    # Payment received within authorization may retry after expiry. Late initial
-    # evidence remains recoverable for review, not an indefinite sale reservation.
-    if (utc(record.received_at) >= utc(attempt.expires_at) or event.occurred_at >= utc(attempt.expires_at)
-            or event.occurred_at < utc(attempt.created_at) or attempt.status in {"expired", "failed"}):
+    # Adapter-verified payment occurrence controls authorization. Webhook receipt
+    # and local processing may arrive later; an expired state preserves history
+    # and prevents browser reuse without erasing a payment completed in time.
+    if not payment_within_authorization(attempt, event.occurred_at) or attempt.status == "failed":
         raise RecoverableApplication("checkout_authorization_expired")
     if attempt.subscription_id is not None:
         raise RecoverableApplication("checkout_already_consumed")
