@@ -47,11 +47,44 @@ class CheckoutResult:
     external_checkout_id: str
 
 
+@dataclass(frozen=True)
+class EvidenceRequest:
+    """Server-loaded identifiers only; never browser-supplied financial facts."""
+    provider: str
+    external_event_id: str | None = None
+    external_subscription_id: str | None = None
+    checkout_reference: str | None = None
+    provider_checkout_id: str | None = None
+
+
+@dataclass(frozen=True)
+class ProviderEvidence:
+    """Authoritative lookup result. Adapters authenticate provider/account/environment.
+
+    A supplied event must meet the same verification standard as a webhook.
+    Lifecycle-only evidence has no payment reference or paid-through entitlement.
+    Native object names, raw payloads and transport credentials stay in adapters.
+    """
+    request: EvidenceRequest
+    observed_at: datetime
+    state: str  # found, not_found, unavailable, unsupported
+    external_subscription_id: str | None = None
+    checkout_reference: str | None = None
+    provider_checkout_id: str | None = None
+    event: SubscriptionEvent | None = None
+    plan_code: str | None = None
+    amount_cents: int | None = None
+    currency: str | None = None
+    interval: str | None = None
+    financial_resolution_required: bool = False
+
+
 class BillingProvider(Protocol):
     def create_checkout(self, *, plan: Plan, idempotency_key: str, expires_at: datetime) -> CheckoutResult: ...
     def cancel_subscription(self, *, external_subscription_id: str) -> None: ...
     def create_portal_session(self, *, external_customer_id: str) -> str: ...
     def verify_and_parse_webhook(self, body: bytes, headers: dict) -> SubscriptionEvent: ...
+    def inspect_evidence(self, request: EvidenceRequest) -> ProviderEvidence: ...
 
 
 class DisabledProvider:
@@ -64,6 +97,9 @@ class DisabledProvider:
     create_checkout = cancel_subscription = create_portal_session = _unavailable
 
     def verify_and_parse_webhook(self, body, headers):
+        return self._unavailable()
+
+    def inspect_evidence(self, request):
         return self._unavailable()
 
 
@@ -186,7 +222,9 @@ def receive_verified_event(session, provider, event, *, payload_hash):
         BillingProviderEvent.provider == provider, BillingProviderEvent.external_event_id == event.external_event_id))
     if existing:
         application = session.scalar(select(BillingEventApplication).where(BillingEventApplication.event_id == existing.id))
-        if existing.payload_hash != payload_hash or (application and application.facts != facts):
+        # Verified lookup and webhook envelopes can differ for the same event.
+        # Identity is bound to ALL normalized facts; retain the first receipt hash.
+        if application and application.facts != facts:
             raise ValueError("Provider event identity was reused with different content.")
         if application is None:
             raise ValueError("Legacy event requires explicit reconciliation.")

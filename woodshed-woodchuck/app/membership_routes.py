@@ -5,6 +5,7 @@ from fastapi import APIRouter, Request, HTTPException
 from fastapi.routing import APIRoute
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
+from starlette.concurrency import run_in_threadpool
 from sqlalchemy import select, or_
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from .db import SessionLocal
@@ -16,7 +17,7 @@ from . import memberships as service
 from .billing_config import BillingConfig, PLANS, available_plans
 from .billing_providers import BillingUnavailable, checkout, process_webhook
 from .site_admin import csrf_token, check_csrf, sign_in_site_admin, require_site_admin
-from . import billing_recovery
+from . import billing_recovery, billing_reconciliation
 
 
 class PrivateRoute(APIRoute):
@@ -260,7 +261,24 @@ def billing_recovery_page(request: Request, before: int | None = None, result: i
     require_site_admin(request)
     with SessionLocal() as session:
         return render(request, "billing_recovery.html", **billing_recovery.queue(session, before),
-                      retry_result=billing_recovery.result_message(session, result), title="Billing Recovery")
+                      retry_result=billing_recovery.result_message(session, result), title="Billing Recovery",
+                      inspections=billing_reconciliation.recent_results(session))
+
+
+@router.post("/admin/billing-recovery/{kind}/{target_id}/inspect")
+async def billing_inspection(request: Request, kind: str, target_id: int):
+    require_site_admin(request)
+    form = await request.form()
+    check_csrf(request, form.get("csrf"))
+    if set(form) != {"csrf"} or kind not in {"event", "checkout"}:
+        raise HTTPException(400, "Only a recorded billing target may be inspected.")
+    try:
+        await run_in_threadpool(billing_reconciliation.inspect, SessionLocal, kind, target_id, service.Actor("admin"))
+    except LookupError as error:
+        raise HTTPException(404, str(error)) from error
+    except SQLAlchemyError as error:
+        raise HTTPException(503, "Inspection outcome unavailable. Review the audit before trying again.") from error
+    return RedirectResponse("/admin/billing-recovery", 303)
 
 
 @router.post("/admin/billing-recovery/{event_id}/retry")

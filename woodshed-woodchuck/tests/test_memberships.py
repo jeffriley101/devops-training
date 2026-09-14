@@ -504,7 +504,12 @@ def test_provider_event_once_paid_through_and_immutable_launch_plan(db, monkeypa
         assert not m.student_has_full_access(session, 1, NOW + timedelta(days=365))
         sub = session.scalar(select(ProviderSubscription))
         assert (sub.plan_code, sub.amount_cents) == ("friendship_annual_30", 3000)
-        with pytest.raises(ValueError):
+        # Lookup and webhook envelopes may differ while verified facts agree.
+        same, fresh = providers.process_webhook(db, "stripe", b"different-body", {"x-test-signature": "valid"}, config=config)
+        assert not fresh and same.id == first.id and same.payload_hash == first.payload_hash
+        from dataclasses import replace
+        fake.event = replace(event, provider_status="active")
+        with pytest.raises(ValueError, match="reused"):
             providers.process_webhook(db, "stripe", b"different-body", {"x-test-signature": "valid"}, config=config)
 
 

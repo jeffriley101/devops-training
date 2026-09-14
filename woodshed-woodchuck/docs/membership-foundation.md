@@ -265,9 +265,76 @@ versus replacement, transaction failure/reentry, and migration round trips with
 foreign-key/deletion and downgrade guards. Historical migration fixtures use
 their reflected audit schema instead of the expanded current ORM model.
 
-Deferred to Phase A4: provider-backed reconciliation and explicit resolution
-policy for conflicts local retry cannot resolve. No refund, capture, cancellation,
-grace period, checkout duration or entitlement override is introduced here.
+Provider evidence inspection is supplied by A4 below. Financial resolution policy
+remains deferred. No refund, capture, cancellation, grace period, checkout duration
+or entitlement override is introduced by recovery.
+
+### Phase A4: authoritative evidence inspection
+
+`POST /admin/billing-recovery/{kind}/{target_id}/inspect` accepts only `event` or
+`checkout` targets loaded from the database and the existing CSRF field. It uses
+the same Site Admin gate, configured-origin/null-origin checks and private response
+headers. The Billing Recovery page offers **Inspect provider & reconcile** and
+shows bounded recent inspection results, safe provider lifecycle/period summaries
+and separately labelled confirmed payment evidence. Raw facts, provider references,
+payment references, payloads and payer identities are not rendered.
+
+`BillingProvider.inspect_evidence(EvidenceRequest)` is the provider-neutral lookup
+boundary. Requests contain only server-loaded known identifiers. `ProviderEvidence`
+identifies the inspected request, observation time, object identity/correlation,
+lookup outcome, optional verified `SubscriptionEvent`, agreed product snapshot,
+and whether financial resolution is necessary. Adapters must authenticate the
+provider account/environment and establish payment evidence before returning a
+paid-through value. Lifecycle-only evidence supplies neither paid-through nor a
+payment reference. A native provider object need not map to a payment event.
+Actual Stripe/PayPal adapters remain disabled; fake evidence adapters live in tests.
+Provider enablement is still required for lookup, independently of public checkout.
+
+`app/billing_reconciliation.py` owns classifications: in sync, local retry
+available, authoritative evidence available, correlation needed, reconciliation
+required, financial decision required, provider unavailable, unsupported, missing
+object, and stale local context. It compares immutable correlation and stored
+price snapshots, existing event facts and payment effects. It never writes a
+correlation into old event facts to make them pass. New authoritative correlated
+events may allow an older event to be retried through A3 after provisioning.
+
+The inspection request audit commits before lookup. All sessions close before the
+adapter call. A fresh transaction discovers/locks billing accounts in A1/A2 order
+and re-reads current context. Correlation that changes incompatibly fails safely.
+Eligible evidence enters `receive_verified_event()` and commits with an evidence
+audit before `apply_verified_event()` runs in a fresh transaction. That processor
+reacquires its normal locks and rechecks payment deduplication, entitlement,
+replacement and seat invariants. Its result audit commits with application effects.
+No reconciliation path directly updates membership access/status, seats or effects.
+
+Different verified transport envelopes may represent the same provider event:
+lookup and webhook receipts are deduplicated by provider/event identity and exact
+normalized facts, retaining the original receipt hash. Reusing an event identity
+with changed normalized facts remains an error. Payment-effect identity remains
+subscription/payment reference. Stale lifecycle evidence cannot overwrite newer
+state and old confirmed payment cannot reduce paid-through entitlement.
+
+Timeout, unavailable/unsupported lookup, missing object, conflict and successful
+processing are audited. Failed local application retains the committed verified
+inbox for A3. If result recording fails, processing rolls back and the committed
+request survives; database unavailability cannot guarantee a result audit until
+storage returns. No raw exception strings or provider credentials are retained.
+
+Revision `r8m9n0o1p2q3` follows `q7l8m9n0o1p2`. It adds only nullable/indexed
+`membership_audit_events.checkout_attempt_id`, a RESTRICT foreign key, and extends
+the target check to require at least one membership, billing event or checkout.
+Existing audits are preserved; multiple targets may coexist. Downgrade refuses
+when checkout-targeted audits exist rather than discarding their history.
+
+A4 tests cover disposable SQLite and opt-in PostgreSQL, including request-audit
+visibility during lookup, independent account-lock acquisition during lookup,
+simultaneous inspections, races with A3/normal processing/replacement, stale
+evidence, duplicate webhook/lookup evidence, and transaction rollback/reentry.
+Provider transport, authenticated account/environment mapping and production
+topology verification remain part of actual adapter integration. No network calls,
+financial override, worker, refund policy or checkout hold duration are implemented.
+Phase A5 should settle and configure bounded checkout validity with explicit
+boundary tests; it must not silently relax A1's existing late-payment checks.
 
 Revision `o5j6k7l8m9n0` follows `n4i5j6k7l8m9`. It only creates membership/billing
 tables; downgrade drops only those tables. No startup code migrates or repairs

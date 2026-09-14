@@ -56,7 +56,14 @@ def test_recovery_audit_migration(tmp_path, monkeypatch, backend):
     with engine.connect() as conn:
         ctx = MigrationContext.configure(conn, opts={"include_object": lambda obj, name, type_, reflected, compare_to:
             name == "membership_audit_events" if type_ == "table" else True})
-        assert compare_metadata(ctx, Base.metadata) == []
+        # A3 predates the A4 checkout audit target. Only that later addition
+        # should differ from today's metadata; do not run current ORM on q7.
+        differences = compare_metadata(ctx, Base.metadata)
+        assert {item[0] for item in differences} == {"add_column", "add_fk", "add_index"}
+        assert len(differences) == 3
+        assert next(item for item in differences if item[0] == "add_column")[3].name == "checkout_attempt_id"
+        assert next(item for item in differences if item[0] == "add_fk")[1].name == "fk_membership_audit_checkout_attempt"
+        assert next(item for item in differences if item[0] == "add_index")[1].name == "ix_membership_audit_events_checkout_attempt_id"
         assert [tuple(r)[:-1] for r in conn.execute(text("SELECT * FROM membership_audit_events ORDER BY id"))] == [tuple(r) for r in old]
     command.downgrade(config, "p6k7l8m9n0o1")
     with engine.connect() as conn:
