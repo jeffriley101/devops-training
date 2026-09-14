@@ -1,0 +1,74 @@
+{
+  "seasonal_art": [
+    {
+      "season_id": "summer-band-camp",
+      "label": "Summer / Band Camp",
+      "enabled": true,
+      "newsletter_src": "/static/seasonal/summer-band-camp/newsletter_masthead_1200x600.jpg",
+      "polaroid_src": "/static/seasonal/summer-band-camp/board_polaroid_1200x900.jpg",
+      "full_src": "/static/seasonal/summer-band-camp/master_2x1.png",
+      "postcard_src": "/static/seasonal/summer-band-camp/app_postcard_1600x900.jpg",
+      "rotation_deg": -2,
+      "caption": "Camp is in session.",
+      "alt": "The Viking Sax, Coach Whistler, John, and Mum at Summer / Band Camp",
+      "position": "board",
+      "click_enabled": true
+    },
+    {
+      "season_id": "fall-back-to-school",
+      "label": "Fall / Back to School",
+      "enabled": true,
+      "newsletter_src": "/static/seasonal/fall-back-to-school/newsletter_masthead_1200x600.jpg",
+      "polaroid_src": "/static/seasonal/fall-back-to-school/board_polaroid_1200x900.jpg",
+      "full_src": "/static/seasonal/fall-back-to-school/master_2x1.png",
+      "postcard_src": "/static/seasonal/fall-back-to-school/app_postcard_1600x900.jpg",
+      "rotation_deg": 2,
+      "caption": "Back in the Woodshed.",
+      "alt": "The Viking Sax, Coach Whistler, John, and Mum at Fall / Back to School",
+      "position": "board",
+      "click_enabled": true
+    },
+    {
+      "season_id": "late-fall-harvest",
+      "label": "Late Fall / Harvest",
+      "enabled": true,
+      "newsletter_src": "/static/seasonal/late-fall-harvest/newsletter_masthead_1200x600.jpg",
+      "polaroid_src": "/static/seasonal/late-fall-harvest/board_polaroid_1200x900.jpg",
+      "full_src": "/static/seasonal/late-fall-harvest/master_2x1.png",
+      "postcard_src": "/static/seasonal/late-fall-harvest/app_postcard_1600x900.jpg",
+      "rotation_deg": -1,
+      "caption": "Keep the practice growing.",
+      "alt": "The Viking Sax, Coach Whistler, John, and Mum at Late Fall / Harvest",
+      "position": "board",
+      "click_enabled": true
+    },
+    {
+      "season_id": "winter-woodshed",
+      "label": "Winter Woodshed",
+      "enabled": true,
+      "newsletter_src": "/static/seasonal/winter-woodshed/newsletter_masthead_1200x600.jpg",
+      "polaroid_src": "/static/seasonal/winter-woodshed/board_polaroid_1200x900.jpg",
+      "full_src": "/static/seasonal/winter-woodshed/master_2x1.png",
+      "postcard_src": "/static/seasonal/winter-woodshed/app_postcard_1600x900.jpg",
+      "rotation_deg": 2,
+      "caption": "Warm up in the Woodshed.",
+      "alt": "The Viking Sax, Coach Whistler, John, and Mum at Winter Woodshed",
+      "position": "board",
+      "click_enabled": true
+    },
+    {
+      "season_id": "spring-concert-festival",
+      "label": "Spring / Concert-Festival",
+      "enabled": true,
+      "newsletter_src": "/static/seasonal/spring-concert-festival/newsletter_masthead_1200x600.jpg",
+      "polaroid_src": "/static/seasonal/spring-concert-festival/board_polaroid_1200x900.jpg",
+      "full_src": "/static/seasonal/spring-concert-festival/master_2x1.png",
+      "postcard_src": "/static/seasonal/spring-concert-festival/app_postcard_1600x900.jpg",
+      "rotation_deg": -2,
+      "caption": "Concert season is growing.",
+      "alt": "The Viking Sax, Coach Whistler, John, and Mum at Spring / Concert-Festival",
+      "position": "board",
+      "click_enabled": true
+    }
+  ]
+}
