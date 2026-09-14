@@ -23,6 +23,7 @@ from .models import (
     WoodchuckProfile,
 )
 from .team_names import InvalidTeamName, normalized_team_name
+from .team_continuity import lock_team_seasons
 
 
 EMOJI_EMBLEMS = {
@@ -124,6 +125,8 @@ def membership_at(session: Session, *, profile_id: int, season_id: int, at: date
 def select_team(session: Session, *, profile: WoodchuckProfile, season: Season,
                 team: Team, now: datetime,
                 private_authorized: bool = False) -> tuple[TeamMembership, bool]:
+    lock_team_seasons(session, season.id)
+    session.refresh(team)
     if team.season_id != season.id:
         raise ValueError("That team is not in the active season.")
     if team.moderation_status == "hidden":
@@ -173,6 +176,7 @@ def _create_team_with_new_family(session: Session, **team_fields: object) -> Tea
 def create_and_join_team(session: Session, *, profile: WoodchuckProfile,
                          season: Season, name: str, emblem_key: str,
                          now: datetime) -> tuple[Team, TeamMembership]:
+    lock_team_seasons(session, season.id)
     if emblem_key not in APPROVED_EMBLEMS:
         raise ValueError("Choose an approved team emblem.")
     try:
@@ -215,6 +219,7 @@ def create_director_team(
     session: Session, *, profile: WoodchuckProfile, season: Season,
     name: str, emblem_key: str, now: datetime,
 ) -> Team:
+    lock_team_seasons(session, season.id)
     if not has_band_director_capability(session, profile_id=profile.id):
         raise PermissionError("Band Director authorization is required.")
     if emblem_key not in APPROVED_EMBLEMS:
@@ -466,6 +471,7 @@ def request_private_team_membership(
 ):
     with SessionLocal() as session:
         profile, season, now = authenticated_context(request, session)
+        lock_team_seasons(session, season.id)
         code = submitted.join_code.strip().upper().replace(" ", "")
         team = session.scalar(select(Team).where(
             Team.season_id == season.id,
@@ -551,6 +557,7 @@ def create_private_director_team(request: Request, submitted: TeamCreate):
 def regenerate_private_team_code(team_id: int, request: Request):
     with SessionLocal() as session:
         profile, season, _ = authenticated_context(request, session)
+        lock_team_seasons(session, season.id)
         try:
             team = _owned_director_team(
                 session, profile=profile, team_id=team_id
@@ -570,6 +577,7 @@ def regenerate_private_team_code(team_id: int, request: Request):
 def join_owned_team_as_player(team_id: int, request: Request):
     with SessionLocal() as session:
         profile, season, now = authenticated_context(request, session)
+        lock_team_seasons(session, season.id)
         try:
             team = _owned_director_team(session, profile=profile, team_id=team_id)
             membership, changed = select_team(
@@ -595,6 +603,7 @@ def resolve_private_team_request(
 ):
     with SessionLocal() as session:
         profile, season, now = authenticated_context(request, session)
+        lock_team_seasons(session, season.id)
         try:
             team = _owned_director_team(session, profile=profile, team_id=team_id)
         except PermissionError as error:
@@ -637,6 +646,7 @@ def resolve_private_team_request(
 def remove_private_team_member(team_id: int, profile_id: int, request: Request):
     with SessionLocal() as session:
         profile, season, now = authenticated_context(request, session)
+        lock_team_seasons(session, season.id)
         try:
             team = _owned_director_team(session, profile=profile, team_id=team_id)
         except PermissionError as error:

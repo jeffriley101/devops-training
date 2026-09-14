@@ -30,6 +30,7 @@ from .contests import (
     utc_iso,
 )
 from .db import SessionLocal
+from .team_continuity import lock_team_seasons
 from .seasons import season_covering_date
 from .models import (
     ContestWeek,
@@ -243,6 +244,9 @@ def grant_band_director(
 def revoke_band_director(profile_id: int, request: Request):
     require_contest_admin(request)
     with SessionLocal() as session:
+        # Continuation validates capability while holding this profile lock.
+        session.scalar(select(WoodchuckProfile).where(
+            WoodchuckProfile.id == profile_id).with_for_update())
         capability = session.scalar(select(ProfileCapability).where(
             ProfileCapability.profile_id == profile_id,
             ProfileCapability.capability == "band_director",
@@ -265,6 +269,8 @@ def moderate_team(
         team = session.get(Team, team_id)
         if team is None:
             raise HTTPException(status_code=404, detail="Team was not found.")
+        lock_team_seasons(session, team.season_id)
+        session.refresh(team)
         if team.moderation_status != state:
             team.moderation_status = state
             team.moderation_updated_at = datetime.now(timezone.utc)

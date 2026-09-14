@@ -105,7 +105,68 @@ referential integrity before completion; application FK settings are not changed
 PostgreSQL locks Teams for the migration. Downgrade refuses if multiple seasonal
 Teams share a family, because removing the identity would lose continuity.
 
-### Existing rollover operation
+### Explicit continuity engine (H1B; not activated)
+
+`app/team_continuity.py` provides `plan_team_continuity` (read-only) and
+`apply_team_continuity` (fresh locked re-plan, caller-owned commit/rollback).
+Both accept source/destination season IDs, not writable dry-run instructions.
+They require a clean unit of work. No route, startup hook, calendar resolver,
+scheduler, or maintenance command calls apply. This is not a production repair.
+
+Adjacent seasons with the same configured timezone use destination local midnight
+as the boundary (September 14, 2026 in Chicago is 05:00 UTC). A source membership
+must start strictly before the boundary and end strictly after it or remain
+unended. A future boundary is REVIEW: its roster is not yet known. The optional
+server-side `now` argument supports deterministic tests, not client authorization.
+An exact-boundary ending is REVIEW, never inferred. Inactive students,
+overlapping boundary memberships and inconsistent season/team references fail
+closed. Membership continuation sets the Monday **containing** destination start,
+counts as the initial selection, and leaves one correction that week. Ordinary
+switching resumes the following Monday. Source memberships are never ended/edited.
+
+SAFE public teams need active moderation and at least one safely represented or
+continuing roster member; an empty team is REVIEW. A null creator is allowed.
+Private director teams may be empty but need a current active owner with the
+director capability. They get new globally unique codes; pending requests and
+reports stay historical. Non-active moderation never automatically continues.
+
+New seasonal Teams share the source family, copy social fields, and receive new
+IDs/creation timestamps. Name, emblem, public-creator and same-family identity
+collisions are CONFLICT; nothing is renamed or merged. Any destination membership
+history wins. An exact same-successor/boundary/Monday row is already represented
+(including a later-ended row), not recreated. This is a no-op recognition rule,
+not provenance inference or permission to rewrite that row. Team/member decisions
+have separate classifications and machine-readable reasons: a SAFE Team can carry
+its SAFE members while conflicting members are left alone. If no public roster
+can be safely represented, no empty successor is created. Aggregate plan status
+also reports member conflicts. No historical families are merged.
+
+PostgreSQL apply requires READ COMMITTED and sorted locks: Seasons, TeamFamilies,
+Teams, profiles, memberships. Team creation/selection, private request management,
+and moderation acquire the same season fence before decisions. Account deletion
+fences all seasons before its cross-season writes; capability revocation locks the
+owner profile. SQLite uses BEGIN IMMEDIATE before reads when no physical transaction
+is active. Enter apply with a fresh transaction, not an earlier SQLite read snapshot
+or unrelated row locks. Constraints remain the backstop; a database error requires
+rollback of the complete caller transaction before retry. No external calls occur.
+
+Closed destinations, frozen weekly results/snapshots, and destination director
+contests require review. These checks do NOT synchronize arbitrary finalization
+workers: H2 must pause finalization/calendar writers (including in-flight work)
+for backdated application. Same-season ordinary team writers are serialized, but
+direct SQL/imports must follow the fence or be paused too. Moderation/capability
+changes after a completed continuation retain their existing seasonal behavior;
+H1B does not propagate later policy changes through a family.
+
+H2 should expose a read-only inventory/plan, then a separately authorized apply
+under a maintenance protocol with conflict reporting. After current production
+repair is approved and verified, a later explicit season-readiness/activation
+operation can call this engine before a new season is exposed. Do not wire it
+only to source-season closure: the calendar can activate the destination first.
+No H1C attribution repair, result/award/snapshot rewrite, Hall identity conversion,
+join-request carry, or automatic runtime activation is implemented here.
+
+### Existing rollover behavior (unchanged)
 
 Existing rollover checks still require an ended source and finalized source weeks,
 reject overlap and partial weeks, and preserve history transactionally. Rollover can

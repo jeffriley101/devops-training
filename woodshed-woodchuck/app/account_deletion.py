@@ -13,6 +13,7 @@ from .models import (
     PracticeChart,
     PracticeChartVerification,
     PracticeEmailPreset,
+    Season,
     StudentOrganizationMembership,
     StudentVerifierConnection,
     Team,
@@ -23,6 +24,7 @@ from .models import (
     WoodchuckState,
 )
 from .security import hash_invitation_token, verify_pin
+from .team_continuity import lock_team_seasons
 
 
 DELETED_PUBLIC_NAME = "Deleted Woodchuck"
@@ -77,6 +79,10 @@ def anonymize_woodchuck_account(
     session: Session, *, profile: WoodchuckProfile, now: datetime
 ) -> None:
     """Disable one profile while retaining immutable scoring/history sources."""
+    # Deletion spans all seasons. Fence before membership/team writes so a
+    # continuation cannot add a roster row behind the anonymization update.
+    with session.no_autoflush:
+        lock_team_seasons(session, *session.scalars(select(Season.id).order_by(Season.id)))
     if profile.status == "deleted":
         return
     now = _utc(now)

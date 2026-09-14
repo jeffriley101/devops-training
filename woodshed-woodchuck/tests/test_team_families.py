@@ -191,20 +191,16 @@ def test_team_deletion_retains_family(family_db):
         assert session.get(TeamFamily, family_id) is not None
 
 
-def test_postgres_concurrent_duplicate_creation(family_db, monkeypatch):
+def test_postgres_concurrent_duplicate_creation(family_db):
     with family_db() as session:
         if session.get_bind().dialect.name != "postgresql":
             pytest.skip("Requires PostgreSQL concurrent transactions")
     barrier = Barrier(2)
-    original = teams._create_team_with_new_family
-    def synchronized(session, **fields):
-        team = original(session, **fields)
-        barrier.wait(timeout=10)
-        return team
-    monkeypatch.setattr(teams, "_create_team_with_new_family", synchronized)
     def worker():
         with family_db() as session:
             try:
+                # H1B serializes from the season fence, before family creation.
+                barrier.wait(timeout=10)
                 create(session, family_db)
                 return "created"
             except ValueError:
