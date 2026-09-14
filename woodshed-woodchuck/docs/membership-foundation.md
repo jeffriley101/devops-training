@@ -129,13 +129,13 @@ sends another payment/checkout request. No worker or scheduler is installed.
 If ingestion cannot commit, delivery fails and must be retried by the provider;
 database durability cannot be promised during database unavailability.
 
-Initial provisioning serializes on the owner identity/account before creating
-membership state. Existing-subscription processing locks the subscription then
-membership without first locking the owner identity, avoiding an inversion with
-student-seat management. If an initial provisioner discovers another worker has
-already created the subscription, it releases its savepoint locks and leaves a
-recoverable retry. Checkout correlation is refreshed rather than trusting cached
-ORM state. SQLite tests do not prove PostgreSQL deadlock freedom.
+Checkout authorization, inbox ingestion and application serialize on the billing
+account before event/subscription/membership locks. Existing accounts do not
+first lock their student identity. Creating a missing billing account temporarily
+locks its identity; a concurrent creator releases that savepoint lock before
+locking the newly visible account. Checkout correlation is refreshed rather than
+trusting cached ORM state. Correlation discovered after lock selection requires
+a new transaction/retry, rather than taking an account lock out of order.
 
 Launch fulfillment reads the stored snapshot rather than today's sale flag.
 Automatic initial application requires both payment occurrence and initial
@@ -154,15 +154,61 @@ and reversals never reduce entitlement in A1. New payments after terminal
 subscription state remain recoverable rather than silently restoring launch
 pricing. The adapter must map actual provider payment identities to this hook.
 
-Deferred to A2/integration: normalizing expired-but-`active` owned memberships
-before replacement purchase, remote pending-checkout cancellation, provider
-environment/account verification, operator reconciliation tooling, PostgreSQL
-concurrency/deadlock integration testing, and refund/grace/cancellation policies.
+Deferred to integration: remote pending-checkout cancellation, provider
+environment/account verification, operator reconciliation tooling, and
+refund/grace/cancellation policies.
 There is no inferred team, relationship, payer-privacy or feature-gating change.
 
 Revision `p6k7l8m9n0o1` follows `o5j6k7l8m9n0` and adds only
 `checkout_attempts`, `billing_event_applications`, and `billing_payment_effects`.
 Downgrade removes only these additions; it does not rewrite existing history.
+
+## Phase A2 replacement contract
+
+`app/billing_replacement.py` supplies the shared purchase decision for checkout
+authorization and initial paid provisioning. An old paid membership can become
+historical only when its confirmed paid-through date has elapsed, its provider
+subscription has a verified `terminated_at` at or before now, and correlated
+billing work is resolved. A past-due or expired access date alone cannot prove
+that a recurring provider contract has stopped charging. No provider cancellation
+is inferred or performed. Manual/complimentary grant and expiry behavior remains
+unchanged.
+
+The decision checks all owner membership history, checkout references and
+provider/subscription references (including events without checkout references).
+Pending/recoverable applications, inconsistent processed state, recoverable
+attempts, and payment effects beyond the materialized paid-through date block
+replacement without a timeout. A replacement may reuse its pending checkout;
+another live pending checkout blocks a distinct replacement attempt.
+
+Safe normalization changes only `Membership.status` from `active` to `ended`,
+with one `membership_ended` audit record. This occurs transactionally at checkout
+authorization and is rechecked during provisioning. Provider IDs, paid-through
+history, payment records and discretionary seats are retained. Replacement
+creates new membership/subscription IDs, automatically seats a student owner,
+and does not copy discretionary seats. The existing seat helper retires an old
+owner reservation when it adds the new owner's seat.
+
+Payments received after normalization remain in the recoverable inbox. They
+never reactivate the historical membership or extend the replacement. If such
+work arrives before replacement provisioning, it blocks provisioning too.
+Successful payment with an owner-seat conflict is retained for explicit review;
+A2 supplies no refund, cancellation or automatic resolution policy.
+
+PostgreSQL uses account `FOR NO KEY UPDATE` locks, compatible with ordinary FK
+`KEY SHARE` checks, at READ COMMITTED isolation. SQLite serializes writers with
+an update. Billing locks precede membership and student-seat locks; provider
+transport runs outside transactions. Savepoints retain failed application facts
+while rolling back partial entitlement writes. Serialization/deadlock errors
+require whole-transaction retry; a separately committed inbox remains durable.
+
+`tests/test_billing_replacement.py` runs SQLite cases plus opt-in PostgreSQL cases
+using `WW_BILLING_TEST_POSTGRES_URL`. This must explicitly name a loopback-hosted
+`ww_billing_a2_test` disposable database; it never uses `DATABASE_URL`. Tests create
+random isolated schemas, retained for failure inspection. PostgreSQL tests observe
+actual lock waits for recovery versus checkout and payment versus seat management.
+Production topology, higher isolation levels and provider transport still need
+their own integration verification. No A2 migration or checkout duration is added.
 
 ## Migration and testing
 

@@ -13,7 +13,8 @@ from sqlalchemy.exc import IntegrityError
 from .billing_config import BillingConfig, Plan, new_subscription_plan
 from .models import (BillingAccount, ProviderSubscription, BillingProviderEvent, Membership,
                      CheckoutAttempt, BillingEventApplication, BillingPaymentEffect)
-from .memberships import Actor, audit, clock, utc, billing_account
+from .memberships import Actor, audit, clock, utc, billing_account, lock_billing_account
+from .billing_replacement import require_new_purchase
 
 
 class BillingUnavailable(ValueError):
@@ -91,21 +92,6 @@ def authorize_checkout(session, actor, provider, plan_code, *, config=None, refe
     enabled_provider(provider, config)
     account = billing_account(session, actor, create=True)
     at = utc(clock())
-    if session.scalar(select(Membership.id).where(Membership.billing_account_id == account.id, Membership.status == "active")):
-        raise ValueError("Manage the existing membership before starting another subscription.")
-    if session.scalar(select(CheckoutAttempt.id).where(CheckoutAttempt.billing_account_id == account.id,
-                                                      CheckoutAttempt.status == "recoverable")):
-        raise ValueError("A paid checkout needs processing review before another purchase.")
-    if session.scalar(select(BillingEventApplication.id).join(
-            CheckoutAttempt, CheckoutAttempt.reference == BillingEventApplication.checkout_reference).join(
-            BillingProviderEvent, BillingProviderEvent.id == BillingEventApplication.event_id).where(
-            CheckoutAttempt.billing_account_id == account.id,
-            CheckoutAttempt.provider == BillingProviderEvent.provider,
-            BillingEventApplication.status != "processed",
-            BillingEventApplication.facts["paid_through"].as_string().is_not(None))):
-        # The inbox commit can survive a crash before application updates the
-        # attempt. Never initiate another purchase while that payment awaits work.
-        raise ValueError("A paid checkout needs processing review before another purchase.")
     if reference:
         attempt = session.scalar(select(CheckoutAttempt).where(
             CheckoutAttempt.reference == reference, CheckoutAttempt.billing_account_id == account.id,
@@ -114,6 +100,7 @@ def authorize_checkout(session, actor, provider, plan_code, *, config=None, refe
             raise ValueError("Checkout attempt not found.")
         if attempt.status != "pending" or utc(attempt.expires_at) <= at:
             raise ValueError("This checkout attempt cannot be started again.")
+        require_new_purchase(session, account.id, at, actor, attempt_id=attempt.id)
         return attempt
     if not new_attempt:
         attempt = session.scalar(select(CheckoutAttempt).where(
@@ -121,7 +108,9 @@ def authorize_checkout(session, actor, provider, plan_code, *, config=None, refe
             CheckoutAttempt.plan_code == plan_code, CheckoutAttempt.status == "pending",
             CheckoutAttempt.expires_at > at).order_by(CheckoutAttempt.id.desc()))
         if attempt is not None:
+            require_new_purchase(session, account.id, at, actor, attempt_id=attempt.id)
             return attempt
+    require_new_purchase(session, account.id, at, actor)
     validity = config.checkout_validity_seconds
     if not isinstance(validity, int) or isinstance(validity, bool) or not 0 < validity < 1_000_000_000:
         raise BillingUnavailable("Checkout validity has not been configured.")
@@ -192,6 +181,7 @@ def receive_verified_event(session, provider, event, *, payload_hash):
     if not isinstance(payload_hash, str) or not 1 <= len(payload_hash) <= 64:
         raise ValueError("Invalid payload hash.")
     facts = _facts(event)
+    _lock_event_accounts(session, provider, event.external_subscription_id, event.checkout_reference)
     existing = session.scalar(select(BillingProviderEvent).where(
         BillingProviderEvent.provider == provider, BillingProviderEvent.external_event_id == event.external_event_id))
     if existing:
@@ -219,6 +209,23 @@ def _event(application):
     return SubscriptionEvent(**facts)
 
 
+def _lock_event_accounts(session, provider, external_subscription_id, reference):
+    """Inbox ingestion and application serialize with purchase authorization.
+
+    Resolve both correlations, locking account IDs in order if they disagree.
+    Unknown events still enter the inbox and acquire their owner lock on retry.
+    """
+    ids = set(session.scalars(select(Membership.billing_account_id).join(ProviderSubscription).where(
+        ProviderSubscription.provider == provider,
+        ProviderSubscription.external_subscription_id == external_subscription_id)))
+    if reference:
+        ids.update(session.scalars(select(CheckoutAttempt.billing_account_id).where(
+            CheckoutAttempt.provider == provider, CheckoutAttempt.reference == reference)))
+    for account_id in sorted(ids):
+        lock_billing_account(session, account_id)
+    return ids
+
+
 def _provision(session, record, application, event):
     if event.paid_through is None:
         raise RecoverableApplication("awaiting_paid_entitlement")
@@ -236,10 +243,10 @@ def _provision(session, record, application, event):
         raise RecoverableApplication("checkout_already_consumed")
     if event.terminal:
         raise RecoverableApplication("initial_subscription_terminated")
-    account = _lock(session, BillingAccount, attempt.billing_account_id)
+    account = session.get(BillingAccount, attempt.billing_account_id)
     actor = Actor("student", account.profile_id) if account.profile_id else Actor("adult", account.verifier_id)
-    if session.scalar(select(Membership.id).where(Membership.billing_account_id == account.id, Membership.status == "active")):
-        raise RecoverableApplication("owner_membership_conflict")
+    require_new_purchase(session, account.id, utc(clock()), actor, attempt_id=attempt.id,
+                         applying_subscription=(record.provider, event.external_subscription_id))
     member = Membership(billing_account_id=account.id, status="active", source=record.provider,
         plan_code=attempt.plan_code, starts_at=event.period_start, access_until=event.paid_through, max_student_seats=5)
     session.add(member)
@@ -266,12 +273,15 @@ def apply_verified_event(session, event_id):
     Commit recoverable outcomes. Unexpected database errors may escape; the
     separately committed inbox survives and remains available for retry.
     """
-    record = _lock(session, BillingProviderEvent, event_id)
+    record = session.get(BillingProviderEvent, event_id)
     if record is None:
         raise ValueError("Event not found.")
     application = session.scalar(select(BillingEventApplication).where(BillingEventApplication.event_id == event_id))
     if application is None:
         raise ValueError("Legacy event requires explicit reconciliation.")
+    locked_accounts = _lock_event_accounts(session, record.provider, application.external_subscription_id, application.checkout_reference)
+    record = _lock(session, BillingProviderEvent, event_id)
+    session.refresh(application)
     if application.status == "processed":
         return record
     application.attempts += 1
@@ -284,21 +294,11 @@ def apply_verified_event(session, event_id):
             sub = session.scalar(select(ProviderSubscription).where(
                 ProviderSubscription.provider == record.provider,
                 ProviderSubscription.external_subscription_id == event.external_subscription_id))
-            if sub is None and attempt:
-                # Only initial provisioning needs the identity lock. Taking it
-                # for renewals would invert seat management's membership ->
-                # student order. Recheck after waiting for another provisioner.
-                owner = session.get(BillingAccount, attempt.billing_account_id)
-                actor = Actor("student", owner.profile_id) if owner.profile_id else Actor("adult", owner.verifier_id)
-                billing_account(session, actor, create=True)
-                _lock(session, BillingAccount, attempt.billing_account_id)
-                sub = session.scalar(select(ProviderSubscription).where(
-                    ProviderSubscription.provider == record.provider,
-                    ProviderSubscription.external_subscription_id == event.external_subscription_id))
-                if sub is not None:
-                    # Release the newly acquired identity lock via the savepoint
-                    # before retrying the existing-subscription lock path.
-                    raise RecoverableApplication("concurrent_provisioning_retry")
+            if ((attempt and attempt.billing_account_id not in locked_accounts) or
+                    (sub and session.get(Membership, sub.membership_id).billing_account_id not in locked_accounts)):
+                # Correlation appeared after account discovery. Retry from the
+                # outer transaction rather than acquiring account locks late.
+                raise RecoverableApplication("subscription_correlation_retry")
             if attempt:
                 # SQLAlchemy may retain the object read before lock acquisition.
                 # Completed correlation must be read from the committed row.

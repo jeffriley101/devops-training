@@ -41,15 +41,47 @@ def billing_account(session, actor, *, create=False):
     if owner is None or (actor.kind == "student" and owner.status != "active"):
         raise ValueError("Account not found.")
     column = BillingAccount.profile_id if actor.kind == "student" else BillingAccount.verifier_id
-    if create:
-        # Acquires a write/row lock even before an account row exists.
-        session.execute(update(model).where(model.id == actor.id).values(id=model.id, updated_at=model.updated_at))
     account = session.scalar(select(BillingAccount).where(column == actor.id))
-    if account is None and create:
-        account = BillingAccount(**{column.key: actor.id})
-        session.add(account)
-        session.flush()
+    if account is not None:
+        return lock_billing_account(session, account.id) if create else account
+    if create:
+        # Only an account that does not exist yet needs the identity lock.
+        # If a concurrent creator wins, release this savepoint's identity lock
+        # before taking its existing account lock (account -> member -> student).
+        creation = session.begin_nested() if session.get_bind().dialect.name == "postgresql" else None
+        session.execute(update(model).where(model.id == actor.id).values(id=model.id, updated_at=model.updated_at))
+        account = session.scalar(select(BillingAccount).where(column == actor.id))
+        if account is not None:
+            account_id = account.id
+            if creation:
+                creation.rollback()
+            return lock_billing_account(session, account_id)
+        try:
+            account = BillingAccount(**{column.key: actor.id})
+            session.add(account)
+            session.flush()
+            if creation:
+                creation.commit()
+        except Exception:
+            if creation:
+                creation.rollback()
+            raise
     return account
+
+
+def lock_billing_account(session, account_id):
+    """Serialize billing work before membership/student locks.
+
+    NO KEY UPDATE permits FK KEY SHARE checks during ordinary seat/audit writes.
+    SQLite needs a write to serialize writers; never touch the timestamp here.
+    Callers use READ COMMITTED on PostgreSQL and retry a rolled-back transaction.
+    """
+    if session.get_bind().dialect.name == "postgresql":
+        return session.scalar(select(BillingAccount).where(BillingAccount.id == account_id)
+                              .with_for_update(key_share=True).execution_options(populate_existing=True))
+    session.execute(update(BillingAccount).where(BillingAccount.id == account_id)
+                    .values(id=BillingAccount.id, updated_at=BillingAccount.updated_at))
+    return session.get(BillingAccount, account_id, populate_existing=True)
 
 
 def membership_is_active(membership, at=None):
