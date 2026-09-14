@@ -123,8 +123,12 @@ class BillingProviderEvent(Base):
 
 class MembershipAuditEvent(Base):
     __tablename__ = "membership_audit_events"
+    __table_args__ = (CheckConstraint("membership_id IS NOT NULL OR billing_event_id IS NOT NULL",
+                                     name="ck_membership_audit_target"),)
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    membership_id: Mapped[int] = mapped_column(ForeignKey("memberships.id", ondelete="RESTRICT"), index=True)
+    membership_id: Mapped[int | None] = mapped_column(ForeignKey("memberships.id", ondelete="RESTRICT"), index=True)
+    billing_event_id: Mapped[int | None] = mapped_column(ForeignKey("billing_provider_events.id", ondelete="RESTRICT",
+        name="fk_membership_audit_billing_event"), index=True)
     action: Mapped[str] = mapped_column(String(50))
     actor_type: Mapped[str] = mapped_column(String(20))
     actor_id: Mapped[int | None] = mapped_column(Integer)

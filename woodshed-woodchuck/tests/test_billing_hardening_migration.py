@@ -12,6 +12,7 @@ import pytest
 from app.db import Base
 from app.models import WoodchuckProfile, CheckoutAttempt
 from app import memberships as m
+from tests.test_membership_migration import historical_auditor
 
 TABLES = {"checkout_attempts", "billing_event_applications", "billing_payment_effects"}
 
@@ -22,6 +23,7 @@ def test_a1_upgrade_downgrade_preserves_old_tables_and_matches_models(tmp_path, 
     config = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
     command.upgrade(config, "o5j6k7l8m9n0")
     engine = create_engine(url)
+    monkeypatch.setattr(m, "audit", historical_auditor(engine))
     with Session(engine) as s:
         s.add(WoodchuckProfile(id=1, woodchuck_id="WC-HISTORY", display_name="Retain",
             pin_hash="unchanged", instrument="Trumpet", level="Beginner", goal="Practice"))

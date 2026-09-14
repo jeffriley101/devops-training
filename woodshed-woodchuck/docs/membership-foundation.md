@@ -212,6 +212,63 @@ their own integration verification. No A2 migration or checkout duration is adde
 
 ## Migration and testing
 
+### Phase A3: Site Admin recovery
+
+`GET /admin/billing-recovery` shows pending/recoverable billing applications,
+inconsistent payment effects and uncorrelated recoverable checkouts. Successful
+historical events are excluded. Event pages are bounded to 50 rows with older-event
+navigation; recent administrator actions remain visible after successful recovery.
+Only selected internal correlation IDs, provider/category, timestamps and safe
+reason text are rendered. Raw verified facts, payload hashes, signatures, email
+addresses and external customer identifiers are not dumped into HTML.
+
+`POST /admin/billing-recovery/{event_id}/retry` requires the existing Site Admin
+session and unchanged CSRF/origin checks. Its only form field is the CSRF token;
+prices, plans and entitlement values cannot be supplied. Public purchasing and
+both live providers remain disabled. No provider transport is called by recovery.
+
+`app/billing_recovery.py` owns retryability. Pending/recoverable normalized work
+with sufficient correlation and payment evidence can enter the normal processor.
+Missing correlation/evidence, expired authorization, conflicting payment/lifecycle
+facts, ended memberships and inconsistent applied effects require reconciliation.
+Unknown reason codes fail closed. Every decision is repeated under the same
+account/event locks used by automatic processing. Both paths use
+`apply_locked_event()`; neither has a privileged entitlement override. Correlation
+that appears after lock selection is retained for a fresh transaction retry.
+
+Each accepted administrator retry first commits a `billing_retry_requested`
+MembershipAuditEvent targeted at the durable billing event. The result audit
+commits atomically with processing effects. Success, still-recoverable, blocked
+and already-completed outcomes are all recorded, including stale browser posts.
+Unexpected local transaction failure rolls back processing and records a safe
+failure outcome in a separate transaction. If the database becomes unavailable,
+the already-committed request remains; a result cannot be guaranteed until the
+database is writable. No exception strings or raw provider facts enter the audit.
+Invalid credentials/CSRF and nonexistent event IDs never start a recovery action.
+
+Revision `q7l8m9n0o1p2` follows `p6k7l8m9n0o1`. It extends only
+`membership_audit_events`: nullable membership target, optional indexed
+`billing_event_id`, RESTRICT foreign key, and a check requiring at least one
+target. Existing membership audits remain intact. No placeholder membership is
+created for failed initial provisioning. Successful result audits can reference
+both targets and appear in the existing membership audit history.
+
+Downgrade is supported before recovery audits exist. It locks the audit table
+and refuses a downgrade once event-targeted audit history exists, because the
+old schema cannot represent that history without loss. Never delete recovery
+audits merely to downgrade; rolling back application code while retaining the
+expanded schema is preferable to losing financial records.
+
+A3 tests cover SQLite and opt-in disposable PostgreSQL using the A2 fixture,
+including simultaneous admin retries, retry versus automatic processing, retry
+versus replacement, transaction failure/reentry, and migration round trips with
+foreign-key/deletion and downgrade guards. Historical migration fixtures use
+their reflected audit schema instead of the expanded current ORM model.
+
+Deferred to Phase A4: provider-backed reconciliation and explicit resolution
+policy for conflicts local retry cannot resolve. No refund, capture, cancellation,
+grace period, checkout duration or entitlement override is introduced here.
+
 Revision `o5j6k7l8m9n0` follows `n4i5j6k7l8m9`. It only creates membership/billing
 tables; downgrade drops only those tables. No startup code migrates or repairs
 data. Tests use disposable SQLite databases. PostgreSQL uses the corresponding

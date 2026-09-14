@@ -268,20 +268,33 @@ def _provision(session, record, application, event):
     return sub
 
 
-def apply_verified_event(session, event_id):
-    """Explicit retry, no transport. Savepoint rolls back partial application.
-    Commit recoverable outcomes. Unexpected database errors may escape; the
-    separately committed inbox survives and remains available for retry.
-    """
+def lock_verified_event(session, event_id):
+    """Shared account -> event locking for automatic and admin application."""
     record = session.get(BillingProviderEvent, event_id)
     if record is None:
         raise ValueError("Event not found.")
     application = session.scalar(select(BillingEventApplication).where(BillingEventApplication.event_id == event_id))
+    locked_accounts = _lock_event_accounts(session, record.provider, application.external_subscription_id,
+        application.checkout_reference) if application else set()
+    record = _lock(session, BillingProviderEvent, event_id)
+    if application:
+        session.refresh(application)
+    return record, application, locked_accounts
+
+
+def apply_verified_event(session, event_id):
+    """Explicit retry; no transport. Commit recoverable outcomes."""
+    return apply_locked_event(session, *lock_verified_event(session, event_id))
+
+
+def apply_locked_event(session, record, application, locked_accounts):
+    """Caller obtained lock_verified_event. Never acquire new account locks here.
+
+    Savepoint rolls back partial application. Unexpected errors may escape; the
+    separately committed inbox survives and remains available for retry.
+    """
     if application is None:
         raise ValueError("Legacy event requires explicit reconciliation.")
-    locked_accounts = _lock_event_accounts(session, record.provider, application.external_subscription_id, application.checkout_reference)
-    record = _lock(session, BillingProviderEvent, event_id)
-    session.refresh(application)
     if application.status == "processed":
         return record
     application.attempts += 1

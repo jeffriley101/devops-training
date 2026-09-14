@@ -6,7 +6,7 @@ from fastapi.routing import APIRoute
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select, or_
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from .db import SessionLocal
 from .account_routes import current_profile
 from .verifier_routes import current_verifier
@@ -16,6 +16,7 @@ from . import memberships as service
 from .billing_config import BillingConfig, PLANS, available_plans
 from .billing_providers import BillingUnavailable, checkout, process_webhook
 from .site_admin import csrf_token, check_csrf, sign_in_site_admin, require_site_admin
+from . import billing_recovery
 
 
 class PrivateRoute(APIRoute):
@@ -252,6 +253,30 @@ def admin_page(request: Request, q: str = "", membership_id: int | None = None):
             subscription=session.scalar(select(ProviderSubscription).where(ProviderSubscription.membership_id == selected.id)) if selected else None,
             history=session.scalars(select(MembershipAuditEvent).where(MembershipAuditEvent.membership_id == selected.id)
                 .order_by(MembershipAuditEvent.id.desc()).limit(50)).all() if selected else [])
+
+
+@router.get("/admin/billing-recovery")
+def billing_recovery_page(request: Request, before: int | None = None, result: int | None = None):
+    require_site_admin(request)
+    with SessionLocal() as session:
+        return render(request, "billing_recovery.html", **billing_recovery.queue(session, before),
+                      retry_result=billing_recovery.result_message(session, result), title="Billing Recovery")
+
+
+@router.post("/admin/billing-recovery/{event_id}/retry")
+async def billing_recovery_retry(request: Request, event_id: int):
+    require_site_admin(request)
+    form = await request.form()
+    check_csrf(request, form.get("csrf"))
+    if set(form) != {"csrf"}:
+        raise HTTPException(400, "Only the recorded event may be retried.")
+    try:
+        result_id = billing_recovery.retry(SessionLocal, event_id, service.Actor("admin"))
+    except LookupError as error:
+        raise HTTPException(404, str(error)) from error
+    except SQLAlchemyError as error:
+        raise HTTPException(503, "Recovery outcome is unavailable. Review the recovery audit before retrying.") from error
+    return RedirectResponse(f"/admin/billing-recovery?result={result_id}", 303)
 
 
 @router.post("/admin/membership")

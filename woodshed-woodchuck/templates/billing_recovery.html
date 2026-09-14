@@ -1,0 +1,29 @@
+{% extends "membership_base.html" %}
+{% from "dashboard_header.html" import dashboard_header %}
+{% block content %}
+{% call dashboard_header('Site Admin', 'Billing Recovery', 'Protected Site Administration') %}
+<a class="btn btn-secondary" href="/admin/membership">Memberships</a>
+<form action="/admin/logout" method="post"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-secondary">Sign out of Site Admin</button></form>
+{% endcall %}
+<section class="card"><p>Process already-recorded billing work. This page does not create payments or manually grant access.</p>
+{% if retry_result %}<p role="status">{{ retry_result }}</p>{% endif %}</section>
+{% for item in items %}<section class="card" aria-labelledby="event-{{ item.event_id }}">
+<h2 id="event-{{ item.event_id }}">Event {{ item.event_id }} · {{ item.provider|title }}</h2>
+<p>{{ item.category }} · {{ item.state }} · Received {{ item.received_at }}</p>
+<p>{{ item.decision.reason }}</p>
+<p>Application {{ item.application_id or 'not available' }}{% if item.account_id %} · Billing account {{ item.account_id }}{% endif %}
+{% if item.membership_id %} · <a href="/admin/membership?membership_id={{ item.membership_id }}">Membership {{ item.membership_id }}</a>{% endif %}
+{% if item.subscription_id %} · Subscription {{ item.subscription_id }}{% endif %}
+{% if item.checkout_id %} · Checkout {{ item.checkout_id }}{% endif %}</p>
+{% if item.decision.retryable %}<form action="/admin/billing-recovery/{{ item.event_id }}/retry" method="post">
+<input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-secondary" type="submit">Retry recorded event</button></form>
+{% else %}<p>Local retry unavailable. Reconciliation is required.</p>{% endif %}
+{% if item.history %}<h3>Recent recovery actions</h3>{% for action in item.history %}
+<p>{{ action.at }} · {{ 'Retry requested' if action.requested else action.result }}</p>{% endfor %}{% endif %}
+</section>{% else %}<section class="card"><p>No billing events require attention.</p></section>{% endfor %}
+{% if next_before %}<a class="btn btn-secondary" href="?before={{ next_before }}">Older events</a>{% endif %}
+{% for checkout in orphan_checkouts %}<section class="card"><h2>Checkout {{ checkout.id }} · {{ checkout.provider|title }}</h2>
+<p>Recovery state has no correlated event. Reconciliation is required; no local retry is available.</p></section>{% endfor %}
+{% if recent_actions %}<section class="card"><h2>Recent recovery actions</h2>{% for action in recent_actions %}
+<p>{{ action.at }} · Event {{ action.event_id }} · {{ action.message }}</p>{% endfor %}</section>{% endif %}
+{% endblock %}
