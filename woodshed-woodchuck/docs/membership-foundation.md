@@ -371,6 +371,27 @@ data. Tests use disposable SQLite databases. PostgreSQL uses the corresponding
 partial indexes and row locks; live PostgreSQL/provider validation belongs to
 integration testing before billing launch.
 
-`app/feature_access.py` contains an initially empty registry of enabled features
-and their required access. Unknown or disabled features deny access. Future
-routes must first authorize the student's context, then call `can_use_feature`.
+## Full product foundation: Practice Insights
+
+`app/feature_access.py` enables only `practice_insights`, requiring Full Access.
+The reserved keys `advanced_practice_analytics`, `practice_history_tools`,
+`customization_collections`, `bonus_game_content`, `advanced_exercises`, and
+`seasonal_side_activities` are disabled and have no public UI or routes.
+Unknown/disabled keys fail closed. Routes authorize the student first, then use
+`require_feature` / `can_use_feature`; template flags are presentation only.
+
+`GET /practice-charts/insights` resolves the signed-in student and returns only
+their four completed Monday–Sunday weeks in America/Chicago, oldest first.
+The current week is excluded. Existing `practice_totals` supplies persisted
+minutes, positive-practice days, verified minutes, and Pristine minutes; no
+sub-minute rounding or rating calculation changes. Empty weeks count as zero;
+the weekly average is the four-week minute total divided by four.
+
+The P-Book shows either this read-only summary or a restrained Full Access card.
+The endpoint and P-Book are no-store. Insights are not persisted or put in raw
+practiceLog state; the client clears them on access denial and page hiding,
+and rechecks on return. Expiration/removal denies the next request without
+deleting history, earned items, or rewards. Membership copy promises only this
+implemented benefit. All pre-existing core features, raw history, competition,
+SHOP, Arcade, and adult role authorization remain unchanged and Open/role-based.
+Billing remains disabled. Advanced analytics and premium content are future work.

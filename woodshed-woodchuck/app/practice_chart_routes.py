@@ -266,6 +266,30 @@ def student_practice_streak(request: Request):
         }
 
 
+@router.get("/insights")
+def student_practice_insights(request: Request):
+    from fastapi.responses import JSONResponse
+    from .feature_access import require_feature
+    from .student_practice_metrics import practice_insights, week_start, WEEK
+    with SessionLocal() as session:
+        profile = current_profile(request, session)
+        if profile is None:
+            raise HTTPException(401, "Student sign-in is required.",
+                                headers={"Cache-Control": "no-store"})
+        require_feature(session, profile.id, "practice_insights")
+        today = datetime.now(CENTRAL).date()
+        end = week_start(today)
+        charts = session.scalars(select(PracticeChart).where(
+            PracticeChart.profile_id == profile.id,
+            PracticeChart.practice_date >= end - WEEK * 4,
+            PracticeChart.practice_date < end)).all()
+        approved = set(session.scalars(select(PracticeChartVerification.practice_chart_id).where(
+            PracticeChartVerification.practice_chart_id.in_([chart.id for chart in charts]),
+            PracticeChartVerification.status == "approved")))
+        return JSONResponse(practice_insights(charts, approved, today=today),
+                            headers={"Cache-Control": "no-store"})
+
+
 @router.get("/totals")
 def student_practice_totals(request: Request):
     with SessionLocal() as session:

@@ -362,10 +362,17 @@ def home(request: Request):
 
 @app.get("/p-book")
 def p_book(request: Request):
-    return _render(
+    from .feature_access import can_use_feature
+    with SessionLocal() as session:
+        profile = current_profile(request, session)
+        feature_access = {"practice_insights": bool(profile and can_use_feature(
+            session, profile.id, "practice_insights"))}
+    response = _render(
         request, "p_book.html", title="book", active_nav="p_book",
-        page_class="main-app-page",
+        page_class="main-app-page", feature_access=feature_access,
     )
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 @app.get("/practice/pristine")

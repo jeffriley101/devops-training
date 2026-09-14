@@ -1,13 +1,31 @@
 """Read-only practice snapshots for callers that have already authorized a student.
 
-These are practice metrics, not contest eligibility or XP chart counts. History
-and future paid analytics deliberately do not form part of the snapshot API.
+These are practice metrics, not contest eligibility or XP chart counts. The
+four-week Insights summary reuses the same totals without changing dashboard
+snapshot/rating semantics or introducing advanced analytics.
 """
 from datetime import date, datetime, time, timedelta
 
 from .contests import CENTRAL, central_week_boundaries
 
 WEEK = timedelta(days=7)
+
+
+def practice_insights(charts, approved: set[int], *, today: date) -> dict:
+    """Four completed Central calendar weeks, oldest first; persisted minutes only."""
+    end = week_start(today)
+    weeks = []
+    for offset in range(4, 0, -1):
+        start = end - WEEK * offset
+        totals = practice_totals([chart for chart in charts
+                                 if start <= chart.practice_date < start + WEEK], approved)
+        weeks.append({"week_start": start.isoformat(),
+                      "week_end": (start + WEEK - timedelta(days=1)).isoformat(),
+                      "minutes": totals["total"], "days": totals["days"],
+                      "verified_minutes": totals["verified"],
+                      "pristine_minutes": totals["pristine"]})
+    total = sum(week["minutes"] for week in weeks)
+    return {"weeks": weeks, "total_minutes": total, "average_weekly_minutes": total / 4}
 
 
 def week_start(day: date) -> date:

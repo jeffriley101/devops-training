@@ -162,6 +162,20 @@
     </article>
   </div>
 
+  <section class="mentor-card mt-md" id="practice-insights" aria-labelledby="practice-insights-title" data-enabled="{{ 'true' if feature_access.practice_insights else 'false' }}">
+    <h2 id="practice-insights-title">Practice Insights</h2>
+    <div data-insights-locked{% if feature_access.practice_insights %} hidden{% endif %}>
+      <p>Full Access includes a four-week practice summary.</p>
+      <p>Open Access includes your Practice Book, raw history, current-week totals, streak, and ordinary practice tools.</p>
+      <a class="btn btn-secondary" href="/membership?as_account=student">Explore Full Access</a>
+    </div>
+    <div data-insights-active{% if not feature_access.practice_insights %} hidden{% endif %}>
+      <p>Last four completed weeks</p>
+      <p data-insights-status role="status">Loading Practice Insights…</p>
+      <div data-insights-content></div>
+    </div>
+  </section>
+
   <article class="mentor-card mt-md pirate-logbook">
     <h2 class="p-book-title">Practice Book</h2>
     <div id="p-book-entries" class="p-book-entry-list">
@@ -180,4 +194,8 @@
   </div>
 </section>
 
+{% endblock %}
+
+{% block page_scripts %}
+<script src="/static/js/practice-insights.js?v=1"></script>
 {% endblock %}

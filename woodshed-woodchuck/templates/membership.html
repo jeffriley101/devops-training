@@ -20,6 +20,10 @@
 {% else %}
 {% if actor.kind == 'student' %}<section class="card"><h2>{{ '✓ Full Access' if full else 'Open Access' }}</h2>
 {% if full %}<p>Your account has Full Access.</p>{% endif %}</section>{% endif %}
+{% if actor.kind == 'student' %}<section class="card"><h2>Practice Insights with Full Access</h2>
+<p>See your last four completed weeks of practice: minutes, practice days, verified and Pristine minutes, plus your four-week total and weekly average.</p>
+<p>Your Practice Book, raw history, current-week totals, streak, and core practice tools remain available with Open Access.</p>
+</section>{% endif %}
 {% for item in memberships %}{% set member = item.membership %}
 <section class="card"><h2>Manage membership</h2><p>{{ item.plan_label }} · {{ member.status|title }}</p>
 {% if not item.active %}<p>This membership is not currently providing Full Access.</p>{% endif %}
