@@ -140,13 +140,14 @@ def season_pair(session, source_key, destination_key):
     return source, dest
 
 
-def build_plan(session, url, source_key, destination_key, *, now=None):
+def build_plan(session, url, source_key, destination_key, *, now=None, preflight=False):
     from . import team_continuity as domain
     moment = clock(now)
     connection = session.connection()
     schema_guard(connection)
     source, dest = season_pair(session, source_key, destination_key)
-    plan = domain.plan_team_continuity(session, source_season_id=source.id,
+    planner = domain.preflight_team_continuity if preflight else domain.plan_team_continuity
+    plan = planner(session, source_season_id=source.id,
                                       destination_season_id=dest.id, now=moment)
     snapshot = Snapshot(connection)
     teams = snapshot.rows("teams", lambda t: t.c.season_id.in_([source.id, dest.id]))

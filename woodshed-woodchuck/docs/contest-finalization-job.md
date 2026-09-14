@@ -16,6 +16,14 @@ For a future Render Cron Job, schedule it for Monday shortly after the current
 week's `finalize_after` timestamp (Band Camp uses America/Chicago boundaries).
 Do not start this command as an in-process FastAPI background loop.
 
+Team continuity is a separate midnight lifecycle operation, not part of
+`finalize_due_weeks`. The explicit `team_preflight` and `team_activate`
+commands share this job entry point; see
+[season team readiness and activation](season-team-activation.md) for scheduling,
+failure handling, and the required boundary traffic pause. The live service
+cadence must be checked by the operator: a noon-only finalizer schedule cannot
+provide midnight activation. No Render scheduling configuration is changed here.
+
 The command is safe to rerun manually with the same invocation. Finalized weeks
 are skipped, due failed weeks are retried, and database uniqueness constraints
 prevent duplicate results and rewards. Exit code `0` means every due week

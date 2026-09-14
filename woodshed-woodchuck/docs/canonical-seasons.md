@@ -110,8 +110,9 @@ Teams share a family, because removing the identity would lose continuity.
 `app/team_continuity.py` provides `plan_team_continuity` (read-only) and
 `apply_team_continuity` (fresh locked re-plan, caller-owned commit/rollback).
 Both accept source/destination season IDs, not writable dry-run instructions.
-They require a clean unit of work. No route, startup hook, calendar resolver,
-scheduler, or maintenance command calls apply. This is not a production repair.
+They require a clean unit of work. No route, startup hook, or calendar resolver
+calls apply. Explicit H2B maintenance and the operational season activation job
+reuse this engine; see [season team activation](season-team-activation.md).
 
 Adjacent seasons with the same configured timezone use destination local midnight
 as the boundary (September 14, 2026 in Chicago is 05:00 UTC). A source membership
@@ -151,18 +152,22 @@ or unrelated row locks. Constraints remain the backstop; a database error requir
 rollback of the complete caller transaction before retry. No external calls occur.
 
 Closed destinations, frozen weekly results/snapshots, and destination director
-contests require review. These checks do NOT synchronize arbitrary finalization
-workers: H2 must pause finalization/calendar writers (including in-flight work)
+contests require review. The normal finalizer now takes the shared season fence;
+these checks do NOT synchronize arbitrary SQL writers. H2 maintenance still
+pauses finalization/calendar writers (including in-flight work)
 for backdated application. Same-season ordinary team writers are serialized, but
 direct SQL/imports must follow the fence or be paused too. Moderation/capability
 changes after a completed continuation retain their existing seasonal behavior;
 H1B does not propagate later policy changes through a family.
 
-H2 should expose a read-only inventory/plan, then a separately authorized apply
-under a maintenance protocol with conflict reporting. After current production
-repair is approved and verified, a later explicit season-readiness/activation
-operation can call this engine before a new season is exposed. Do not wire it
-only to source-season closure: the calendar can activate the destination first.
+H2B exposes a read-only plan and separately authorized apply under maintenance.
+The explicit operational job now provides read-only prospective preflight and
+whole-transition activation at/after local midnight, requiring zero REVIEW and
+zero CONFLICT. It does not wait for source closure or not-yet-due finalization.
+Source finalization can occur later without rewriting historical memberships.
+If the stored source finalization deadline is already due, finalize normally
+first. Job scheduling and a boundary traffic pause must be configured separately;
+no web request runs activation. See the operational document linked above.
 No H1C attribution repair, result/award/snapshot rewrite, Hall identity conversion,
 join-request carry, or automatic runtime activation is implemented here.
 

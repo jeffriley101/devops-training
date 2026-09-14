@@ -22,7 +22,7 @@ from app.contests import (contest_week_schedule, current_contests_payload, ensur
 from app.db import Base
 from app.models import (Season, ContestWeek, Contest, ContestResult, Team, TeamMembership,
                         TeamWeekMembershipSnapshot, RewardGrant, CrownAward, CrownProgress,
-                        WoodchuckProfile, CampPointAward, PracticeChart)
+                        WoodchuckProfile, CampPointAward, PracticeChart, StudentVerifierConnection)
 from app.seasons import (CANONICAL_SEASONS, SeasonConfigurationError, bootstrap_canonical_seasons,
                          season_covering_date)
 from app.season_maintenance import apply_calendar_plan, calendar_plan
@@ -32,6 +32,16 @@ from test_band_director_roster import roster_db, add_student, signed_client
 
 NOW = datetime(2026, 9, 12, 18, tzinfo=timezone.utc)
 BACK_TO_SCHOOL_NOW = datetime(2026, 9, 19, 18, tzinfo=timezone.utc)
+
+
+def add_dual_role_student(factory, name):
+    """Use distinct adults for director and verifier relationships."""
+    profile_id = add_student(factory, name)
+    with factory() as session:
+        session.add(StudentVerifierConnection(profile_id=profile_id, verifier_id=2,
+                                             role="verifier", status="accepted"))
+        session.commit()
+    return profile_id
 
 
 @pytest.fixture
@@ -238,7 +248,7 @@ def test_rollover_reuses_preseeded_canonical_season_and_weeks(database):
 
 
 def test_all_consumers_agree_and_board_has_no_calendar(roster_db, monkeypatch):
-    profile_id = add_student(roster_db, "Canonical Student")
+    profile_id = add_dual_role_student(roster_db, "Canonical Student")
     with roster_db() as session:
         source, _ = legacy_data(session)
         apply_calendar_plan(session, repair=True)
@@ -246,7 +256,7 @@ def test_all_consumers_agree_and_board_has_no_calendar(roster_db, monkeypatch):
         season, week = current_roster_period(session, today=NOW.date())
         assert season.key == "band-camp-2026"
         assert week.week_start == date(2026, 9, 7)
-        assert verifier_dashboard_snapshot(session, verifier_id=1, today=NOW.date())["student"]["season"]["name"] == season.name
+        assert verifier_dashboard_snapshot(session, verifier_id=2, today=NOW.date())["student"]["season"]["name"] == season.name
         assert dashboard_metrics(session, verifier_id=1, today=NOW.date())["students"][0]["team"] is None
         assert band_director_practice_students(session, verifier_id=1, today=NOW.date())[0]["contest"]["week_start"] == week.week_start.isoformat()
         assert current_contests_payload(session, now=NOW, current_profile_id=profile_id)["season"]["key"] == season.key
@@ -276,7 +286,7 @@ def test_all_consumers_agree_and_board_has_no_calendar(roster_db, monkeypatch):
 
 
 def test_current_membership_helpers_ignore_expired_and_future_teams(roster_db):
-    profile_id = add_student(roster_db, "Seasonal Member")
+    profile_id = add_dual_role_student(roster_db, "Seasonal Member")
     with roster_db() as session:
         bootstrap_canonical_seasons(session)
         target = season_covering_date(session, NOW.date())
@@ -294,7 +304,7 @@ def test_current_membership_helpers_ignore_expired_and_future_teams(roster_db):
         champion = {"_normalized_name": "shared identity", "_owner_profile_id": None}
         assert _current_team_member_ids(session, champion, now=NOW) == {profile_id}
         assert dashboard_metrics(session, verifier_id=1, today=NOW.date())["students"][0]["team"]["name"] == "Band Camp"
-        assert verifier_dashboard_snapshot(session, verifier_id=1, today=NOW.date())["student"]["team"]["name"] == "Band Camp"
+        assert verifier_dashboard_snapshot(session, verifier_id=2, today=NOW.date())["student"]["team"]["name"] == "Band Camp"
         target.status = "closed"
         session.flush()
         assert _active_team_id_for_event(session, profile_id, NOW) is None
@@ -473,7 +483,7 @@ def test_previous_calendar_repair_is_not_silently_rewritten(database):
 
 @pytest.mark.parametrize("now,name", [(NOW, "Band Camp"), (BACK_TO_SCHOOL_NOW, "Back to School")])
 def test_runtime_consumers_follow_launch_transition(roster_db, now, name):
-    profile_id = add_student(roster_db, "Launch Student")
+    profile_id = add_dual_role_student(roster_db, "Launch Student")
     with roster_db() as session:
         legacy_data(session)
         apply_calendar_plan(session, repair=True)
@@ -481,7 +491,7 @@ def test_runtime_consumers_follow_launch_transition(roster_db, now, name):
         season, _ = current_roster_period(session, today=now.date())
         assert season.name == name
         assert board_season_presentation(season).title == name
-        assert verifier_dashboard_snapshot(session, verifier_id=1, today=now.date())["student"]["season"]["name"] == name
+        assert verifier_dashboard_snapshot(session, verifier_id=2, today=now.date())["student"]["season"]["name"] == name
         assert current_contests_payload(session, now=now, current_profile_id=profile_id)["season"]["name"] == name
         assert selection_payload(session, profile=session.get(WoodchuckProfile, profile_id), now=now)["season"]["name"] == name
         assert admin_status(session, now=now)["active_season"]["name"] == name

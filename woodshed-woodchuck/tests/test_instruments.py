@@ -118,7 +118,7 @@ def test_instrument_change_preserves_account_state_and_history(
     connection = StudentVerifierConnection(
         profile_id=profile.id,
         verifier_id=verifier.id,
-        role="teacher",
+        role="verifier",
         status="accepted",
     )
     verification = PracticeChartVerification(

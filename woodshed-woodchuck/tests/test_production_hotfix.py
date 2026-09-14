@@ -25,7 +25,7 @@ def test_instrument_assets_are_cache_busted_and_failures_are_visible() -> None:
     assert "/static/css/styles.css?v=119" in base
     assert "/static/manifest.webmanifest?v=4" in base
     assert "/static/js/instruments.js?v=3" in base
-    assert "/static/js/app.js?v=82" in base
+    assert "/static/js/app.js?v=83" in base
     assert "/static/js/account.js?v=14" in base
     assert 'id="change-instrument-feedback"' in home
     assert 'role="status"' in home
@@ -49,7 +49,7 @@ def test_verifier_mailto_uses_percent_spaces_and_preserves_real_plus() -> None:
     assert 'id="email-p-chart-btn"' not in (ROOT / "templates/p_book.html").read_text(encoding="utf-8")
     assert "?${params.toString()}" not in javascript
     assert "?${params.toString()}" not in app_javascript
-    assert "trusted-verifiers.js?v=9" in template
+    assert "trusted-verifiers.js?v=10" in template
 
     subject = "Woodshed Woodchuck Trusted Verifier Invitation"
     verification_url = "https://example.test/verify?token=a%2Bb%20c"

@@ -1,4 +1,4 @@
-"""Explicit seasonal continuity engine. No runtime entry point invokes apply.
+"""Explicit seasonal continuity engine. No web/startup entry point invokes apply.
 
 H2 must run backdated application with finalization/calendar maintenance paused:
 the frozen-data checks here are guardrails, not a replacement for that protocol.
@@ -92,7 +92,20 @@ def plan_team_continuity(session, *, source_season_id, destination_season_id, no
         return _plan(session, source_season_id, destination_season_id, _utc(now or datetime.now(timezone.utc)))
 
 
-def _plan(session, source_id, destination_id, now):
+def preflight_team_continuity(session, *, source_season_id, destination_season_id, now=None):
+    """Read-only projection from stored timestamps; never authorizes early apply.
+
+    Future roster changes can invalidate this forecast. Activation always uses
+    plan_team_continuity again, with the actual boundary gate, under locks.
+    """
+    if session.new or session.dirty or session.deleted:
+        raise ValueError("Continuity planning requires a clean unit of work.")
+    with session.no_autoflush:
+        return _plan(session, source_season_id, destination_season_id,
+                     _utc(now or datetime.now(timezone.utc)), allow_future=True)
+
+
+def _plan(session, source_id, destination_id, now, *, allow_future=False):
     from .teams import has_band_director_capability
 
     def rows(model, *conditions):
@@ -116,7 +129,7 @@ def _plan(session, source_id, destination_id, now):
         try:
             boundary = datetime.combine(dest.starts_on, time.min, ZoneInfo(dest.timezone)).astimezone(timezone.utc)
             week_start = dest.starts_on - timedelta(days=dest.starts_on.weekday())
-            if boundary > now:
+            if boundary > now and not allow_future:
                 reasons.append("boundary_not_reached")
         except (ValueError, KeyError):
             reasons.append("invalid_season_timezone")

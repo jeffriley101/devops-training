@@ -1759,6 +1759,14 @@ def finalize_contest_week(
     """Finalize a week, or fill deterministic gaps when explicitly repairing."""
     if now.tzinfo is None or now.utcoffset() is None:
         raise ValueError("The current time must be timezone-aware.")
+    # Share continuity's writer fence before taking week/reward locks. An
+    # activation at midnight must serialize with a later source finalization.
+    from .team_continuity import lock_team_seasons
+    season_id = session.scalar(select(ContestWeek.season_id).join(Season).where(
+        ContestWeek.week_start == week_start, contest_season_clause(),
+    ))
+    if season_id is not None:
+        lock_team_seasons(session, season_id)
     week = session.scalar(select(ContestWeek).join(Season).where(
         ContestWeek.week_start == week_start,
         contest_season_clause(),
