@@ -1607,6 +1607,27 @@ class RewardGrant(Base):
     )
 
 
+class AnalyticsEvent(Base):
+    """First feature entry per student/Central day; no metadata or personal fields."""
+    __tablename__ = "analytics_events"
+    __table_args__ = (
+        CheckConstraint("event_type IN ('arcade_entered', 'pristine_entered')",
+                        name="ck_analytics_event_type"),
+        UniqueConstraint("profile_id", "event_type", "activity_date",
+                         name="uq_analytics_event_profile_type_day"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    profile_id: Mapped[int] = mapped_column(
+        ForeignKey("woodchuck_profiles.id", ondelete="CASCADE"), nullable=False
+    )
+    event_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    occurred_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False, index=True
+    )
+    activity_date: Mapped[date] = mapped_column(Date, nullable=False)
+
+
 class CrownProgress(Base):
     __tablename__ = "crown_progress"
     __table_args__ = (
