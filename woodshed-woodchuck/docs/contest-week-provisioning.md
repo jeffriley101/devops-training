@@ -1,136 +1,91 @@
 # Advance ContestWeek provisioning
 
-`provision_weeks` is an explicit calendar job. It defaults to a database-enforced
-read-only plan; `--apply` inserts only missing weeks in one transaction. No
-migration is required: it uses the existing schema at `s9n0o1p2q3r4` and the
-`(season_id, week_start)` unique constraint. It neither creates/enables Seasons
-nor changes Teams, deadlines, results, rewards, snapshots, or other history.
+Prepare approved weeks ahead, run [ordinary finalization](contest-finalization-job.md)
+through the existing operational service, and supervise
+[seasonal Team activation](season-team-activation.md). These are separate jobs.
+Local tests do not establish production provisioning, readiness, or scheduling.
+Jeff's [September 14 production run evidence](contest-finalization-job.md#supplied-production-execution-evidence)
+confirms that September 14 and September 21 week rows existed then; it does not
+establish Halloween coverage or that `provision_weeks` created those rows.
 
-## Plan, apply, verify
+## Prerequisites
 
-Set `DATABASE_URL` explicitly to the intended database in the process environment.
-Provisioning and Team jobs also accept `--database-url`; they have no local DB
-fallback. The finalizer uses `DATABASE_URL`, so keep it set for every command.
+Run from `woodshed-woodchuck` with the application environment and an explicit
+`DATABASE_URL` for the intended database. Never paste its value into logs.
+Provisioning also accepts `--database-url`; it has no local-database fallback.
+The deployed code must include `bc766ff` and the existing schema revision
+`s9n0o1p2q3r4`. No additional migration is required.
 
-For Back to School → Halloween, provision only the source final week (September
-21–28) and destination first week (September 28–October 5):
+Season records must already match `app/seasons.py`: canonical keys, names, dates,
+and `America/Chicago`. Provisioning does not create or enable Seasons. Resolve
+missing records through the [canonical bootstrap runbook](canonical-seasons.md),
+reviewing its plan first; do not use incident repair or rollover to force this
+transition. Team activation additionally requires source `active`/`closed`,
+destination `active`, and a clean Team preflight. Ordinary finalization also
+requires the existing Contest definitions; week provisioning does not seed them.
 
-```bash
-python -m app.contest_jobs provision_weeks \
-  --source-season back-to-school-2026 --destination-season halloween-2026
+## Recommended: prepare both complete seasons
 
-python -m app.contest_jobs provision_weeks \
-  --source-season back-to-school-2026 --destination-season halloween-2026 --apply
-
-python -m app.contest_jobs provision_weeks \
-  --source-season back-to-school-2026 --destination-season halloween-2026
-```
-
-Alternatively, prepare all weeks in explicitly named canonical seasons:
+The command supports **all seven weeks**: Back to School September 14–27 (two)
+and Halloween September 28–November 1, 2026 (five). Dates here are inclusive;
+stored week ends are exclusive Mondays. Run plan, review, apply, then plan again:
 
 ```bash
 python -m app.contest_jobs provision_weeks \
   --season back-to-school-2026 --season halloween-2026
 python -m app.contest_jobs provision_weeks \
   --season back-to-school-2026 --season halloween-2026 --apply
+python -m app.contest_jobs provision_weeks \
+  --season back-to-school-2026 --season halloween-2026
 ```
 
-These are alternative scopes; do not combine the season and transition flags.
-A transition must be canonically adjacent. Whole-season preparation requires
-an approved end date. A transition into open-ended Band Camp 2027 can prepare
-its first seven-day week without inventing a season end or later weeks.
-
-Check the JSON `scope`, `weeks`, `conflicts`, and `activation_prerequisites`.
-`READY` concerns calendar provisioning only. Missing Season records, canonical
-metadata mismatches, overlapping Season coverage, wrong week ownership, malformed
-boundaries, and overlapping week rows cause `BLOCKED` and nonzero exit with no
-inserts. Provisioning requires existing canonical Season records; resolve missing
-records with the separately reviewed season bootstrap workflow. Never repurpose
-incident calendar repair or rollover to force this transition.
-
-A matching week means the same owner and exact date interval. Its stored
-deadlines, status, timestamps, and history remain unchanged, including finalized
-rows. `stored_deadlines_differ` highlights custom deadlines without rewriting
-them. The bounded transition inspects its two intervals, including overlapping
-rows owned by other seasons; it does not repair or certify other historical
-weeks. Frozen destination history can still block Team activation.
-
-After apply, expect `APPLIED` and the committed `created` count; repeat plan
-must show zero `missing`, zero conflicts, and all weeks `unchanged`. Repeated
-apply returns `ALREADY_COMPLETE` with zero creates. Retain job output externally
-as operational evidence; no audit records are added to the database.
-
-## Required lifecycle order and timezones
-
-Run prospective Team preflight after calendar provisioning:
+For only the activation minimum—source September 21–28 and destination September
+28–October 5—use this bounded alternative, adding `--apply` only after review,
+then repeating without it to verify:
 
 ```bash
-python -m app.contest_jobs team_preflight \
+python -m app.contest_jobs provision_weeks \
   --source-season back-to-school-2026 --destination-season halloween-2026
 ```
 
-Preflight remains read-only. Resolve every REVIEW/CONFLICT and other blocker.
-Source must be enabled or closed and destination enabled (`active`). READY is
-prospective and does not authorize a later changed roster. Source-final-week
-presence, stored deadlines, an open destination first week, and all existing
-frozen-history checks still apply.
+Do not combine the two scope forms. Whole-season preparation needs an approved
+end date. Band Camp 2027 still has no approved end: do not invent one or provision
+its whole season. An adjacent Beach → Band Camp 2027 transition can provision
+only the source final and destination first week. Unresolved future calendar
+changes, including Hibernaculum proposals, remain unchanged.
 
-At or after **2026-09-28 00:00 America/Chicago (05:00 UTC)**:
+## Results, preservation, and retries
 
-```bash
-python -m app.contest_jobs team_activate \
-  --source-season back-to-school-2026 --destination-season halloween-2026
-```
+- Plan is database-enforced read-only. Review `scope`, `weeks`, `conflicts`, and
+  `activation_prerequisites`. `READY` means calendar preparation is safe, not
+  that Team activation is ready.
+- `BLOCKED`/nonzero means resolve missing/conflicting Seasons, wrong ownership,
+  malformed or overlapping weeks before retrying. Application makes no partial
+  inserts. Full-season mode also rejects weeks assigned outside that season;
+  transition mode inspects only its two intervals and overlaps with them.
+- Successful apply returns `APPLIED`, committed `created` count, new row IDs,
+  and `missing: 0`. Repeat plan must have zero missing/conflicts and seven
+  unchanged rows for the complete pair. Repeat apply returns `ALREADY_COMPLETE`
+  and zero creates. Keep the JSON and process exit status as operational evidence.
+- Matching ownership/date intervals remain unchanged, including finalized rows,
+  stored deadlines, timestamps, rewards, results and membership snapshots.
+  `stored_deadlines_differ` reports custom deadlines; never normalize them.
 
-Verify the activation report's verification result and zero remaining creates;
-repeat this explicit activation command for `ALREADY_COMPLETE`. Keep the
-[activation runbook's boundary writer/user pause](season-team-activation.md)
-until verification passes. Activation before the boundary remains `NOT_DUE`.
-There is no CLI clock override.
+Dates/deadlines come from the canonical rules and `contest_week_schedule`, with
+ZoneInfo conversion per week. See [weekly timing](contest-finalization-job.md#weekly-boundary-and-deadlines)
+for DST and strictly-after finalization rules.
 
-Later, after the source's stored deadlines:
+Apply replans under sorted Season locks. SQLite uses `BEGIN IMMEDIATE`;
+PostgreSQL uses READ COMMITTED plus a short `SHARE ROW EXCLUSIVE` lock on
+`contest_weeks`, including coordination with legacy/lazy calendar writers.
+The existing per-season/start unique constraint provides another duplicate
+safeguard. Inserts and verification commit together; lock/constraint errors or
+failed verification roll back. Retry the same scope after transient contention.
+After a lost connection or missing final report, plan again before deciding
+whether the previous apply committed. Never repair history to force a retry.
 
-```bash
-python -m app.contest_jobs finalize_due_weeks
-```
-
-This finalizes **all due weeks**, so inspect the intended database's due-week
-state before running it. Default source deadlines are September 28 at 12:00 and
-12:05 Central (17:00 and 17:05 UTC); both must be strictly passed. Existing custom
-deadlines take precedence. If activation is delayed until source finalization is
-due, finalize normally first, then rerun preflight/activation. Destination frozen
-history still requires operator review; provisioning never clears it.
-
-Canonical dates come from `app/seasons.py`; scheduling comes from
-`contest_week_schedule`: Monday-to-Monday half-open dates, verification at the
-ending Monday's noon Central, finalization five minutes later. ZoneInfo computes
-UTC offsets for each deadline. For example, the Halloween final week crosses
-the November 1 DST change and its November 2 noon deadline is 18:00 UTC. Do not
-calculate deadlines by adding fixed UTC weeks.
-
-## Transactions, retries, and scheduling
-
-Apply replans from current state after sorted shared Season locks. SQLite uses
-`BEGIN IMMEDIATE`; PostgreSQL uses READ COMMITTED and a short
-`SHARE ROW EXCLUSIVE` lock on `contest_weeks` to serialize interval checks with
-legacy/lazy writers too. This can briefly delay unrelated calendar/finalization
-writes. The unique constraint provides an additional duplicate safeguard.
-All inserts and post-insert validation commit together. Conflicts, lock errors,
-constraint failures, or verification failures roll back the operation. Retry
-the same bounded command after transient contention; persistent conflicts need
-review, never deadline/history edits. A previously printed plan is informational;
-apply always replans and does not accept plan JSON as authority.
-
-No scheduler is installed or activated by this code. An operator still needs to
-review/release the change, verify the intended database and canonical Season
-records, run plan/apply/preflight in advance, arrange boundary activation and its
-traffic pause, and configure monitored retries plus independent due-week
-finalization. A noon-only finalizer schedule cannot perform midnight activation.
-Monitor nonzero exits and structured results; confirm successful execution rather
-than merely the existence of a schedule.
-
-Validation for this change uses disposable SQLite and loopback PostgreSQL
-fixtures, including the full provisioning → preflight → activation → later
-source-finalization sequence. Local test readiness does **not** mean production
-weeks are provisioned, a schedule exists, or production preflight is clean.
-No production access or scheduler changes are part of this implementation.
+Next, follow the activation runbook's preflight and supervised boundary procedure.
+Provisioning neither pauses users nor activates Teams nor awards anything, and
+it installs no schedule. See the finalizer runbook's
+[live settings checklist](contest-finalization-job.md#live-settings-to-verify)
+before arranging operational execution.
