@@ -348,6 +348,9 @@ def run_finalize_due_weeks(
 
 def main(argv: Sequence[str] | None = None) -> int:
     arguments = list(sys.argv[1:] if argv is None else argv)
+    if arguments and arguments[0] == "provision_weeks":
+        from .contest_week_provisioning import main as provision_job
+        return provision_job(arguments[1:])
     if arguments and arguments[0] in {"team_preflight", "team_activate"}:
         from .season_team_activation import main as team_job
         return team_job(arguments)
@@ -432,7 +435,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         sys.stderr.write(
             "Usage: python -m app.contest_jobs "
             "{finalize_due_weeks|audit_history --week YYYY-MM-DD [--apply]|"
-            "rollover_season ...|team_preflight ...|team_activate ...}\n"
+            "rollover_season ...|provision_weeks ...|team_preflight ...|team_activate ...}\n"
         )
         return 2
 

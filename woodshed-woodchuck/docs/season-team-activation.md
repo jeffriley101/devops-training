@@ -118,13 +118,14 @@ not all future ContestWeeks. Normal `ensure_current_contest_data` creates the
 current week lazily and commits; it is deliberately not called from this atomic
 activation transaction. Preflight MUST find the source final week and an open
 destination first week already provisioned. A missing first week returns
-`destination_first_week_not_open`, NOT_READY, with no writes. Inspect this before
-September 28 and arrange separately reviewed calendar provisioning. The existing
+`destination_first_week_not_open`, NOT_READY, with no writes. Use the explicit
+[advance week provisioning runbook](contest-week-provisioning.md) to plan and
+apply the missing source-final/destination-first weeks before September 28,
+then rerun preflight. Provisioning is separate from activation and finalization;
+it cannot resolve Team REVIEW/CONFLICT or frozen-history blockers. The existing
 `season_maintenance bootstrap` alone does not provision Halloween weeks, and
 source `rollover_season` cannot be used before source finalization. Do not wait
-for a student's page load to satisfy this prerequisite. If it remains unmet,
-keep traffic paused and resolve it through controlled calendar setup before
-activation; this release does not add a week-provisioning command.
+for a student's page load to satisfy this prerequisite.
 
 A scheduled process alone cannot promise a zero-second empty-Team window:
 startup delay or a rejected plan can outlast midnight, while date-covered lookup
