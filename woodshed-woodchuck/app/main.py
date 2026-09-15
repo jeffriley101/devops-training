@@ -36,6 +36,8 @@ from .teams import has_band_director_capability, router as team_router
 from .xp_routes import router as xp_router
 from .store_routes import router as store_router
 from .arcade_routes import router as arcade_router
+from .analytics import observe_response
+from .analytics_routes import router as analytics_router
 from .db import SessionLocal
 from .content import (
     ART_SUBMISSION_EMAIL,
@@ -87,6 +89,7 @@ app.include_router(director_router)
 app.include_router(xp_router)
 app.include_router(store_router)
 app.include_router(arcade_router)
+app.include_router(analytics_router)
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 templates.env.filters["practice_duration"] = format_minutes
@@ -100,7 +103,7 @@ NAV_ITEMS = [
 ]
 
 
-def _render(request: Request, template_name: str, **context: object):
+def _render(request: Request, template_name: str, *, analytics_event: str | None = None, **context: object):
     account_state_bootstrap = None
     authenticated_profile = None
     with SessionLocal() as session:
@@ -119,7 +122,7 @@ def _render(request: Request, template_name: str, **context: object):
                 "revision": saved_state.revision if saved_state else 0,
             }
 
-    return templates.TemplateResponse(
+    response = templates.TemplateResponse(
         request=request,
         name=template_name,
         context={
@@ -134,6 +137,13 @@ def _render(request: Request, template_name: str, **context: object):
             **context,
         },
     )
+    if analytics_event is not None:
+        return observe_response(
+            response, session_factory=SessionLocal,
+            profile_id=profile.id if profile is not None else None,
+            event_type=analytics_event,
+        )
+    return response
 
 
 def public_site_url(request: Request) -> str:
@@ -382,6 +392,7 @@ def pristine_practice(request: Request):
     return _render(
         request,
         "pristine_practice.html",
+        analytics_event="pristine_entered",
         title="Pristine Practice",
         active_nav="store",
         page_class="main-app-page pristine-practice-screen",
@@ -425,6 +436,7 @@ def arcade(request: Request):
     return _render(
         request,
         "arcade.html",
+        analytics_event="arcade_entered",
         title="Arcade",
         active_nav="store",
         page_class="main-app-page arcade-screen",

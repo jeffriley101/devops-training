@@ -1,0 +1,76 @@
+{% extends "dashboard_base.html" %}
+{% from "dashboard_header.html" import dashboard_header %}
+{% block dashboard_styles %}
+<style>
+  .analytics-table-wrap { overflow-x: auto; }
+  .analytics-table { width: 100%; border-collapse: collapse; text-align: left; }
+  .analytics-table th, .analytics-table td { padding: .55rem; border-bottom: 1px solid #dec89d; vertical-align: top; }
+  .analytics-table thead th { white-space: nowrap; }
+</style>
+{% endblock %}
+{% block content %}
+{% call dashboard_header('Site Admin', 'Pre-beta activity', 'Protected Site Administration') %}
+<a class="btn btn-secondary" href="/admin/membership">Site Admin</a>
+{% endcall %}
+<section class="card">
+  <h2>Overview</h2>
+  <p>{{ report.first_day }} through {{ report.today }} (30 calendar days). As of {{ report.as_of.strftime('%Y-%m-%d %H:%M %Z') }}.</p>
+  <p>All non-deleted student accounts, including staff/test accounts. There is no separate tester cohort.</p>
+  <ul>
+    <li>Student accounts: <strong>{{ report.accounts }}</strong>; created in this window: <strong>{{ report.new_accounts }}</strong></li>
+    <li>Active today: <strong>{{ report.active_today }}</strong></li>
+    <li>Active in the last 7 calendar days: <strong>{{ report.active_7 }}</strong></li>
+    <li>Active in the last 30 calendar days: <strong>{{ report.active_30 }}</strong></li>
+    <li>Returning in this window: <strong>{{ report.returning }}</strong></li>
+    <li>Students saving practice: <strong>{{ report.practicing_students }}</strong>; charts saved: <strong>{{ report.practice_charts }}</strong>; credited duration: <strong>{{ report.practice_duration }}</strong></li>
+  </ul>
+  <p>Active means at least one recorded sign-in day, saved practice chart, game start/completion, quest, trivia attempt, Board claim, store purchase, or observed feature entry. Returning means active on two or more distinct America/Chicago dates in this window. Account creation and automatic rewards/results alone do not count.</p>
+  <p>Practice totals cover charts <em>saved</em> in this window, including entries for earlier practice dates. Credited duration uses Woodshed's existing calculation; separate ordinary and Pristine charts remain additive. This is not a count of distinct real-world practice sessions.</p>
+  {% if not report.events_available %}<p role="status"><strong>Entry observations are unavailable.</strong> Existing activity records are still shown; entry counts and workflow comparisons are incomplete.</p>{% endif %}
+  {% if not report.recording_enabled %}<p role="status">New entry recording is disabled. Previously recorded entries remain visible.</p>{% endif %}
+</section>
+<section class="card">
+  <h2>Feature usage</h2>
+  <p>Counts describe records, not clicks or time spent. Each new entry observation counts only the first successful authenticated page render per student per day. Sign-in activity comes from existing daily login rewards.</p>
+  <div class="analytics-table-wrap"><table class="analytics-table">
+    <thead><tr><th scope="col">Activity</th><th scope="col">Records</th><th scope="col">Students</th></tr></thead>
+    <tbody>{% for label, count, students in report.features %}<tr><th scope="row">{{ label }}</th><td>{{ count if report.events_available or label not in ['Arcade entry days', 'Pristine Practice entry days'] else 'Unavailable' }}</td><td>{{ students if report.events_available or label not in ['Arcade entry days', 'Pristine Practice entry days'] else '—' }}</td></tr>{% endfor %}</tbody>
+  </table></div>
+  <p>Charts opting into individual contests: {{ report.contest_charts }}; team contests: {{ report.team_contest_charts }}. Opt-in records do not establish eligibility or placement.</p>
+  <p>Context only: {{ report.reward_count }} reward grants and {{ report.medal_count }} student contest medal records created in the window. These may be automatic and are excluded as independent evidence of activity.</p>
+</section>
+<section class="card">
+  <h2>Workflow observations</h2>
+  {% if report.events_available %}
+  <p>Arcade entry days without a game start on the same student/date: <strong>{{ report.arcade_without_start }}</strong>.</p>
+  <p>Pristine entry days without a saved Pristine chart on the same student/date: <strong>{{ report.pristine_without_save }}</strong>.</p>
+  {% else %}<p>Entry comparisons unavailable.</p>{% endif %}
+  <p>These are prompts for tester observation, not failure or abandonment rates. Today may still be in progress, a workflow can cross midnight, a game can resume an older play, and visits can be exploratory. Entry collection begins with this release and is best-effort; there is no historical backfill.</p>
+  <div class="analytics-table-wrap"><table class="analytics-table">
+    <thead><tr><th scope="col">Game</th><th scope="col">Started</th><th scope="col">Of those, completed</th><th scope="col">Uncompleted, started ≥1 hour ago</th></tr></thead>
+    <tbody>{% for game, values in report.games %}<tr><th scope="row">{{ game }}</th><td>{{ values.started }}</td><td>{{ values.completed }}</td><td>{{ values.open_over_hour }}</td></tr>{% else %}<tr><td colspan="4">No game starts in this window.</td></tr>{% endfor %}</tbody>
+  </table></div>
+</section>
+<section class="card">
+  <h2>Students active by day</h2>
+  <details><summary>Show all 30 Central dates</summary>
+  <table class="analytics-table"><thead><tr><th scope="col">Date</th><th scope="col">Active students</th></tr></thead><tbody>{% for day, count in report.daily %}<tr><th scope="row">{{ day }}</th><td>{{ count }}</td></tr>{% endfor %}</tbody></table>
+  </details>
+</section>
+<section class="card">
+  <h2>Per-student summary</h2>
+  <p>Internal numeric IDs only. Last observed is the latest available evidence in this window, not an exact last-visit time; entry-only visits retain the first observation of each day.</p>
+  <div class="analytics-table-wrap"><table class="analytics-table">
+    <thead><tr><th scope="col">Student ID</th><th scope="col">Last observed (Central)</th><th scope="col">Active days</th><th scope="col">Practice saved</th><th scope="col">Activities</th></tr></thead>
+    <tbody>{% for student in report.students %}<tr><th scope="row">{{ student.id }}</th><td>{{ student.last_seen.strftime('%Y-%m-%d %H:%M %Z') if student.last_seen else 'None in window' }}</td><td>{{ student.active_days }}</td><td>{{ student.practice_charts }} charts · {{ student.practice_duration }}</td><td>{{ student.areas|join(', ') or 'None recorded' }}</td></tr>{% else %}<tr><td colspan="5">No student accounts.</td></tr>{% endfor %}</tbody>
+  </table></div>
+</section>
+<section class="card">
+  <h2>Recent recorded activity</h2>
+  <p>Latest 50 records in this window. Game starts and completions are separate records.</p>
+  <div class="analytics-table-wrap"><table class="analytics-table">
+    <thead><tr><th scope="col">Time (Central)</th><th scope="col">Student ID</th><th scope="col">Activity</th></tr></thead>
+    <tbody>{% for timestamp, profile_id, label in report.recent %}<tr><td>{{ timestamp.strftime('%Y-%m-%d %H:%M %Z') }}</td><td>{{ profile_id }}</td><td>{{ label }}</td></tr>{% else %}<tr><td colspan="3">No recorded activity in this window.</td></tr>{% endfor %}</tbody>
+  </table></div>
+</section>
+{% endblock %}
