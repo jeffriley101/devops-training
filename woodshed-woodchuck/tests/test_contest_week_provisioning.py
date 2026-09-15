@@ -207,13 +207,17 @@ def test_cli_scope_opt_in_and_safe_errors(db, monkeypatch, capsys):
 
 
 @pytest.mark.parametrize("backend", ["sqlite", "postgresql"])
-def test_provision_preflight_activate_later_source_finalization(tmp_path, backend):
+@pytest.mark.parametrize("scoring_mode", ["legacy_minutes", "precise_seconds"])
+def test_provision_preflight_activate_later_source_finalization(tmp_path, backend, scoring_mode):
     url = disposable_url(tmp_path, backend)
     engine = lifecycle.seed(url)
     try:
         with Session(engine) as s:
             s.get(m.Season, 1).name = "Back to School"
             s.get(m.Season, 2).name = "Halloween"
+            s.get(m.ContestWeek, 6).practice_scoring_mode = scoring_mode
+            if scoring_mode == "precise_seconds":
+                s.scalar(select(m.ContestResult)).precise_score = 40.25
             # The activation fixture's older frozen weeks stay outside this
             # explicitly bounded transition and must remain byte-for-byte intact.
             s.delete(s.get(m.ContestWeek, 7))
@@ -234,10 +238,16 @@ def test_provision_preflight_activate_later_source_finalization(tmp_path, backen
         assert activation.activate(url, **PAIR, now=lifecycle.BOUNDARY - timedelta(seconds=1))["status"] == "NOT_DUE"
         activated = activation.activate(url, **PAIR, now=lifecycle.BOUNDARY)
         assert (activated["teams_created"], activated["memberships_created"]) == (4, 11)
-        assert history.full_snapshot(engine)["reward_grants"] == before["reward_grants"]
+        activated_history = history.full_snapshot(engine)
+        for table in before:
+            if table not in {"teams", "team_memberships"}:
+                assert activated_history[table] == after[table], table
+        assert activation.activate(url, **PAIR, now=lifecycle.BOUNDARY)["status"] == "ALREADY_COMPLETE"
+        assert history.full_snapshot(engine) == activated_history
         with Session(engine) as s:
             source = finalize_contest_week(s, week_start=date(2026, 9, 21), now=lifecycle.DUE + timedelta(seconds=1))
             s.commit()
+            assert source.practice_scoring_mode == "precise_seconds"
             snapshots = list(s.scalars(select(m.TeamWeekMembershipSnapshot).where(m.TeamWeekMembershipSnapshot.contest_week_id == source.id)))
             assert len(snapshots) == 11 and {r.team_id for r in snapshots} == {1, 6, 8, 9}
             dest = s.scalar(select(m.ContestWeek).where(m.ContestWeek.week_start == date(2026, 9, 28)))

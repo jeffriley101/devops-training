@@ -171,7 +171,7 @@ def test_conflicting_snapshot_mode_refuses_repair(pristine_database, mode):
         assert snapshot(session, (ContestResult, *HISTORY, ContestWeek)) == before
 
 
-def test_season_tools_guard_rejects_unapproved_precision_head():
+def test_season_tools_guard_rejects_incomplete_precision_schema():
     from sqlalchemy import create_engine
     from app.team_continuity_repair import schema_guard, RepairError
     engine = create_engine("sqlite://")
@@ -180,7 +180,7 @@ def test_season_tools_guard_rejects_unapproved_precision_head():
                     "CREATE TABLE team_families (id INTEGER)", "CREATE TABLE teams (id INTEGER)",
                     "INSERT INTO alembic_version VALUES ('t0p1q2r3s4t5')"):
             connection.execute(text(ddl))
-        with pytest.raises(RepairError, match="revision_not_approved"):
+        with pytest.raises(RepairError, match="team_family_constraints_missing"):
             schema_guard(connection)
     engine.dispose()
 

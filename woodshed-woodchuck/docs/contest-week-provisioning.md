@@ -13,8 +13,19 @@ establish Halloween coverage or that `provision_weeks` created those rows.
 Run from `woodshed-woodchuck` with the application environment and an explicit
 `DATABASE_URL` for the intended database. Never paste its value into logs.
 Provisioning also accepts `--database-url`; it has no local-database fallback.
-The deployed code must include `bc766ff` and the existing schema revision
-`s9n0o1p2q3r4`. No additional migration is required.
+The deployed code must include provisioning (`bc766ff`), practice-time precision,
+and the schema-compatibility update. This combined code requires exactly one
+Alembic head, `t0p1q2r3s4t5`, and its required columns/TeamFamily constraints.
+The previous `s9n0o1p2q3r4` schema is unsupported: even read-only planning selects
+`ContestWeek.practice_scoring_mode`; the combined result ORM also selects
+`ContestResult.precise_score`. Older, unknown, multiple, or incomplete schema
+states refuse before writes. Do not stamp a revision to bypass migration.
+
+In production, apply the precision migration **before starting the new code**.
+Pause/drain finalization writers and coordinate the web/finalizer upgrade;
+resume only when all entry points use the compatible release. Follow the
+[precision release ordering](practice-time-precision.md#release-ordering-and-maintenance-compatibility).
+This compatibility update adds no further migration.
 
 Season records must already match `app/seasons.py`: canonical keys, names, dates,
 and `America/Chicago`. Provisioning does not create or enable Seasons. Resolve
@@ -68,7 +79,8 @@ changes, including Hibernaculum proposals, remain unchanged.
   unchanged rows for the complete pair. Repeat apply returns `ALREADY_COMPLETE`
   and zero creates. Keep the JSON and process exit status as operational evidence.
 - Matching ownership/date intervals remain unchanged, including finalized rows,
-  stored deadlines, timestamps, rewards, results and membership snapshots.
+  stored deadlines, timestamps, scoring provenance, fractional/frozen results,
+  rewards, crowns and membership snapshots.
   `stored_deadlines_differ` reports custom deadlines; never normalize them.
 
 Dates/deadlines come from the canonical rules and `contest_week_schedule`, with

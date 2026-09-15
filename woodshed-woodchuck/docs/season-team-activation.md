@@ -3,7 +3,14 @@
 Use the existing explicit jobs after [calendar preparation](contest-week-provisioning.md).
 Run from `woodshed-woodchuck` in the application environment with an explicit
 `DATABASE_URL` (or `--database-url`); there is no local-database fallback.
-The current schema guard requires `s9n0o1p2q3r4`; this workflow adds no migration.
+The shared schema guard requires exactly one head, `t0p1q2r3s4t5`, including
+both precision columns and the existing TeamFamily constraints. Previous
+`s9n0o1p2q3r4` is incompatible with the combined ORM, including read-only
+preflight; older, unknown, multiple, and incomplete states refuse before writes.
+Apply the precision migration **before starting the new production code** and
+coordinate the web/finalizer upgrade with finalization writers paused/drained.
+Follow [precision release ordering](practice-time-precision.md#release-ordering-and-maintenance-compatibility);
+this compatibility update adds no further migration. Never stamp past a refusal.
 These CLI jobs install no scheduler or startup hook. Existing authenticated
 admin finalization remains separate from seasonal activation.
 
@@ -43,7 +50,8 @@ successors need review, not partial activation.
 
 Only successor Teams/memberships can be inserted. The transaction verifies the
 exact continuation delta and unchanged protected history, including source
-memberships; exceptions/refusals roll back. Successful repeats create nothing.
+memberships, fractional result scores and per-week scoring provenance;
+exceptions/refusals roll back. Successful repeats create nothing.
 Source finalization remains a later independent job.
 
 ## Supervised boundary procedure
@@ -166,7 +174,8 @@ old transitions after destination history freezes.
 Seamless season transitions should eventually coordinate date-based Season
 selection with Team readiness, while retaining transaction, conflict,
 frozen-history and deadline safeguards. That implementation is deferred.
-**Practice-time precision remains the next separate code task.** No scheduler,
-maintenance framework, new endpoint or dashboard is introduced here. For current
+Practice-time precision and schema compatibility require the coordinated release
+described above. No scheduler, maintenance framework, new endpoint or dashboard
+is introduced here. For current
 job visibility and outstanding live settings, use the
 [finalizer operations runbook](contest-finalization-job.md#visibility-and-notifications).

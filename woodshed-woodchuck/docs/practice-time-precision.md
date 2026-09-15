@@ -71,16 +71,46 @@ and repairs to stay paused: old code does not honor precise scoring markers.
 Resolve service/schema compatibility and preserve or restore provenance before
 resuming historical repairs.
 
-Compatibility inspection: `app/team_continuity_repair.py::schema_guard` pins
-`REVISION` to `s9n0o1p2q3r4` and rejects every other head. Current season
-activation and continuity maintenance use it. The protected
-`feature/contest-week-provisioning` branch at `3196ee7` has the same guard and
-calls it for both provisioning plan and apply. It **does not accept
-`t0p1q2r3s4t5`**; the check returns `revision_not_approved`. No guard was weakened
-or protected branch merged. Using these maintenance tools after the precision
-migration requires a separate reviewed compatibility update (including
-preservation/snapshot coverage of the new fields) and coordinated release.
-Do not bypass the revision check or rewrite `alembic_version`.
+The combined schema-compatibility update pins
+`app/team_continuity_repair.py::schema_guard` to exactly `t0p1q2r3s4t5`.
+Season preflight/activation, continuity maintenance and provisioning plan/apply
+share this guard. It requires the two new columns and existing structural
+constraints; unknown, multiple, unsupported or incomplete states still refuse
+before writes. The previous `s9n0o1p2q3r4` schema cannot support this ORM:
+`ContestWeek` and `ContestResult` SELECTs require their new mapped columns,
+including during read-only planning. Upgrade first; do not rewrite
+`alembic_version` or bypass the guard. No further migration is introduced.
+
+Protected-history verification now includes `ContestResult.precise_score` and
+`ContestWeek.practice_scoring_mode`. Existing scores, ranks, provenance,
+deadlines, rewards, crowns and membership snapshots remain unchanged by
+activation/provisioning. Regenerate continuity maintenance plans after the
+upgrade: old revision/hashes are not reusable. Local compatibility validation
+uses disposable SQLite and PostgreSQL databases; it does not establish a
+production migration or coordinated service release.
+
+### Local compatibility validation
+
+Set `WW_BILLING_TEST_POSTGRES_URL` only to an isolated loopback PostgreSQL
+database named `ww_billing_a2_test`; the fixtures create separate schemas.
+From the repository application directory, run:
+
+```bash
+.venv/bin/pytest -q tests/test_contest_schema_compatibility.py \
+  tests/test_contest_week_provisioning.py \
+  tests/test_season_team_activation.py tests/test_season_team_activation_postgres.py \
+  tests/test_team_continuity_repair.py tests/test_team_continuity_repair_postgres.py \
+  tests/test_practice_time_precision.py tests/test_practice_scoring_repairs.py \
+  tests/test_contest_jobs.py
+git diff --check
+```
+
+Coverage includes real old-schema refusal and migration, upgraded read-only
+planning/apply, incomplete/unsupported revision refusal before writes,
+PostgreSQL writer locks, rollback, repeat no-ops, frozen legacy/precise history,
+stored deadlines, rewards/crowns, and precision-aware maintenance fingerprints.
+Without the explicit PostgreSQL URL, PostgreSQL cases skip and do not validate
+the PostgreSQL lock contract.
 
 ## Limits
 

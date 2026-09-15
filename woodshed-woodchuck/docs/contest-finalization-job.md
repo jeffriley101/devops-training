@@ -21,6 +21,13 @@ trusted operational environment. Existing Contest definitions must be present;
 missing definitions fail finalization. Normal contest setup seeds them;
 `provision_weeks` and Season bootstrap do not.
 
+For the combined precision/provisioning release, migrate to `t0p1q2r3s4t5`
+**before starting the new web or finalizer code**. Pause/drain all finalization
+writers, upgrade both services and every finalization entry point together,
+then resume; old/new finalizers must not overlap. Follow the
+[precision release procedure](practice-time-precision.md#release-ordering-and-maintenance-compatibility).
+Local compatibility tests do not establish that production has been upgraded.
+
 The operational service name `woodshed-contest-finalizer` appears in the existing
 runbooks. No tracked Render Blueprint, cron expression or scheduler startup
 establishes its service type, live command, cadence or alert destination. The

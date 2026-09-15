@@ -25,14 +25,14 @@ from sqlalchemy.pool import NullPool
 
 from . import team_continuity_inventory as inventory
 
-REVISION = "s9n0o1p2q3r4"  # Descendants require explicit code/schema review.
+REVISION = "t0p1q2r3s4t5"  # Descendants require explicit code/schema review.
 CONFIRMATION = "APPLY TEAM CONTINUITY"
 ACKS = ("backup_taken", "writers_paused", "finalization_paused", "maintenance_mode")
 FIELDS = dict(inventory.FIELDS)
-FIELDS["contest_weeks"] += " verification_deadline_at finalize_after"
+FIELDS["contest_weeks"] += " verification_deadline_at finalize_after practice_scoring_mode"
 FIELDS["camp_point_awards"] += " activity_type points_awarded"
 FIELDS["practice_charts"] += " include_contests minutes source detected_playing_seconds"
-FIELDS["contest_results"] += " score rank division subject_key"
+FIELDS["contest_results"] += " score precise_score rank division subject_key"
 FIELDS["team_families"] += " created_at"
 HISTORY = ("team_families", "practice_charts", "camp_point_awards", "contest_results",
            "team_week_membership_snapshots", "reward_grants", "crown_awards",
@@ -71,7 +71,11 @@ def schema_guard(connection):
         raise RepairError("h1a_schema_required: use H2A inventory before migration")
     versions = list(connection.scalars(text("SELECT version_num FROM alembic_version")))
     if versions != [REVISION]:
-        raise RepairError("revision_not_approved: require s9n0o1p2q3r4; use H2A for older schemas")
+        # The combined ORM selects both precision columns even for planning.
+        raise RepairError(
+            "revision_not_approved: require t0p1q2r3s4t5; upgrade older schemas "
+            "before running this code; use H2A for older-schema inventory"
+        )
     columns = {c["name"]: c for c in inspector.get_columns("teams")}
     fks = inspector.get_foreign_keys("teams")
     indexes = inspector.get_indexes("teams")
