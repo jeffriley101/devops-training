@@ -6,13 +6,14 @@ snapshot/rating semantics or introducing advanced analytics.
 """
 from datetime import date, datetime, time, timedelta
 
+from .practice_duration import chart_seconds
 from .contests import CENTRAL, central_week_boundaries
 
 WEEK = timedelta(days=7)
 
 
 def practice_insights(charts, approved: set[int], *, today: date) -> dict:
-    """Four completed Central calendar weeks, oldest first; persisted minutes only."""
+    """Four completed Central calendar weeks, oldest first; persisted credited duration only."""
     end = week_start(today)
     weeks = []
     for offset in range(4, 0, -1):
@@ -21,18 +22,22 @@ def practice_insights(charts, approved: set[int], *, today: date) -> dict:
                                  if start <= chart.practice_date < start + WEEK], approved)
         weeks.append({"week_start": start.isoformat(),
                       "week_end": (start + WEEK - timedelta(days=1)).isoformat(),
+                      "seconds": totals["total_seconds"],
+                      "verified_seconds": totals["verified_seconds"],
+                      "pristine_seconds": totals["pristine_seconds"],
                       "minutes": totals["total"], "days": totals["days"],
                       "verified_minutes": totals["verified"],
                       "pristine_minutes": totals["pristine"]})
-    total = sum(week["minutes"] for week in weeks)
-    return {"weeks": weeks, "total_minutes": total, "average_weekly_minutes": total / 4}
+    seconds = sum(week["seconds"] for week in weeks)
+    return {"weeks": weeks, "total_seconds": seconds, "average_weekly_seconds": seconds / 4,
+            "total_minutes": seconds / 60, "average_weekly_minutes": seconds / 240}
 
 
 def week_start(day: date) -> date:
     return central_week_boundaries(datetime.combine(day, time.min, CENTRAL))[0]
 
 
-def student_practice_rating(minutes: int, days: int, verified: bool, pristine: bool) -> float:
+def student_practice_rating(minutes: float, days: int, verified: bool, pristine: bool) -> float:
     # Volume supplies 95% of the core; four distinct positive-practice days
     # supply at most 5%. Each category bonus is awarded once, never per minute.
     core = min(max(minutes, 0), 120) / 120 * (95 + 5 * min(max(days, 0), 4) / 4)
@@ -49,14 +54,18 @@ def trend(delta: float) -> dict:
 def practice_totals(charts, approved: set[int]) -> dict:
     # Include contest opt-outs. Pristine takes precedence even if an anomalous
     # Pristine chart has an approved verification. Count all records, not XP awards.
-    positive = [chart for chart in charts if chart.minutes > 0]
-    return {
-        "total": sum(chart.minutes for chart in positive),
-        "verified": sum(chart.minutes for chart in positive
+    positive = [(chart, chart_seconds(chart)) for chart in charts if chart_seconds(chart) > 0]
+    seconds = {
+        "total": sum(duration for chart, duration in positive),
+        "verified": sum(duration for chart, duration in positive
                         if chart.source != "pristine" and chart.id in approved),
-        "pristine": sum(chart.minutes for chart in positive if chart.source == "pristine"),
+        "pristine": sum(duration for chart, duration in positive if chart.source == "pristine"),
+    }
+    return {
+        **{key: value / 60 for key, value in seconds.items()},
+        **{f"{key}_seconds": value for key, value in seconds.items()},
         "charts": len(charts),
-        "days": len({chart.practice_date for chart in positive}),
+        "days": len({chart.practice_date for chart, _ in positive}),
     }
 
 

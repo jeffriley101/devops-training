@@ -9,6 +9,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from .practice_duration import chart_seconds_sql
 from .models import (
     CampPointAward,
     PlungePointAward,
@@ -203,11 +204,11 @@ def plunge_xp(session: Session, *, profile_id: int) -> int:
     return sum(min(PLUNGE_DAILY_XP_CAP, points) for points in daily_points.values())
 
 
-def xp_sources(session: Session, *, profile_id: int) -> dict[str, int]:
-    practice_minutes = session.scalar(
-        select(func.coalesce(func.sum(PracticeChart.minutes), 0)).where(
+def xp_sources(session: Session, *, profile_id: int) -> dict[str, float | int]:
+    practice_seconds = session.scalar(
+        select(func.coalesce(func.sum(chart_seconds_sql()), 0)).where(
             PracticeChart.profile_id == profile_id,
-            PracticeChart.minutes > 0,
+            chart_seconds_sql() > 0,
         )
     ) or 0
     board_points = session.scalar(
@@ -219,18 +220,18 @@ def xp_sources(session: Session, *, profile_id: int) -> dict[str, int]:
         select(func.count()).select_from(PracticeChart).where(
             PracticeChart.profile_id == profile_id,
             PracticeChart.source == "p-book",
-            PracticeChart.minutes > 0,
+            chart_seconds_sql() > 0,
         )
     ) or 0
     return {
-        "practice_minutes": int(practice_minutes),
+        "practice_minutes": practice_seconds / 60,
         "board_points": int(board_points),
         "p_charts": int(p_charts),
         "plunge_points": plunge_xp(session, profile_id=profile_id),
     }
 
 
-def level_payload(xp_total: int) -> dict[str, int | float | None]:
+def level_payload(xp_total: float) -> dict[str, int | float | None]:
     if xp_total < 0:
         raise ValueError("XP cannot be negative.")
     level = min(bisect_right(LEVEL_THRESHOLDS, xp_total), len(LEVEL_THRESHOLDS))

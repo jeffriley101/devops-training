@@ -1,148 +1,181 @@
-# Season team readiness and activation
+# Supervised seasonal Team activation
 
-These explicit job commands reuse the H1B continuation engine and H2B schema,
-snapshot, insertion fence, and verification helpers. Nothing runs from startup,
-login, GET requests, current-season lookup, or the existing finalizer command.
-No migration is required; the approved revision remains `s9n0o1p2q3r4`.
+Use the existing explicit jobs after [calendar preparation](contest-week-provisioning.md).
+Run from `woodshed-woodchuck` in the application environment with an explicit
+`DATABASE_URL` (or `--database-url`); there is no local-database fallback.
+The shared schema guard requires exactly one head, `t0p1q2r3s4t5`, including
+both precision columns and the existing TeamFamily constraints. Previous
+`s9n0o1p2q3r4` is incompatible with the combined ORM, including read-only
+preflight; older, unknown, multiple, and incomplete states refuse before writes.
+Apply the precision migration **before starting the new production code** and
+coordinate the web/finalizer upgrade with finalization writers paused/drained.
+Follow [precision release ordering](practice-time-precision.md#release-ordering-and-maintenance-compatibility);
+this compatibility update adds no further migration. Never stamp past a refusal.
+These CLI jobs install no scheduler or startup hook. Existing authenticated
+admin finalization remains separate from seasonal activation.
 
-Supply `DATABASE_URL` explicitly in the job environment (standard Render
-`postgresql://` and `postgres://` URLs use psycopg 3), or use `--database-url`.
-Credentials are never included in the JSON diagnostics. There is no fallback to
-the application's local database. Commands exit nonzero on NOT_READY or errors.
+## Commands and safeguards
 
-## Read-only preflight
-
-```bash
-python -m app.contest_jobs team_preflight
-```
-
-Automatic discovery inspects the earliest upcoming enabled durable season and
-its unique adjacent predecessor. Dates and timezones come from database rows,
-not a second calendar. Ambiguous coverage, skipped seasons, and timezone changes
-are refused. Explicit review of a pair is also supported:
+Prospective **read-only** preflight, before the boundary:
 
 ```bash
 python -m app.contest_jobs team_preflight \
   --source-season back-to-school-2026 --destination-season halloween-2026
 ```
 
-Preflight uses the same H1B rules but allows a prospective, read-only roster
-projection before midnight. Membership timestamps are evaluated against the
-destination boundary. This does not create future Teams or memberships and
-does not authorize activation: a later switch, deletion, moderation, or other
-change can invalidate READY. Connections enforce PostgreSQL REPEATABLE READ,
-READ ONLY or SQLite read-only/query_only through the H2A connection helper.
-
-JSON includes keys/IDs, UTC boundary, source Team count, expected roster and
-creation counts, represented rows, destination history counts, freeze state,
-REVIEW/CONFLICT counts, and sorted machine-readable reason codes. It omits names,
-private codes, PINs, report text, and practice notes.
-
-## Boundary activation
-
-```bash
-python -m app.contest_jobs team_activate
-```
-
-Automatic discovery selects the date-covered enabled destination and its
-adjacent predecessor. To pin an operator run to the intended transition:
+Explicit supervised activation, only at/after the boundary and the verified
+pause below:
 
 ```bash
 python -m app.contest_jobs team_activate \
   --source-season back-to-school-2026 --destination-season halloween-2026
 ```
 
-`team_activate` is an explicit write command for a trusted operational job; it
-does not accept an approved JSON plan as instructions. It acquires H1B's sorted
-season/family/team/profile/membership locks, revalidates discovery, and plans
-again with the real current time. Before midnight it returns NOT_DUE without
-inserts. The Halloween boundary is September 28, 2026 at 00:00 America/Chicago,
-05:00 UTC. UTC offsets are always computed with ZoneInfo, including DST.
+Without keys, preflight discovers the earliest upcoming enabled adjacent pair;
+activation discovers the current destination. Use explicit keys for review and
+repeat checks. Source must be `active`/`closed`, destination `active`, with
+unambiguous adjacent coverage and compatible timezones.
 
-Unattended execution requires zero REVIEW and zero CONFLICT for the WHOLE
-transition. Hidden/under-review Teams, empty public rosters, invalid private
-owners, collisions, ambiguous memberships, exact-boundary endings, incompatible
-successors, and contradictory destination history block all inserts. Pending
-private requests stay historical; eligible private successor codes rotate via
-H1B. The destination first week must be open and every destination week must be
-unfrozen. Any destination results/snapshots or director-contest complications
-also block backdating. Use reviewed H2B maintenance for exceptions.
+Preflight uses a database-enforced read-only snapshot and projects boundary
+memberships. Its JSON includes keys/IDs, UTC boundary, expected Team/member
+counts, REVIEW/CONFLICT/frozen counts and `reason_codes`. READY is prospective:
+roster/moderation changes can invalidate it before activation.
 
-H1B creates only successor Teams and memberships. Verification inside the same
-transaction permits exactly those new rows, checks identity/family/boundary/
-opening-week values, compares the protected historical snapshots, and requires
-a fresh plan with zero remaining creates. The SQL/ORM insertion fence rejects
-other mutations. Any exception or verification failure rolls back everything.
-Repeated successful runs return ALREADY_COMPLETE with zero new rows. READY on
-activation includes committed creation counts and a passed verification result.
-There is no persistent readiness marker: future changes are always rechecked.
+Activation locks and replans, requiring zero REVIEW/CONFLICT for the **whole**
+transition. It retains collision, ambiguous membership, private-owner/code,
+moderation, boundary, source-deadline, director-contest and frozen-history guards.
+The source final week must exist; the destination first week must be open and
+all destination weeks/history unfrozen. Hidden/under-review Teams and incompatible
+successors need review, not partial activation.
 
-Status meanings: READY = projected safe or successfully activated;
-NOT_READY = blocked, no activation writes; ALREADY_COMPLETE = compatible rows
-already represented with no creates; NOT_DUE = boundary not reached;
-NO_TRANSITION = no relevant transition in the selected discovery mode.
+Only successor Teams/memberships can be inserted. The transaction verifies the
+exact continuation delta and unchanged protected history, including source
+memberships, fractional result scores and per-week scoring provenance;
+exceptions/refusals roll back. Successful repeats create nothing.
+Source finalization remains a later independent job.
 
-## Finalization coordination
+## Supervised boundary procedure
 
-Midnight activation does not wait for noon verification. Source memberships
-remain historical and unchanged. The source final week can finalize later using
-its own memberships, snapshots, and Team IDs. The normal finalizer now takes the
-same season fence before week/reward locks, serializing it with activation;
-scoring, deadlines, and rewards are unchanged.
+Prepare the [complete source/destination calendar](contest-week-provisioning.md)
+in advance. Run the explicit preflight above and retain expected Team/member
+counts. No automatic seasonal activation is proposed: Jeff supervises this
+window; ordinary weekly finalization follows its own recurring invocation.
 
-If delayed activation reaches the STORED source final-week `finalize_after`
-while that week remains unfinalized, activation blocks. Finalize normally first
-(strict deadline rules still apply), then rerun preflight/activation:
+### Pause coverage: platform prerequisites, not an application feature
 
-```bash
-python -m app.contest_jobs finalize_due_weeks
-```
+There is **no application maintenance flag, request gate, active-session drain,
+or general draft autosave**. H2B's `--ack-writers-paused`,
+`--ack-finalization-paused`, and `--ack-maintenance-mode` are attestations,
+not controls. The older [H2B runbook](team-continuity-repair.md) mentions Render
+Maintenance Mode and owner-reported deployment settings. Jeff has now located
+Maintenance Mode on the Woodshed web service: **availability is confirmed,
+operation is untested**, and background-writer pause is not established.
 
-Inspect due weeks before running that command: it finalizes all due weeks, not
-just the source. If the destination is already due/frozen, use an operator
-review; this command must not be used to bypass frozen history. Activation never
-invokes finalization itself. No noon wait is added to the midnight path.
+Render provides Maintenance Mode for paid web services under **Settings →
+Maintenance Mode**. It returns a maintenance response to public requests while
+the app stays running; private-network and SSH access remain available.
+Jeff's confirmed control still needs an operational rehearsal; its presence
+alone does not demonstrate this behavior on the live service or stop background
+writers. [Render maintenance documentation](https://render.com/docs/maintenance-mode).
 
-## Scheduling and rollout before September 28
+| Writers/access to coordinate | Existing protection and remaining gap |
+| --- | --- |
+| Public student, verifier and director requests; Team creation, selection, approvals, moderation and account deletion | Participating Team mutations share Season locks, but locks do not pause users. Block public traffic for the short boundary window and let accepted requests finish. |
+| Charts/verification, BOARD/Arcade points, rewards, profile changes, director contests and calendar bootstrap | Not all use the Team lock protocol. Some apparent reads lazily create contest data. Activation compares protected history across the database, so unrelated writes can also cause refusal. A Team-page-only restriction is insufficient. |
+| Finalizer cron, other workers, operator/admin/import/repair jobs and direct/private database writers | Public Maintenance Mode does not suspend them. Identify and pause their actual triggers, let active jobs finish, and prevent manual runs. No application command performs this. |
 
-The repository documents `woodshed-contest-finalizer` behavior but does not
-establish its actual live cadence. Do not assume the current Monday-after-noon
-schedule is sufficient. Deploy/checkpoint only after review, then explicitly
-configure the existing operational service (or its command dispatch) to invoke
-preflight before the transition and activation at the boundary, with monitored
-retries. Keep the existing due-week finalization invocation independent. These
-commands do not install another scheduler or change Render settings.
+**Execution blocker:** a verified public-traffic pause plus writer drain and an
+in-progress-work plan have not been established by repository evidence. The
+smallest proposed solution is an agreed save-before-window procedure using
+Render's confirmed Maintenance Mode control and the existing controls for
+each background writer. Verify these controls and rehearse save/failure/retry on
+a non-production environment first. If those controls are unavailable, choose a
+separately approved platform-level pause before attempting activation. Do not
+substitute acknowledgment flags, a request-gate implementation, forced restarts,
+or an assumption that midnight has no users.
 
-**Calendar prerequisite:** canonical season bootstrap creates Season records,
-not all future ContestWeeks. Normal `ensure_current_contest_data` creates the
-current week lazily and commits; it is deliberately not called from this atomic
-activation transaction. Preflight MUST find the source final week and an open
-destination first week already provisioned. A missing first week returns
-`destination_first_week_not_open`, NOT_READY, with no writes. Inspect this before
-September 28 and arrange separately reviewed calendar provisioning. The existing
-`season_maintenance bootstrap` alone does not provision Halloween weeks, and
-source `rollover_season` cannot be used before source finalization. Do not wait
-for a student's page load to satisfy this prerequisite. If it remains unmet,
-keep traffic paused and resolve it through controlled calendar setup before
-activation; this release does not add a week-provisioning command.
+### Protect timers and unsaved charts
 
-A scheduled process alone cannot promise a zero-second empty-Team window:
-startup delay or a rejected plan can outlast midnight, while date-covered lookup
-continues to advance. For this release, arrange a brief controlled writer/user
-pause spanning midnight and keep it until activation verification passes. Run
-preflight in advance and resolve every REVIEW/CONFLICT; run activation only at
-or after the real boundary. No fake `--now` override is available in the CLI.
-An unattended failure must page/reach the operator via nonzero job status and
-the structured reason/count log; it must not reopen traffic or partially apply.
+The operational job does not send a browser reload or logout. A loaded page can
+continue running during an outage, but its save requests can fail. Browser
+suspension, reload, navigation or closure can still lose work:
 
-After success, check representative students' current Teams, verify zero creates
-with an explicit repeat, and resume traffic. Opening-week continuation is the
-initial selection and leaves exactly one correction. Standings start fresh.
-Do not continuously replay old transitions after their destination freezes:
-the frozen-history and deadline guards deliberately remain conservative.
-Use explicit pairs for repeat checks; automatic preflight now targets the NEXT
-season. Concurrent unrelated historical activity may cause strict snapshot
-verification to refuse; retry under controlled conditions, never weaken it.
+- **Ordinary timer:** its start timestamp is saved in same-tab `sessionStorage`;
+  restoring computes wall-clock elapsed time, capped at two hours. It does not
+  pause for maintenance. Stopping transfers rounded minutes into the form and
+  clears that timestamp; it does **not** save a chart.
+- **Ordinary unsaved chart:** fields and the pending retry key normally live in
+  page memory. The only specific draft save is when following Manage Verifiers,
+  with a 30-minute same-tab restore; it is not general autosave. On a failed
+  submission, keep the page open and retry there after service returns. Avoid
+  repeated new submissions if the earlier save's outcome is uncertain; inspect
+  BOOK for the saved chart.
+- **Pristine:** detected seconds and retry key live in memory until Save & Finish
+  succeeds. Pause stops timing, not data loss. Failed saving exposes Retry Save;
+  keep that tab open, do not start another session or approve leaving. Its
+  before-unload warning is not durable recovery.
 
-H2B remains the audited manual fallback. There is no historical chart/award
-repair, persistent audit schema, billing change, or automatic web activation.
+Ask users ahead of the window to stop and **successfully save/confirm in BOOK
+before the pause**, then avoid starting new work until resume. Do not clear
+browser storage, force logout or tell them to reload an unsaved form. If someone
+is still unsaved, the procedure cannot guarantee preservation: resolve the save
+before blocking requests. Merely leaving a tab open is not a durable backup.
+
+This matters at midnight: ordinary charts keep the submitted practice date,
+but server Team attribution uses membership in the season current at submission;
+Pristine also uses the submission's Central date. A pre-midnight timer does not
+reserve source-season attribution. Finish/save beforehand rather than assuming
+a cross-boundary retry will retain the old date/Team. This run changes neither
+attribution nor practice-time precision.
+
+### Run, verify, resume, recover
+
+1. **Before the boundary:** resolve calendar/preflight blockers; confirm the
+   release, intended database, recent backup, actual pause controls and writer
+   list. Coordinate the save window and keep unrelated deployments/manual jobs
+   out of it. Complete student saves while requests still work.
+2. **Pause:** use the verified platform public-traffic control, pause background
+   triggers and drain accepted requests/jobs. Confirm public requests are blocked,
+   no jobs are running and private/operator writers are idle. No repository
+   drain command exists; the cron's pause/resume control and treatment of active
+   runs still need live verification. If that cannot be established, stop here.
+3. **Activate:** at/after **September 28, 2026, 00:00 America/Chicago (05:00 UTC)**,
+   use the exact explicit `team_activate` command above in the authenticated
+   operational shell. Retain stdout/stderr and exit status. No `--now` override
+   exists. Never bypass REVIEW/CONFLICT, frozen history or boundary checks.
+4. **Verify while paused:** require `READY` or `ALREADY_COMPLETE`,
+   `verification.passed: true`, expected creation/roster counts and zero
+   `remaining_team_creates`/`remaining_membership_creates`. Repeat that explicit
+   activation command for `ALREADY_COMPLETE` and zero new rows. Exit zero alone
+   is insufficient: `NOT_DUE` and `NO_TRANSITION` also exit zero.
+5. **Resume:** only after verified success, release the pause and re-enable the
+   recorded background triggers. Check representative existing students' current
+   Teams/BOOK/BOARD without changing selections or spending correction allowances.
+   Preserve sessions. Continued membership leaves one opening-week correction.
+6. **Failure:** `NOT_READY`, exceptions or verification refusal stop the whole
+   activation transaction. Keep the established pause, inspect `reason_codes`,
+   resolve the cause and rerun explicit preflight/activation. If output/connection
+   was lost, the commit outcome is unknown: inspect preflight, then repeat the
+   guarded activation while still paused. Do not delete successors or restore
+   old deadlines to force success. Keep Jeff informed of a prolonged pause;
+   resuming after midnight without readiness is not a safe fallback.
+
+If the source's stored `finalize_after` is reached while unfinalized, activation
+refuses. Run the [ordinary finalizer](contest-finalization-job.md) alone only
+**after both stored deadlines are strictly passed**, inspect all due weeks first,
+then pause it again and rerun preflight/activation. Source memberships remain
+unchanged so later source finalization uses historical source Teams and snapshots.
+A due/frozen destination or unresolved conflict needs reviewed maintenance;
+H2B is a separate reviewed fallback, not a way around these guards. Do not replay
+old transitions after destination history freezes.
+
+## Deferred improvements
+
+Seamless season transitions should eventually coordinate date-based Season
+selection with Team readiness, while retaining transaction, conflict,
+frozen-history and deadline safeguards. That implementation is deferred.
+Practice-time precision and schema compatibility require the coordinated release
+described above. No scheduler, maintenance framework, new endpoint or dashboard
+is introduced here. For current
+job visibility and outstanding live settings, use the
+[finalizer operations runbook](contest-finalization-job.md#visibility-and-notifications).

@@ -95,6 +95,8 @@ def add_week(
         finalize_after=finalize_after or NOW - timedelta(minutes=30),
         status=status,
         finalized_at=NOW - timedelta(days=1) if status == "finalized" else None,
+        # Model historical weeks as classified by the precision migration.
+        practice_scoring_mode="legacy_minutes" if status == "finalized" else None,
     )
     session.add(week)
     session.commit()

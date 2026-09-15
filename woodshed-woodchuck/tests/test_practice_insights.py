@@ -67,13 +67,14 @@ def test_full_summary_and_privacy(insights_db):
     assert response.status_code == 200
     assert "no-store" in response.headers["cache-control"]
     data = response.json()
-    assert set(data) == {"weeks", "total_minutes", "average_weekly_minutes"}
-    assert data["total_minutes"] == 35
-    assert data["average_weekly_minutes"] == 8.75
+    assert set(data) == {"weeks", "total_minutes", "average_weekly_minutes", "total_seconds", "average_weekly_seconds"}
+    assert data["total_minutes"] == 2120 / 60
+    assert data["average_weekly_minutes"] == 2120 / 240
     assert data["weeks"][0] == dict(week_start="2026-08-17", week_end="2026-08-23",
-        minutes=15, days=1, verified_minutes=10, pristine_minutes=0)
-    assert data["weeks"][1]["pristine_minutes"] == 20
-    assert data["weeks"][1]["days"] == 1  # Sub-minute chart is preserved, not rounded up.
+        minutes=15, days=1, verified_minutes=10, pristine_minutes=0,
+        seconds=900, verified_seconds=600, pristine_seconds=0)
+    assert data["weeks"][1]["pristine_minutes"] == 1220 / 60
+    assert data["weeks"][1]["days"] == 2  # Positive sub-minute practice counts.
     assert data["weeks"][3]["week_end"] == "2026-09-13"
     assert "payer" not in response.text and "profile_id" not in response.text
     assert client("student", id=2).get("/practice-charts/insights").status_code == 403
@@ -127,7 +128,7 @@ def test_adult_funded_seat_has_insights_without_payer_data(insights_db):
         session.commit()
     response = client("student").get("/practice-charts/insights")
     assert response.status_code == 200
-    assert response.json()["total_minutes"] == 35
+    assert response.json()["total_minutes"] == 2120 / 60
     for private in ("payer1", "Adult 1", "billing_account", "membership_id", "email"):
         assert private not in response.text
     assert client("adult").get("/practice-charts/insights").status_code == 401

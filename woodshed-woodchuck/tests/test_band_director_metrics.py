@@ -51,8 +51,10 @@ def test_week_lifetime_categories_and_duplicate_reviews(roster_db):
         session.commit()
     current = metrics(roster_db)
     row = current["students"][0]
-    assert row["weekly"] == {"total": 95, "verified": 20, "pristine": 5, "charts": 4, "days": 3}
-    assert row["lifetime"] == {"total": 205, "verified": 31, "pristine": 5, "charts": 6, "days": 5}
+    assert row["weekly"] == {"total": 95, "verified": 20, "pristine": 5, "charts": 4, "days": 3,
+        "total_seconds": 5700, "verified_seconds": 1200, "pristine_seconds": 300}
+    assert row["lifetime"] == {"total": 205, "verified": 31, "pristine": 5, "charts": 6, "days": 5,
+        "total_seconds": 12300, "verified_seconds": 1860, "pristine_seconds": 300}
     past = metrics(roster_db, selected_week=date(2026, 8, 31))
     assert past["students"][0]["weekly"]["total"] == 11
     assert past["students"][0]["lifetime"] == row["lifetime"]
@@ -157,9 +159,9 @@ def test_rendered_table_contract_and_week_request(roster_db):
     assert response.context["students"][0]["weekly"]["total"] == 42
     parser = HeaderParser()
     parser.feed(response.text)
-    assert parser.headers == ["Name", "Rating", "Trend", "Total Min Wk", "Verified Min Wk",
-                              "Pristine Min Wk", "Total Min Life", "Verified Min Life",
-                              "Pristine Min Life", "Charts Wk", "Charts Life", "Team"]
+    assert parser.headers == ["Name", "Rating", "Trend", "Total Time Wk", "Verified Time Wk",
+                              "Pristine Time Wk", "Total Time Life", "Verified Time Life",
+                              "Pristine Time Life", "Charts Wk", "Charts Life", "Team"]
     assert parser.sort_types == ["text"] + ["number"] * 10 + ["text"]
     for forbidden in ["Recent P-Charts", "response_note", "rating_week", "baseline", "core score"]:
         assert forbidden not in response.text
@@ -196,7 +198,14 @@ def test_browser_table_layout_and_sorting(roster_db, tmp_path, width):
         student = add_student(roster_db, f"Musician {index:03}")
         if index < 2:
             add_chart(roster_db, student, TODAY, 100 if index == 0 else 9)
+    with roster_db() as session:
+        first = session.scalar(select(PracticeChart).where(PracticeChart.minutes == 100))
+        for seconds in (59, 59):
+            session.add(PracticeChart(profile_id=first.profile_id, practice_date=TODAY,
+                minutes=0, source="pristine", instrument="Trumpet", detected_playing_seconds=seconds))
+        session.commit()
     html = signed_client().get("/band-director/dashboard?week=2026-09-07").text
+    assert "1 hour 41 minutes 58 seconds" in html
     # Load the actual shared CSS and dashboard assets without unrelated app
     # scripts/network requests. The authenticated response supplies the DOM.
     html = re.sub(r'<script src="[^"]+"></script>', "", html)
@@ -284,7 +293,7 @@ process.stdin.on("end", async () => {
     assert values["width"] == width
     assert values["pageWidth"] <= width
     assert values["count"] == 100 and values["columns"] == 12
-    assert values["totals"] == [100, 9, 0]
+    assert values["totals"] == [6118 / 60, 9, 0]
     assert values["aligned"] and values["circleWidth"] == values["circleHeight"]
     assert values["fits"]
     assert values["arrowBeside"]

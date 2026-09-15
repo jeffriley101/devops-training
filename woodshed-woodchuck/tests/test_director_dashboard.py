@@ -485,3 +485,40 @@ def test_director_dashboard_migration_follows_published_team_foundation() -> Non
     assert '"director_team_contest_results"' in migration
     assert 'batch.drop_constraint("uq_team_season_creator"' in migration
     assert '"uq_team_public_season_creator"' in migration
+
+
+@pytest.mark.parametrize("metric", ["total_minutes", "average_minutes"])
+def test_seconds_break_live_director_ties_and_freeze_precisely(dashboard_database, metric):
+    from app.director_dashboard import _contest_team_scores
+    first = add_owned_team(dashboard_database, "DIRECTOR", "Seconds North", "letter:N")
+    second = add_owned_team(dashboard_database, "DIRECTOR", "Seconds South", "letter:S")
+    start, end = NOW - timedelta(days=1), NOW + timedelta(days=1)
+    with dashboard_database() as session:
+        owner = profile(session, "DIRECTOR")
+        season = session.scalar(select(Season))
+        for team, key, durations in [(first, "MEMBER", (299, 59)), (second, "STUDENT", (359,))]:
+            member = profile(session, key)
+            session.add(TeamMembership(season_id=season.id, team_id=team.id, profile_id=member.id,
+                selected_week_start=date(2026, 8, 24), started_at=start - timedelta(days=1)))
+            for seconds in durations:
+                session.add(PracticeChart(profile_id=member.id, practice_date=NOW.date(),
+                    minutes=seconds // 60, instrument="Flute", source="pristine",
+                    detected_playing_seconds=seconds, team_id=team.id, created_at=NOW))
+            # Preserve contest opt-out and created-at window rules.
+            session.add(PracticeChart(profile_id=member.id, practice_date=NOW.date(), minutes=99,
+                instrument="Flute", team_id=team.id, include_contests=False, created_at=NOW))
+            session.add(PracticeChart(profile_id=member.id, practice_date=NOW.date(), minutes=99,
+                instrument="Flute", team_id=team.id, created_at=end))
+        session.commit()
+        contest = create_director_contest(session, profile=owner, now=start,
+            submitted=DirectorContestCreate(title="Seconds", starts_at=start, ends_at=end,
+                finalizes_at=end, metric=metric, team_ids=[first.id, second.id]))
+        scores = _contest_team_scores(session, contest)
+        assert scores[first.id][0] == 358 / 60
+        assert scores[second.id][0] == 359 / 60
+        finalize_director_contest(session, contest=contest, profile=owner, now=end)
+        results = session.scalars(select(DirectorTeamContestResult).where(
+            DirectorTeamContestResult.contest_id == contest.id).order_by(DirectorTeamContestResult.rank)).all()
+        assert [(row.team_id, row.rank, row.score) for row in results] == [
+            (second.id, 1, 359 / 60), (first.id, 2, 358 / 60)]
+        assert not finalize_director_contest(session, contest=contest, profile=owner, now=end)[1]

@@ -127,7 +127,7 @@ def test_book_history_uses_accessible_verified_and_pristine_badges() -> None:
     assert 'class="p-book-entry-badge p-book-pristine-badge"' in formatter
     assert 'aria-label="Pristine P-Chart" title="Pristine P-Chart">🥇</span>' in formatter
     assert "`${verificationText}${pristineText}${verifierNoteText}`" in formatter
-    assert "formatDetectedPlayingTime(entry.detectedPlayingSeconds)" in formatter
+    assert "formatDetectedPlayingTime(window.WWPracticeDuration.entrySeconds(entry))" in formatter
 
 
 def test_book_history_shows_bounded_pagination_and_positive_practice_days() -> None:
@@ -138,7 +138,7 @@ def test_book_history_shows_bounded_pagination_and_positive_practice_days() -> N
     assert 'Showing ${shown} of ${allEntries.length} P-Charts using actual values.' in renderer
     assert 'visibleEntryCount += 10' in script
     assert 'visibleEntryCount = 10' in script
-    assert '.filter((entry) => Number(entry.minutes) > 0)' in script
+    assert '.filter(chart => chart.duration_seconds > 0)' in script
     assert 'id="p-book-history-controls"' in template
     assert 'id="p-book-show-more"' in template
     assert 'id="p-book-show-less"' in template
@@ -146,9 +146,9 @@ def test_book_history_shows_bounded_pagination_and_positive_practice_days() -> N
 
 def test_book_asset_versions_are_advanced() -> None:
     base = (ROOT / "templates/base.html").read_text(encoding="utf-8")
-    assert "/static/css/styles.css?v=119" in base
+    assert "/static/css/styles.css?v=120" in base
     assert "/static/js/character-reaction.js?v=3" in base
-    assert "/static/js/app.js?v=83" in base
+    assert "/static/js/app.js?v=84" in base
     assert "styles.css?v=68" not in base
     assert "app.js?v=34" not in base
 

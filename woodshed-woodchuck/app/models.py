@@ -1413,6 +1413,8 @@ class ContestWeek(Base):
         DateTime(timezone=True), nullable=False
     )
     status: Mapped[str] = mapped_column(String(20), nullable=False)
+    # Recorded with finalization; NULL is unknown, never implicit legacy.
+    practice_scoring_mode: Mapped[str | None] = mapped_column(String(30), nullable=True)
     finalized_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
@@ -1474,6 +1476,13 @@ class ContestResult(Base):
     active_member_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     display_name_snapshot: Mapped[str] = mapped_column(String(100), nullable=False)
     score: Mapped[int] = mapped_column(Integer, nullable=False)
+    # Practice minutes, including fractions, for new snapshots only.
+    precise_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    @property
+    def effective_score(self) -> float:
+        return self.precise_score if self.precise_score is not None else self.score
+
     rank: Mapped[int] = mapped_column(Integer, nullable=False)
     medal: Mapped[str] = mapped_column(String(20), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
