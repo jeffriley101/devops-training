@@ -284,6 +284,8 @@ def test_repair_preserves_team_and_individual_history_without_duplicates() -> No
     add_chart(session, captain, team.id, 45, created_at=NOW)
     add_chart(session, member, team.id, 20, created_at=NOW)
     week.status = "finalized"
+    # Pre-precision historical fixtures carry the migration attestation.
+    week.practice_scoring_mode = "legacy_minutes"
     week.finalized_at = FINAL_NOW
     session.commit()
     chart_ids = set(session.scalars(select(PracticeChart.id)).all())
@@ -351,6 +353,8 @@ def test_repair_does_not_backfill_replacement_metrics_into_legacy_history() -> N
         session.add(result)
         legacy_results.append(result)
     week.status = "finalized"
+    # Pre-precision historical fixtures carry the migration attestation.
+    week.practice_scoring_mode = "legacy_minutes"
     week.finalized_at = FINAL_NOW
     session.commit()
     legacy_snapshot = [(row.id, row.score) for row in legacy_results]

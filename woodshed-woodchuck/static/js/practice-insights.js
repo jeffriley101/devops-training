@@ -35,11 +35,11 @@
       active.hidden = false;
       for (const week of data.weeks) {
         const row = document.createElement("p");
-        row.textContent = `${week.week_start} – ${week.week_end}: ${week.minutes} minutes · ${week.days} practice days · ${week.verified_minutes} verified minutes · ${week.pristine_minutes} Pristine minutes`;
+        row.textContent = `${week.week_start} – ${week.week_end}: ${window.WWPracticeDuration.seconds(week.seconds)} · ${week.days} practice days · ${window.WWPracticeDuration.seconds(week.verified_seconds)} verified · ${window.WWPracticeDuration.seconds(week.pristine_seconds)} Pristine`;
         content.append(row);
       }
       const summary = document.createElement("p");
-      summary.textContent = `Four-week total: ${data.total_minutes} minutes · Weekly average: ${data.average_weekly_minutes} minutes`;
+      summary.textContent = `Four-week total: ${window.WWPracticeDuration.seconds(data.total_seconds)} · Weekly average: ${window.WWPracticeDuration.seconds(data.average_weekly_seconds)}`;
       content.append(summary);
       status.textContent = "";
     } catch (_) {

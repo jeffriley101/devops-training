@@ -536,6 +536,6 @@ def test_open_and_pristine_charts_have_no_review_actions(roster_db):
                     minutes=5, instrument="Trumpet", source="pristine", detected_playing_seconds=300))
         session.commit()
     html = signed_client().get("/band-director/dashboard").text
-    assert "Self Report" in html and "Pristine Min Wk" in html
+    assert "Self Report" in html and "Pristine Time Wk" in html
     assert signed_client().get("/trusted-verifiers/practice-charts").json()["pending_charts"] == []
     assert "data-band-director-review" not in html

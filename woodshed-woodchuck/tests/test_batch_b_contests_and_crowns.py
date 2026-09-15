@@ -70,6 +70,7 @@ def test_server_practice_totals_use_central_week_and_include_opt_out() -> None:
         "week_start": "2026-07-27", "week_end": "2026-08-02",
         "this_week_minutes": 117, "this_week_display": "1 hour 57 minutes",
         "career_minutes": 207, "career_display": "3 hours 27 minutes",
+        "this_week_seconds": 7020, "career_seconds": 12420,
     }
     assert format_practice_minutes(42) == "42 minutes"
     assert format_practice_minutes(195) == "3 hours 15 minutes"
@@ -95,7 +96,7 @@ def test_batch_b_markup_and_privacy_hooks() -> None:
     assert "Actual practice time comes from submitted P-Charts" in board
     assert "Weekly Gold, Silver, and Bronze winners" in board
     assert "Medals will appear after a contest week is finalized." in board
-    assert "This Week’s Practice" in book and "Career Practice" in book
+    assert "This Week’s Credited Practice" in book and "Career Credited Practice" in book
     for category in (
         "Practice Crown", "Band Camp Crown", "Trivia Crown",
         "Instrument Care Crown", "Marching Crown", "Band Camp Hours Crown",

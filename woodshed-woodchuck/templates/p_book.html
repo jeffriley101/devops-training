@@ -145,22 +145,23 @@
   <div class="p-book-lower-region">
   <div class="stats-grid mt-md practice-total-cards" aria-label="Persisted practice totals">
     <article class="stat-card practice-stat-stone">
-      <h3>This Week’s Practice</h3>
+      <h3>This Week’s Credited Practice</h3>
       <p id="p-book-week-practice">0 minutes</p>
     </article>
     <article class="stat-card practice-stat-stone">
-      <h3>Career Practice</h3>
+      <h3>Career Credited Practice</h3>
       <p id="p-book-career-practice">0 minutes</p>
     </article>
     <article class="stat-card practice-stat-stone">
-      <h3>Practice Days</h3>
+      <h3>Saved Practice Days</h3>
       <p id="p-book-practice-days">0</p>
     </article>
     <article class="stat-card practice-stat-stone">
-      <h3>Charts in Book</h3>
+      <h3>Saved Charts</h3>
       <p id="p-book-pages-count">0</p>
     </article>
   </div>
+  <p class="muted">Totals use saved charts. Pristine and ordinary charts may credit the same practice. Browser-local legacy entries are shown in history but excluded from these totals.</p>
 
   <section class="mentor-card mt-md" id="practice-insights" aria-labelledby="practice-insights-title" data-enabled="{{ 'true' if feature_access.practice_insights else 'false' }}">
     <h2 id="practice-insights-title">Practice Insights</h2>
@@ -197,5 +198,5 @@
 {% endblock %}
 
 {% block page_scripts %}
-<script src="/static/js/practice-insights.js?v=1"></script>
+<script src="/static/js/practice-insights.js?v=2"></script>
 {% endblock %}

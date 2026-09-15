@@ -5,6 +5,7 @@ from datetime import date, datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from .practice_duration import chart_seconds, format_seconds
 from .models import PracticeChart, PracticeChartVerification
 from .practice_chart_routes import CENTRAL, practice_totals_payload
 from .verifiers import band_director_students
@@ -41,7 +42,8 @@ def band_director_practice_students(
                 submitted = submitted.replace(tzinfo=timezone.utc)
             recent_charts.append({
                 "practice_date": chart.practice_date.isoformat(),
-                "minutes": chart.minutes,
+                "minutes": chart_seconds(chart) / 60,
+                "duration_display": format_seconds(chart_seconds(chart)),
                 "submitted_at": submitted.isoformat(),
                 "submitted_display": submitted.astimezone(CENTRAL).strftime("%b %d, %Y %I:%M %p %Z"),
                 "unreviewed_label": "Pristine" if chart.source == "pristine" else "Open — no verification requested",
@@ -64,6 +66,7 @@ def band_director_practice_students(
             "week_start": totals["week_start"],
             "week_end": totals["week_end"],
             "this_week_minutes": totals["this_week_minutes"],
+            "this_week_display": totals["this_week_display"],
             "recent_charts": recent_charts,
             **student_contest_context(session, profile_id=profile_id, season=season, week=week),
         })

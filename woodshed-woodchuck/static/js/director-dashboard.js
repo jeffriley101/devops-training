@@ -40,8 +40,8 @@
       bar.className = "director-bar-fill";
       bar.style.width = `${Math.max(0, Number(row.minutes) || 0) * 100 / highest}%`;
       const value = document.createElement("strong");
-      value.textContent = String(row.minutes);
-      line.setAttribute("aria-label", `${row[labelKey]}: ${row.minutes} minutes`);
+      value.textContent = window.WWPracticeDuration.minutes(row.minutes);
+      line.setAttribute("aria-label", `${row[labelKey]}: ${window.WWPracticeDuration.minutes(row.minutes)}`);
       track.appendChild(bar);
       line.append(label, track, value);
       root.appendChild(line);
@@ -51,8 +51,8 @@
 
   function renderMetrics(data) {
     const metrics = data.metrics;
-    document.getElementById("director-total-minutes").textContent = metrics.total_practice_minutes;
-    document.getElementById("director-average-minutes").textContent = metrics.average_minutes;
+    document.getElementById("director-total-minutes").textContent = window.WWPracticeDuration.minutes(metrics.total_practice_minutes);
+    document.getElementById("director-average-minutes").textContent = window.WWPracticeDuration.minutes(metrics.average_minutes);
     document.getElementById("director-participation").textContent = `${metrics.participation.active} / ${metrics.participation.eligible}`;
     document.getElementById("director-participation-percent").textContent = `${metrics.participation.percent}%`;
     document.getElementById("director-pcharts").textContent = metrics.p_charts.submitted;
@@ -157,7 +157,7 @@
         contest.results.forEach((row) => {
           const item = document.createElement("li");
           item.value = row.rank;
-          item.textContent = `${row.emblem.value} ${row.team_name} — ${row.score}`;
+          item.textContent = `${row.emblem.value} ${row.team_name} — ${contest.metric === "team_practice_rating" ? Number(row.score).toFixed(1) : window.WWPracticeDuration.minutes(row.score)}`;
           results.appendChild(item);
         });
         card.appendChild(results);

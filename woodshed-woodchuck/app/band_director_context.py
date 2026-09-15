@@ -77,7 +77,7 @@ def student_contest_context(
             positions.append({
                 "label": "Practice" if contest.key == "weekly-points-leaders" else "Board activity",
                 "division": result.division, "rank": result.rank,
-                "score": result.score,
+                "score": result.effective_score,
                 "unit": "minutes" if contest.key == "weekly-points-leaders" else "points",
             })
     else:

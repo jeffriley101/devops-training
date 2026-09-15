@@ -63,7 +63,7 @@
         {% endif %}
       </caption>
       <thead><tr>
-        {% for label in ['Name', 'Rating', 'Trend', 'Total Min Wk', 'Verified Min Wk', 'Pristine Min Wk', 'Total Min Life', 'Verified Min Life', 'Pristine Min Life', 'Charts Wk', 'Charts Life', 'Team'] %}
+        {% for label in ['Name', 'Rating', 'Trend', 'Total Time Wk', 'Verified Time Wk', 'Pristine Time Wk', 'Total Time Life', 'Verified Time Life', 'Pristine Time Life', 'Charts Wk', 'Charts Life', 'Team'] %}
         <th scope="col" aria-sort="none"><button type="button" data-sort="{{ 'text' if loop.first or loop.last else 'number' }}">{{ label }}</button></th>
         {% endfor %}
       </tr></thead>
@@ -74,7 +74,7 @@
           <td data-sort-value="{{ student.rating }}">{{ '%.1f' | format(student.rating) }}</td>
           <td data-sort-value="{{ student.trend.delta }}">{{ arrow(student.trend) }}</td>
           {% for value in [student.weekly.total, student.weekly.verified, student.weekly.pristine, student.lifetime.total, student.lifetime.verified, student.lifetime.pristine, student.weekly.charts, student.lifetime.charts] %}
-          <td data-sort-value="{{ value }}">{{ value }}</td>
+          <td data-sort-value="{{ value }}">{{ value | practice_duration if loop.index <= 6 else value }}</td>
           {% endfor %}
           <td data-sort-value="{{ student.team.name if student.team else 'No team' }}">
             {% if student.team %}

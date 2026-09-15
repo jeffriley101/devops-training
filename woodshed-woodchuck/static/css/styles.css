@@ -2277,7 +2277,7 @@ select {
 
 .director-bar-row {
   display: grid;
-  grid-template-columns: minmax(3.5rem, auto) minmax(5rem, 1fr) 3rem;
+  grid-template-columns: minmax(3.5rem, auto) minmax(3rem, 1fr) minmax(3rem, auto);
   align-items: center;
   gap: 0.5rem;
   font-variant-numeric: tabular-nums;

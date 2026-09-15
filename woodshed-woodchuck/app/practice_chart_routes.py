@@ -20,6 +20,7 @@ from .models import (
     TrustedVerifier,
     TeamMembership,
 )
+from .practice_duration import chart_seconds, chart_seconds_sql, format_minutes, format_seconds
 from .seasons import season_covering_date
 from .verifiers import validate_email
 from .practice_charts import (
@@ -88,36 +89,32 @@ def profile_practice_streak(session, profile_id: int, today: date | None = None)
     dates = list(session.scalars(
         select(distinct(PracticeChart.practice_date)).where(
             PracticeChart.profile_id == profile_id,
-            PracticeChart.minutes > 0,
+            chart_seconds_sql() > 0,
         )
     ))
     return practice_streak(dates, today or datetime.now(CENTRAL).date())
 
 
-def format_practice_minutes(minutes: int) -> str:
-    if minutes < 60:
-        return f"{minutes} minute{'s' if minutes != 1 else ''}"
-    hours, remaining = divmod(minutes, 60)
-    hour_text = f"{hours} hour{'s' if hours != 1 else ''}"
-    return hour_text if remaining == 0 else f"{hour_text} {remaining} minutes"
-
+format_practice_minutes = format_minutes
 
 def practice_totals_payload(session, profile_id: int, today: date | None = None) -> dict[str, object]:
     today = today or datetime.now(CENTRAL).date()
     week_start = today - timedelta(days=today.weekday())
     week_end = week_start + timedelta(days=7)
-    career = session.scalar(select(func.coalesce(func.sum(PracticeChart.minutes), 0)).where(
-        PracticeChart.profile_id == profile_id, PracticeChart.minutes > 0,
+    career = session.scalar(select(func.coalesce(func.sum(chart_seconds_sql()), 0)).where(
+        PracticeChart.profile_id == profile_id, chart_seconds_sql() > 0,
     )) or 0
-    weekly = session.scalar(select(func.coalesce(func.sum(PracticeChart.minutes), 0)).where(
-        PracticeChart.profile_id == profile_id, PracticeChart.minutes > 0,
+    weekly = session.scalar(select(func.coalesce(func.sum(chart_seconds_sql()), 0)).where(
+        PracticeChart.profile_id == profile_id, chart_seconds_sql() > 0,
         PracticeChart.practice_date >= week_start,
         PracticeChart.practice_date < week_end,
     )) or 0
     return {
         "week_start": week_start.isoformat(), "week_end": (week_end - timedelta(days=1)).isoformat(),
-        "this_week_minutes": int(weekly), "this_week_display": format_practice_minutes(int(weekly)),
-        "career_minutes": int(career), "career_display": format_practice_minutes(int(career)),
+        "this_week_seconds": weekly, "this_week_minutes": weekly / 60,
+        "this_week_display": format_seconds(weekly),
+        "career_seconds": career, "career_minutes": career / 60,
+        "career_display": format_seconds(career),
     }
 
 
@@ -186,6 +183,7 @@ def chart_payload(
         "id": chart.id,
         "practice_date": chart.practice_date.isoformat(),
         "minutes": chart.minutes,
+        "duration_seconds": chart_seconds(chart),
         "instrument": chart.instrument,
         "note": chart.note or "",
         "practice_details": chart.practice_details,
@@ -262,7 +260,7 @@ def student_practice_streak(request: Request):
             raise HTTPException(status_code=401, detail="Student sign-in is required.")
         return {
             "streak": profile_practice_streak(session, profile.id),
-            "qualifying_day": "A calendar day with at least one persisted P-Chart containing practice minutes.",
+            "qualifying_day": "A calendar day with positive credited practice duration in a saved P-Chart.",
         }
 
 

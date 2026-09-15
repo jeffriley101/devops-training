@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
+from .practice_duration import chart_seconds
 from .account_routes import current_profile
 from .contests import CENTRAL, central_week_boundaries, ensure_current_contest_data
 from .db import SessionLocal
@@ -155,23 +156,21 @@ def dashboard_payload(
         session, team_id=selected_id, week_start=week_start, week_end=week_end
     )
     charts = [chart for chart in charts if chart.profile_id in roster]
-    member_minutes: dict[int, int] = defaultdict(int)
-    daily_minutes: dict[date, int] = defaultdict(int)
-    instrument_minutes: dict[str, int] = defaultdict(int)
+    member_seconds: dict[int, int] = defaultdict(int)
+    daily_seconds: dict[date, int] = defaultdict(int)
+    instrument_seconds: dict[str, int] = defaultdict(int)
     for chart in charts:
-        member_minutes[chart.profile_id] += chart.minutes
-        daily_minutes[chart.practice_date] += chart.minutes
+        seconds = chart_seconds(chart)
+        member_seconds[chart.profile_id] += seconds
+        daily_seconds[chart.practice_date] += seconds
         instrument = " ".join(chart.instrument.split()).title() or "Other"
-        instrument_minutes[instrument] += chart.minutes
-    capped = {
-        member_id: min(minutes, TEAM_MEMBER_MINUTES_CAP)
-        for member_id, minutes in member_minutes.items()
-    }
-    meaningful = [minutes for minutes in capped.values() if minutes >= ACTIVE_MINUTES_THRESHOLD]
-    total_minutes = sum(member_minutes.values())
-    average_minutes = round(sum(meaningful) / len(meaningful), 1) if meaningful else 0.0
+        instrument_seconds[instrument] += seconds
+    meaningful = [min(seconds, TEAM_MEMBER_MINUTES_CAP * 60)
+                  for seconds in member_seconds.values() if seconds >= ACTIVE_MINUTES_THRESHOLD * 60]
+    total_minutes = sum(member_seconds.values()) / 60
+    average_minutes = sum(meaningful) / (60 * len(meaningful)) if meaningful else 0.0
     tpr = calculate_team_practice_rating(
-        list(member_minutes.values()), eligible_roster=len(roster)
+        [seconds / 60 for seconds in member_seconds.values()], eligible_roster=len(roster)
     )
 
     chart_ids = [chart.id for chart in charts]
@@ -185,8 +184,8 @@ def dashboard_payload(
     final_day = min(today, week_end - timedelta(days=1))
     elapsed_days = max(0, (final_day - week_start).days + 1)
     meaningful_days = sum(
-        daily_minutes.get(week_start + timedelta(days=offset), 0)
-        >= ACTIVE_MINUTES_THRESHOLD
+        daily_seconds.get(week_start + timedelta(days=offset), 0)
+        >= ACTIVE_MINUTES_THRESHOLD * 60
         for offset in range(elapsed_days)
     )
     consistency_rate = round(meaningful_days * 100 / elapsed_days) if elapsed_days else 0
@@ -194,14 +193,14 @@ def dashboard_payload(
         {
             "date": (week_start + timedelta(days=offset)).isoformat(),
             "label": (week_start + timedelta(days=offset)).strftime("%a"),
-            "minutes": daily_minutes.get(week_start + timedelta(days=offset), 0),
+            "minutes": daily_seconds.get(week_start + timedelta(days=offset), 0) / 60,
         }
         for offset in range(7)
     ]
     instrument_rows = [
-        {"instrument": instrument, "minutes": minutes}
-        for instrument, minutes in sorted(
-            instrument_minutes.items(), key=lambda item: (-item[1], item[0].casefold())
+        {"instrument": instrument, "minutes": seconds / 60}
+        for instrument, seconds in sorted(
+            instrument_seconds.items(), key=lambda item: (-item[1], item[0].casefold())
         )
     ]
     return {
@@ -360,24 +359,24 @@ def _contest_team_scores(
     )).all() if team_ids else []
     for chart in charts:
         if chart.profile_id in rosters.get(chart.team_id, set()):
-            totals[chart.team_id][chart.profile_id] += chart.minutes
+            totals[chart.team_id][chart.profile_id] += chart_seconds(chart)
 
     scores: dict[int, tuple[float, int, int]] = {}
     for team_id in team_ids:
         member_values = list(totals[team_id].values())
         active_values = [
-            min(minutes, TEAM_MEMBER_MINUTES_CAP)
-            for minutes in member_values if minutes >= ACTIVE_MINUTES_THRESHOLD
+            min(seconds, TEAM_MEMBER_MINUTES_CAP * 60)
+            for seconds in member_values if seconds >= ACTIVE_MINUTES_THRESHOLD * 60
         ]
         active_count = len(active_values)
         roster_count = len(rosters[team_id])
         if contest.metric == "total_minutes":
-            score = float(sum(member_values))
+            score = sum(totals[team_id].values()) / 60
         elif contest.metric == "average_minutes":
-            score = round(sum(active_values) / active_count, 1) if active_count else 0.0
+            score = sum(active_values) / (60 * active_count) if active_count else 0.0
         else:
             score = calculate_team_practice_rating(
-                member_values, eligible_roster=roster_count
+                [seconds / 60 for seconds in member_values], eligible_roster=roster_count
             ).rating
         scores[team_id] = (score, active_count, roster_count)
     return scores

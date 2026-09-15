@@ -440,7 +440,7 @@
     }
 
     function render(payload) {
-      if (!Number.isInteger(payload.level) || !Number.isInteger(payload.xp_total)) throw new Error("Invalid XP response");
+      if (!Number.isInteger(payload.level) || !Number.isFinite(payload.xp_total)) throw new Error("Invalid XP response");
       const isMaxLevel = payload.level === 10 || payload.next_level_xp === null;
       const progressPercent = isMaxLevel
         ? 100
@@ -451,10 +451,12 @@
       progressEl.textContent = `${Math.round(progressPercent)}%`;
       maxLevelEl.hidden = !isMaxLevel;
       progressTextEl.textContent = isMaxLevel
-        ? `${payload.xp_total} lifetime XP`
-        : `${payload.xp_total} XP / ${payload.next_level_xp} XP`;
+        ? `${Number(payload.xp_total.toFixed(2))} lifetime XP`
+        : `${Number(payload.xp_total.toFixed(2))} XP / ${payload.next_level_xp} XP`;
       Object.entries(sourceEls).forEach(([key, element]) => {
-        if (element) element.textContent = String(payload.sources?.[key] ?? 0);
+        if (element) element.textContent = key === "practice_minutes"
+          ? window.WWPracticeDuration.minutes(payload.sources?.[key] ?? 0)
+          : String(payload.sources?.[key] ?? 0);
       });
       statusEl.textContent = "";
       control.setAttribute("aria-label", `XP Level ${payload.level}. Open XP details.`);
@@ -2938,7 +2940,7 @@
             Number.isInteger(row.rank) && row.rank > 0 &&
             typeof row.instrument === "string" &&
             row.instrument.trim() &&
-            Number.isInteger(row.total_minutes) && row.total_minutes >= 0
+            Number.isFinite(row.total_minutes) && row.total_minutes >= 0
           ))
         : [];
 
@@ -2950,7 +2952,7 @@
         rankedRow.setAttribute("role", "listitem");
         rankedRow.setAttribute(
           "aria-label",
-          `Rank ${row.rank}, ${teamName || row.instrument}, ${row.total_minutes} practice minutes`
+          `Rank ${row.rank}, ${teamName || row.instrument}, ${window.WWPracticeDuration.minutes(row.total_minutes)} credited practice`
         );
         const rank = document.createElement("span");
         rank.className = "contest-rank-badge";
@@ -2965,7 +2967,7 @@
         subject.textContent = `${icon} ${teamName || row.instrument}`;
         const score = document.createElement("strong");
         score.className = "contest-ranked-score";
-        score.textContent = String(row.total_minutes);
+        score.textContent = window.WWPracticeDuration.minutes(row.total_minutes);
         rankedRow.append(rank, subject, score);
         list.appendChild(rankedRow);
       });
@@ -3006,14 +3008,14 @@
           : `Rank ${position.rank}`,
         campPoints
           ? `${score} Board Activity ${score === 1 ? "Point" : "Points"}`
-          : `${score} min`,
+          : window.WWPracticeDuration.minutes(score),
       ];
       if (position.rank === 1) {
         parts.push("Leading the board");
-      } else if (Number.isInteger(behind)) {
+      } else if (Number.isFinite(behind)) {
         parts.push(campPoints
           ? `${behind} Board Activity ${behind === 1 ? "Point" : "Points"} behind leader`
-          : `${behind} min behind leader`);
+          : `${window.WWPracticeDuration.minutes(behind)} behind leader`);
       }
       if (position.in_top_five === false) parts.push("Outside Top Five");
       return parts.join(" · ");
@@ -3038,7 +3040,7 @@
             row.rank > 0 &&
             typeof row.display_name === "string" &&
             row.display_name.trim() &&
-            Number.isInteger(campPoints ? row.total_points : row.total_minutes) &&
+            (campPoints ? Number.isInteger(row.total_points) : Number.isFinite(row.total_minutes)) &&
             (campPoints ? row.total_points : row.total_minutes) >= 0 &&
             (row.emblem_key === null || (
               typeof row.emblem_key === "string" && row.emblem_key.trim()
@@ -3060,7 +3062,7 @@
           : row.display_name;
         rankedRow.setAttribute(
           "aria-label",
-          `Rank ${row.rank}, ${publicName}, ${scoreValue} ${campPoints ? "Board Activity Points" : "practice minutes"}`
+          `Rank ${row.rank}, ${publicName}, ${campPoints ? `${scoreValue} Board Activity Points` : `${window.WWPracticeDuration.minutes(scoreValue)} credited practice`}`
         );
         const rank = document.createElement("span");
         rank.className = "contest-rank-badge";
@@ -3077,7 +3079,7 @@
         subject.append(studentName);
         const score = document.createElement("strong");
         score.className = "contest-ranked-score";
-        score.textContent = String(scoreValue);
+        score.textContent = campPoints ? String(scoreValue) : window.WWPracticeDuration.minutes(scoreValue);
         rankedRow.append(rank, subject, score);
         list.appendChild(rankedRow);
       });
@@ -3117,11 +3119,11 @@
             const score = document.createElement("strong"); score.className = "contest-ranked-score";
             const scoreValue = key === "team-practice-rating"
                 ? Number(row.score).toFixed(1)
-                : String(row.score);
+                : key === "team-weekly-activity-points" ? String(row.score) : window.WWPracticeDuration.minutes(row.score);
             score.textContent = scoreValue;
             const scoreUnit = key === "team-weekly-activity-points"
               ? "Board Activity Points"
-              : key === "team-practice-rating" ? "Team Practice Rating" : "practice minutes";
+              : key === "team-practice-rating" ? "Team Practice Rating" : "credited practice";
             item.setAttribute("aria-label", `Rank ${row.rank}, ${row.team_name}, ${scoreValue} ${scoreUnit}`);
             item.append(rank, subject, score); list.append(item);
           });
@@ -3428,7 +3430,7 @@
         return medal && result.medal === medal.key &&
           result.division === division && contest && (contestKey === "team" ? result.subject_type === "team" : contest.key === contestKey) &&
           typeof subject === "string" && subject.trim() &&
-          Number.isInteger(result.score) && result.score >= 0;
+          Number.isFinite(result.score) && result.score >= 0;
       });
       const groups = type === "teams"
         ? groupTeamContestResults(rows)
@@ -3480,7 +3482,7 @@
           } else if (type === "teams" && result.contest.key === "team-average-practice") {
             score.textContent = `${(result.score / 100).toFixed(2)} min`;
           } else {
-            score.textContent = `${result.score} min`;
+            score.textContent = window.WWPracticeDuration.minutes(result.score);
           }
           row.append(icon, subjectBlock, score);
           groupRows.appendChild(row);
@@ -4544,7 +4546,10 @@
       return payload;
     }
 
+    let authoritativeCharts = null;
+
     async function loadPersistentPracticeCharts() {
+      authoritativeCharts = null;
       try {
         const response = await fetch(
           "/practice-charts",
@@ -4571,6 +4576,7 @@
           ? payload.charts
           : [];
 
+        authoritativeCharts = serverCharts;
         const next = stateApi.getState();
 
         next.practiceLog = Array.isArray(next.practiceLog)
@@ -4606,6 +4612,10 @@
           const existing = entriesByServerId.get(serverId);
 
           if (existing) {
+            if (existing.durationSeconds !== serverChart.duration_seconds) {
+              existing.durationSeconds = serverChart.duration_seconds;
+              changed = true;
+            }
             if (existing.pristine !== (serverChart.pristine === true)) {
               existing.pristine = serverChart.pristine === true;
               changed = true;
@@ -4647,6 +4657,7 @@
             source: serverChart.source || "p-book",
             pristine: serverChart.pristine === true,
             detectedPlayingSeconds: serverChart.detected_playing_seconds,
+            durationSeconds: serverChart.duration_seconds,
             creditsAwarded:
               Number(serverChart.credits_awarded) || 0,
             loggedAt:
@@ -4664,6 +4675,7 @@
         });
 
         if (!changed) {
+          renderPBookSummary(next);
           return;
         }
 
@@ -4886,14 +4898,16 @@
           : "";
 
       const durationText = (entry.pristine === true || entry.isPristine === true) &&
-        Number.isInteger(entry.detectedPlayingSeconds)
-        ? formatDetectedPlayingTime(entry.detectedPlayingSeconds)
+        Number.isInteger(entry.detectedPlayingSeconds) &&
+        entry.detectedPlayingSeconds >= 0 && entry.detectedPlayingSeconds <= 86400
+        ? formatDetectedPlayingTime(window.WWPracticeDuration.entrySeconds(entry))
         : `${entry.minutes} minutes`;
 
       return (
         `${entry.dateKey} — ${durationText}` +
         `${detailText}${noteText}` +
-        `${verificationText}${pristineText}${verifierNoteText}`
+        `${verificationText}${pristineText}${verifierNoteText}` +
+        (entry.serverChartId ? "" : " — Browser-local legacy entry")
       );
     }
 
@@ -4924,15 +4938,11 @@
     }
 
     function renderPBookSummary(s) {
-      const entries = Array.isArray(s.practiceLog) ? s.practiceLog : [];
-      const practiceDays = new Set(entries
-        .filter((entry) => Number(entry.minutes) > 0)
-        .map((entry) => entry.dateKey)
-        .filter(Boolean)).size;
-      const pagesCount = entries.length;
-
+      if (authoritativeCharts === null) return;
+      const practiceDays = new Set(authoritativeCharts
+        .filter(chart => chart.duration_seconds > 0).map(chart => chart.practice_date)).size;
       if (practiceDaysEl) practiceDaysEl.textContent = String(practiceDays);
-      if (pagesCountEl) pagesCountEl.textContent = String(pagesCount);
+      if (pagesCountEl) pagesCountEl.textContent = String(authoritativeCharts.length);
     }
 
     if (showMoreEl) showMoreEl.addEventListener("click", () => {
@@ -4965,29 +4975,28 @@
     }
 
     function buildExportText(s) {
-      const profileName = s.profile.woodchuckName || "Not named";
-      const instrument = s.profile.instrument || "Not set";
-      const entries = Array.isArray(s.practiceLog) ? s.practiceLog : [];
-      const totalMinutes = entries.reduce((sum, entry) => sum + (Number(entry.minutes) || 0), 0);
-
-      const lines = [
-        "Woodshed Woodchuck Practice Chart",
-        "",
-        `Student/Woodchuck: ${profileName}`,
-        `Instrument: ${instrument}`,
-        `Total Minutes: ${totalMinutes}`,
-        "",
-        "Practice Entries:",
-      ];
-
-      if (!entries.length) {
-        lines.push("No practice entries yet.");
+      const lines = ["Woodshed Woodchuck Practice Chart", "",
+        `Student/Woodchuck: ${s.profile.woodchuckName || "Not named"}`,
+        `Instrument: ${s.profile.instrument || "Not set"}`,
+        "Credited practice can include Pristine and ordinary charts covering the same time.", ""];
+      if (authoritativeCharts !== null) {
+        const seconds = authoritativeCharts.reduce((sum, chart) => sum + chart.duration_seconds, 0);
+        lines.push(`Saved charts — credited duration: ${window.WWPracticeDuration.seconds(seconds)} (${seconds} seconds)`,
+          ...authoritativeCharts.map(chart => [
+            chart.practice_date, `${window.WWPracticeDuration.seconds(chart.duration_seconds)} (${chart.duration_seconds} seconds)`,
+            chart.source, (chart.practice_details || []).join(", "), chart.note,
+            chart.verification ? `Verification ${chart.verification.status}` : "",
+            chart.verification?.response_note,
+          ].filter(Boolean).join(" — ")));
       } else {
-        entries.forEach((entry) => {
-          lines.push(formatEntry(entry));
-        });
+        lines.push("Saved chart totals unavailable; reload while online.");
       }
-
+      const legacy = (s.practiceLog || []).filter(entry => !entry.serverChartId);
+      if (legacy.length) {
+        const seconds = legacy.reduce((sum, entry) => sum + window.WWPracticeDuration.entrySeconds(entry), 0);
+        lines.push("", `Browser-local legacy entries — separate from saved totals: ${window.WWPracticeDuration.seconds(seconds)} (${seconds} seconds)`,
+          ...legacy.map(entry => `${entry.dateKey} — ${window.WWPracticeDuration.seconds(window.WWPracticeDuration.entrySeconds(entry))}${entry.note ? " — " + entry.note : ""}`));
+      }
       return lines.join("\n");
     }
 

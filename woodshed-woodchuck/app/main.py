@@ -15,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
+from .practice_duration import format_minutes
 from .account_routes import (
     current_profile,
     router as account_router,
@@ -88,6 +89,7 @@ app.include_router(store_router)
 app.include_router(arcade_router)
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+templates.env.filters["practice_duration"] = format_minutes
 
 
 NAV_ITEMS = [

@@ -25,15 +25,15 @@ class TeamPracticeRating:
 
 
 def calculate_team_practice_rating(
-    member_minutes: Iterable[int], *, eligible_roster: int
+    member_minutes: Iterable[float], *, eligible_roster: int
 ) -> TeamPracticeRating:
     """Calculate a readable, size-softened weekly team practice rating."""
     if eligible_roster < 0:
         raise ValueError("Eligible roster size cannot be negative.")
     active = [
-        min(max(0, int(minutes)), TPR_MEMBER_MINUTES_CAP)
+        min(max(0, minutes), TPR_MEMBER_MINUTES_CAP)
         for minutes in member_minutes
-        if int(minutes) >= ACTIVE_MINUTES_THRESHOLD
+        if minutes >= ACTIVE_MINUTES_THRESHOLD
     ]
     active_count = len(active)
     roster = max(eligible_roster, active_count)

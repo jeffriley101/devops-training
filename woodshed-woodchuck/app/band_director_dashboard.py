@@ -88,6 +88,8 @@ CSV_COLUMNS = (
     "Student", "Instrument", "Level", "Team", "Week Start", "Week End",
     "Practice Minutes", "Practice Days", "Practice Rating", "Trend",
     "Verified Minutes", "Pristine Minutes",
+    "Practice Seconds", "Verified Seconds", "Pristine Seconds",
+    "Career Practice Seconds", "Career Verified Seconds", "Career Pristine Seconds",
 )
 
 
@@ -106,7 +108,9 @@ def dashboard_csv(metrics: dict) -> str:
             *map(text_cell, (student["display_name"], student["instrument"], student["level"],
                             student["team"]["name"] if student["team"] else "No team")),
             metrics["selected_week"].isoformat(), metrics["week_end"].isoformat(),
-            student["weekly"]["total"], student["weekly"]["days"], student["rating"],
-            student["trend"]["label"], student["weekly"]["verified"], student["weekly"]["pristine"],
+            format(student["weekly"]["total"], ".15g"), student["weekly"]["days"], student["rating"],
+            student["trend"]["label"], format(student["weekly"]["verified"], ".15g"), format(student["weekly"]["pristine"], ".15g"),
+            *[student[period][f"{kind}_seconds"] for period in ("weekly", "lifetime")
+              for kind in ("total", "verified", "pristine")],
         ])
     return output.getvalue()

@@ -48,7 +48,7 @@ def test_xp_panel_lists_every_lifetime_source() -> None:
     panel_end = HOME.index("id=\"shed-team-panel\"", panel_start)
     panel = HOME[panel_start:panel_end]
 
-    assert "Practice Minutes" in panel
+    assert "Credited Practice Time" in panel
     assert "Board Points" in panel
     assert "P-Charts" in panel
     assert "Plunge Points" in panel
@@ -61,8 +61,8 @@ def test_xp_panel_fetches_calculated_xp_and_handles_max_level() -> None:
 
     assert "fetch(\"/xp\"" in javascript
     assert "payload.level === 10 || payload.next_level_xp === null" in javascript
-    assert "? `${payload.xp_total} lifetime XP`" in javascript
-    assert ": `${payload.xp_total} XP / ${payload.next_level_xp} XP`" in javascript
+    assert "? `${Number(payload.xp_total.toFixed(2))} lifetime XP`" in javascript
+    assert ": `${Number(payload.xp_total.toFixed(2))} XP / ${payload.next_level_xp} XP`" in javascript
     assert "maxLevelEl.hidden = !isMaxLevel" in javascript
     assert "XP is unavailable right now." in javascript
 
