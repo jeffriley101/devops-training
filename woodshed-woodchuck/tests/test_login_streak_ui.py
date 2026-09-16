@@ -27,7 +27,12 @@ def test_shed_records_and_renders_server_login_streak_without_browser_inference(
     assert 'method: "POST"' in wiring
     assert "payload.current_streak" in wiring
     assert "payload.crown_progress" in wiring
-    assert "payload.dandelion_balance" in wiring
+    # Server balances now go through the shared revision/account guard rather
+    # than directly replacing a potentially newer browser snapshot.
+    assert "stateApi.stateForResponse(requestAccount)" in wiring
+    assert "stateApi.applyEconomy(next, payload)" in wiring
+    assert "next.progress.credits =" not in wiring
+    assert "payload.dandelion_balance" in (ROOT / "static/js/state.js").read_text()
     assert "localDateKey" not in wiring
     assert 'document.body.dataset.authenticated !== "true"' in wiring
     assert "data-authenticated=" in BASE

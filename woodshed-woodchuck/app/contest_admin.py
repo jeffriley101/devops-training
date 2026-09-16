@@ -42,6 +42,10 @@ from .models import (
 )
 
 
+from .session_config import session_secret
+from .login_limits import enforce_login_limit
+
+
 router = APIRouter(prefix="/contests/admin", tags=["contest-admin"])
 templates = Jinja2Templates(
     directory=str(Path(__file__).resolve().parent.parent / "templates")
@@ -57,11 +61,8 @@ def _configured_token() -> str:
 
 
 def _fingerprint(token: str) -> str:
-    session_secret = os.getenv(
-        "SESSION_SECRET", "woodshed-local-development-secret"
-    ).encode("utf-8")
     return hmac.new(
-        session_secret,
+        session_secret().encode("utf-8"),
         token.encode("utf-8"),
         hashlib.sha256,
     ).hexdigest()
@@ -75,6 +76,7 @@ def require_contest_admin(request: Request) -> None:
         session_fingerprint, expected
     ):
         return
+    enforce_login_limit(request, "contest_admin")
     supplied = request.headers.get("X-Contest-Admin-Token", "")
     if not hmac.compare_digest(supplied, configured):
         raise HTTPException(status_code=403, detail="Invalid contest admin token.")

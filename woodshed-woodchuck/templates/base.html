@@ -39,9 +39,9 @@
   />
   <!-- End Woodshed app icons -->
 </head>
-<body{% if page_class %} class="{{ page_class }}"{% endif %} data-authenticated="{{ 'true' if authenticated_profile else 'false' }}">
+<body{% if page_class %} class="{{ page_class }}"{% endif %} data-authenticated="{{ 'true' if authenticated_profile else 'false' }}" data-account-id="{{ authenticated_profile.woodchuck_id if authenticated_profile else '' }}" data-page-generation="{{ request.session.get('woodchuck_page_generation', '') if authenticated_profile else '' }}">
   <div class="bg-orbs" aria-hidden="true"></div>
-  <div class="app-shell">
+  <div class="app-shell"{% if authenticated_profile %} hidden{% endif %}>
     <main class="content-wrap">
       {% block content %}{% endblock %}
     </main>
@@ -76,16 +76,20 @@
   <script id="instrument-definitions-data" type="application/json">{{ instrument_definitions | default([]) | tojson }}</script>
   <script id="account-state-bootstrap" type="application/json">{{ account_state_bootstrap | default(none) | tojson }}</script>
   <script id="authenticated-player-name" type="application/json">{{ (authenticated_profile.display_name if authenticated_profile else none) | tojson }}</script>
-  <script src="/static/js/state.js?v=7"></script>
+  {% if authenticated_profile %}<template id="account-scripts">{% else %}
+  <script src="/static/js/session-boundary.js?v=2"></script>{% endif %}
+  <script src="/static/js/state.js?v=9"></script>
   <script src="/static/js/instruments.js?v=3"></script>
   <script src="/static/vendor/tone/Tone.js?v=15.1.22"></script>
-  <script src="/static/js/audio.js?v=14"></script>
+  <script src="/static/js/audio.js?v=15"></script>
   <script src="/static/js/tuner.js?v=2"></script>
   <script src="/static/js/character-reaction.js?v=3"></script>
   <script src="/static/js/woodchuck-motion.js?v=3"></script>
   <script src="/static/js/practice-duration.js?v=1"></script>
-  <script src="/static/js/app.js?v=84"></script>
-  <script src="/static/js/account.js?v=14"></script>
+  <script src="/static/js/app.js?v=86"></script>
+  <script src="/static/js/account.js?v=16"></script>
   {% block page_scripts %}{% endblock %}
+  {% if authenticated_profile %}</template>
+  <script src="/static/js/session-boundary.js?v=2"></script>{% endif %}
 </body>
 </html>

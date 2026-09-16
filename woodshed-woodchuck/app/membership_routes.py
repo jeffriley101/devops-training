@@ -3,7 +3,7 @@ from pathlib import Path
 from datetime import datetime
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.routing import APIRoute
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from starlette.concurrency import run_in_threadpool
 from sqlalchemy import select, or_
@@ -17,6 +17,7 @@ from . import memberships as service
 from .billing_config import BillingConfig, PLANS, available_plans
 from .billing_providers import BillingUnavailable, checkout, process_webhook
 from .site_admin import csrf_token, check_csrf, sign_in_site_admin, require_site_admin
+from .login_limits import enforce_login_limit, protection_status
 from . import billing_recovery, billing_reconciliation
 
 
@@ -209,10 +210,17 @@ def admin_login_page(request: Request):
 
 @router.post("/admin/login")
 async def admin_login(request: Request):
+    await run_in_threadpool(enforce_login_limit, request, "admin")
     form = await request.form()
     check_csrf(request, form.get("csrf"))
     sign_in_site_admin(request, str(form.get("token", "")))
     return RedirectResponse("/admin/membership", 303)
+
+
+@router.get("/admin/security/rate-limit")
+def admin_rate_limit_status(request: Request):
+    require_site_admin(request)
+    return JSONResponse(protection_status(), headers={"Cache-Control": "no-store"})
 
 
 @router.post("/admin/logout")

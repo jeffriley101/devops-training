@@ -1,0 +1,158 @@
+"""Real Chromium, DOM handlers, cookie login and local Uvicorn/SQLite quiz flow."""
+import json
+import os
+from pathlib import Path
+import shutil
+import socket
+import subprocess
+import sys
+import time
+from urllib.error import URLError
+from urllib.request import urlopen
+
+import pytest
+
+from app.history_mystery import history_mystery_central_date, history_mystery_questions_for_date
+from tests.test_sensitive_logging import SERVER
+
+
+DRIVER = r'''
+const {spawn} = require('node:child_process');
+let input = '';
+process.stdin.on('data', chunk => input += chunk);
+process.stdin.on('end', async () => {
+  const config = JSON.parse(input);
+  const chrome = spawn(config.chrome, ['--headless', '--no-sandbox', '--remote-debugging-pipe',
+    '--no-first-run', '--disable-background-networking', '--disable-component-update',
+    '--disable-sync', '--user-data-dir=' + config.profile],
+    {stdio: ['ignore', 'ignore', 'ignore', 'pipe', 'pipe']});
+  let sequence = 0, buffer = '';
+  const pending = new Map();
+  const timer = setTimeout(() => {chrome.kill(); process.exit(2);}, 60000);
+  chrome.stdio[4].on('data', chunk => {
+    buffer += chunk;
+    let end;
+    while ((end = buffer.indexOf('\0')) >= 0) {
+      const message = JSON.parse(buffer.slice(0, end));
+      buffer = buffer.slice(end + 1);
+      const waiter = pending.get(message.id);
+      if (waiter) {
+        pending.delete(message.id);
+        message.error ? waiter.reject(message.error) : waiter.resolve(message.result);
+      }
+    }
+  });
+  const send = (method, params = {}, sessionId) => new Promise((resolve, reject) => {
+    const id = ++sequence;
+    pending.set(id, {resolve, reject});
+    chrome.stdio[3].write(JSON.stringify({id, method, params, sessionId}) + '\0');
+  });
+  try {
+    const {targetId} = await send('Target.createTarget', {url: 'about:blank'});
+    const {sessionId} = await send('Target.attachToTarget', {targetId, flatten: true});
+    const evaluate = async expression => {
+      const result = await send('Runtime.evaluate', {expression, awaitPromise: true, returnByValue: true}, sessionId);
+      if (result.exceptionDetails) throw result.exceptionDetails;
+      return result.result.value;
+    };
+    const until = async expression => {
+      for (let i = 0; i < 200; i++) {
+        if (await evaluate(expression)) return;
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+      throw new Error('Timed out: ' + expression);
+    };
+    await send('Emulation.setDeviceMetricsOverride', {width: config.width, height: 844,
+      deviceScaleFactor: 1, mobile: config.width < 500}, sessionId);
+    await send('Page.navigate', {url: config.origin + '/login'}, sessionId);
+    await until('document.readyState === "complete" && location.pathname === "/login"');
+    const login = await evaluate(`fetch('/account/login', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:'woodchuck_id=WC-LOG-TEST&pin=2468'}).then(r => r.status)`);
+    if (login !== 200) throw new Error('Login failed');
+    await send('Page.navigate', {url: config.origin + '/arcade/history-mystery'}, sessionId);
+    await until('document.readyState === "complete" && !!window.WoodshedArcadeEconomy && document.querySelector("[data-arcade-balance]").textContent !== "—"');
+    const initial = await evaluate('Number(document.querySelector("[data-arcade-balance]").textContent)');
+    await evaluate('document.getElementById("history-mystery-start").click()');
+    await until('document.querySelectorAll("#history-mystery-answers button:not(:disabled)").length > 0');
+    const buttonHeight = await evaluate('document.querySelector("#history-mystery-answers button").getBoundingClientRect().height');
+    // Lose the response after the server has saved the first answer; real shared
+    // retry must send the same answer and not consume another question/reward.
+    await evaluate(`(() => {const native=window.fetch; let lost=false; window.fetch=async (...args) => {
+      const response=await native(...args); if(!lost && String(args[0]).endsWith('/answer')) {
+        lost=true; throw new Error('synthetic lost response'); } return response; };})()`);
+    for (let index = 0; index < 5; index++) {
+      const choice = config.choices[index];
+      await evaluate(`Array.from(document.querySelectorAll('#history-mystery-answers button')).find(b => b.textContent === ${JSON.stringify(choice)}).click()`);
+      if (index === 4) {
+        await until('document.getElementById("history-mystery-start").textContent === "Played Today"');
+      } else {
+        await until(`document.getElementById('history-mystery-progress').textContent === '${index+2}' && !!document.querySelector('#history-mystery-answers button:not(:disabled)')`);
+      }
+      if (index === 1) {
+        await send('Page.reload', {}, sessionId);
+        await until('document.readyState === "complete" && document.getElementById("history-mystery-message")?.textContent.includes("Resume")');
+        await evaluate('document.getElementById("history-mystery-start").click()');
+        await until('document.getElementById("history-mystery-progress").textContent === "3" && !!document.querySelector("#history-mystery-answers button:not(:disabled)")');
+      }
+    }
+    await until(`document.getElementById('history-mystery-best').textContent === '${config.score}'`);
+    const final = await evaluate(`fetch('/account/state').then(r => r.json()).then(p => ({
+      credits:p.state.progress.credits, answers:p.state._history_mystery.answers.length,
+      score:document.getElementById('history-mystery-score').textContent,
+      best:document.getElementById('history-mystery-best').textContent,
+      message:document.getElementById('history-mystery-message').textContent}))`);
+    process.stdout.write(JSON.stringify({initial, buttonHeight, ...final}));
+  } catch (error) {process.stderr.write(JSON.stringify(error, Object.getOwnPropertyNames(error))); process.exitCode=1;}
+  finally {clearTimeout(timer); chrome.kill();}
+});
+'''
+
+
+@pytest.mark.parametrize('width,score', [(390, 0), (1440, 5)])
+def test_history_browser_loss_refresh_and_completion(tmp_path, width, score):
+    chrome = shutil.which('google-chrome')
+    if not chrome or not shutil.which('node'):
+        pytest.skip('Chromium and Node required for real browser validation')
+    (tmp_path / 'browser_app.py').write_text(SERVER)
+    with socket.socket() as sock:
+        sock.bind(('127.0.0.1', 0))
+        port = sock.getsockname()[1]
+    origin = f'http://127.0.0.1:{port}'
+    env = {'PATH': os.environ['PATH'], 'PYTHONPATH': str(Path.cwd()),
+           'DATABASE_URL': 'sqlite:///' + str(tmp_path / 'browser.db'),
+           'SESSION_SECRET': 'synthetic-browser-session', 'SESSION_COOKIE_SECURE': 'false',
+           'PYTHONPYCACHEPREFIX': os.environ.get('PYTHONPYCACHEPREFIX', str(tmp_path / 'pycache'))}
+    questions = history_mystery_questions_for_date(history_mystery_central_date())
+    choices = [q['answer'] if score == 5 else next(c for c in q['choices'] if c != q['answer']) for q in questions]
+    with (tmp_path / 'uvicorn.log').open('w') as stream:
+        process = subprocess.Popen([sys.executable, '-m', 'uvicorn', 'browser_app:app', '--app-dir', str(tmp_path),
+            '--host', '127.0.0.1', '--port', str(port), '--timeout-graceful-shutdown', '2'],
+            env=env, stdout=stream, stderr=stream)
+        try:
+            for _ in range(1000):
+                try:
+                    with urlopen(origin + '/login', timeout=5) as response:
+                        assert response.status == 200
+                    break
+                except URLError:
+                    assert process.poll() is None
+                    time.sleep(.05)
+            else:
+                pytest.fail('Local Uvicorn did not start')
+            result = subprocess.run(['node', '-e', DRIVER], input=json.dumps({
+                'chrome': chrome, 'profile': str(tmp_path / 'chrome'), 'origin': origin,
+                'width': width, 'score': score, 'choices': choices,
+            }), text=True, capture_output=True, timeout=75)
+            assert result.returncode == 0, result.stderr
+            payload = json.loads(result.stdout)
+            assert payload['answers'] == 5
+            assert payload['score'] == payload['best'] == str(score)
+            assert payload['credits'] == payload['initial'] - 1 + (5 if score == 5 else 0)
+            assert payload['buttonHeight'] >= 48
+            assert f'Final score: {score} / 5' in payload['message']
+        finally:
+            process.terminate()
+            try:
+                process.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=5)

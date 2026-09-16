@@ -20,6 +20,7 @@ from app.arcade_rewards import (
     complete_arcade_play,
     payout_for_score,
     start_arcade_play,
+    answer_history_play,
 )
 from app.db import Base
 from app.history_mystery import (
@@ -113,6 +114,19 @@ def signed_client(factory, suffix: str, *, credits: int = 20):
         state.state_json = {"progress": {"credits": credits}}
         session.commit()
     return client, profile
+
+
+def answer_quiz(factory, profile, play_token, score, now=None):
+    with factory() as session:
+        play = session.scalar(select(ArcadePlaySession).where(ArcadePlaySession.play_token == play_token))
+        questions = history_mystery_questions_for_date(play.daily_play_date)
+        for index, question in enumerate(questions):
+            choice = question['answer'] if index < score else next(
+                value for value in question['choices'] if value != question['answer'])
+            result = answer_history_play(session, profile_id=profile.id, play_token=play_token,
+                                        question_index=index, choice=choice, now=now)
+        session.commit()
+        return result
 
 
 def test_ninth_cabinet_and_authenticated_history_route(history_database) -> None:
@@ -238,8 +252,13 @@ def test_daily_start_cost_limit_and_idempotent_completion(history_database) -> N
         "daily_play_available"
     ] is False
     second = client.post("/arcade/plays", json={"game_key": "history-mystery"})
-    assert second.status_code == 409
-    assert "once each Central day" in second.json()["detail"]
+    assert second.status_code == 200
+    assert second.json()["resumed"] is True
+    assert second.json()["play_token"] == first.json()["play_token"]
+    assert second.json()["balance"] == 3
+
+    answer_quiz(history_database, profile, first.json()['play_token'], 5)
+    assert client.post("/arcade/plays", json={"game_key": "history-mystery"}).status_code == 409
 
     completed = client.post(
         f"/arcade/plays/{first.json()['play_token']}/complete", json={"score": 5}
@@ -271,12 +290,13 @@ def test_zero_balance_and_score_bounds_are_server_enforced(history_database) -> 
             "progress"
         ]["credits"] == 0
 
-    client, _profile = signed_client(history_database, "BOUNDS", credits=2)
+    client, profile = signed_client(history_database, "BOUNDS", credits=2)
     started = client.post("/arcade/plays", json={"game_key": "history-mystery"})
     too_high = client.post(
         f"/arcade/plays/{started.json()['play_token']}/complete", json={"score": 6}
     )
     assert too_high.status_code == 404
+    answer_quiz(history_database, profile, started.json()['play_token'], 2)
     valid = client.post(
         f"/arcade/plays/{started.json()['play_token']}/complete", json={"score": 2}
     )
@@ -305,14 +325,10 @@ def test_central_midnight_resets_daily_eligibility(history_database) -> None:
             now=before_midnight,
         )
         session.commit()
-        with pytest.raises(ArcadeDailyLimitError):
-            start_arcade_play(
-                session,
-                profile_id=profile.id,
-                game_key="history-mystery",
-                now=before_midnight,
-            )
-        session.rollback()
+        resumed = start_arcade_play(
+            session, profile_id=profile.id, game_key="history-mystery", now=before_midnight)
+        assert resumed.play.id == first.play.id and resumed.resumed
+        session.commit()
         assert arcade_play_status(
             session,
             profile_id=profile.id,
@@ -364,26 +380,12 @@ def test_personal_best_is_independent_and_lower_score_does_not_replace(
             session, profile_id=profile.id, game_key="history-mystery", now=first_day
         )
         session.commit()
-        complete_arcade_play(
-            session,
-            profile_id=profile.id,
-            play_token=first.play.play_token,
-            score=5,
-            now=first_day,
-        )
-        session.commit()
+        answer_quiz(history_database, profile, first.play.play_token, 5, now=first_day)
         second = start_arcade_play(
             session, profile_id=profile.id, game_key="history-mystery", now=second_day
         )
         session.commit()
-        result = complete_arcade_play(
-            session,
-            profile_id=profile.id,
-            play_token=second.play.play_token,
-            score=3,
-            now=second_day,
-        )
-        session.commit()
+        result = answer_quiz(history_database, profile, second.play.play_token, 3, now=second_day)
         score = session.scalar(select(ArcadeHighScore).where(
             ArcadeHighScore.profile_id == profile.id,
             ArcadeHighScore.game_key == "history-mystery",

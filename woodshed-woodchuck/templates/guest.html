@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Guest exploration · Woodshed Woodchuck</title>
+  <link rel="stylesheet" href="/static/css/styles.css?v=120" />
+</head>
+<body data-guest="{{ 'local' if not blocked and not signing_in else 'transition' }}" data-account-id="{{ account_id }}" data-page-generation="{{ request.session.get('woodchuck_page_generation', '') if account_id else '' }}" data-authenticated="{{ 'true' if account_id else 'false' }}">
+<div class="app-shell"{% if account_id %} hidden{% endif %}><main class="content-wrap">
+<section class="card">
+  <p class="chip">Guest exploration</p>
+  <h1>Try Woodshed's practice tools</h1>
+  {% if blocked %}
+  <p>A signed-in session is active in this browser. Confirm sign out before using Guest tools. Opening this page has not signed you out or joined C001.</p>
+  <button id="guest-confirm-logout" class="btn btn-primary" type="button">Confirm sign out and explore as Guest</button>
+  <a class="btn btn-secondary" href="/">Keep my signed-in session</a>
+  {% elif signing_in %}
+  <h2>Sign in to an existing account</h2>
+  <p>Your account's saved progress will load. Guest preferences and activity will not transfer.</p>
+  <form id="account-login-form" class="stack-form">
+    <label for="login-woodchuck-id">Woodchuck ID</label>
+    <input id="login-woodchuck-id" name="woodchuck_id" type="text" maxlength="11" autocomplete="username" autocapitalize="characters" required />
+    <label for="login-pin">Four-digit PIN</label>
+    <input id="login-pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" minlength="4" maxlength="4" autocomplete="current-password" required />
+    <p id="login-error" class="error-text" role="status"></p>
+    <button class="btn btn-primary" type="submit">Sign In</button>
+  </form>
+  <a class="btn btn-secondary" href="/guest">Back to Guest tools</a>
+  {% else %}
+  <p>No account needed. Preferences stay in this browser and can be discarded below. The tuner uses your microphone locally; no audio is uploaded. Browsing still makes ordinary web requests that may appear in operational logs.</p>
+  <form id="guest-setup-form" class="stack-form">
+    {% for field, label, choices in [('instrument', 'Instrument', instruments), ('level', 'Level', levels), ('goal', 'Practice goal', goals)] %}
+    <label for="guest-{{ field }}">{{ label }}</label>
+    <select id="guest-{{ field }}" name="{{ field }}" required>
+      <option value="">Choose {{ label | lower }}</option>
+      {% for choice in choices %}<option value="{{ choice }}">{{ choice }}</option>{% endfor %}
+    </select>
+    {% endfor %}
+    <button class="btn btn-primary" type="submit">Explore locally</button>
+  </form>
+  <div id="guest-tools" hidden>
+    <h2>Local practice tools</h2>
+    <p>Use the metronome and tuner. Tempo and setup preferences survive reload; no practice history, scores or rewards are recorded.</p>
+    <div class="button-row">
+      <button id="metronome-open-button" class="btn" type="button" aria-controls="metronome-panel" aria-expanded="false">Metronome</button>
+      <button id="tuner-open-button" class="btn" type="button" aria-controls="tuner-panel" aria-expanded="false">Tuner</button>
+    </div>
+  <section
+    id="metronome-panel"
+    class="metronome-panel hidden"
+    aria-labelledby="metronome-title"
+  >
+    <div class="metronome-panel-head">
+      <div>
+        <p class="chip">Practice Tool</p>
+        <h2 id="metronome-title">Metronome</h2>
+      </div>
+
+      <button
+        id="metronome-close-button"
+        class="metronome-close-button"
+        type="button"
+        aria-label="Close metronome"
+      >
+        ×
+      </button>
+    </div>
+
+    <div class="metronome-display">
+      <div
+        id="metronome-pulse"
+        class="metronome-pulse"
+        aria-hidden="true"
+      ></div>
+
+      <div class="metronome-tempo-readout">
+        <strong id="metronome-bpm-readout">120</strong>
+        <span>BPM</span>
+      </div>
+    </div>
+
+    <div class="metronome-controls">
+      <label for="metronome-bpm-range">Tempo</label>
+
+      <input
+        id="metronome-bpm-range"
+        type="range"
+        min="40"
+        max="220"
+        step="1"
+        value="120"
+      />
+
+      <div class="metronome-number-row">
+        <button
+          id="metronome-slower-button"
+          class="btn btn-secondary"
+          type="button"
+        >
+          −4
+        </button>
+
+        <input
+          id="metronome-bpm-input"
+          type="number"
+          min="40"
+          max="220"
+          step="1"
+          value="120"
+          aria-label="Metronome beats per minute"
+        />
+
+        <button
+          id="metronome-faster-button"
+          class="btn btn-secondary"
+          type="button"
+        >
+          +4
+        </button>
+      </div>
+
+      <div class="button-row metronome-button-row">
+        <button
+          id="metronome-tap-button"
+          class="btn btn-secondary"
+          type="button"
+        >
+          Tap Tempo
+        </button>
+
+        <button
+          id="metronome-start-button"
+          class="btn btn-primary"
+          type="button"
+        >
+          Start
+        </button>
+      </div>
+    </div>
+
+    <p id="metronome-status" class="metronome-status" aria-live="polite">
+      Stopped at 120 BPM.
+    </p>
+  </section>
+
+  <section
+    id="tuner-panel"
+    class="tuner-panel tuner-state-neutral hidden"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="tuner-note"
+    hidden
+  >
+    <button
+      id="tuner-close-button"
+      class="tuner-close-button"
+      type="button"
+      aria-label="Stop tuner and return to Guest tools"
+    >
+      STOP
+    </button>
+
+    <div class="tuner-reading" aria-live="polite" aria-atomic="true">
+      <h2 id="tuner-note" class="tuner-note">—</h2>
+      <p id="tuner-diagnosis" class="tuner-diagnosis">READY</p>
+    </div>
+  </section>
+
+
+  </div>
+  <button id="guest-discard" class="btn btn-secondary" type="button">Discard Guest data</button>
+  <a class="btn btn-primary" href="/guest/login">Exit Guest and sign in</a>
+  <a class="btn btn-secondary" href="/">Exit to welcome</a>
+  <h2>Account required</h2>
+  <p>Practice timers and saved P-Charts/P-Book, Pristine Practice, Arcade games, contests, rewards, inventory/shop and teams need an account and are not enabled here.</p>
+  {% endif %}
+  <p id="guest-feedback" class="body-copy" role="status" aria-live="polite"></p>
+  <p>C001 registration is not available yet. Guest exploration does not establish eligibility, create an account or grant Full Access.</p>
+</section>
+</main></div>
+{% if account_id %}<template id="account-scripts">{% else %}
+<script src="/static/js/session-boundary.js?v=2"></script>{% endif %}
+{% if signing_in %}
+<script src="/static/js/state.js?v=9"></script>
+<script src="/static/js/account.js?v=16"></script>
+{% elif not blocked %}
+<script src="/static/js/tuner.js?v=2"></script>
+<script src="/static/js/app.js?v=86"></script>
+{% endif %}
+<script src="/static/js/guest.js?v=1"></script>
+{% if account_id %}</template>
+<script src="/static/js/session-boundary.js?v=2"></script>{% endif %}
+</body>
+</html>

@@ -11,6 +11,7 @@ from sqlalchemy import distinct, func, select
 
 from .account_routes import current_profile
 from .db import SessionLocal
+from .economy import lock_state, economy_payload
 from .email_service import DeliveryResult, EmailService, public_link
 from .models import (
     PracticeChart,
@@ -385,6 +386,7 @@ def create_student_practice_chart(
                 practice_details=submitted.practice_details,
                 source=submitted.source,
                 credits_awarded=submitted.credits_awarded,
+                award_dandelions=True,
                 submission_key=submitted.submission_key,
                 include_contests=submitted.include_contests,
                 include_team_contests=submitted.include_team_contests,
@@ -438,6 +440,7 @@ def create_student_practice_chart(
                 record_verification_delivery(session, created.verification, delivery)
 
         return {
+            **economy_payload(lock_state(session, profile.id)),
             "created": created.created,
             "streak": profile_practice_streak(session, profile.id),
             "chart": chart_payload(

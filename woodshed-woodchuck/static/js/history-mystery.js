@@ -101,10 +101,7 @@
   const page = document.querySelector("[data-history-mystery-game]");
   if (!page) return;
 
-  const questionData = document.getElementById("history-mystery-question-data");
-  let questions = [];
-  try { questions = JSON.parse(questionData.textContent || "[]"); } catch (_error) { questions = []; }
-  const game = new HistoryMysteryGame(questions);
+  const game = new HistoryMysteryGame([]);
   const scoreOutput = document.getElementById("history-mystery-score");
   const bestOutput = document.getElementById("history-mystery-best");
   const progressOutput = document.getElementById("history-mystery-progress");
@@ -118,6 +115,20 @@
   let starting = false;
   let dailyPlayAvailable = true;
   let feedbackTimer = null;
+  let playAccount = null;
+  let pendingAnswer = null;
+
+  function sameAccount(account) {
+    return !root.WWState || !!root.WWState.stateForResponse(account);
+  }
+
+  function applySnapshot(snapshot) {
+    game.questionIndex = snapshot.question_index;
+    game.questions[snapshot.question_index] = snapshot.question;
+    game.score = snapshot.score;
+    game.status = snapshot.finished ? "ended" : "running";
+    game.awaitingAdvance = false;
+  }
 
   function render() {
     const state = game.snapshot();
@@ -147,12 +158,14 @@
   }
 
   function loadScores() {
+    const requestAccount = root.WWState?.accountRequest();
     return fetch(`/arcade/scores/${GAME_KEY}`, {
       credentials: "same-origin",
       cache: "no-store",
     }).then(function (response) {
       return response.json().catch(function () { return {}; }).then(function (payload) {
         if (!response.ok) throw new Error(payload.detail || "Score is unavailable.");
+        if (!sameAccount(requestAccount)) return payload;
         bestOutput.textContent = String(payload.best_score || 0);
         return payload;
       });
@@ -169,35 +182,59 @@
     message.textContent = `Final score: ${game.score} / 5`;
     finishPromise = root.WoodshedArcadeEconomy.completePlay(token, game.score)
       .then(function (payload) {
+        if (!sameAccount(playAccount)) return payload;
         bestOutput.textContent = String(payload.best_score || 0);
         return payload;
       })
       .catch(function (error) {
+        if (!sameAccount(playAccount)) throw error;
         message.textContent = `${message.textContent} · ${error.message}`;
         throw error;
       });
     return finishPromise;
   }
 
-  function answerQuestion(choice) {
-    const result = game.answer(choice);
-    if (!result.accepted) return;
-    message.textContent = result.correct
-      ? `Correct! ${result.fact}`
-      : `The answer is ${result.answer}. ${result.fact}`;
+  async function answerQuestion(choice) {
+    if (game.status !== "running" || game.awaitingAdvance || !sameAccount(playAccount)) return;
+    // A lost response retries the same committed choice, never a second guess.
+    if (!pendingAnswer) pendingAnswer = { index: game.questionIndex, choice };
+    game.awaitingAdvance = true;
+    message.textContent = "Checking your answer…";
     render();
-    root.clearTimeout(feedbackTimer);
-    feedbackTimer = root.setTimeout(function () {
-      if (result.finished) {
-        finishGame().catch(function () {});
-      } else {
-        game.advance();
-        message.textContent = "Choose one answer.";
+    try {
+      const payload = await root.WoodshedArcadeEconomy.answerHistory(
+        activePlayToken, pendingAnswer.index, pendingAnswer.choice
+      );
+      if (!sameAccount(playAccount)) return;
+      pendingAnswer = null;
+      const result = payload.answer_result;
+      game.score = payload.history.score;
+      message.textContent = result.correct
+        ? `Correct! ${result.fact}`
+        : `The answer is ${result.answer}. ${result.fact}`;
+      render();
+      root.clearTimeout(feedbackTimer);
+      feedbackTimer = root.setTimeout(function () {
+        if (!sameAccount(playAccount)) return;
+        applySnapshot(payload.history);
+        if (payload.history.finished) finishGame().catch(function () {});
+        else message.textContent = "Choose one answer.";
         render();
         const firstAnswer = answers.querySelector("button");
         if (firstAnswer) firstAnswer.focus();
+      }, 700);
+    } catch (error) {
+      if (!sameAccount(playAccount)) return;
+      game.awaitingAdvance = false;
+      if (error.message.includes("daily quiz has expired")) {
+        game.status = "ended";
+        dailyPlayAvailable = false;
+        message.textContent = "That daily quiz has expired. Reload this page to start today's quiz.";
+      } else {
+        message.textContent = `${error.message} Tap an answer to retry saving your original choice.`;
       }
-    }, 700);
+      render();
+    }
   }
 
   function startGame() {
@@ -205,19 +242,26 @@
     starting = true;
     message.textContent = "Starting today's quiz…";
     render();
+    const requestAccount = root.WWState?.accountRequest();
     root.WoodshedArcadeEconomy.startPlay(GAME_KEY).then(function (payload) {
+      if (!sameAccount(requestAccount)) return;
+      playAccount = requestAccount;
       activePlayToken = payload.play_token;
       finishPromise = null;
+      pendingAnswer = null;
       dailyPlayAvailable = false;
-      game.start();
+      game.submitted = false;
+      applySnapshot(payload.history);
       message.textContent = "Choose one answer.";
       render();
       const firstAnswer = answers.querySelector("button");
       if (firstAnswer) firstAnswer.focus();
     }).catch(function (error) {
+      if (!sameAccount(requestAccount)) return;
       message.textContent = error.message;
       if (error.message.includes("once each Central day")) dailyPlayAvailable = false;
     }).finally(function () {
+      if (!sameAccount(requestAccount)) return;
       starting = false;
       render();
     });
@@ -230,13 +274,17 @@
   });
   startButton.addEventListener("click", startGame);
 
+  const statusAccount = root.WWState?.accountRequest();
   root.WoodshedArcadeEconomy.loadStatus(GAME_KEY).then(function (payload) {
-    dailyPlayAvailable = payload.daily_play_available !== false;
+    if (!sameAccount(statusAccount)) return;
+    dailyPlayAvailable = payload.daily_play_available !== false || payload.daily_play_resumable === true;
+    if (payload.daily_play_resumable) message.textContent = "Resume today's quiz with New Game. No extra dandelion.";
     if (!dailyPlayAvailable) {
       message.textContent = "Today's quiz is complete. Come back after Central midnight.";
     }
     render();
   }).catch(function (error) {
+    if (!sameAccount(statusAccount)) return;
     message.textContent = error.message;
   });
   loadScores().catch(function () {});

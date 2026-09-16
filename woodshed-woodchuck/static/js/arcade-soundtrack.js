@@ -184,7 +184,7 @@
   window.addEventListener("pagehide", stopSoundtrack, { once: true });
   window.addEventListener("beforeunload", stopSoundtrack, { once: true });
 
-  document.addEventListener("DOMContentLoaded", function () {
+  function wireSoundtrackControls() {
     const toggle = document.getElementById("sound-effects-enabled");
     const volume = document.getElementById("sound-effects-volume");
     const soundtrackToggle = document.querySelector("[data-arcade-soundtrack-toggle]");
@@ -207,5 +207,7 @@
     applyPreferences();
     updateSoundtrackToggle();
     audio.currentTime = 0;
-  }, { once: true });
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", wireSoundtrackControls, { once: true });
+  else wireSoundtrackControls();
 }());

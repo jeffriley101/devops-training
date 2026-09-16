@@ -24,13 +24,14 @@ TRACKS = [
 ]
 
 
+@pytest.mark.parametrize("ready_state", ["loading", "complete"])
 @pytest.mark.parametrize("game,filename,loop,restart", TRACKS)
-def test_game_mapping_and_end_of_track_behavior(game, filename, loop, restart):
+def test_game_mapping_and_end_of_track_behavior(game, filename, loop, restart, ready_state):
     source = r'''
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const vm = require("node:vm");
-const [game, filename, loop, restart] = JSON.parse(process.argv[1]);
+const [game, filename, loop, restart, readyState] = JSON.parse(process.argv[1]);
 const listeners = {};
 const audioListeners = {};
 const timers = new Map();
@@ -38,6 +39,7 @@ let timerId = 0;
 let audio;
 let plays = 0;
 const document = {
+  readyState,
   querySelector(selector) {
     return selector === "[data-arcade-soundtrack]"
       ? {dataset: {arcadeSoundtrack: game}} : null;
@@ -64,7 +66,8 @@ assert.equal(audio.src, "/static/audio/arcade/" + filename);
 assert.equal(audio.loop, loop);
 assert.equal(audio.preload, "auto");
 assert.equal(Boolean(audioListeners.ended), restart);
-listeners.DOMContentLoaded();
+if (readyState === "loading") listeners.DOMContentLoaded();
+else assert.equal(listeners.DOMContentLoaded, undefined, "late script already wired controls");
 assert.equal(plays, 0, "no autoplay before user gesture");
 listeners.pointerdown({});
 assert.equal(plays, 1);
@@ -90,7 +93,7 @@ if (game === "thirds") {
 }
 '''
     result = subprocess.run(
-        ["node", "-e", source, json.dumps([game, filename, loop, restart])],
+        ["node", "-e", source, json.dumps([game, filename, loop, restart, ready_state])],
         cwd=ROOT, capture_output=True, text=True, check=False,
     )
     assert result.returncode == 0, result.stderr

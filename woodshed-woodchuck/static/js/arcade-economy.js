@@ -4,6 +4,18 @@
   const RETRY_DELAY_MS = 350;
   const FRIENDLY_NETWORK_MESSAGE = "Couldn't reach the Woodshed. Try again.";
 
+  function safeEndpoint(endpoint) {
+    const path = String(endpoint || "").split("?")[0];
+    if (path === "/arcade/plays") return path;
+    if (/^\/arcade\/plays\/[^/]+\/(complete|answer)$/.test(path)) {
+      return path.replace(/\/plays\/[^/]+\//, "/plays/{play_token}/");
+    }
+    if (/^\/arcade\/(scores|plays\/status)\/[^/]+$/.test(path)) {
+      return path.replace(/\/[^/]+$/, "/{game_key}");
+    }
+    return "<unmatched>";
+  }
+
   class ArcadeRequestError extends Error {
     constructor(message, details) {
       super(message);
@@ -16,7 +28,12 @@
     // This is intentionally concise: it identifies the request that failed
     // without putting student, token, or session data in production logs.
     if (root.console && typeof root.console.warn === "function") {
-      root.console.warn("[woodshed-arcade-request]", details);
+      root.console.warn("[woodshed-arcade-request]", {
+        operation: details.operation,
+        attempt: details.attempt,
+        status: details.status,
+        receivedResponse: details.receivedResponse,
+      });
     }
   }
 
@@ -39,7 +56,7 @@
         const details = {
           gameKey: settings.gameKey,
           operation: settings.operation,
-          endpoint: settings.endpoint,
+          endpoint: safeEndpoint(settings.endpoint),
           attempt,
           status: null,
           receivedResponse: false,
@@ -61,7 +78,7 @@
         const details = {
           gameKey: settings.gameKey,
           operation: settings.operation,
-          endpoint: settings.endpoint,
+          endpoint: safeEndpoint(settings.endpoint),
           attempt,
           status: response.status,
           receivedResponse: true,
@@ -78,7 +95,7 @@
         const details = {
           gameKey: settings.gameKey,
           operation: settings.operation,
-          endpoint: settings.endpoint,
+          endpoint: safeEndpoint(settings.endpoint),
           attempt,
           status: response.status,
           receivedResponse: true,
@@ -97,19 +114,19 @@
     throw new ArcadeRequestError(FRIENDLY_NETWORK_MESSAGE);
   }
 
-  function renderStatus(payload) {
+  function renderStatus(payload, requestAccount) {
     if (!payload || typeof payload !== "object") return;
-    document.querySelectorAll("[data-arcade-balance]").forEach(function (output) {
-      if (Number.isInteger(payload.balance)) output.textContent = String(payload.balance);
-    });
-    if (root.WWState && Number.isInteger(payload.balance)) {
-      const state = root.WWState.getState();
-      state.progress.credits = payload.balance;
-      if (Number.isInteger(payload.state_revision)) {
-        state.account.serverRevision = payload.state_revision;
-      }
+    let balance = payload.balance;
+    if (root.WWState) {
+      const state = requestAccount ? root.WWState.stateForResponse(requestAccount) : null;
+      if (!state) return;
+      root.WWState.applyEconomy(state, payload);
       root.WWState.saveState(state, { sync: false });
+      balance = state.progress.credits;
     }
+    document.querySelectorAll("[data-arcade-balance]").forEach(function (output) {
+      if (Number.isInteger(balance)) output.textContent = String(balance);
+    });
     document.querySelectorAll("[data-arcade-economy-message]").forEach(function (message) {
       if (payload.reward_eligible === false) {
         message.textContent = "Daily prize plays complete — scores still count.";
@@ -118,18 +135,20 @@
   }
 
   function loadStatus(gameKey) {
+    const requestAccount = root.WWState?.accountRequest();
     return arcadeRequest({
       gameKey,
       operation: "status",
       endpoint: `/arcade/plays/status/${encodeURIComponent(gameKey)}`,
       fetchOptions: { credentials: "same-origin", cache: "no-store" },
     }).then(function (payload) {
-      renderStatus(payload);
+      renderStatus(payload, requestAccount);
       return payload;
     });
   }
 
   function startPlay(gameKey) {
+    const requestAccount = root.WWState?.accountRequest();
     return arcadeRequest({
       gameKey,
       operation: "start",
@@ -141,10 +160,11 @@
         body: JSON.stringify({ game_key: gameKey }),
       },
     }).then(function (payload) {
+      if (root.WWState && !root.WWState.stateForResponse(requestAccount)) return payload;
       if (typeof payload.play_token === "string") {
         playTokens.set(payload.play_token, gameKey);
       }
-      renderStatus(payload);
+      renderStatus(payload, requestAccount);
       document.querySelectorAll("[data-arcade-economy-message]").forEach(function (message) {
         message.textContent = payload.reward_eligible === false
           ? "-1 🌼 · Daily prize plays complete — scores still count."
@@ -155,6 +175,7 @@
   }
 
   function completePlay(playToken, score) {
+    const requestAccount = root.WWState?.accountRequest();
     if (!playToken) return Promise.reject(new Error("Start a new game first."));
     const gameKey = playTokens.get(playToken) || "unknown";
     return arcadeRequest({
@@ -168,8 +189,9 @@
         body: JSON.stringify({ score: Math.max(0, Math.round(score)) }),
       },
     }).then(function (payload) {
+      if (root.WWState && !root.WWState.stateForResponse(requestAccount)) return payload;
       playTokens.delete(playToken);
-      renderStatus(payload);
+      renderStatus(payload, requestAccount);
       document.querySelectorAll("[data-arcade-economy-message]").forEach(function (message) {
         if (payload.reward_eligible === false) {
           message.textContent = "Daily prize plays complete — scores still count.";
@@ -192,11 +214,29 @@
     });
   }
 
+  function answerHistory(playToken, questionIndex, choice) {
+    const requestAccount = root.WWState?.accountRequest();
+    return arcadeRequest({
+      gameKey: "history-mystery",
+      operation: "history-answer",
+      endpoint: `/arcade/plays/${encodeURIComponent(playToken)}/answer`,
+      fetchOptions: {
+        method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question_index: questionIndex, choice }),
+      },
+    }).then(function (payload) {
+      renderStatus(payload, requestAccount);
+      return payload;
+    });
+  }
+
   const playTokens = new Map();
 
   root.WoodshedArcadeEconomy = Object.freeze({
     ArcadeRequestError,
     arcadeRequest,
+    answerHistory,
     completePlay,
     loadStatus,
     loadScores,

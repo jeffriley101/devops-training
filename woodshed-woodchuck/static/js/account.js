@@ -295,7 +295,7 @@
         const loginPayload = await loginResponse.json();
         const profile = loginPayload.profile;
 
-        const stateResponse = await fetch("/account/state");
+        const stateResponse = await fetch("/account/state", {cache: "no-store", credentials: "same-origin"});
 
         if (!stateResponse.ok) {
           throw new Error(
@@ -307,6 +307,10 @@
         }
 
         const statePayload = await stateResponse.json();
+        if (statePayload.state?.account?.woodchuckId &&
+            statePayload.state.account.woodchuckId !== profile.woodchuck_id) {
+          throw new Error("Sign-in changed. Reload before continuing.");
+        }
         let restoredState;
 
         if (
@@ -534,7 +538,7 @@
     );
   }
 
-  async function recoverFromConflict(localState) {
+  async function recoverFromConflict(localState, requestAccount) {
     const backupKey =
       `woodshedWoodchuckConflictBackup.${Date.now()}`;
 
@@ -561,9 +565,12 @@
 
     const payload = await response.json();
 
+    const latest = stateApi.stateForResponse(requestAccount);
+    if (!latest || payload.revision < latest.account.serverRevision) return;
     if (!payload.state || typeof payload.state !== "object") {
       throw new Error("The server did not return a saved Woodshed.");
     }
+    if (payload.state.account?.woodchuckId !== latest.account.woodchuckId) return;
 
     stateApi.saveState(payload.state, { sync: false });
 
@@ -591,6 +598,7 @@
 
   async function syncStateToServer() {
     const state = stateApi.getState();
+    const requestAccount = stateApi.accountRequest();
 
     if (!isPersistentAccount(state)) return false;
 
@@ -613,14 +621,17 @@
       });
 
       if (response.status === 401) {
-        state.account.authenticated = false;
-        stateApi.saveState(state, { sync: false });
+        const latest = stateApi.stateForResponse(requestAccount);
+        if (!latest) return false;
+        latest.account.authenticated = false;
+        stateApi.saveState(latest, { sync: false });
         return false;
       }
 
       if (response.status === 409) {
         pendingSync = false;
-        await recoverFromConflict(state);
+        if (!stateApi.stateForResponse(requestAccount)) return false;
+        await recoverFromConflict(state, requestAccount);
         return false;
       }
 
@@ -629,22 +640,22 @@
       }
 
       const payload = await response.json();
-      const latestState = stateApi.getState();
+      const latestState = stateApi.stateForResponse(requestAccount);
+      if (!latestState) return false;
       const latestAccount =
         latestState.account &&
         typeof latestState.account === "object"
           ? latestState.account
           : {};
 
-      latestState.account = {
-        ...latestAccount,
-        serverRevision:
-          Number.isInteger(payload.revision)
-            ? payload.revision
-            : latestAccount.serverRevision || 0,
-        lastSyncedAt:
-          payload.last_synced_at || new Date().toISOString(),
-      };
+      if (!Number.isInteger(payload.revision) || payload.revision >= (latestAccount.serverRevision || 0)) {
+        latestState.account = {
+          ...latestAccount,
+          serverRevision: Number.isInteger(payload.revision) ? payload.revision : latestAccount.serverRevision || 0,
+          lastSyncedAt: payload.last_synced_at || new Date().toISOString(),
+        };
+        stateApi.applyEconomy(latestState, payload);
+      }
 
       stateApi.saveState(latestState, { sync: false });
       return true;

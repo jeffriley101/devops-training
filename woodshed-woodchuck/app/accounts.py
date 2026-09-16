@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-import os
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
@@ -13,6 +12,7 @@ from .models import WoodchuckProfile
 from .instruments import normalize_supported_instrument
 from .content import LEVEL_OPTIONS
 from .security import generate_woodchuck_id, hash_pin, is_valid_pin, verify_pin
+from .session_config import session_secret
 
 
 def normalize_woodchuck_id(woodchuck_id: str) -> str:
@@ -27,7 +27,7 @@ def retired_identifier_hash(woodchuck_id: str) -> str:
     introducing another deployment secret while preventing offline dictionary
     testing of a copied retired-ID column.
     """
-    secret = os.getenv("SESSION_SECRET", "woodshed-local-development-secret")
+    secret = session_secret()
     return hmac.new(
         secret.encode("utf-8"),
         normalize_woodchuck_id(woodchuck_id).encode("utf-8"),

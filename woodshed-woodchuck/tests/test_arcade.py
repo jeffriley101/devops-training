@@ -166,7 +166,7 @@ def test_arcade_room_renders_nine_touch_friendly_cabinets() -> None:
     mobile = CSS[CSS.index("@media (max-width: 760px)"):]
     assert ".arcade-cabinet-grid { grid-template-columns: 1fr; }" in mobile
     assert '/static/js/arcade.js?v=14' in ARCADE
-    assert '/static/js/arcade-economy.js?v=3' in ARCADE
+    assert '/static/js/arcade-economy.js?v=5' in ARCADE
 
 
 def test_arcade_pages_route_game_specific_soundtracks() -> None:
@@ -321,7 +321,7 @@ def test_arcade_landing_renders_personal_bests_from_existing_score_payload() -> 
     assert "data-arcade-personal-best" in ARCADE_JS
     assert "renderPersonalBest(gameKey, payload.best_score)" in room
     assert "data-arcade-personal-best" in room
-    assert ARCADE.index('/static/js/arcade-economy.js?v=3') < ARCADE.index('/static/js/arcade.js?v=14')
+    assert ARCADE.index('/static/js/arcade-economy.js?v=5') < ARCADE.index('/static/js/arcade.js?v=14')
     assert ARCADE.count('data-arcade-leaderboard=') == 8
     assert 'data-arcade-leaderboard="history-mystery"' not in ARCADE
 

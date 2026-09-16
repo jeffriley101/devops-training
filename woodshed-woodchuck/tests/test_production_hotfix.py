@@ -26,7 +26,7 @@ def test_instrument_assets_are_cache_busted_and_failures_are_visible() -> None:
     assert "/static/manifest.webmanifest?v=4" in base
     assert "/static/js/instruments.js?v=3" in base
     assert "/static/js/app.js?v=83" in base
-    assert "/static/js/account.js?v=14" in base
+    assert "/static/js/account.js?v=15" in base
     assert 'id="change-instrument-feedback"' in home
     assert 'role="status"' in home
     assert 'feedback.classList.add("error-text")' in account_js

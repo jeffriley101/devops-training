@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from .account_routes import current_profile
 from .db import SessionLocal
+from .economy import lock_state
 from .store_catalog import catalog_payload
 from .store_inventory import (
     InsufficientDandelionsError,
@@ -181,6 +182,7 @@ def create_store_purchase(request: Request, submitted: StorePurchaseSubmission):
                 profile_id=profile.id,
                 item_key=submitted.item_key,
             )
+            state_revision = lock_state(session, profile.id).revision
             session.commit()
         except StoreItemUnavailableError as error:
             session.rollback()
@@ -194,4 +196,5 @@ def create_store_purchase(request: Request, submitted: StorePurchaseSubmission):
         return {
             "item": owned_item_payload(owned),
             "dandelion_balance": balance,
+            "state_revision": state_revision,
         }

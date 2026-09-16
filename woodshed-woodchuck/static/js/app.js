@@ -1,6 +1,16 @@
 (function () {
   const stateApi = window.WWState;
-  if (!stateApi) return;
+  const localGuest = document.body?.dataset?.guest === "local";
+  if (!stateApi && !localGuest) return;
+
+  // Guest runs only these existing local tools. No account bootstrap, autosave,
+  // timer/chart, inventory, teams, analytics or paid-game consumers are wired.
+  if (localGuest) {
+    wireMetronome();
+    wireTuner();
+    return;
+  }
+
 
   function playSound(effectName) {
     try {
@@ -317,8 +327,10 @@
     button.addEventListener("click", async function () {
       button.disabled = true;
       try {
-        await fetch("/account/logout", {method: "POST", credentials: "same-origin"});
-      } finally {
+        const response = await fetch("/account/logout", {method: "POST", credentials: "same-origin"});
+        if (!response.ok || (await response.json()).authenticated !== false) {
+          throw new Error("Sign out could not be confirmed. Please try again.");
+        }
         try {
           window.localStorage.removeItem("woodshedWoodchuckState.v1");
           Object.keys(window.localStorage).filter((key) => key.startsWith("woodshedWoodchuckConflictBackup.")).forEach((key) => window.localStorage.removeItem(key));
@@ -326,6 +338,9 @@
           window.sessionStorage.removeItem("woodshed:practice-timer-started-at");
         } catch (_storageError) {}
         window.location.assign("/");
+      } catch (_error) {
+        button.disabled = false;
+        window.alert("Sign out could not be confirmed. Your saved account data was kept. Please try again.");
       }
     });
   }
@@ -896,6 +911,7 @@
       event.preventDefault();
       const submit = form.querySelector("button[type='submit']");
       submit.disabled = true;
+      const requestAccount = stateApi.accountRequest();
       try {
         const response = await fetch("/account/daily-secret", {
           method: "POST", credentials: "same-origin",
@@ -904,11 +920,11 @@
         });
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.detail || "The secret could not be checked.");
+        const next = stateApi.stateForResponse(requestAccount);
+        if (!next) return;
         playNewCrownIfConfirmed(payload);
         playNewMedalIfConfirmed(payload);
-        const next = stateApi.getState();
-        if (Number.isInteger(payload.credits)) next.progress.credits = payload.credits;
-        if (Number.isInteger(payload.revision)) next.account.serverRevision = payload.revision;
+        stateApi.applyEconomy(next, payload);
         stateApi.saveState(next, { sync: false });
         hydrateHome(next);
         feedback.textContent = payload.redeemed ? "+20 dandelions" : "Already found today. Come back tomorrow!";
@@ -1100,17 +1116,14 @@
             : `${payload.days_to_next_crown} days to the next weekly streak crown.`;
       }
 
-      const next = stateApi.getState();
-      if (Number.isInteger(payload.dandelion_balance)) {
-        next.progress.credits = payload.dandelion_balance;
-      }
-      if (Number.isInteger(payload.state_revision)) {
-        next.account.serverRevision = payload.state_revision;
-      }
+      const next = stateApi.stateForResponse(requestAccount);
+      if (!next) return;
+      stateApi.applyEconomy(next, payload);
       stateApi.saveState(next, { sync: false });
       hydrateHome(next);
     }
 
+    const requestAccount = stateApi.accountRequest();
     fetch("/account/login-streak", {
       method: "POST",
       credentials: "same-origin",
@@ -1199,6 +1212,7 @@
     }
 
     async function loadAuthoritativeBonusChallenge() {
+      const requestAccount = stateApi.accountRequest();
       if (completeBtn) {
         completeBtn.disabled = true;
         completeBtn.textContent = "Loading Challenge…";
@@ -1220,7 +1234,8 @@
         }
         const challenge = payload.challenge;
         currentChallengeInstance = challenge.instance_key;
-        const next = stateApi.getState();
+        const next = stateApi.stateForResponse(requestAccount);
+        if (!next) return;
         next.daily = {
           dateKey: challenge.activity_date,
           questId: challenge.challenge_id,
@@ -1274,7 +1289,8 @@
       if (completionInFlight) return;
       if (errorEl) errorEl.textContent = "";
 
-      const next = stateApi.getState();
+      let next = stateApi.getState();
+      const requestAccount = stateApi.accountRequest();
       if (!currentChallengeInstance) {
         if (errorEl) errorEl.textContent = "No Bonus Challenge is available.";
         return;
@@ -1305,6 +1321,8 @@
         if (!response.ok) {
           throw new Error(payload.detail || "Quest completion could not be saved.");
         }
+        next = stateApi.stateForResponse(requestAccount);
+        if (!next) return;
         if (payload.challenge_id !== next.daily.questId) {
           throw new Error("The saved Bonus Challenge response could not be read.");
         }
@@ -1312,7 +1330,7 @@
         next.daily.completed = payload.completed === true;
         next.daily.completedAt = payload.completed ? new Date().toISOString() : null;
         next.quest.completed = payload.completed === true;
-        if (Number.isInteger(payload.credits)) next.progress.credits = payload.credits;
+        stateApi.applyEconomy(next, payload);
         const rewardMessage = payload.created === true
           ? `Challenge complete: +5 dandelions and +2 Board Activity Points. Total: ${payload.credits} dandelions.`
           : payload.completed === true
@@ -1660,6 +1678,8 @@
       }
     }
 
+    window.addEventListener("ww:session-changed", function () { stopTuner(false); });
+    window.addEventListener("ww:guest-discarded", function () { stopTuner(false); });
     openButton.addEventListener("click", startTuner);
     closeButton.addEventListener("click", function () { stopTuner(true); });
     document.addEventListener("keydown", function (event) {
@@ -1908,13 +1928,15 @@
       return;
     }
 
-    const BPM_STORAGE_KEY = "woodshedWoodchuckMetronomeBpm";
+    const BPM_STORAGE_KEY = localGuest
+      ? "woodshed:guest:v1:metronome-bpm" : "woodshedWoodchuckMetronomeBpm";
     const AudioContextClass =
       window.AudioContext || window.webkitAudioContext;
 
     let bpm = 120;
     let audioContext = null;
     let schedulerTimer = null;
+    let playbackGeneration = 0;
     let nextBeatTime = 0;
     let isRunning = false;
     let tapTimes = [];
@@ -1956,7 +1978,7 @@
       }
     }
 
-    function renderBpm() {
+    function renderBpm(persist = true) {
       rangeInput.value = String(bpm);
       numberInput.value = String(bpm);
 
@@ -1964,7 +1986,7 @@
         bpmReadout.textContent = String(bpm);
       }
 
-      saveBpm();
+      if (persist) saveBpm();
     }
 
     function setBpm(value) {
@@ -2065,6 +2087,7 @@
     }
 
     async function startMetronome() {
+      const startingGeneration = playbackGeneration;
       if (!AudioContextClass) {
         if (status) {
           status.textContent =
@@ -2085,6 +2108,7 @@
         resumePromise = Promise.resolve(audioContext.resume());
       }
       await resumePromise;
+      if (startingGeneration !== playbackGeneration) return;
 
       if (schedulerTimer !== null) {
         window.clearInterval(schedulerTimer);
@@ -2106,6 +2130,7 @@
     }
 
     function stopMetronome() {
+      playbackGeneration += 1;
       isRunning = false;
       setPracticeSway(false);
 
@@ -2198,7 +2223,7 @@
     }
 
     loadBpm();
-    renderBpm();
+    renderBpm(!localGuest);
 
     openButton.addEventListener("click", function () {
       panel.classList.remove("hidden");
@@ -2249,6 +2274,12 @@
       if (document.hidden && isRunning) stopMetronome();
     });
     window.addEventListener("pagehide", stopMetronome);
+    window.addEventListener("ww:session-changed", stopMetronome);
+    window.addEventListener("ww:guest-discarded", function () {
+      stopMetronome();
+      bpm = 120;
+      renderBpm(false);
+    });
   }
 
   const BACK_TO_SCHOOL_READINESS_CHALLENGES = [
@@ -2460,7 +2491,6 @@
       current.bandCamp.daily.awarded.push(contestKey);
       current.bandCamp.totals.points += 1;
       current.bandCamp.totals.wins[contestKey] += 1;
-      current.progress.credits += 1;
 
       addDailyWinnerIfComplete(current);
 
@@ -2712,7 +2742,8 @@
     if (hoursCheckbox) {
       hoursCheckbox.addEventListener("change", async function () {
         if (!hoursCheckbox.checked) return;
-        const next = prepareCurrentDay(stateApi.getState());
+        let next = prepareCurrentDay(stateApi.getState());
+        const requestAccount = stateApi.accountRequest();
         if (serverConfirmedAwards.has("hours")) return;
         hoursCheckbox.disabled = true;
 
@@ -2721,6 +2752,10 @@
           if (!persistedAward) {
             throw new Error("Rehearsal or lesson activity could not be saved.");
           }
+          next = stateApi.stateForResponse(requestAccount);
+          if (!next) return;
+          next = prepareCurrentDay(next);
+          stateApi.applyEconomy(next, persistedAward);
           if (persistedAward.created === true) {
             awardContest(next, "hours");
             playSound("bandCampBonus");
@@ -2747,12 +2782,17 @@
 
     if (careButton) {
       careButton.addEventListener("click", async function () {
-        const next = prepareCurrentDay(stateApi.getState());
+        let next = prepareCurrentDay(stateApi.getState());
+        const requestAccount = stateApi.accountRequest();
 
         if (next.bandCamp.daily.careComplete) return;
 
         try {
           const persistedAward = await persistCampPoint("care");
+          next = stateApi.stateForResponse(requestAccount);
+          if (!next) return;
+          next = prepareCurrentDay(next);
+          stateApi.applyEconomy(next, persistedAward);
           if (persistedAward && persistedAward.created === true) {
             playCampReward(false);
           }
@@ -2777,7 +2817,8 @@
       triviaForm.addEventListener("submit", async function (event) {
         event.preventDefault();
 
-        const next = prepareCurrentDay(stateApi.getState());
+        let next = prepareCurrentDay(stateApi.getState());
+        const requestAccount = stateApi.accountRequest();
 
         if (next.bandCamp.daily.triviaAttempted) return;
 
@@ -2804,6 +2845,9 @@
           feedbackEl.textContent = error.message || "Trivia could not be checked.";
           return;
         }
+        next = stateApi.stateForResponse(requestAccount);
+        if (!next) return;
+        next = prepareCurrentDay(next);
         const isCorrect = checkedAnswer.correct === true;
         playNewCrownIfConfirmed(checkedAnswer);
         playNewMedalIfConfirmed(checkedAnswer);
@@ -2813,6 +2857,7 @@
           correct: isCorrect,
         };
 
+        stateApi.applyEconomy(next, checkedAnswer);
         next.bandCamp.daily.triviaAttempted = true;
         next.bandCamp.daily.triviaCorrect = isCorrect;
         next.bandCamp.daily.triviaSelectedAnswer = checkedAnswer.selected_answer_id;
@@ -2852,7 +2897,8 @@
 
     if (marchingButton) {
       marchingButton.addEventListener("click", async function () {
-        const next = prepareCurrentDay(stateApi.getState());
+        let next = prepareCurrentDay(stateApi.getState());
+        const requestAccount = stateApi.accountRequest();
 
         if (next.bandCamp.daily.marchingComplete || marchingButton.disabled) return;
 
@@ -2872,6 +2918,10 @@
           return;
         }
 
+        next = stateApi.stateForResponse(requestAccount);
+        if (!next) return;
+        next = prepareCurrentDay(next);
+        stateApi.applyEconomy(next, persistedAward);
         next.bandCamp.daily.marchingComplete = true;
         if (persistedAward.created === true) {
           awardContest(next, "marching");
@@ -4189,6 +4239,7 @@
     async function purchaseItem(shelfKey, itemKey) {
       const item = shelfItems[shelfKey].find((candidate) => candidate.item_key === itemKey);
       if (!item || purchaseInFlight.has(itemKey)) return;
+      const requestAccount = stateApi.accountRequest();
       purchaseInFlight.add(itemKey);
       setShelfFeedback(shelfKey, "");
       renderShelf(shelfKey);
@@ -4206,11 +4257,15 @@
             ? "Not enough dandelions for that item."
             : "That purchase could not be completed."));
         }
+        const currentState = stateApi.stateForResponse(requestAccount);
+        if (!currentState) return;
+        stateApi.applyEconomy(currentState, payload);
+        stateApi.saveState(currentState, { sync: false });
         ownedCounts.set(itemKey, (ownedCounts.get(itemKey) || 0) + 1);
         const credits = document.getElementById("credits-value");
         const dandelionControl = document.getElementById("dandelion-object");
-        if (credits) credits.textContent = String(payload.dandelion_balance);
-        if (dandelionControl) dandelionControl.setAttribute("aria-label", `${payload.dandelion_balance} dandelions`);
+        if (credits) credits.textContent = String(currentState.progress.credits);
+        if (dandelionControl) dandelionControl.setAttribute("aria-label", `${currentState.progress.credits} dandelions`);
         setShelfFeedback(shelfKey, `${item.name} purchased. Owned ×${ownedCounts.get(itemKey)}.`);
       } catch (error) {
         setShelfFeedback(shelfKey, error.message || "That purchase could not be completed.", true);
@@ -5068,8 +5123,9 @@
         return;
       }
 
-      const next = stateApi.getState();
-      const dandelionsEarned = calculateDandelionsForPractice(
+      let next = stateApi.getState();
+      const requestAccount = stateApi.accountRequest();
+      let dandelionsEarned = calculateDandelionsForPractice(
         minutes,
         practiceDetails,
         next.practiceLog || [],
@@ -5147,6 +5203,8 @@
           includeContests,
           includeTeamContests,
         });
+        next = stateApi.stateForResponse(requestAccount);
+        if (!next) return;
         const serverChart = createdPayload && createdPayload.chart;
         if (!serverChart || !Number.isInteger(serverChart.id)) {
           throw new Error("The saved P-Chart response could not be read.");
@@ -5158,10 +5216,10 @@
           playSound("pChartSubmitted");
         }
 
-        if (createdPayload.created === true) {
-          next.progress.credits = (next.progress.credits || 0) + dandelionsEarned;
-        }
-        if (Number.isInteger(createdPayload.streak)) {
+        dandelionsEarned = Number(serverChart.credits_awarded) || 0;
+        stateApi.applyEconomy(next, createdPayload);
+        if (Number.isInteger(createdPayload.streak) &&
+            createdPayload.state_revision >= next.account.serverRevision) {
           next.progress.streak = createdPayload.streak;
         }
 

@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from .economy import lock_state
 from .models import (
     CrownAward,
     LoginStreak,
@@ -38,17 +39,7 @@ def _pending_row(session: Session, model: type, **values: object):
 
 
 def _state_for_update(session: Session, profile_id: int) -> WoodchuckState:
-    state = _pending_row(session, WoodchuckState, profile_id=profile_id)
-    if state is None:
-        state = session.scalar(
-            select(WoodchuckState)
-            .where(WoodchuckState.profile_id == profile_id)
-            .with_for_update()
-        )
-    if state is None:
-        state = WoodchuckState(profile_id=profile_id, state_json={}, revision=0)
-        session.add(state)
-    return state
+    return lock_state(session, profile_id)
 
 
 def _credits(state: WoodchuckState) -> int:

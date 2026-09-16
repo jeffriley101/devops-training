@@ -536,7 +536,8 @@
   document.addEventListener("keydown", gestureUnlock, true);
   document.addEventListener("visibilitychange", refreshAudioState);
   window.addEventListener("pageshow", refreshAudioState);
-  document.addEventListener("DOMContentLoaded", wireControls, { once: true });
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", wireControls, { once: true });
+  else wireControls();
 
   window.WoodshedAudio = {
     unlock, play, playCampReward, playPianoPitch, setEnabled, setVolume,

@@ -1,10 +1,15 @@
 import os
+import logging
 import base64
 from datetime import date, datetime
 from io import BytesIO
 from pathlib import Path
 from urllib.parse import quote
 from zoneinfo import ZoneInfo
+
+from .safe_logging import SafeRequestLogContext, install_safe_logging
+
+install_safe_logging()
 
 import qrcode
 import qrcode.image.svg
@@ -18,6 +23,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from .practice_duration import format_minutes
 from .account_routes import (
     current_profile,
+    page_generation,
     router as account_router,
 )
 from .membership_routes import router as membership_router
@@ -53,25 +59,26 @@ from .content import (
 from .instruments import instrument_definition_payloads, shed_artwork_url, shed_character_url
 from .history_mystery import (
     history_mystery_central_date,
-    history_mystery_questions_for_date,
 )
 from .models import WoodchuckState
 from .board_seasons import board_season_presentation
 from .seasons import season_covering_date
+from .session_config import session_secret, secure_session_cookie, is_production
+from .login_limits import protection_status
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SESSION_SECRET = os.getenv(
-    "SESSION_SECRET",
-    "woodshed-local-development-secret",
-)
-SESSION_COOKIE_SECURE = os.getenv(
-    "SESSION_COOKIE_SECURE",
-    "",
-).lower() in {"1", "true", "yes"}
+SESSION_SECRET = session_secret()
+SESSION_COOKIE_SECURE = secure_session_cookie()
+if is_production():
+    logging.getLogger(__name__).warning(
+        "Authentication rate limiting: %s; deployment verification still required.",
+        protection_status(check_backend=False)["state"],
+    )
 
 
 app = FastAPI(title="Woodshed Woodchuck")
+app.add_middleware(SafeRequestLogContext)
 app.add_middleware(
     SessionMiddleware,
     secret_key=SESSION_SECRET,
@@ -109,6 +116,7 @@ def _render(request: Request, template_name: str, *, analytics_event: str | None
     with SessionLocal() as session:
         profile = current_profile(request, session)
         if profile is not None:
+            page_generation(request)
             authenticated_profile = {
                 "display_name": profile.display_name,
                 "woodchuck_id": profile.woodchuck_id,
@@ -137,6 +145,7 @@ def _render(request: Request, template_name: str, *, analytics_event: str | None
             **context,
         },
     )
+    response.headers["Cache-Control"] = "no-store"
     if analytics_event is not None:
         return observe_response(
             response, session_factory=SessionLocal,
@@ -317,6 +326,35 @@ def trusted_verifiers_page(request: Request):
         # position; retain that existing utility-page behavior.
         page_class="main-app-page",
     )
+
+
+@app.get("/guest")
+@app.get("/guest/login")
+def guest_page(request: Request):
+    # Read the existing account and its page-freshness marker only. Do not
+    # bootstrap account state or observe Guest activity.
+    with SessionLocal() as session:
+        profile = current_profile(request, session)
+        account_id = profile.woodchuck_id if profile is not None else ""
+        if profile is not None:
+            page_generation(request)
+    # Adult/admin sessions also need explicit logout before local exploration.
+    blocked = bool(request.session)
+    signing_in = request.url.path == "/guest/login" and not blocked
+    response = templates.TemplateResponse(
+        request=request, name="guest.html",
+        context={"blocked": blocked, "signing_in": signing_in,
+                 "account_id": account_id, "instruments": INSTRUMENT_OPTIONS,
+                 "levels": LEVEL_OPTIONS, "goals": GOAL_OPTIONS},
+    )
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; connect-src "
+        + ("'self'" if blocked or signing_in else "'none'")
+        + "; form-action 'none'; frame-ancestors 'none'; base-uri 'none'"
+    )
+    return response
 
 
 @app.get("/setup")
@@ -561,7 +599,6 @@ def arcade_history_mystery(request: Request):
         active_nav="store",
         page_class="main-app-page arcade-screen",
         history_mystery_date=play_date.isoformat(),
-        history_mystery_questions=history_mystery_questions_for_date(play_date),
     )
 
 

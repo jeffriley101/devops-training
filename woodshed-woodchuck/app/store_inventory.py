@@ -9,6 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .contests import traveling_cup_entitlements
+from .economy import lock_state
 from .models import (
     CrownAward,
     OwnedItemCopy,
@@ -847,11 +848,7 @@ def purchase_catalog_item(
     if item is None:
         raise StoreItemUnavailableError("That item is not available in today's catalog.")
 
-    state = session.scalar(
-        select(WoodchuckState)
-        .where(WoodchuckState.profile_id == profile_id)
-        .with_for_update()
-    )
+    state = lock_state(session, profile_id)
     balance = _credits(state)
     if balance < item.price:
         raise InsufficientDandelionsError(

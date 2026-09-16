@@ -11,6 +11,11 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .arcade_scores import MAX_ARCADE_SCORE, arcade_score_payload, record_arcade_high_score
+from .economy import lock_state
+from .history_attempts import (
+    HistoryAttemptError, accept_history_answer, history_score, history_snapshot,
+    initialize_history,
+)
 from .models import ArcadePlaySession, WoodchuckProfile, WoodchuckState
 from .xp import plunge_best_payload, record_plunge_best_score
 
@@ -100,16 +105,7 @@ def _central_day_bounds(now: datetime) -> tuple[datetime, datetime]:
 
 
 def _state_for_update(session: Session, profile_id: int) -> WoodchuckState:
-    state = session.scalar(
-        select(WoodchuckState)
-        .where(WoodchuckState.profile_id == profile_id)
-        .with_for_update()
-    )
-    if state is None:
-        state = WoodchuckState(profile_id=profile_id, state_json={}, revision=0)
-        session.add(state)
-        session.flush()
-    return state
+    return lock_state(session, profile_id)
 
 
 def _balance(state: WoodchuckState) -> int:
@@ -182,12 +178,19 @@ def arcade_play_status(
         session, profile_id=profile_id, game_key=key, now=timestamp
     )
     daily_play_available = True
+    daily_play_resumable = False
     if key == "history-mystery":
         daily_play_available = not _has_daily_history_play(
             session,
             profile_id=profile_id,
             play_date=_central_play_date(timestamp),
         )
+        daily_play_resumable = session.scalar(select(ArcadePlaySession.id).where(
+            ArcadePlaySession.profile_id == profile_id,
+            ArcadePlaySession.game_key == key,
+            ArcadePlaySession.daily_play_date == _central_play_date(timestamp),
+            ArcadePlaySession.completed_at.is_(None),
+        )) is not None
     return {
         "game_key": key,
         "balance": _balance(state) if state is not None else 0,
@@ -197,6 +200,7 @@ def arcade_play_status(
         "daily_reward_limit": DAILY_REWARDED_PLAY_LIMIT,
         "reward_eligible": completed < DAILY_REWARDED_PLAY_LIMIT,
         "daily_play_available": daily_play_available,
+        "daily_play_resumable": daily_play_resumable,
     }
 
 
@@ -219,16 +223,22 @@ def start_arcade_play(
         raise ValueError("The signed-in Woodchuck profile is unavailable.")
 
     daily_play_date = None
+    state = _state_for_update(session, profile_id)
     if key == "history-mystery":
         daily_play_date = _central_play_date(timestamp)
-        if _has_daily_history_play(
-            session, profile_id=profile_id, play_date=daily_play_date
-        ):
+        prior = session.scalar(select(ArcadePlaySession).where(
+            ArcadePlaySession.profile_id == profile_id,
+            ArcadePlaySession.game_key == key,
+            ArcadePlaySession.daily_play_date == daily_play_date,
+        ).with_for_update())
+        if prior is not None and prior.completed_at is None:
+            initialize_history(state, prior)
+            return ArcadePlayStartResult(prior, _balance(state), True, 0, state.revision, resumed=True)
+        if prior is not None:
             raise ArcadeDailyLimitError(
                 "History Mystery can be played once each Central day."
             )
 
-    state = _state_for_update(session, profile_id)
     # A browser can lose the response after this transaction commits.  Do not
     # charge a second dandelion when the student safely retries the same game:
     # the profile row lock above serializes concurrent start requests and this
@@ -284,6 +294,8 @@ def start_arcade_play(
                 "History Mystery can be played once each Central day."
             ) from error
         raise
+    if key == "history-mystery":
+        initialize_history(state, play)
     return ArcadePlayStartResult(
         play=play,
         balance=new_balance,
@@ -346,6 +358,13 @@ def complete_arcade_play(
             "already_completed": True,
         }
 
+    if play.game_key == "history-mystery":
+        if play.daily_play_date != _central_play_date(timestamp):
+            raise HistoryAttemptError("That daily quiz has expired. Start today's quiz.")
+        state = _state_for_update(session, profile_id)
+        if history_score(state, play, require_finished=True) != score:
+            raise HistoryAttemptError("The score must match the quiz answers.")
+
     completed_before = _completed_plays_today(
         session,
         profile_id=profile_id,
@@ -389,3 +408,25 @@ def complete_arcade_play(
         "already_completed": False,
         "updated": updated,
     }
+
+
+def answer_history_play(session, *, profile_id, play_token, question_index, choice, now=None):
+    timestamp = _utc_now(now)
+    # Match the shared profile -> play/state lock order. A last answer and its
+    # reward are committed together; retries cannot change an answer or pay twice.
+    active = session.scalar(select(WoodchuckProfile.id).where(
+        WoodchuckProfile.id == profile_id, WoodchuckProfile.status == "active",
+    ).with_for_update())
+    play = session.scalar(select(ArcadePlaySession).where(
+        ArcadePlaySession.play_token == play_token,
+    ).with_for_update())
+    if active is None or play is None or play.profile_id != profile_id or play.game_key != "history-mystery":
+        raise ValueError("That Arcade play is unavailable.")
+    state = _state_for_update(session, profile_id)
+    payload = accept_history_answer(state, play, question_index=question_index, choice=choice, now=timestamp)
+    if payload["history"]["finished"]:
+        payload.update(complete_arcade_play(session, profile_id=profile_id, play_token=play_token,
+                                           score=payload["history"]["score"], now=timestamp))
+    else:
+        payload.update(balance=_balance(state), state_revision=state.revision)
+    return payload

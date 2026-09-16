@@ -5,6 +5,7 @@ import os
 import secrets
 from urllib.parse import urlsplit
 from fastapi import HTTPException
+from .session_config import session_secret
 
 
 def csrf_token(request):
@@ -69,7 +70,7 @@ def _request_host_endpoint(request, scheme=""):
 
 
 def _fingerprint(token):
-    secret = os.getenv("SESSION_SECRET", "woodshed-local-development-secret")
+    secret = session_secret()
     return hmac.new(secret.encode(), token.encode(), hashlib.sha256).hexdigest()
 
 

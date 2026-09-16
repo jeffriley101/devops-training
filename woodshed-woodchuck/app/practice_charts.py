@@ -1,15 +1,19 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from .economy import lock_state
 from .models import (
     PracticeChart,
     PracticeChartVerification,
+    QuestCompletion,
+    RewardGrant,
     StudentVerifierConnection,
     TrustedVerifier,
     WoodchuckProfile,
@@ -83,6 +87,7 @@ def create_practice_chart_verification_request(
     team_id: int | None = None,
     ordinary_email_preset_id: int | None = None,
     detected_playing_seconds: int | None = None,
+    award_dandelions: bool = False,
 ) -> CreatedPracticeChartRequest:
     if profile.id is None:
         raise ValueError("The student account must be saved first.")
@@ -163,6 +168,8 @@ def create_practice_chart_verification_request(
                 "Choose an accepted Verifier connection for this student."
             )
 
+    state = lock_state(session, profile.id) if award_dandelions else None
+
     if submission_key is not None:
         if not isinstance(submission_key, str):
             raise ValueError("The P-Chart submission key must be text.")
@@ -201,6 +208,26 @@ def create_practice_chart_verification_request(
             "The student must have an instrument before creating a P-Chart."
         )
 
+    if award_dandelions:
+        # Match BOOK's existing formula/cap using persisted records, not its
+        # truncated browser history or the submitted credits_awarded value.
+        earned = session.scalar(select(func.coalesce(func.sum(PracticeChart.credits_awarded), 0)).where(
+            PracticeChart.profile_id == profile.id, PracticeChart.practice_date == practice_date,
+        )) or 0
+        completion = session.scalar(select(QuestCompletion).where(
+            QuestCompletion.profile_id == profile.id, QuestCompletion.activity_date == practice_date,
+        ))
+        # Only the legacy quest endpoint inserts a rewarded BOOK log entry.
+        # The current Board Bonus Challenge has always awarded separately.
+        if completion is not None and session.scalar(select(RewardGrant.id).where(
+            RewardGrant.profile_id == profile.id,
+            RewardGrant.reward_type == "dandelion",
+            RewardGrant.source_key == f"bonus-challenge:{practice_date.isoformat()}:{completion.quest_id}",
+        )) is not None:
+            earned += completion.reward_amount
+        credits_awarded = (min(minutes // 5 + len(normalized_details), max(0, MAX_DAILY_CREDITS - earned))
+                           if source == "p-book" else 0)
+
     chart = PracticeChart(
         profile_id=profile.id,
         practice_date=practice_date,
@@ -220,6 +247,18 @@ def create_practice_chart_verification_request(
 
     session.add(chart)
     session.flush()
+
+    if award_dandelions and credits_awarded:
+        payload = deepcopy(state.state_json or {})
+        progress = dict(payload.get("progress") or {})
+        balance = progress.get("credits", 0)
+        balance = balance if type(balance) is int else 0
+        progress["credits"] = balance + credits_awarded
+        payload["progress"] = progress
+        state.state_json = payload
+        state.revision += 1
+        session.add(RewardGrant(profile_id=profile.id, source_key=f"practice-chart:{chart.id}",
+                                reward_type="dandelion", category_key="practice", amount=credits_awarded))
 
     verification = None
     if verifier_id is not None:

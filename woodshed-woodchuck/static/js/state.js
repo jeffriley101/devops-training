@@ -1,6 +1,11 @@
 (function () {
   const STORAGE_KEY = "woodshedWoodchuckState.v1";
   let serverBootstrap = null;
+  let accountGeneration = 0;
+
+  function accountIdentity(state) {
+    return JSON.stringify([state?.account?.woodchuckId || "", state?.account?.authenticated === true]);
+  }
 
   const bootstrapElement = document.getElementById(
     "account-state-bootstrap"
@@ -185,6 +190,8 @@
   }
 
   function getState() {
+    const boundary = window.WWSessionBoundary;
+    if (boundary && !boundary.isCurrent()) return defaultState();
     if (serverBootstrap) {
       const bootstrap = serverBootstrap;
       serverBootstrap = null;
@@ -207,6 +214,10 @@
     try {
       const parsed = JSON.parse(raw);
       const migrated = migrateToV4(parsed);
+      // Never restore another account from an origin-wide browser cache.
+      if (boundary && (migrated.account.woodchuckId !== boundary.accountId() || !boundary.accountId())) {
+        return defaultState();
+      }
       saveState(migrated, { sync: false });
       return migrated;
     } catch (_err) {
@@ -217,6 +228,10 @@
   }
 
   function saveState(state, options = {}) {
+    if (window.WWSessionBoundary && !window.WWSessionBoundary.isCurrent()) return false;
+    let previous = null;
+    try { previous = JSON.parse(window.localStorage.getItem(STORAGE_KEY)); } catch (_error) {}
+    if (accountIdentity(previous) !== accountIdentity(state)) accountGeneration += 1;
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 
     if (options.sync !== false) {
@@ -226,6 +241,33 @@
         })
       );
     }
+  }
+
+  function accountRequest() {
+    const state = getState();
+    return { identity: accountIdentity(state), generation: accountGeneration, boundary: window.WWSessionBoundary?.epoch() };
+  }
+
+  // Re-read after await: never save the request's old copy over intervening edits.
+  // The generation also rejects logout followed by signing into the same account.
+  function stateForResponse(requestAccount) {
+    if (window.WWSessionBoundary && (!window.WWSessionBoundary.isCurrent() ||
+        requestAccount.boundary !== window.WWSessionBoundary.epoch())) return null;
+    const latest = getState();
+    if (requestAccount.identity !== accountIdentity(latest) ||
+        requestAccount.generation !== accountGeneration) return null;
+    return latest;
+  }
+
+  function applyEconomy(state, payload) {
+    if (!payload || typeof payload !== "object") return;
+    const revision = payload.state_revision ?? payload.revision;
+    const credits = payload.credits ?? payload.dandelion_balance ?? payload.balance;
+    const currentRevision = state.account?.serverRevision || 0;
+    // A delayed response must not replace a newer reward/purchase snapshot.
+    if (!Number.isInteger(revision) || revision < currentRevision || !Number.isInteger(credits)) return;
+    state.progress = { ...(state.progress || {}), credits };
+    state.account = { ...(state.account || {}), serverRevision: revision };
   }
 
   function resetState() {
@@ -239,6 +281,9 @@
     getState,
     saveState,
     resetState,
+    applyEconomy,
+    accountRequest,
+    stateForResponse,
     localDateKey,
   };
 })();

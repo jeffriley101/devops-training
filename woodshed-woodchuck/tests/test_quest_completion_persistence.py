@@ -65,7 +65,14 @@ def create_student(
         "initial_state": json.dumps(initial_state),
     })
     assert response.status_code == 200
-    return response.json()["profile"]["id"]
+    profile_id = response.json()["profile"]["id"]
+    with account_routes.SessionLocal() as session:
+        state = session.get(WoodchuckState, profile_id)
+        payload = dict(state.state_json)
+        payload["progress"] = {**payload["progress"], "credits": credits + 1}
+        state.state_json = payload
+        session.commit()
+    return profile_id
 
 
 def completion_payload() -> dict[str, object]:

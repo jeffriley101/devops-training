@@ -242,7 +242,7 @@ def test_create_atomically_returns_authoritative_state_and_credentials(
         "lastSyncedAt": None,
     }
     assert result["state"]["profile"]["woodchuckName"] == "New Chuck"
-    assert result["state"]["progress"]["credits"] == 10
+    assert result["state"]["progress"]["credits"] == 1  # Only the server login grant.
     assert result["login_streak"]["current_streak"] == 1
     assert result["login_streak"]["dandelions_awarded"] == 1
     with sessions() as session:
@@ -402,4 +402,4 @@ def test_stale_state_is_rejected_without_overwriting_newer_account_data(
     with sessions() as session:
         saved = session.get(WoodchuckState, profile_id)
         assert saved.revision == 5
-        assert saved.state_json["progress"]["credits"] == 18
+        assert saved.state_json["progress"]["credits"] == 17  # Sync cannot mint a credit.

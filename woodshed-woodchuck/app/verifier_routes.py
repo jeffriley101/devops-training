@@ -10,6 +10,8 @@ from sqlalchemy.orm import Session
 
 from .account_routes import current_profile
 from .db import SessionLocal
+from .login_limits import enforce_login_limit
+from .security import hash_invitation_token
 from .email_service import DeliveryResult, EmailService, public_link
 from .models import (
     PracticeChart,
@@ -445,6 +447,10 @@ def accept_invitation(
     pin: str = Form(...),
 ):
     with SessionLocal() as session:
+        invitation = session.scalar(select(TrustedVerifierInvitation).where(
+            TrustedVerifierInvitation.token_hash == hash_invitation_token(token.strip()),
+        ))
+        enforce_login_limit(request, "verifier", invitation.email if invitation else "")
         try:
             accepted = accept_trusted_verifier_invitation(
                 session,
@@ -484,6 +490,7 @@ def verifier_login(
     email: str = Form(...),
     pin: str = Form(...),
 ):
+    enforce_login_limit(request, "verifier", email)
     with SessionLocal() as session:
         verifier = authenticate_trusted_verifier(
             session,

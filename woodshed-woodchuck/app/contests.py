@@ -15,8 +15,11 @@ from sqlalchemy.orm import Session
 
 from .practice_duration import chart_seconds
 from .account_routes import current_profile
+from .economy import lock_state, economy_payload
+from .login_limits import enforce_login_limit
 from .content import GENERAL_BONUS_CHALLENGE, QUEST_POOL
 from .db import SessionLocal
+from .hall_public import public_hall_payload
 from .instruments import INSTRUMENTS_BY_LABEL, canonical_instrument_key
 from .models import (
     CampPointAward,
@@ -1314,16 +1317,7 @@ def _ranked_student_scores(
 
 
 def _add_dandelion(session: Session, profile_id: int, amount: int = 1) -> None:
-    state = session.get(WoodchuckState, profile_id)
-    if state is None:
-        state = next((
-            row for row in session.new
-            if isinstance(row, WoodchuckState)
-            and row.profile_id == profile_id
-        ), None)
-    if state is None:
-        state = WoodchuckState(profile_id=profile_id, state_json={}, revision=0)
-        session.add(state)
+    state = lock_state(session, profile_id)
     payload = deepcopy(state.state_json or {})
     progress = dict(payload.get("progress") or {})
     credits = progress.get("credits", 0)
@@ -2474,12 +2468,6 @@ def hall_of_champions_payload(
         teams=teams_payload,
         now=aware_utc(now or datetime.now(timezone.utc)),
     )
-    if not _include_internal:
-        for champion in students:
-            champion.pop("_profile_id", None)
-        for champion in teams_payload:
-            champion.pop("_normalized_name", None)
-            champion.pop("_owner_profile_id", None)
     payload = {
         "students": students,
         "teams": teams_payload,
@@ -2489,7 +2477,8 @@ def hall_of_champions_payload(
     }
     if _include_internal:
         payload["_traveling_cup_entitlements"] = internal_entitlements
-    return payload
+        return payload
+    return public_hall_payload(payload)
 
 
 def crown_progress_payload(
@@ -2890,6 +2879,7 @@ def record_bonus_challenge_progress(
         profile = current_profile(request, session)
         if profile is None:
             raise HTTPException(status_code=401, detail="Student sign-in is required.")
+        locked_state = lock_state(session, profile.id)
         now = datetime.now(timezone.utc)
         resolved = resolve_current_bonus_challenge(
             session, profile=profile, now=now
@@ -2927,12 +2917,7 @@ def record_bonus_challenge_progress(
                 now=now,
             )
 
-        state = session.scalar(select(WoodchuckState).where(
-            WoodchuckState.profile_id == profile.id
-        ).with_for_update())
-        if state is None:
-            state = WoodchuckState(profile_id=profile.id, state_json={}, revision=0)
-            session.add(state)
+        state = locked_state
         state_json = deepcopy(state.state_json or {})
         daily = dict(state_json.get("daily") or {})
         same_instance = (
@@ -3056,6 +3041,7 @@ def complete_quest(
         profile = current_profile(request, session)
         if profile is None:
             raise HTTPException(status_code=401, detail="Student sign-in is required.")
+        locked_state = lock_state(session, profile.id)
         now = datetime.now(timezone.utc)
         today = now.astimezone(CENTRAL).date()
         if submitted.activity_date != today:
@@ -3081,7 +3067,7 @@ def complete_quest(
                 reward_created=False, now=now,
             )
 
-        state = session.get(WoodchuckState, profile.id)
+        state = locked_state
         completion = QuestCompletion(
             profile_id=profile.id,
             activity_date=today,
@@ -3260,6 +3246,13 @@ def daily_camp_point_awards(
         }
 
 
+def _award_board_dandelion(session, profile_id, award, created):
+    if created and _grant_once(session, profile_id=profile_id, result_id=None,
+                              source_key=f"board-activity:{award.id}",
+                              reward_type="dandelion", category_key="board-activity"):
+        _add_dandelion(session, profile_id)
+
+
 @router.post("/trivia/answer")
 def check_trivia_answer(
     request: Request,
@@ -3269,6 +3262,7 @@ def check_trivia_answer(
         profile = current_profile(request, session)
         if profile is None:
             raise HTTPException(status_code=401, detail="Student sign-in is required.")
+        locked_state = lock_state(session, profile.id)
         now = datetime.now(timezone.utc)
         today = now.astimezone(CENTRAL).date()
         if submitted.activity_date != today:
@@ -3314,9 +3308,11 @@ def check_trivia_answer(
                 activity_date=today,
                 now=now,
             )
+            _award_board_dandelion(session, profile.id, award, award_created)
             _reconcile_crown_categories(session, profile_id=profile.id)
         session.commit()
         return {
+            **economy_payload(locked_state),
             "question": question["question"],
             "selected_answer_id": (
                 (trivia_selected_choice(
@@ -3344,6 +3340,14 @@ def award_camp_points(
         profile = current_profile(request, session)
         if profile is None:
             raise HTTPException(status_code=401, detail="Student sign-in is required.")
+        locked_state = lock_state(session, profile.id)
+        if submitted.activity_type.strip().casefold() == "trivia":
+            attempt = session.scalar(select(DailyTriviaAttempt).where(
+                DailyTriviaAttempt.profile_id == profile.id,
+                DailyTriviaAttempt.activity_date == submitted.activity_date,
+            ))
+            if attempt is None or not attempt.correct:
+                raise HTTPException(status_code=400, detail="Answer today's trivia correctly first.")
         now = datetime.now(timezone.utc)
         try:
             award, created = create_camp_point_award(
@@ -3353,6 +3357,7 @@ def award_camp_points(
                 activity_date=submitted.activity_date,
                 now=now,
             )
+            _award_board_dandelion(session, profile.id, award, created)
             _reconcile_crown_categories(session, profile_id=profile.id)
             session.commit()
         except ValueError as error:
@@ -3371,6 +3376,7 @@ def award_camp_points(
                 raise HTTPException(status_code=500, detail="Camp points could not be saved.")
             created = False
         return {
+            **economy_payload(locked_state),
             "created": created,
             **student_camp_point_totals(
                 session, profile_id=profile.id, now=now
@@ -3394,6 +3400,7 @@ def finalize_week_route(
             status_code=503,
             detail="Contest finalization is unavailable.",
         )
+    enforce_login_limit(request, "contest_admin")
     supplied_token = request.headers.get("X-Contest-Admin-Token", "")
     if not hmac.compare_digest(supplied_token, configured_token):
         raise HTTPException(status_code=403, detail="Invalid contest admin token.")

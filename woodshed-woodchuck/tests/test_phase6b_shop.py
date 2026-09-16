@@ -83,7 +83,12 @@ def test_shop_dialogs_and_keyboard_focus_behavior_are_wired() -> None:
     assert 'dialog.addEventListener("close"' in javascript
     assert 'aria-live="polite"' in markup
     shop_wiring = javascript[javascript.index("function wireShopPolish"):javascript.index("function wirePBook")]
-    assert "saveState" not in shop_wiring
+    # Purchases may cache the server's balance/revision, but must not submit
+    # generic browser state or calculate their own authoritative deduction.
+    authoritative_cache = 'stateApi.saveState(currentState, { sync: false });'
+    assert authoritative_cache in shop_wiring
+    assert 'stateApi.applyEconomy(currentState, payload)' in shop_wiring
+    assert "saveState" not in shop_wiring.replace(authoritative_cache, "")
     assert 'fetch("/store/catalog"' in shop_wiring
     assert 'fetch("/store/inventory"' in shop_wiring
     assert 'fetch("/store/purchases"' in shop_wiring

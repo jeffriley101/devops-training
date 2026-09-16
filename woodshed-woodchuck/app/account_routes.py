@@ -3,6 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 from datetime import datetime, timezone
 import json
+import secrets
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -25,6 +26,8 @@ from .accounts import (
 from .instruments import INSTRUMENTS_BY_LABEL, shed_artwork_url, shed_character_url
 from .content import LEVEL_OPTIONS
 from .db import SessionLocal
+from .economy import lock_state, preserve_server_values
+from .login_limits import enforce_login_limit
 from .models import RewardGrant, WoodchuckProfile, WoodchuckState
 from .login_streaks import apply_daily_login
 from .account_deletion import (
@@ -39,6 +42,20 @@ router = APIRouter(prefix="/account", tags=["account"])
 
 SESSION_PROFILE_ID = "woodchuck_profile_id"
 SESSION_PROFILE_VERSION = "woodchuck_session_version"
+SESSION_PAGE_GENERATION = "woodchuck_page_generation"
+
+
+def page_generation(request: Request) -> str:
+    """Non-authorizing page freshness marker, scoped to an authenticated session.
+
+    Existing sessions receive one on their next rendered account page. It is
+    never a Guest identifier, stored in the database, or accepted as credentials.
+    """
+    if SESSION_PAGE_GENERATION not in request.session:
+        request.session[SESSION_PAGE_GENERATION] = secrets.token_urlsafe(24)
+    return request.session[SESSION_PAGE_GENERATION]
+
+
 templates = Jinja2Templates(
     directory=str(Path(__file__).resolve().parent.parent / "templates")
 )
@@ -114,6 +131,11 @@ def current_profile(
         request.session.pop(SESSION_PROFILE_VERSION, None)
         return None
 
+    # Bind requests from a rendered browser page to that page's account. This
+    # supplements session authentication; the header can never authenticate anyone.
+    expected_account = request.headers.get("x-woodshed-account")
+    if expected_account is not None and expected_account != profile.woodchuck_id:
+        raise HTTPException(status_code=401, detail="Sign-in changed. Reload this page.")
     return profile
 
 
@@ -170,8 +192,8 @@ def create_account(
                 goal=goal,
                 commit=False,
             )
-            authoritative_state = deepcopy(submitted_state)
-            account = dict(authoritative_state.get("account") or {})
+            authoritative_state = preserve_server_values(submitted_state)
+            account = {}
             account.update({
                 "woodchuckId": profile.woodchuck_id,
                 "authenticated": True,
@@ -179,7 +201,8 @@ def create_account(
                 "lastSyncedAt": None,
             })
             authoritative_state["account"] = account
-            browser_profile = dict(authoritative_state.get("profile") or {})
+            browser_profile = authoritative_state.get("profile")
+            browser_profile = dict(browser_profile) if isinstance(browser_profile, dict) else {}
             browser_profile.update({
                 "woodchuckName": profile.display_name,
                 "instrument": profile.instrument,
@@ -206,6 +229,7 @@ def create_account(
 
         request.session[SESSION_PROFILE_ID] = profile.id
         request.session[SESSION_PROFILE_VERSION] = profile.session_version
+        request.session[SESSION_PAGE_GENERATION] = secrets.token_urlsafe(24)
 
         return {
             "authenticated": True,
@@ -226,6 +250,7 @@ def login(
     woodchuck_id: str = Form(...),
     pin: str = Form(...),
 ):
+    enforce_login_limit(request, "student", woodchuck_id)
     with SessionLocal() as session:
         profile = authenticate_woodchuck(
             session,
@@ -243,6 +268,7 @@ def login(
 
         request.session[SESSION_PROFILE_ID] = profile.id
         request.session[SESSION_PROFILE_VERSION] = profile.session_version
+        request.session[SESSION_PAGE_GENERATION] = secrets.token_urlsafe(24)
 
         return {
             "authenticated": True,
@@ -266,12 +292,13 @@ def account_me(request: Request):
         profile = current_profile(request, session)
 
         if profile is None:
-            return {"authenticated": False, "profile": None}
+            return JSONResponse({"authenticated": False, "profile": None}, headers={"Cache-Control": "no-store"})
 
-        return {
+        return JSONResponse({
             "authenticated": True,
             "profile": profile_payload(profile),
-        }
+            "page_generation": request.session.get(SESSION_PAGE_GENERATION),
+        }, headers={"Cache-Control": "no-store"})
 
 
 @router.post("/logout")
@@ -287,11 +314,17 @@ def account_privacy_page(request: Request):
         profile = current_profile(request, session)
         if profile is None:
             return RedirectResponse(url="/login", status_code=303)
-        return templates.TemplateResponse(
+        page_generation(request)
+        response = templates.TemplateResponse(
             request=request,
             name="account_privacy.html",
-            context={"profile": profile},
+            context={"profile": profile, "authenticated_profile": {
+                "woodchuck_id": profile.woodchuck_id,
+                "display_name": profile.display_name,
+            }},
         )
+        response.headers["Cache-Control"] = "no-store"
+        return response
 
 
 @router.post("/delete")
@@ -334,13 +367,13 @@ def redeem_daily_secret(request: Request, submitted: DailySecretSubmission):
         if profile is None:
             raise HTTPException(status_code=401, detail="Student sign-in is required.")
         activity_date = datetime.now(timezone.utc).astimezone(SECRET_REWARD_TIMEZONE).date()
+        state = lock_state(session, profile.id)
         source_key = f"daily-secret:{activity_date.isoformat()}"
         existing = session.scalar(select(RewardGrant).where(
             RewardGrant.profile_id == profile.id,
             RewardGrant.source_key == source_key,
             RewardGrant.reward_type == "dandelion",
         ))
-        state = session.get(WoodchuckState, profile.id)
         if existing is not None:
             credits = ((state.state_json or {}).get("progress") or {}).get("credits", 0) if state else 0
             return {"redeemed": False, "amount": 0, "credits": credits, "revision": state.revision if state else 0}
@@ -447,11 +480,11 @@ def load_account_state(request: Request):
 
         saved_state = session.get(WoodchuckState, profile.id)
 
-        return {
+        return JSONResponse({
             "authenticated": True,
             "state": saved_state.state_json if saved_state else None,
             "revision": saved_state.revision if saved_state else 0,
-        }
+        }, headers={"Cache-Control": "no-store"})
 
 
 @router.put("/state")
@@ -482,10 +515,13 @@ def save_account_state(
             0,
         )
 
-        if not isinstance(submitted_revision, int):
+        if type(submitted_revision) is not int:
             submitted_revision = 0
 
-        saved_state = session.get(WoodchuckState, profile.id)
+        saved_state = lock_state(session, profile.id)
+        session.refresh(profile)
+        if current_profile(request, session) is None:
+            raise HTTPException(status_code=401, detail="Sign in is required.")
         current_revision = (
             saved_state.revision
             if saved_state is not None
@@ -506,14 +542,10 @@ def save_account_state(
                 },
             )
 
+        normalized_state = preserve_server_values(normalized_state, saved_state.state_json)
         next_revision = current_revision + 1
 
-        existing_account = normalized_state.get("account")
-        account = (
-            dict(existing_account)
-            if isinstance(existing_account, dict)
-            else {}
-        )
+        account = {}
         account.update(
             {
                 "woodchuckId": profile.woodchuck_id,
@@ -536,6 +568,7 @@ def save_account_state(
                 "instrument": profile.instrument,
                 "level": profile.level,
                 "goal": profile.goal,
+                "createdAt": profile.created_at.isoformat(),
             }
         )
         normalized_state["profile"] = browser_profile
@@ -557,4 +590,5 @@ def save_account_state(
             "saved": True,
             "revision": next_revision,
             "last_synced_at": synced_at,
+            "credits": normalized_state["progress"]["credits"],
         }

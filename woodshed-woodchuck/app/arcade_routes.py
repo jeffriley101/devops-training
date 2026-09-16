@@ -12,6 +12,7 @@ from .arcade_scores import (
     arcade_score_payload,
 )
 from .arcade_rewards import (
+    ARCADE_PLAY_GAME_KEYS,
     DAILY_REWARDED_PLAY_LIMIT,
     ArcadeDailyLimitError,
     ArcadePlayConflictError,
@@ -19,8 +20,11 @@ from .arcade_rewards import (
     arcade_play_status,
     complete_arcade_play,
     start_arcade_play,
+    answer_history_play,
 )
 from .db import SessionLocal
+from .history_attempts import HistoryAttemptError, history_snapshot
+from .models import WoodchuckState
 
 
 router = APIRouter(prefix="/arcade", tags=["arcade"])
@@ -29,7 +33,8 @@ logger = logging.getLogger(__name__)
 
 def _unexpected_arcade_error(*, operation: str, game_key: str) -> HTTPException:
     """Log request attribution without logging a student or play token."""
-    logger.exception("arcade_request_failed operation=%s game_key=%s", operation, game_key)
+    # SQLAlchemy exception text can contain bound play tokens and credentials.
+    logger.error("arcade_request_failed operation=%s game_key=%s", operation, game_key)
     return HTTPException(
         status_code=503,
         detail="The Arcade is temporarily unavailable. Please try again.",
@@ -38,7 +43,7 @@ def _unexpected_arcade_error(*, operation: str, game_key: str) -> HTTPException:
 
 def _request_game_key(request: Request) -> str:
     value = request.headers.get("X-Woodshed-Arcade-Game", "unknown")
-    return value[:30] if value else "unknown"
+    return value if value in ARCADE_PLAY_GAME_KEYS else "unknown"
 
 
 class ArcadeScoreSubmission(BaseModel):
@@ -58,6 +63,12 @@ class ArcadePlayCompletion(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     score: StrictInt = Field(ge=0, le=MAX_ARCADE_SCORE)
+
+
+class HistoryAnswerSubmission(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    question_index: StrictInt = Field(ge=0, le=4)
+    choice: str = Field(min_length=1, max_length=160)
 
 
 @router.get("/plays/status/{game_key}")
@@ -99,6 +110,8 @@ def create_arcade_play(submitted: ArcadePlayStart, request: Request):
                 "daily_reward_limit": DAILY_REWARDED_PLAY_LIMIT,
                 "state_revision": result.state_revision,
                 "resumed": result.resumed,
+                **({"history": history_snapshot(session.get(WoodchuckState, profile.id), result.play)}
+                   if result.play.game_key == "history-mystery" else {}),
             }
         except (ArcadeDailyLimitError, InsufficientArcadeBalanceError) as error:
             session.rollback()
@@ -132,7 +145,7 @@ def finish_arcade_play(
             )
             session.commit()
             return payload
-        except ArcadePlayConflictError as error:
+        except (ArcadePlayConflictError, HistoryAttemptError) as error:
             session.rollback()
             raise HTTPException(status_code=409, detail=str(error)) from error
         except ValueError as error:
@@ -143,6 +156,28 @@ def finish_arcade_play(
             raise _unexpected_arcade_error(
                 operation="complete", game_key=_request_game_key(request)
             ) from error
+
+
+@router.post("/plays/{play_token}/answer")
+def answer_history(play_token: str, submitted: HistoryAnswerSubmission, request: Request):
+    with SessionLocal() as session:
+        profile = current_profile(request, session)
+        if profile is None:
+            raise HTTPException(status_code=401, detail="Student sign-in is required.")
+        try:
+            payload = answer_history_play(session, profile_id=profile.id, play_token=play_token,
+                                          question_index=submitted.question_index, choice=submitted.choice)
+            session.commit()
+            return payload
+        except (ArcadePlayConflictError, HistoryAttemptError) as error:
+            session.rollback()
+            raise HTTPException(status_code=409, detail=str(error)) from error
+        except ValueError as error:
+            session.rollback()
+            raise HTTPException(status_code=404, detail=str(error)) from error
+        except SQLAlchemyError as error:
+            session.rollback()
+            raise _unexpected_arcade_error(operation="history-answer", game_key="history-mystery") from error
 
 
 @router.get("/scores/{game_key}")
@@ -186,7 +221,7 @@ def update_arcade_scores(
                 )
             session.commit()
             return payload
-        except ArcadePlayConflictError as error:
+        except (ArcadePlayConflictError, HistoryAttemptError) as error:
             session.rollback()
             raise HTTPException(status_code=409, detail=str(error)) from error
         except ValueError as error:
