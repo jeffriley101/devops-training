@@ -27,6 +27,8 @@ def economy_db(request, tmp_path, monkeypatch):
               if request.param == 'sqlite' else create_engine(disposable_url(tmp_path, 'postgresql')))
     Base.metadata.create_all(engine)
     factory = sessionmaker(engine, expire_on_commit=False, autoflush=False)
+    from app import session_revocations
+    monkeypatch.setattr(session_revocations, "SessionLocal", factory)
     for module in (account_routes, arcade_routes, contests, main, practice_chart_routes, store_routes):
         monkeypatch.setattr(module, 'SessionLocal', factory)
     monkeypatch.delenv('SMTP_HOST', raising=False)

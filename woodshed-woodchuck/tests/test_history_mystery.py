@@ -71,6 +71,8 @@ def history_database(monkeypatch: pytest.MonkeyPatch):
         poolclass=StaticPool,
     )
     factory = sessionmaker(bind=engine, expire_on_commit=False)
+    from app import session_revocations
+    monkeypatch.setattr(session_revocations, "SessionLocal", factory)
     Base.metadata.create_all(engine)
     monkeypatch.setattr(account_routes, "SessionLocal", factory)
     monkeypatch.setattr(arcade_routes, "SessionLocal", factory)

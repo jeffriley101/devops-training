@@ -25,6 +25,8 @@ def hall_db(monkeypatch):
                            poolclass=StaticPool)
     Base.metadata.create_all(engine)
     factory = sessionmaker(bind=engine, expire_on_commit=False)
+    from app import session_revocations
+    monkeypatch.setattr(session_revocations, "SessionLocal", factory)
     for module in (account_routes, contests, main):
         monkeypatch.setattr(module, "SessionLocal", factory)
     with factory() as session:

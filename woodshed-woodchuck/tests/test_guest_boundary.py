@@ -75,7 +75,9 @@ def test_signed_in_guest_url_requires_explicit_logout_and_does_not_enroll(guest_
     assert client.post('/account/logout').json() == {'authenticated': False}
     assert 'id="guest-setup-form"' in client.get('/guest').text
     assert client.get('/account/state').status_code == 401
-    assert counts(guest_db) == before
+    after = counts(guest_db)
+    assert after.pop('revoked_browser_sessions') == before.pop('revoked_browser_sessions') + 1
+    assert after == before  # Only authenticated-session retirement may persist.
 
 
 SUBMISSIONS = [

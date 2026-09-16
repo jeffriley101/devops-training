@@ -18,7 +18,7 @@ from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from starlette.middleware.sessions import SessionMiddleware
+from .session_revocations import RevocableSessionMiddleware as SessionMiddleware
 
 from .practice_duration import format_minutes
 from .account_routes import (

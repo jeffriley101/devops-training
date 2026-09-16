@@ -19,6 +19,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .db import Base
+from .session_revocations import RevokedBrowserSession
 from .membership_models import (BillingAccount, Membership, MembershipSeat,
                                 MembershipSeatInvitation, ProviderSubscription,
                                 BillingProviderEvent, MembershipAuditEvent, CheckoutAttempt,

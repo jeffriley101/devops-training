@@ -1,0 +1,13 @@
+# Authenticated session retirement release
+
+This release retains the Security + Hall + Guest tree from `0a05228301f3f7d1a39449f540be50a52bfc6fd3` and adds authenticated session retirement. It excludes the separately preserved C001 foundation changes. C001 remains inactive; `/c001` is absent. Login limiting stays `off`, required `false`. No proxy changes.
+
+Starlette previously refreshed an unchanged authenticated cookie on ordinary responses. A response delayed across logout could reinstall that cookie even when JavaScript rejected its stale body. `RevocableSessionMiddleware` suppresses unchanged refreshes and checks hashed retired nonces before protected route use. Logout and identity changes retire the previous nonce before acknowledgement. Failure to persist retirement returns 503; Guest tools must remain closed. Anonymous Guest requests create no session-retirement row.
+
+The signed-cookie format, signing secret and Secure/HttpOnly/SameSite settings are retained. New sign-ins have independent nonces. Retiring a legacy cookie can require fresh login in other legacy sessions with identical authentication facts. Authentication has an absolute 14-day lifetime; unchanged responses do not extend it. Existing account data, memberships and balances are not migrated. Retired hashes have an expiry timestamp and an explicit `purge_expired` helper; no scheduled purge is enabled.
+
+Migration `v2r3s4t5u6v7` follows `u1q2r3s4t5u6` and adds only the revocation table/index. Deploy after migration, with all old writers drained and old web workers retired before authenticated verification or reopening. An old worker ignores retirement. Old tabs may need reload/sign-in; server revision and economy protections remain authoritative.
+
+Recovery to `efee4d1f3a79ed57505c6b7db897968dd956e256` retains this additive schema. That old source cannot resolve the new Alembic head: temporarily clear its pre-deploy command (Save only) before deploying it. Never downgrade/drop/stamp as a shortcut. Keep the normal `alembic upgrade head` command associated with the forward code; do not restore it while an old-code redeploy would execute it. Recovery restores the previous logout/economy exposures; it is not a security upgrade.
+
+The timestamped release manifest, report and operations package in Downloads provide exact reconstruction and tests, the approved-window boundary, finalizer coordination, and operator commands. No code/QR deployment or enrollment approval is implied by this document. The deferred C001 package retains shared eligibility, cap 125 and lifetime personal Full without sharing or billing; consent/disclosure enforcement remains blocked on approved requirements.

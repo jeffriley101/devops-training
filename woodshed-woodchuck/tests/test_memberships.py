@@ -32,6 +32,8 @@ def db(tmp_path, monkeypatch):
         connection.execute("PRAGMA synchronous=OFF")  # Disposable test DB only.
     Base.metadata.create_all(engine)
     factory = sessionmaker(engine, expire_on_commit=False)
+    from app import session_revocations
+    monkeypatch.setattr(session_revocations, "SessionLocal", factory)
     monkeypatch.setattr(routes, "SessionLocal", factory)
     monkeypatch.setattr(m, "clock", lambda: NOW)
     monkeypatch.setattr(providers, "clock", lambda: NOW)
