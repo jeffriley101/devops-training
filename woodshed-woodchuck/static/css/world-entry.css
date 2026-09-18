@@ -1,0 +1,46 @@
+/* Kept separate from room layout: no SHED sizing or emoji positions change. */
+.world-entry-overlay {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  background: #171c23;
+  color: #fff6df;
+  opacity: 1;
+  transition: opacity 140ms ease, filter 140ms ease;
+}
+.world-entry-overlay::backdrop { background: #171c23; }
+.world-entry-overlay:focus { outline: none; }
+.world-entry-stage { position: absolute; inset: 0; overflow: hidden; }
+.world-entry-stage img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.world-entry-arcade { cursor: pointer; animation: world-entry-reveal 220ms ease-out both; }
+.world-entry-arcade[open] { display: grid; grid-template-rows: minmax(0, 1fr) auto; }
+.world-entry-arcade .world-entry-stage { position: relative; inset: auto; min-height: 0; }
+.world-entry-instruction {
+  margin: 0;
+  padding: .75rem 1rem calc(.75rem + env(safe-area-inset-bottom, 0px));
+  color: #fff6df;
+  font-size: .9rem;
+  line-height: 1.5;
+  text-align: center;
+}
+.world-entry-arcade img { animation: world-entry-settle 350ms ease-out both; }
+.world-entry-woodshed { background: #4b4938; }
+.world-entry-woodshed img { max-width: none; transform-origin: 0 0; object-fit: cover; }
+.world-entry-flight .app-shell { opacity: 0; transition: opacity 160ms ease; }
+.world-entry-leaving { opacity: 0; filter: blur(4px); animation: none; }
+.world-entry-arrival .app-shell { animation: world-entry-reveal 180ms ease-out both; }
+@keyframes world-entry-reveal { from { opacity: 0; } to { opacity: 1; } }
+@keyframes world-entry-settle { from { transform: scale(.975); } to { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) {
+  .world-entry-arcade img { animation: none; }
+  .world-entry-leaving { filter: none; }
+  .world-entry-arcade { animation-duration: 140ms; }
+}

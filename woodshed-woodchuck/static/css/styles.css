@@ -7486,3 +7486,23 @@ select {
     max-height: min(18rem, calc(100dvh - 1.5rem));
   }
 }
+
+
+/* Approved 2172 × 724 sheet: three equal 724px cells, left to right.
+   Retain each full panel (including its title) and the original file path. */
+.arcade-cabinet-screen.arcade-keeper-screen {
+  position: relative;
+  overflow: hidden;
+  width: min(100%, 12rem);
+  aspect-ratio: 1;
+}
+.arcade-keeper-art {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 300%;
+  max-width: none;
+  height: 100%;
+}
+.arcade-keeper-intervals .arcade-keeper-art { left: -100%; }
+.arcade-keeper-history .arcade-keeper-art { left: -200%; }

@@ -1,5 +1,9 @@
 {% extends "base.html" %}
 
+{% block dashboard_styles %}
+  <link rel="preload" as="image" href="/static/img/woodshed-painting.png" />
+{% endblock %}
+
 {% block content %}
 {% if request.query_params.get('account_deleted') == '1' %}
 <p class="flash-message" role="status">Your Woodchuck account has been deleted.</p>
@@ -16,7 +20,7 @@
   />
   <div class="welcome-hero-content">
     <div class="button-row welcome-button-row">
-      <a class="btn welcome-enter-button" href="/home" data-requires-profile="true">Enter Your Woodshed</a>
+      <a class="btn welcome-enter-button" href="/home" data-requires-profile="true" data-world-entry="woodshed">Enter Your Woodshed</a>
       <a class="btn btn-secondary" href="/guest">Explore as Guest</a>
       <a class="btn btn-primary" href="/setup">Create Your Woodchuck</a>
       <a class="btn btn-secondary" href="/login">Sign In from New Device</a>

@@ -4,8 +4,12 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{{ title }} · Woodshed Woodchuck</title>
-  <link rel="stylesheet" href="/static/css/styles.css?v=120" />
+  <link rel="stylesheet" href="/static/css/styles.css?v=121" />
   <link rel="stylesheet" href="/static/css/woodchuck-motion.css?v=6" />
+  <link rel="stylesheet" href="/static/css/world-entry.css?v=2" />
+  {% if authenticated_profile and active_nav == "store" %}
+  <link rel="preload" as="image" href="/static/img/arcade/arcade-entry-splash.png" />
+  {% endif %}
   {% block dashboard_styles %}{% endblock %}
 
   <!-- Woodshed app icons -->
@@ -39,7 +43,7 @@
   />
   <!-- End Woodshed app icons -->
 </head>
-<body{% if page_class %} class="{{ page_class }}"{% endif %} data-authenticated="{{ 'true' if authenticated_profile else 'false' }}" data-account-id="{{ authenticated_profile.woodchuck_id if authenticated_profile else '' }}" data-page-generation="{{ request.session.get('woodchuck_page_generation', '') if authenticated_profile else '' }}">
+<body{% if page_class %} class="{{ page_class }}"{% endif %} data-authenticated="{{ 'true' if authenticated_profile else 'false' }}" data-account-id="{{ authenticated_profile.woodchuck_id if authenticated_profile else '' }}" data-page-generation="{{ request.session.get('woodchuck_page_generation', '') if authenticated_profile else '' }}" data-world-entry-account="{{ authenticated_profile.world_entry_account if authenticated_profile else '' }}">
   <div class="bg-orbs" aria-hidden="true"></div>
   <div class="app-shell"{% if authenticated_profile %} hidden{% endif %}>
     <main class="content-wrap">
@@ -88,6 +92,7 @@
   <script src="/static/js/practice-duration.js?v=1"></script>
   <script src="/static/js/app.js?v=86"></script>
   <script src="/static/js/account.js?v=16"></script>
+  <script src="/static/js/world-entry.js?v=3"></script>
   {% block page_scripts %}{% endblock %}
   {% if authenticated_profile %}</template>
   <script src="/static/js/session-boundary.js?v=2"></script>{% endif %}

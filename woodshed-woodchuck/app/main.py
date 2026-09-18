@@ -1,6 +1,8 @@
 import os
 import logging
 import base64
+import hashlib
+import hmac
 from datetime import date, datetime
 from io import BytesIO
 from pathlib import Path
@@ -118,6 +120,12 @@ def _render(request: Request, template_name: str, *, analytics_event: str | None
         if profile is not None:
             page_generation(request)
             authenticated_profile = {
+                # Presentation-only account scope for the daily Arcade entrance.
+                "world_entry_account": hmac.new(
+                    SESSION_SECRET.encode(),
+                    f"world-entry:daily:v2:{profile.id}".encode(),
+                    hashlib.sha256,
+                ).hexdigest(),
                 "display_name": profile.display_name,
                 "woodchuck_id": profile.woodchuck_id,
                 "band_director": has_band_director_capability(
