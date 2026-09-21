@@ -123,6 +123,9 @@ def test_midweek_and_dst(db):
 def test_later_normal_source_finalization(db):
     activate(db)
     with Session(db[1]) as s:
+        from app.age_privacy import declare_age
+        for profile in s.scalars(select(m.WoodchuckProfile)).all():
+            declare_age(s, profile.id, "adult", at=base.OLD)
         finalize_contest_week(s, week_start=date(2026, 9, 21), now=DUE + timedelta(seconds=1))
         s.commit()
         snapshots = list(s.scalars(select(m.TeamWeekMembershipSnapshot).where(m.TeamWeekMembershipSnapshot.contest_week_id == 7)))

@@ -385,8 +385,8 @@ def test_live_scoreboard_javascript_uses_actual_ranks_and_preserves_ties() -> No
     assert "Math.min(row.rank, 4)" in javascript
     assert "position.tied === true" in javascript
     assert "position.in_top_five === false" in javascript
-    assert ': `${score} min`' in javascript
-    assert ': `${behind} min behind leader`' in javascript
+    assert "window.WWPracticeDuration.minutes(score)" in javascript
+    assert "`${window.WWPracticeDuration.minutes(behind)} behind leader`" in javascript
 
 
 def test_live_leaderboard_rows_show_numeric_scores_without_repeated_units() -> None:
@@ -406,8 +406,8 @@ def test_live_leaderboard_rows_show_numeric_scores_without_repeated_units() -> N
         javascript.index("function showError", javascript.index("function renderTeamBoards"))
     ]
 
-    assert "score.textContent = String(row.total_minutes)" in instruments
-    assert "score.textContent = String(scoreValue)" in students
+    assert "score.textContent = window.WWPracticeDuration.minutes(row.total_minutes)" in instruments
+    assert "score.textContent = campPoints ? String(scoreValue) : window.WWPracticeDuration.minutes(scoreValue)" in students
     assert "score.textContent = scoreValue" in teams
     for renderer in (instruments, students):
         score_assignment = renderer[renderer.index("score.textContent"):]

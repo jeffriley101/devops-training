@@ -490,6 +490,8 @@ def test_recently_closed_week_audit_respects_deadline_then_finalizes(
         session, now=datetime(2026, 7, 28, tzinfo=timezone.utc)
     )
     student = add_student(session, "RECENT")
+    from app.age_privacy import declare_age
+    declare_age(session, student.id, "adult", at=datetime(2026, 7, 1, tzinfo=timezone.utc))
     add_week_activity(
         session, student, week,
         created_at=datetime(2026, 7, 28, 15, tzinfo=timezone.utc),
@@ -549,6 +551,9 @@ def test_incomplete_finalized_week_repairs_once_without_duplicate_rewards(
     ))
     source_award.created_at = incomplete.finalized_at - timedelta(days=1)
     late_student = add_student(session, "LATE")
+    from app.age_privacy import declare_age
+    declare_age(session, student.id, "adult", at=datetime(2026, 7, 1, tzinfo=timezone.utc))
+    declare_age(session, late_student.id, "adult", at=datetime(2026, 7, 1, tzinfo=timezone.utc))
     session.add(PracticeChart(
         profile_id=late_student.id, practice_date=incomplete.week_start,
         minutes=999, instrument=late_student.instrument, practice_details=[],

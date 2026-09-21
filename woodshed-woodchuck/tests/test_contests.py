@@ -89,6 +89,8 @@ def add_student(
     )
     session.add(profile)
     session.flush()
+    from app.age_privacy import declare_age
+    declare_age(session, profile.id, "adult", at=datetime(2025, 1, 1, tzinfo=timezone.utc))
     return profile
 
 
@@ -1084,6 +1086,9 @@ def test_successful_finalization_medals_rewards_crown_and_idempotence(
     beta = add_student(session, woodchuck_id="WC-FINAL-B", instrument="Clarinet")
     gamma = add_student(session, woodchuck_id="WC-FINAL-C", instrument="Oboe")
     delta = add_student(session, woodchuck_id="WC-FINAL-D", instrument="Bassoon")
+    from app.age_privacy import declare_age
+    for profile in (alpha, beta, gamma, delta):
+        declare_age(session, profile.id, "adult", at=datetime(2026, 7, 1, tzinfo=timezone.utc))
     for profile, count in ((alpha, 4), (beta, 3), (gamma, 2), (delta, 1)):
         for _ in range(count):
             add_chart(
@@ -1137,6 +1142,8 @@ def test_open_and_verified_wins_reuse_pending_crown_progress(
         student = add_student(
             session, woodchuck_id="WC-DUAL-DIVISION", instrument="Flute"
         )
+        from app.age_privacy import declare_age
+        declare_age(session, student.id, "adult", at=datetime(2026, 7, 1, tzinfo=timezone.utc))
         session.add(WoodchuckState(
             profile_id=student.id,
             state_json={"progress": {"credits": 7}},
@@ -1210,6 +1217,8 @@ def test_multiple_finalization_rewards_reuse_one_woodchuck_state(
         student = add_student(
             session, woodchuck_id="WC-MULTI-REWARD", instrument="Flute"
         )
+        from app.age_privacy import declare_age
+        declare_age(session, student.id, "adult", at=datetime(2026, 7, 1, tzinfo=timezone.utc))
         unrelated = add_student(
             session, woodchuck_id="WC-UNRELATED-STATE", instrument="Oboe"
         )
@@ -1304,9 +1313,12 @@ def test_existing_finalized_student_scores_are_not_rewritten(
     session, _ = database
     _, contests, week = ensure_band_camp_data(session, now=NOW)
     student = add_student(session, woodchuck_id="WC-HIST-MIN", instrument="Flute")
+    from app.age_privacy import declare_age
+    declare_age(session, student.id, "adult", at=datetime(2026, 7, 1, tzinfo=timezone.utc))
     contest = next(item for item in contests if item.key == "weekly-points-leaders")
     week.status = "finalized"
     week.finalized_at = FINAL_NOW
+    week.practice_scoring_mode = "precise_seconds"
     historical = ContestResult(
         contest_week_id=week.id,
         contest_id=contest.id,
@@ -1342,6 +1354,9 @@ def test_camp_points_finalize_once_with_medals_reward_and_crown(
     gold = add_student(session, woodchuck_id="WC-CAMP-G", instrument="Flute")
     silver = add_student(session, woodchuck_id="WC-CAMP-S", instrument="Oboe")
     bronze = add_student(session, woodchuck_id="WC-CAMP-BR", instrument="Tuba")
+    from app.age_privacy import declare_age
+    for profile in (gold, silver, bronze):
+        declare_age(session, profile.id, "adult", at=datetime(2026, 7, 1, tzinfo=timezone.utc))
     for profile, activities in (
         (gold, ("hours", "care", "trivia")),
         (silver, ("hours", "care")),
@@ -1429,6 +1444,8 @@ def test_tenth_win_creates_permanent_crown_and_resets_next_progress(
     session, _ = database
     week = ready_week(session)
     student = add_student(session, woodchuck_id="WC-CROWN-10", instrument="Tuba")
+    from app.age_privacy import declare_age
+    declare_age(session, student.id, "adult", at=datetime(2026, 7, 1, tzinfo=timezone.utc))
     contest = session.scalar(select(Contest).where(Contest.key == "weekly-points-leaders"))
     assert contest is not None
     session.add(CrownProgress(
@@ -1508,6 +1525,8 @@ def test_same_crown_source_is_pending_idempotent_before_flush(
 ) -> None:
     session, factory = database
     profile = add_student(session, woodchuck_id="WC-CROWN-SOURCE", instrument="Tuba")
+    from app.age_privacy import declare_age
+    declare_age(session, profile.id, "adult", at=datetime(2026, 7, 1, tzinfo=timezone.utc))
     session.add(CrownProgress(
         profile_id=profile.id,
         category_key="trivia",
@@ -1596,6 +1615,8 @@ def test_failure_rolls_back_every_finalization_change(
     session, _ = database
     week = ready_week(session)
     student = add_student(session, woodchuck_id="WC-ROLLBACK", instrument="Flute")
+    from app.age_privacy import declare_age
+    declare_age(session, student.id, "adult", at=datetime(2026, 7, 1, tzinfo=timezone.utc))
     session.add(WoodchuckState(profile_id=student.id, state_json={"progress": {"credits": 7}}, revision=4))
     add_chart(
         session, profile=student, practice_date=date(2026, 8, 2),
@@ -1759,6 +1780,8 @@ def test_finalized_week_listing_requires_authentication_and_can_be_empty(
 ) -> None:
     session, factory = database
     profile = add_student(session, woodchuck_id="WC-WEEKS-AUTH", instrument="Flute")
+    from app.age_privacy import declare_age
+    declare_age(session, profile.id, "adult", at=datetime(2026, 7, 1, tzinfo=timezone.utc))
     session.commit()
     monkeypatch.setattr(contest_module, "SessionLocal", factory)
 
@@ -2423,6 +2446,8 @@ def test_crown_progress_endpoint_authentication_and_privacy(
 ) -> None:
     session, factory = database
     profile = add_student(session, woodchuck_id="WC-CROWN-PRIVATE", instrument="Flute")
+    from app.age_privacy import declare_age
+    declare_age(session, profile.id, "adult", at=datetime(2026, 7, 1, tzinfo=timezone.utc))
     session.commit()
     monkeypatch.setattr(contest_module, "SessionLocal", factory)
 

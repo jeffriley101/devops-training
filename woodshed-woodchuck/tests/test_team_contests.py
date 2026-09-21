@@ -37,6 +37,8 @@ def add_profile(session: Session, number: int) -> WoodchuckProfile:
         pin_hash="hash", instrument="Flute", level="Beginner", goal="Practice",
     )
     session.add(row); session.flush()
+    from app.age_privacy import declare_age
+    declare_age(session, row.id, "adult", at=datetime(2025, 1, 1, tzinfo=timezone.utc))
     return row
 
 
