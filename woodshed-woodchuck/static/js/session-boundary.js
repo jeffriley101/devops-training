@@ -164,17 +164,19 @@
         // Load real consumers in their original order only after verification.
         // Keep the shell hidden until every script is ready; JSON bootstrap is
         // outside the inert template but no state consumer ran before this gate.
+        const loads = [];
         for (const original of scripts.content.querySelectorAll("script")) {
           check();
-          await new Promise((resolve, reject) => {
-            const script = document.createElement("script");
-            for (const attr of original.attributes) script.setAttribute(attr.name, attr.value);
-            script.async = false;
+          const script = document.createElement("script");
+          for (const attr of original.attributes) script.setAttribute(attr.name, attr.value);
+          script.async = false;
+          loads.push(new Promise((resolve, reject) => {
             script.onload = resolve;
             script.onerror = () => reject(new Error("Account script could not load"));
-            document.body.appendChild(script);
-          });
+          }));
+          document.body.appendChild(script);
         }
+        await Promise.all(loads);
         check();
         const shell = document.querySelector(".app-shell");
         if (shell) shell.hidden = false;

@@ -81,7 +81,7 @@
   <script id="account-state-bootstrap" type="application/json">{{ account_state_bootstrap | default(none) | tojson }}</script>
   <script id="authenticated-player-name" type="application/json">{{ (authenticated_profile.display_name if authenticated_profile else none) | tojson }}</script>
   {% if authenticated_profile %}<template id="account-scripts">{% else %}
-  <script src="/static/js/session-boundary.js?v=2"></script>{% endif %}
+  <script src="/static/js/session-boundary.js?v=3"></script>{% endif %}
   <script src="/static/js/state.js?v=9"></script>
   <script src="/static/js/instruments.js?v=3"></script>
   <script src="/static/vendor/tone/Tone.js?v=15.1.22"></script>
@@ -95,7 +95,7 @@
   <script src="/static/js/world-entry.js?v=3"></script>
   {% block page_scripts %}{% endblock %}
   {% if authenticated_profile %}</template>
-  <script src="/static/js/session-boundary.js?v=2"></script>{% endif %}
+  <script src="/static/js/session-boundary.js?v=3"></script>{% endif %}
 <p class="body-copy"><a href="/family/practice">Private practice and director</a> · <a href="/family/parent-access">Parent access</a></p>
 </body>
 </html>
