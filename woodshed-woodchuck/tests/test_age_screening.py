@@ -330,7 +330,16 @@ def test_hall_and_raw_results_exclude_unknown_and_earlier_private_history(age_db
     # public_from boundary.
     r=c.get('/contests/hall-of-champions')
     assert r.status_code==200 and 'Synthetic A' in r.text
-    assert 'Synthetic A' not in c.get('/contests/weeks/2026-09-14/results').text
+    # The Medal Board endpoint follows the same legacy individual-history
+    # compatibility rule as the Hall for a current 13+ account.
+    medal=c.get('/contests/weeks/2026-09-14/results')
+    assert medal.status_code==200 and 'Synthetic A' in medal.text
+
+    # The underlying payload remains strict unless explicitly requested.
+    from app.contests import contest_results_payload
+    with age_db() as s:
+        week=s.scalar(select(ContestWeek))
+        assert 'Synthetic A' not in repr(contest_results_payload(s,week))
 
     # A snapshot created after screening for a week that began before the
     # publication boundary is not a legacy snapshot and stays hidden.

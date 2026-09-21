@@ -1626,6 +1626,8 @@ def test_results_are_immutable_private_and_preserve_historical_data(
     session, _ = database
     week = ready_week(session)
     student = add_student(session, woodchuck_id="WC-SECRET-HIST", instrument="Flute")
+    from app.age_privacy import declare_age
+    declare_age(session, student.id, "adult", at=datetime(2025, 1, 1, tzinfo=timezone.utc))
     student.display_name = "Original Public Name"
     chart = add_chart(session, profile=student, practice_date=date(2026, 8, 2), minutes=20,
                       verification_status="approved", created_at=NOW)
@@ -1781,6 +1783,8 @@ def test_prior_finalized_band_camp_week_results_remain_browsable(
 ) -> None:
     session, factory = database
     profile = add_student(session, woodchuck_id="WC-PRIOR", instrument="Flute")
+    from app.age_privacy import declare_age
+    declare_age(session, profile.id, "adult", at=datetime(2025, 1, 1, tzinfo=timezone.utc))
     season = Season(
         key="band-camp-2025", name="Band Camp 2025",
         timezone="America/Chicago", starts_on=date(2025, 7, 28), status="closed",

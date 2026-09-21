@@ -2045,7 +2045,11 @@ def finalize_contest_week(
 
 
 def contest_results_payload(
-    session: Session, contest_week: ContestWeek, *, _include_private: bool = False
+    session: Session,
+    contest_week: ContestWeek,
+    *,
+    _include_private: bool = False,
+    _restore_legacy_students: bool = False,
 ) -> dict[str, object]:
     rows = session.execute(select(ContestResult, Contest).join(
         Contest, Contest.id == ContestResult.contest_id
@@ -2053,7 +2057,11 @@ def contest_results_payload(
         Contest.key, ContestResult.division, ContestResult.rank, ContestResult.display_name_snapshot
     )).all()
     if not _include_private:
-        rows = filter_result_rows(session, rows)
+        rows = (
+            filter_hall_result_rows(session, rows)
+            if _restore_legacy_students
+            else filter_result_rows(session, rows)
+        )
     team_ids = {result.team_id for result, _contest in rows if result.team_id is not None}
     teams = {
         team.id: team
@@ -3527,4 +3535,11 @@ def contest_week_results(week_start: date, request: Request) -> dict[str, object
         )
         if contest_week is None:
             raise HTTPException(status_code=404, detail="Contest week not found.")
-        return contest_results_payload(session, contest_week)
+        # This endpoint powers the Medal Board of Past Winners. Restore only
+        # eligible 13+ legacy individual snapshots; team/instrument history
+        # remains under the ordinary conservative filter.
+        return contest_results_payload(
+            session,
+            contest_week,
+            _restore_legacy_students=True,
+        )
