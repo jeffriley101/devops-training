@@ -1,5 +1,5 @@
 """Small Free practice/parent/director pages using existing forms and metrics."""
-import secrets
+import os,secrets
 from datetime import date
 from pathlib import Path
 from fastapi import APIRouter,Request,HTTPException
@@ -19,6 +19,11 @@ templates=Jinja2Templates(directory=str(Path(__file__).resolve().parent.parent/'
 
 def page(request,kind,**context):
     return templates.TemplateResponse(request=request,name='family.html',context={'kind':kind,'csrf':csrf_token(request),**context})
+def kws_label():
+    try:
+        from .kws_client import runtime_environment
+        return 'KWS Test' if runtime_environment()=='test' else 'KWS'
+    except ValueError:return 'KWS'
 async def form(request,allowed):
     data=await request.form();check_csrf(request,data.get('csrf'))
     if set(data)-set(allowed)-{'csrf'} or any(len(data.getlist(k))!=1 for k in data):raise HTTPException(400,'Unexpected or duplicate form fields.')
@@ -58,13 +63,16 @@ def charts(s,pid):
     return rows
 
 @router.get('/family/notice')
-def notice(request:Request):return page(request,'notice',notice=service.NOTICE)
+def notice(request:Request):
+    try:_,text,_=service.notice_policy()
+    except ValueError:text=service.PRODUCTION_NOTICE if os.getenv('APP_ENV')=='production' else service.NOTICE
+    return page(request,'notice',notice=text)
 
 @router.get('/family/request')
 def request_page(request:Request):
     with SessionLocal() as s:
         p=current_profile(request,s)
-        return page(request,'request',available=service.under13_available(),confirm_account=p.woodchuck_id if p else 'new')
+        return page(request,'request',available=service.under13_available(),confirm_account=p.woodchuck_id if p else 'new',kws_label=kws_label())
 
 @router.post('/family/request')
 async def request_permission(request:Request):
@@ -86,7 +94,8 @@ def approval(request:Request,token:str):
         from .kws_models import KWSVerification
         v=s.scalar(select(KWSVerification).where(KWSVerification.pending_id==r.id))
         target=s.get(WoodchuckProfile,r.profile_id) if r.profile_id else None
-        return page(request,'approve',notice=service.NOTICE,notice_version=service.NOTICE_VERSION,director_name=r.director_name,director_email=r.director_email,
+        version,notice_text,_=service.notice_policy()
+        return page(request,'approve',notice=notice_text,notice_version=version,kws_label=kws_label(),director_name=r.director_name,director_email=r.director_email,
                     verification_state=v.state if v else None,activation_token=service.derived_token(r,'activate') if v and v.state=='verified' else None,
                     withdrawal_token=service.derived_token(r,'withdraw'),account_label=target.woodchuck_id if target else 'one new Free child account')
 
@@ -101,8 +110,8 @@ async def approve(request:Request,token:str):
             outcome=await run_in_threadpool(kws.deliver,s,*started) if started else None
         except ValueError as e:raise HTTPException(409,str(e))
     message=('Account permission declined. No KWS email or child account was created.' if started is None else
-             'KWS Test accepted the verification email request. Acceptance is not verification. Complete the KWS email journey, then reopen this permission link for activation.' if outcome=='accepted' else
-             'KWS Test delivery could not be confirmed. No verification or permission is implied. Do not repeatedly resend; reopen this permission link for status or withdraw the request.')
+             'KWS accepted the verification email request. Acceptance is not verification. Complete the KWS email journey, then reopen this permission link for activation.' if outcome=='accepted' else
+             'KWS delivery could not be confirmed. No verification or permission is implied. Do not repeatedly resend; reopen this permission link for status or withdraw the request.')
     return page(request,'message',message=message)
 
 @router.get('/family/activate/{token}')

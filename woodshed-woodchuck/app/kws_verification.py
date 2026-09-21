@@ -1,4 +1,4 @@
-"""Signed KWS Test results converge here; permissions come from prior parent choices."""
+"""Signed KWS results converge here; permissions come from prior parent choices."""
 from datetime import timedelta
 import hashlib
 import hmac
@@ -11,7 +11,7 @@ from .child_models import PendingConsent
 from .age_models import AccountPrivacy
 from .models import WoodchuckProfile
 from .kws_models import KWSVerification, KWSEmailBudget
-from .kws_client import Config, KWSUnavailable, client, secret_list
+from .kws_client import Config, KWSUnavailable, client
 from .security import hash_invitation_token
 from .session_config import session_secret
 
@@ -28,7 +28,7 @@ class InvalidResult(ValueError):
 
 
 def fail():
-    raise InvalidResult('Invalid, expired or unbound KWS Test result.')
+    raise InvalidResult('Invalid, expired or unbound KWS result.')
 
 
 def unique_object(pairs):
@@ -85,7 +85,7 @@ def webhook_result(raw, header, cfg):
     timestamp = fresh(int(times[0]))
     # The original timestamp and EXACT raw bytes are signed, before any JSON parse.
     signatures_match(times[0].encode() + b'.' + raw,
-                     [v for k, v in parts if k == 'v1'], secret_list('KWS_TEST_WEBHOOK_SECRETS'))
+                     [v for k, v in parts if k == 'v1'], cfg.webhook_secrets)
     event = parse_json(raw.decode('utf-8', errors='strict'))
     if event.get('name') != 'parent-verified' or event.get('orgId') != cfg.org_id:
         fail()
@@ -97,7 +97,7 @@ def webhook_result(raw, header, cfg):
     return payload.get('externalPayload'), payload.get('status'), timestamp, payload['parentEmail']
 
 
-def redirect_result(params):
+def redirect_result(params, cfg):
     if (len(params.getlist('status')) != 1 or len(params.getlist('externalPayload')) != 1
             or set(params) - {'status', 'externalPayload', 'signature'}):
         fail()
@@ -106,7 +106,7 @@ def redirect_result(params):
         fail()
     # QueryParams has percent-decoded once. Never reserialize the signed strings.
     signatures_match((status + ':' + payload).encode(), params.getlist('signature'),
-                     secret_list('KWS_TEST_VERIFICATION_SECRETS'))
+                     cfg.verification_secrets)
     data = parse_json(status)
     return payload, data, fresh(data.get('timestamp')), None
 
@@ -127,8 +127,9 @@ def binding(row, verification):
 
 
 def current_binding(session, row, v, cfg):
-    if (v.environment != 'test' or v.org_id != cfg.org_id or v.product_id != cfg.product_id
-            or row.notice_version != consent.NOTICE_VERSION or v.notice_sha256 != consent.NOTICE_SHA256
+    notice_version, _, notice_sha256 = consent.notice_policy(cfg.environment)
+    if (v.environment != cfg.environment or v.org_id != cfg.org_id or v.product_id != cfg.product_id
+            or row.notice_version != notice_version or v.notice_sha256 != notice_sha256
             or not v.account_allowed or not hmac.compare_digest(v.binding_sha256, binding(row, v))):
         fail()
     if row.profile_id:
@@ -140,8 +141,10 @@ def current_binding(session, row, v, cfg):
             fail()
 
 
-def reserve_budget(session, email):
-    key = hmac.new(session_secret().encode(), ('kws-test-email:' + email.lower()).encode(),
+def reserve_budget(session, email, environment='test'):
+    if environment not in ('test', 'production'):
+        raise KWSUnavailable('KWS environment is invalid.')
+    key = hmac.new(session_secret().encode(), (f'kws-{environment}-email:' + email.lower()).encode(),
                    hashlib.sha256).hexdigest()
     dialect = session.get_bind().dialect.name
     if dialect == 'postgresql':
@@ -149,7 +152,7 @@ def reserve_budget(session, email):
     elif dialect == 'sqlite':
         from sqlalchemy.dialects.sqlite import insert
     else:
-        raise KWSUnavailable('KWS Test requires a supported local/Test database.')
+        raise KWSUnavailable('KWS requires a supported database.')
     session.execute(insert(KWSEmailBudget).values(email_hash=key, sent_at=[])
                     .on_conflict_do_nothing(index_elements=['email_hash']))
     row = session.scalar(select(KWSEmailBudget).where(KWSEmailBudget.email_hash == key)
@@ -157,13 +160,14 @@ def reserve_budget(session, email):
     now = consent.clock().timestamp()
     history = [t for t in row.sent_at if t > now - 3600]
     if len(history) >= MAX_EMAILS_PER_HOUR or (history and now - max(history) < 300):
-        raise ValueError('Wait before requesting another KWS Test email; check the parent inbox.')
+        raise ValueError('Wait before requesting another KWS email; check the parent inbox.')
     row.sent_at = history + [now]
 
 
 def start(session, token, fields):
     consent.require_under13_review()
     cfg = Config.load()
+    notice_version, _, notice_sha256 = consent.notice_policy(cfg.environment)
     row = consent.pending_from_token(session, token, lock=True)
     if session.scalar(select(KWSVerification.id).where(KWSVerification.pending_id == row.id)):
         raise ValueError('Verification was already requested. Reopen this permission link for its status, or withdraw it.')
@@ -172,7 +176,7 @@ def start(session, token, fields):
         session.commit()
         return None
     if (fields.get('guardian_attestation') != 'yes' or fields.get('notice_accepted') != 'yes'
-            or fields.get('notice_version') != consent.NOTICE_VERSION):
+            or fields.get('notice_version') != notice_version):
         raise ValueError('Guardian attestation and explicit acceptance of the current notice are required.')
     from .verifiers import validate_email
     share = fields.get('director_allowed') == 'yes'
@@ -192,15 +196,15 @@ def start(session, token, fields):
     now = consent.clock()
     payload = secrets.token_urlsafe(32)  # 256 random bits, 43 chars, no unsigned account identifiers.
     v = KWSVerification(pending_id=row.id, payload_hash=hash_invitation_token(payload),
-                        environment='test', org_id=cfg.org_id, product_id=cfg.product_id,
-                        notice_sha256=consent.NOTICE_SHA256,
+                        environment=cfg.environment, org_id=cfg.org_id, product_id=cfg.product_id,
+                        notice_sha256=notice_sha256,
                         profile_session_version=profile.session_version if profile else None,
                         prior_consent_id=rule.consent_id if rule else None,
                         account_allowed=True, director_allowed=share, guardian_attested_at=now,
                         notice_accepted_at=now, created_at=now, expires_at=row.expires_at,
                         state='reserved', binding_sha256='')
     v.binding_sha256 = binding(row, v)
-    reserve_budget(session, row.parent_email)
+    reserve_budget(session, row.parent_email, cfg.environment)
     session.add(v)
     session.flush()
     # Persist the binding/budget BEFORE the external side effect. Neither uncertain
@@ -213,7 +217,8 @@ def deliver(session, verification_id, payload):
     v = session.get(KWSVerification, verification_id)
     row = session.get(PendingConsent, v.pending_id)
     try:
-        client.send_email(Config.load(), row.parent_email, payload)
+        cfg = Config.load(v.environment)
+        client.send_email(cfg, row.parent_email, payload)
         outcome = 'accepted'
     except KWSUnavailable:
         outcome = 'delivery_unknown'
@@ -249,7 +254,7 @@ def complete(session, cfg, payload, status, timestamp, parent_email=None):
         fail()
     if timestamp < consent.utc(v.created_at).timestamp() - SKEW.total_seconds():
         fail()
-    transaction = hashlib.sha256(json.dumps(['test', cfg.org_id, cfg.product_id,
+    transaction = hashlib.sha256(json.dumps([cfg.environment, cfg.org_id, cfg.product_id,
                                             status['transactionId']], separators=(',', ':')).encode()).hexdigest()
     if v.state in TERMINAL:
         # Already activated/revoked/withdrawn cannot be reconstructed by another delivery.
@@ -286,8 +291,8 @@ def verified_for_activation(session, row):
     v = session.scalar(select(KWSVerification).where(KWSVerification.pending_id == row.id)
                        .with_for_update().execution_options(populate_existing=True))
     if not v or v.state != 'verified':
-        raise ValueError('A completed, current KWS Test verification is required.')
-    current_binding(session, row, v, Config.load())
+        raise ValueError('A completed, current KWS verification is required.')
+    current_binding(session, row, v, Config.load(v.environment))
     return v
 
 

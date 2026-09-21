@@ -3,7 +3,7 @@
 No cohort, access grant, deletion or provider-suitability approval is implied.
 """
 from datetime import datetime, timedelta, timezone
-import hashlib, hmac, html, re
+import hashlib, hmac, html, os, re
 from sqlalchemy import select, func
 from .age_models import AccountPrivacy
 from .child_models import PendingConsent, ConsentEvidence, DirectorPermission
@@ -23,6 +23,21 @@ This isolated Test integration uses Epic Kids Web Services (KWS) to verify an ad
 Proposed timings: unverified requests expire after 48 hours; activation expires 72 hours after verification. Signed results have a local 24-hour freshness limit with five minutes of clock skew. These are tested technical settings, not approved retention periods. This candidate does not run deletion/anonymization or retention cleanup. A reviewed retention/deletion procedure and scheduler are required before production activation.
 Contact Woodshed Woodchuck LLC, 302 Heyden Dr., Eureka, MO 63025. Phone (314) 514-5611; email woodshedwoodchuck@gmail.com. Request access, correction, withdrawal or deletion through support. This draft and the authorization method require review before launch.'''
 NOTICE_SHA256 = hashlib.sha256(NOTICE.encode()).hexdigest()
+PRODUCTION_NOTICE_VERSION = 'private-practice-kws-production-v1'
+PRODUCTION_NOTICE = NOTICE.replace(
+    'This isolated Test integration uses Epic Kids Web Services (KWS) to verify an adult.',
+    'This Production integration uses Epic Kids Web Services (KWS) to verify an adult.'
+).replace(
+    'Provider suitability, policy and retention review remain outstanding; production activation is closed.',
+    'Production use remains closed unless an operator deliberately enables the separate Production configuration after required review.'
+).replace(
+    'These are tested technical settings, not approved retention periods.',
+    'These are Woodshed technical settings, not provider retention guarantees.'
+).replace(
+    'A reviewed retention/deletion procedure and scheduler are required before production activation.',
+    'A reviewed retention/deletion procedure and scheduler are required before Production is enabled.'
+)
+PRODUCTION_NOTICE_SHA256 = hashlib.sha256(PRODUCTION_NOTICE.encode()).hexdigest()
 PENDING_TTL=timedelta(hours=48)
 CONFIRMATION_DELAY=timedelta(hours=24)
 APPROVED_TTL=timedelta(hours=72)
@@ -31,14 +46,30 @@ REQUEST_INTERVAL=timedelta(minutes=5)
 
 def clock():return datetime.now(timezone.utc)
 def utc(value):return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
+def notice_policy(environment=None):
+    if environment is None:
+        from .kws_client import runtime_environment
+        environment=runtime_environment()
+    if environment=='test':return NOTICE_VERSION,NOTICE,NOTICE_SHA256
+    if environment=='production':return PRODUCTION_NOTICE_VERSION,PRODUCTION_NOTICE,PRODUCTION_NOTICE_SHA256
+    raise ValueError('KWS environment is unavailable.')
 def under13_available():
-    from .kws_client import test_enabled
-    return UNDER13_REVIEW_APPROVED or test_enabled()
+    from .kws_client import Config,KWSUnavailable,runtime_environment
+    try:
+        environment=runtime_environment()
+        Config.load(environment)
+        return True
+    except KWSUnavailable:
+        return bool(UNDER13_REVIEW_APPROVED and os.getenv('APP_ENV')=='kws-test')
 def require_under13_review():
     if not under13_available():raise ValueError('Parent authorization is not open yet. Guest tools and help remain available.')
 def consent_active(session,rule):
     e=session.get(ConsentEvidence,rule.consent_id,populate_existing=True) if rule and rule.consent_id else None
-    return bool(under13_available() and e and e.profile_id==rule.profile_id and e.parent_email and e.approved_at and e.confirmed_at and not e.withdrawn_at and e.notice_version==NOTICE_VERSION and e.notice_sha256==NOTICE_SHA256)
+    if not under13_available() or not e:return False
+    try:version,_,digest=notice_policy()
+    except (ValueError, RuntimeError):return False
+    return bool(e.profile_id==rule.profile_id and e.parent_email and e.approved_at and e.confirmed_at
+                and not e.withdrawn_at and e.notice_version==version and e.notice_sha256==digest)
 def protected_child(session,pid):
     rule=session.get(AccountPrivacy,pid,populate_existing=True)
     return bool(rule and (rule.age_band=='under13' or rule.consent_id))
@@ -53,6 +84,7 @@ def director_copy(row):return f'\nSuggested director (optional): {row.director_n
 
 def request_consent(session,*,parent_email,director_email='',director_name='',profile=None):
     require_under13_review()
+    version,notice,_=notice_policy()
     from .verifiers import validate_email
     from .age_privacy import declare_age
     email=validate_email(parent_email);director=validate_email(director_email) if director_email else ''
@@ -70,9 +102,9 @@ def request_consent(session,*,parent_email,director_email='',director_name='',pr
     if session.scalar(select(func.count(PendingConsent.id)).where(PendingConsent.created_at>now-timedelta(hours=1)))>=125:
         raise ValueError('Permission requests are temporarily busy.')
     token=generate_invitation_token()
-    row=PendingConsent(profile_id=profile.id if profile else None,parent_email=email,director_email=director,director_name=name,review_allowed=False,approve_hash=hash_invitation_token(token),created_at=now,expires_at=now+PENDING_TTL,notice_version=NOTICE_VERSION)
+    row=PendingConsent(profile_id=profile.id if profile else None,parent_email=email,director_email=director,director_name=name,review_allowed=False,approve_hash=hash_invitation_token(token),created_at=now,expires_at=now+PENDING_TTL,notice_version=version)
     session.add(row);session.flush()
-    send_copy(EmailService(),email,'Woodshed: parent permission request',NOTICE+director_copy(row)+'\nRead and choose permissions: '+public_link('/family/approve/'+token)+'\nWithdraw this request: '+public_link('/family/withdraw/'+derived_token(row,'withdraw')))
+    send_copy(EmailService(),email,'Woodshed: parent permission request',notice+director_copy(row)+'\nRead and choose permissions: '+public_link('/family/approve/'+token)+'\nWithdraw this request: '+public_link('/family/withdraw/'+derived_token(row,'withdraw')))
     return row
 
 def pending_from_token(session,token,*,purpose='approve',lock=False):
@@ -80,11 +112,12 @@ def pending_from_token(session,token,*,purpose='approve',lock=False):
     column=PendingConsent.approve_hash if purpose=='approve' else PendingConsent.activation_hash
     q=select(PendingConsent).where(column==hash_invitation_token(token))
     row=session.scalar((q.with_for_update() if lock else q).execution_options(populate_existing=True))
-    if not row or utc(row.expires_at)<=clock() or row.notice_version!=NOTICE_VERSION:raise ValueError('Invalid, expired or superseded notice link.')
+    version,_,_=notice_policy()
+    if not row or utc(row.expires_at)<=clock() or row.notice_version!=version:raise ValueError('Invalid, expired or superseded notice link.')
     return row
 
 def approve(session,token,*,explicit,notice_version,review_allowed):
-    raise ValueError('The prototype email-only approval is disabled. Use the KWS Test permission flow.')
+    raise ValueError('The prototype email-only approval is disabled. Use the KWS permission flow.')
 
 def send_due_confirmations(session):
     require_under13_review()
@@ -118,7 +151,7 @@ def activate(session,token,*,profile,fields):
         state['account']={'woodchuckId':profile.woodchuck_id,'authenticated':True,'serverRevision':0}
         session.add(WoodchuckState(profile_id=profile.id,state_json=state,revision=0))
     rule=declare_age(session,profile.id,'under13')
-    e=ConsentEvidence(profile_id=profile.id,parent_email=row.parent_email,activation_hash=hash_invitation_token(token),withdrawal_hash=hash_invitation_token(derived_token(row,'withdraw')),notice_version=NOTICE_VERSION,notice_sha256=NOTICE_SHA256,approved_at=row.approved_at,confirmed_at=row.confirmed_at)
+    e=ConsentEvidence(profile_id=profile.id,parent_email=row.parent_email,activation_hash=hash_invitation_token(token),withdrawal_hash=hash_invitation_token(derived_token(row,'withdraw')),notice_version=row.notice_version,notice_sha256=verification.notice_sha256,approved_at=row.approved_at,confirmed_at=row.confirmed_at)
     session.add(e);session.flush();rule.consent_id=e.id
     permission=None
     if verification.director_allowed:

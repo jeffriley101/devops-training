@@ -1,4 +1,4 @@
-"""KWS-only callbacks. Signature verification replaces CSRF only on these two paths."""
+"""KWS-only callbacks. Signature verification replaces CSRF only on these paths."""
 from fastapi import APIRouter, Request, HTTPException
 from sqlalchemy.exc import IntegrityError
 from .db import SessionLocal
@@ -10,10 +10,9 @@ from . import kws_verification as kws
 router = APIRouter(route_class=PrivateRoute)
 
 
-@router.post('/family/kws/test/webhook')
-async def webhook(request: Request):
+async def handle_webhook(request: Request, environment: str):
     try:
-        cfg = Config.load()
+        cfg = Config.load(environment)
         headers = request.headers.getlist('x-kws-signature')
         if len(headers) != 1:
             kws.fail()
@@ -28,25 +27,44 @@ async def webhook(request: Request):
             session.commit()
         return {'received': True}
     except KWSUnavailable:
-        raise HTTPException(503, 'KWS Test callback is unavailable.') from None
+        raise HTTPException(503, 'KWS callback is unavailable.') from None
     except (kws.InvalidResult, UnicodeError):
-        raise HTTPException(400, 'Invalid KWS Test result.') from None
+        raise HTTPException(400, 'Invalid KWS result.') from None
     except IntegrityError:
-        raise HTTPException(409, 'KWS Test transaction was already bound to another request.') from None
+        raise HTTPException(409, 'KWS transaction was already bound to another request.') from None
 
 
-@router.get('/family/kws/test/response')
-def verification_response(request: Request):
+def handle_response(request: Request, environment: str):
     try:
-        cfg = Config.load()
-        result = kws.redirect_result(request.query_params)
+        cfg = Config.load(environment)
+        result = kws.redirect_result(request.query_params, cfg)
         with SessionLocal() as session:
             token = kws.complete(session, cfg, *result)
             session.commit()
         return page(request, 'kws-result', activation_token=token)
     except KWSUnavailable:
-        raise HTTPException(503, 'KWS Test callback is unavailable.') from None
+        raise HTTPException(503, 'KWS callback is unavailable.') from None
     except kws.InvalidResult:
-        raise HTTPException(400, 'Invalid KWS Test result.') from None
+        raise HTTPException(400, 'Invalid KWS result.') from None
     except IntegrityError:
-        raise HTTPException(409, 'KWS Test transaction was already bound to another request.') from None
+        raise HTTPException(409, 'KWS transaction was already bound to another request.') from None
+
+
+@router.post('/family/kws/test/webhook')
+async def test_webhook(request: Request):
+    return await handle_webhook(request, 'test')
+
+
+@router.get('/family/kws/test/response')
+def test_verification_response(request: Request):
+    return handle_response(request, 'test')
+
+
+@router.post('/family/kws/production/webhook')
+async def production_webhook(request: Request):
+    return await handle_webhook(request, 'production')
+
+
+@router.get('/family/kws/production/response')
+def production_verification_response(request: Request):
+    return handle_response(request, 'production')
