@@ -3,6 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 from datetime import datetime, timezone
 import json
+import re
 import secrets
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -131,6 +132,21 @@ def current_profile(
         request.session.pop(SESSION_PROFILE_VERSION, None)
         return None
 
+    from .age_privacy import require_eligible
+    protective = request.url.path in ('/account/me','/account/age','/account/help','/account/privacy','/account/delete') or request.url.path.startswith(('/guest','/family')) or (
+        request.method == 'DELETE' and re.fullmatch(r'/trusted-verifiers/connections/[0-9]+',request.url.path))
+    if not protective:require_eligible(session,profile.id)
+    from .age_privacy import sharing_allowed
+    if not protective and not sharing_allowed(session,profile.id):
+        path=request.url.path
+        from .age_privacy import ordinary_director_allowed
+        director_resend=(path.startswith('/trusted-verifiers/invitations/') and path.endswith('/resend-email') and ordinary_director_allowed(session,profile.id))
+        if path.startswith('/teams') and request.method not in ('GET','HEAD') or ('email' in path and not path.startswith('/family') and not director_resend):
+            raise HTTPException(403,'Private practice does not authorize team or email sharing.')
+        if path.startswith('/trusted-verifiers/invitations') and request.method not in ('GET','HEAD'):
+            from .age_privacy import ordinary_director_allowed
+            if not ordinary_director_allowed(session,profile.id):raise HTTPException(403,'Use parent-authorized director access from Private practice.')
+
     # Bind requests from a rendered browser page to that page's account. This
     # supplements session authentication; the header can never authenticate anyone.
     expected_account = request.headers.get("x-woodshed-account")
@@ -148,7 +164,14 @@ def create_account(
     level: str | None = Form(None),
     goal: str | None = Form(None),
     initial_state: str | None = Form(None),
+    age_band: str | None = Form(None),
 ):
+    from .age_screen import registration_age
+    from .age_privacy import declare_age
+    try:
+        age_band = registration_age(age_band)
+    except ValueError as exc:
+        raise HTTPException(403, str(exc)) from exc
     with SessionLocal() as session:
         existing_profile = current_profile(request, session)
         if existing_profile is not None:
@@ -192,6 +215,7 @@ def create_account(
                 goal=goal,
                 commit=False,
             )
+            declare_age(session, profile.id, age_band)
             authoritative_state = preserve_server_values(submitted_state)
             account = {}
             account.update({
@@ -264,7 +288,9 @@ def login(
                 detail="Woodchuck ID or PIN was not recognized.",
             )
 
-        login_streak = _record_login_streak(session, profile_id=profile.id)
+        from .age_privacy import eligible
+        age_screen_required = not eligible(session, profile.id)
+        login_streak = None if age_screen_required else _record_login_streak(session, profile_id=profile.id)
 
         request.session[SESSION_PROFILE_ID] = profile.id
         request.session[SESSION_PROFILE_VERSION] = profile.session_version
@@ -274,6 +300,7 @@ def login(
             "authenticated": True,
             "profile": profile_payload(profile),
             "login_streak": login_streak,
+            "age_screen_required": age_screen_required,
         }
 
 

@@ -63,6 +63,8 @@ from .history_mystery import (
     history_mystery_central_date,
 )
 from .models import WoodchuckState
+from .age_routes import router as age_router
+from .age_privacy import AgeScreenRequired
 from .board_seasons import board_season_presentation
 from .seasons import season_covering_date
 from .session_config import session_secret, secure_session_cookie, is_production
@@ -79,7 +81,17 @@ if is_production():
     )
 
 
-app = FastAPI(title="Woodshed Woodchuck")
+local_kws_test = os.getenv('KWS_TEST_RUNTIME_MODE') == 'local'
+app = FastAPI(title="Woodshed Woodchuck", docs_url=None if local_kws_test else '/docs',
+              redoc_url=None if local_kws_test else '/redoc',
+              openapi_url=None if local_kws_test else '/openapi.json')
+if local_kws_test:
+    from .kws_test_safety import bootstrap_local_delivery
+    bootstrap_local_delivery()
+    from starlette.middleware.trustedhost import TrustedHostMiddleware
+    from starlette.middleware.httpsredirect import HTTPSRedirectMiddleware
+    app.add_middleware(HTTPSRedirectMiddleware)
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=[os.environ['KWS_TEST_PUBLIC_HOST'], '127.0.0.1', 'localhost'])
 app.add_middleware(SafeRequestLogContext)
 app.add_middleware(
     SessionMiddleware,
@@ -88,6 +100,14 @@ app.add_middleware(
     https_only=SESSION_COOKIE_SECURE,
 )
 app.include_router(account_router)
+app.include_router(age_router)
+
+@app.exception_handler(AgeScreenRequired)
+async def age_screen_required_response(request, error):
+    if request.method == "GET" and "text/html" in request.headers.get("accept", ""):
+        return RedirectResponse("/account/age",303,headers={"Cache-Control":"no-store"})
+    from fastapi.responses import JSONResponse
+    return JSONResponse({"detail":error.detail,"age_screen_required":True,"next":"/account/age"},403,headers=error.headers)
 app.include_router(membership_router)
 app.include_router(verifier_router)
 app.include_router(practice_chart_router)
@@ -370,6 +390,7 @@ def setup(request: Request):
     return _render(
         request,
         "setup.html",
+        selected_age=request.query_params.get("age"),
         title="Setup Your Musician",
         instruments=INSTRUMENT_OPTIONS,
         levels=LEVEL_OPTIONS,
@@ -620,3 +641,14 @@ def store(request: Request):
         practice_definition=PRACTICE_DEFINITION,
         art_submission_mailto=art_submission_mailto(),
     )
+
+from .age_privacy import PublicationCacheBoundary
+app.add_middleware(PublicationCacheBoundary)
+
+from .family_routes import router as family_router
+app.include_router(family_router)
+from .kws_routes import router as kws_router
+app.include_router(kws_router)
+if local_kws_test:
+    from .kws_test_safety import LocalCallbackEvidence
+    app.add_middleware(LocalCallbackEvidence)

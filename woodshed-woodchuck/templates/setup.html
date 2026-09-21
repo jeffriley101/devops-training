@@ -5,14 +5,29 @@
   <div class="section-head">
     <h2>Create Your Woodchuck</h2>
     <p class="body-copy">
-      Choose your musical path and create a four-digit PIN.
-      We will give your Woodchuck a permanent ID.
+      Start by choosing your age band. If registration is available,
+      you can then create your Woodchuck ID and four-digit PIN.
     </p>
   </div>
 
   <div class="setup-layout">
     <div>
+      {% if selected_age is none %}
+      <form action="/setup" method="get" class="stack-form">
+        <label for="registration-age">Age band</label>
+        <select id="registration-age" name="age" required>
+          {% include "age_options.html" %}
+        </select>
+        <button class="btn btn-primary" type="submit">Continue</button>
+      </form>
+      {% elif selected_age == 'under13' %}
+      <p>Private practice needs parent authorization. <a href="/family/request">Ask your parent for permission</a>. No child account is created before authorization.</p>
+      {% elif selected_age not in ('13to17', 'adult') %}
+      <p role="status">Account registration is unavailable for this age selection. Guest tools remain available.</p>
+      {% endif %}
+      {% if selected_age in ('13to17', 'adult') %}
       <form id="account-create-form" class="stack-form" novalidate>
+        <input type="hidden" name="age_band" value="{{ selected_age }}" />
         <label for="woodchuck-name">Name your Woodchuck</label>
         <input
           id="woodchuck-name"
@@ -75,6 +90,8 @@
           I Already Have a Woodchuck
         </a>
       </form>
+      {% endif %}
+      <p><a href="/guest">Explore as Guest</a> · <a href="/login">Sign in to an existing account</a> · <a href="/account/help">Privacy and help</a></p>
 
       <section
         id="account-created-panel"

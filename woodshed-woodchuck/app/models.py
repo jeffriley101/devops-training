@@ -19,6 +19,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .db import Base
+from .age_models import AccountPrivacy
 from .session_revocations import RevokedBrowserSession
 from .membership_models import (BillingAccount, Membership, MembershipSeat,
                                 MembershipSeatInvitation, ProviderSubscription,
@@ -1658,3 +1659,6 @@ class CrownProgress(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
     )
+
+from .child_models import PendingConsent, ConsentEvidence, ParentAccess, ParentAgeDeclaration, DirectorPermission
+from .kws_models import KWSVerification, KWSEmailBudget

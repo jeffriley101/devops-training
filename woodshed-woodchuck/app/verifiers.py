@@ -36,6 +36,7 @@ ACTIVE_CONNECTION_STATUSES = ("pending", "accepted")
 
 def accepted_active_verifier_students(session: Session, *, verifier_id: int) -> list[dict]:
     """Safe connection roster; pending capacity reservations are not access grants."""
+    from .age_privacy import sharing_allowed as eligible
     return [dict(row) for row in session.execute(select(
         StudentVerifierConnection.id.label("connection_id"),
         StudentVerifierConnection.role,
@@ -45,7 +46,7 @@ def accepted_active_verifier_students(session: Session, *, verifier_id: int) -> 
         StudentVerifierConnection.verifier_id == verifier_id,
         StudentVerifierConnection.status == "accepted", WoodchuckProfile.status == "active",
         StudentVerifierConnection.role == "verifier",
-    ).order_by(WoodchuckProfile.display_name, WoodchuckProfile.id)).mappings()]
+    ).order_by(WoodchuckProfile.display_name, WoodchuckProfile.id)).mappings() if eligible(session,row["profile_id"])]
 
 
 def select_verifier_student(roster: list[dict], connection_id: int | None) -> dict | None:
@@ -81,7 +82,8 @@ def band_director_students(
         )
         .order_by(WoodchuckProfile.display_name, WoodchuckProfile.id)
     ).mappings().all()
-    return [dict(row) for row in rows]
+    from .age_privacy import ordinary_director_connection
+    return [dict(row) for row in rows if ordinary_director_connection(session,row["profile_id"],verifier_id)]
 
 
 @dataclass(frozen=True)
@@ -209,12 +211,17 @@ def create_trusted_verifier_invitation(
     profile: WoodchuckProfile,
     email: str,
     role: str,
+    commit: bool = True,
 ) -> CreatedInvitation:
     if profile.id is None:
         raise ValueError("The student account must be saved first.")
 
     normalized_email = validate_email(email)
     normalized_role = validate_role(role)
+    from .child_authorization import protected_child
+    from .age_privacy import ordinary_director_allowed
+    if protected_child(session,profile.id) and commit and (normalized_role!='band_director' or not ordinary_director_allowed(session,profile.id)):
+        raise ValueError('Only a new ordinary director connection is available after the protected 13+ transition.')
     now = _utc_now()
 
     existing_connection = session.scalar(
@@ -281,7 +288,7 @@ def create_trusted_verifier_invitation(
     session.add(invitation)
 
     try:
-        session.commit()
+        session.commit() if commit else session.flush()
         session.refresh(invitation)
     except IntegrityError as error:
         session.rollback()
@@ -300,6 +307,7 @@ def reissue_trusted_verifier_invitation(
     *,
     profile: WoodchuckProfile,
     invitation_id: int,
+    commit: bool = True,
 ) -> CreatedInvitation:
     if profile.id is None:
         raise ValueError("The student account must be saved first.")
@@ -323,6 +331,10 @@ def reissue_trusted_verifier_invitation(
     if profile is None or profile.status != "active":
         raise ValueError("That trusted-verifier invitation is invalid.")
 
+    from .child_authorization import protected_child
+    from .age_privacy import ordinary_director_allowed
+    if protected_child(session,profile.id) and commit and (invitation.role!='band_director' or not ordinary_director_allowed(session,profile.id)):
+        raise ValueError('Only ordinary director invitations are available after the protected transition.')
     token = generate_invitation_token()
     now = _utc_now()
 
@@ -330,7 +342,7 @@ def reissue_trusted_verifier_invitation(
     invitation.expires_at = now + INVITATION_LIFETIME
 
     try:
-        session.commit()
+        session.commit() if commit else session.flush()
         session.refresh(invitation)
     except IntegrityError as error:
         session.rollback()
@@ -350,6 +362,8 @@ def accept_trusted_verifier_invitation(
     token: str,
     display_name: str,
     pin: str,
+    commit: bool = True,
+    private_permission=None,
 ) -> AcceptedInvitation:
     raw_token = token.strip()
 
@@ -375,11 +389,22 @@ def accept_trusted_verifier_invitation(
     if profile is None or profile.status != "active":
         raise ValueError("That trusted-verifier invitation is invalid.")
 
+    from .age_privacy import require_eligible
+    require_eligible(session,profile.id)
+    from .child_authorization import protected_child, permission_valid
+    if protected_child(session,profile.id):
+        from .age_privacy import ordinary_director_allowed
+        from .age_models import AccountPrivacy
+        rule=session.get(AccountPrivacy,profile.id)
+        ordinary=(ordinary_director_allowed(session,profile.id) and invitation.role=='band_director'
+                  and rule.public_from and _as_utc(invitation.created_at)>=_as_utc(rule.public_from))
+        if not ordinary and (not permission_valid(session,private_permission) or private_permission.profile_id!=profile.id or private_permission.email!=invitation.email or invitation.role!='band_director'):
+            raise ValueError('Verify the parent-authorized director connection using its current emailed link.')
     now = _utc_now()
 
     if _as_utc(invitation.expires_at) <= now:
         invitation.status = "expired"
-        session.commit()
+        session.commit() if commit else session.flush()
         raise ValueError(
             "That trusted-verifier invitation has expired."
         )
@@ -461,6 +486,7 @@ def accept_trusted_verifier_invitation(
         session.add(connection)
     else:
         connection.role = invitation.role
+        connection.invited_at = invitation.created_at
         connection.status = "accepted"
         connection.accepted_at = now
 
@@ -469,7 +495,7 @@ def accept_trusted_verifier_invitation(
     invitation.accepted_at = now
 
     try:
-        session.commit()
+        session.commit() if commit else session.flush()
         session.refresh(invitation)
         session.refresh(verifier)
         session.refresh(connection)

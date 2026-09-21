@@ -39,6 +39,9 @@ def db(monkeypatch):
             s.add(p)
             s.flush()
             s.add(WoodchuckState(profile_id=p.id, state_json={}, revision=0))
+            # These logout regressions require an eligible synthetic account.
+            from app.age_privacy import declare_age
+            declare_age(s, p.id, "13to17")
         s.commit()
     yield factory
     engine.dispose()

@@ -13,6 +13,7 @@ from typing import Callable
 from urllib.parse import urljoin
 
 from .content import SHOP_SHARE_URL
+from .kws_test_safety import message_allowed
 
 
 @dataclass(frozen=True)
@@ -103,6 +104,8 @@ class EmailService:
         self.smtp_factory = smtp_factory or smtplib.SMTP
 
     def send(self, message: EmailMessage) -> DeliveryResult:
+        if not message_allowed(message):
+            return DeliveryResult(False, "test_recipient_blocked")
         if self.config is None:
             return DeliveryResult(False, "not_configured")
         try:

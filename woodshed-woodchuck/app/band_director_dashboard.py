@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .band_director_context import current_roster_period
+from .age_privacy import director_chart_visible, director_scope_start
 from .contests import CENTRAL
 from .models import PracticeChart, PracticeChartVerification, Team, TeamMembership
 from .teams import public_team_identity
@@ -32,6 +33,9 @@ def dashboard_metrics(session: Session, *, verifier_id: int,
     reviews = session.scalars(select(PracticeChartVerification).join(PracticeChart).where(
         PracticeChart.profile_id.in_(ids),
     ).order_by(PracticeChartVerification.id)).all() if ids else []
+    charts=[chart for chart in charts if director_chart_visible(session,chart,verifier_id)]
+    chart_ids={chart.id for chart in charts}
+    reviews=[review for review in reviews if review.practice_chart_id in chart_ids]
     approved = {review.practice_chart_id for review in reviews if review.status == "approved"}
 
     earliest = min([current_week] + [week_start(chart.practice_date) for chart in charts])
@@ -53,7 +57,8 @@ def dashboard_metrics(session: Session, *, verifier_id: int,
         ).where(TeamMembership.profile_id.in_(ids), TeamMembership.season_id == season.id,
                 TeamMembership.ended_at.is_(None), Team.season_id == season.id)):
             name, emblem = public_team_identity(team)
-            teams.setdefault(profile_id, {"name": name, "emblem": emblem})
+            if director_scope_start(session,profile_id) is None:
+                teams.setdefault(profile_id, {"name": name, "emblem": emblem})
 
     students = []
     program_week_sums = [0.0] * 5

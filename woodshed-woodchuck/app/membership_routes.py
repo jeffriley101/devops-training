@@ -81,6 +81,9 @@ def detail(session, membership):
         MembershipSeatInvitation.status == "pending", MembershipSeatInvitation.expires_at > service.clock()
     ).order_by(MembershipSeatInvitation.created_at.desc())).all()
     owner_profile_id = session.scalar(select(BillingAccount.profile_id).where(BillingAccount.id == membership.billing_account_id))
+    from .age_privacy import sharing_allowed as eligible
+    seats=[({"id":seat.id,"slot_number":seat.slot_number,"profile_id":seat.profile_id if eligible(session,seat.profile_id) else None},
+            name if eligible(session,seat.profile_id) else "Private member") for seat,name in seats]
     return {"membership": membership, "seats": seats, "owner_profile_id": owner_profile_id, "invitations": invitations,
             "active": service.membership_is_active(membership),
             "plan_label": PLANS[membership.plan_code].label if membership.plan_code in PLANS else "Complimentary Full membership"}

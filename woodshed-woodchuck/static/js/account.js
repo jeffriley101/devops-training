@@ -294,6 +294,10 @@
 
         const loginPayload = await loginResponse.json();
         const profile = loginPayload.profile;
+        if (loginPayload.age_screen_required) {
+          window.location.assign("/account/age");
+          return;
+        }
 
         const stateResponse = await fetch("/account/state", {cache: "no-store", credentials: "same-origin"});
 

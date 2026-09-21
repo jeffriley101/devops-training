@@ -171,6 +171,8 @@ def apply_daily_login(
     profile_id: int,
     now: datetime | None = None,
 ) -> dict[str, object]:
+    from .age_privacy import require_eligible
+    require_eligible(session,profile_id)
     instant = now or datetime.now(timezone.utc)
     if instant.tzinfo is None:
         instant = instant.replace(tzinfo=timezone.utc)

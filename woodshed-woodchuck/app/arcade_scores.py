@@ -108,6 +108,8 @@ def arcade_score_payload(
         )
     ).all()
 
+    from .age_privacy import can_publish
+    rows=[(score,profile) for score,profile in rows if profile.id==profile_id or can_publish(session,profile.id,at=score.updated_at)]
     leaderboard: list[dict[str, object]] = []
     prior_score: int | None = None
     rank = 0

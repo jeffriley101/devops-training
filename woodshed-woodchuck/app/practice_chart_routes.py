@@ -98,15 +98,21 @@ def profile_practice_streak(session, profile_id: int, today: date | None = None)
 
 format_practice_minutes = format_minutes
 
-def practice_totals_payload(session, profile_id: int, today: date | None = None) -> dict[str, object]:
+def practice_totals_payload(session, profile_id: int, today: date | None = None, *, verifier_id=None) -> dict[str, object]:
     today = today or datetime.now(CENTRAL).date()
     week_start = today - timedelta(days=today.weekday())
     week_end = week_start + timedelta(days=7)
+    scope=[]
+    if verifier_id is not None:
+        from .age_privacy import director_scope_start
+        boundary=director_scope_start(session,profile_id)
+        if boundary is not None:
+            scope=[PracticeChart.created_at>=boundary, PracticeChart.practice_date>boundary.astimezone(CENTRAL).date()]
     career = session.scalar(select(func.coalesce(func.sum(chart_seconds_sql()), 0)).where(
-        PracticeChart.profile_id == profile_id, chart_seconds_sql() > 0,
+        PracticeChart.profile_id == profile_id, chart_seconds_sql() > 0, *scope,
     )) or 0
     weekly = session.scalar(select(func.coalesce(func.sum(chart_seconds_sql()), 0)).where(
-        PracticeChart.profile_id == profile_id, chart_seconds_sql() > 0,
+        PracticeChart.profile_id == profile_id, chart_seconds_sql() > 0, *scope,
         PracticeChart.practice_date >= week_start,
         PracticeChart.practice_date < week_end,
     )) or 0
@@ -431,7 +437,8 @@ def create_student_practice_chart(
                 f"/trusted-verifiers/dashboard#verification-{created.verification.id}",
                 local_base_url=str(request.base_url),
             )
-            if created.created:
+            from .child_authorization import protected_child
+            if created.created and not protected_child(session,profile.id):
                 delivery = EmailService().send_practice_chart(
                     recipient=verifier.email, student_name=profile.display_name,
                     practice_date=created.chart.practice_date.isoformat(), minutes=created.chart.minutes,

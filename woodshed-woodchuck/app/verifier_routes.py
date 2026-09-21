@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from .age_privacy import sharing_allowed as eligible, ordinary_director_connection, director_chart_visible
 from .account_routes import current_profile
 from .db import SessionLocal
 from .login_limits import enforce_login_limit
@@ -336,6 +337,12 @@ def disconnect_student_verifier(
                 detail="That trusted verifier is not currently connected.",
             )
 
+        from .child_models import DirectorPermission, ConsentEvidence
+        from .child_authorization import clock
+        permissions=session.scalars(select(DirectorPermission).where(DirectorPermission.connection_id==connection.id).order_by(DirectorPermission.consent_id)).all()
+        for permission in permissions:
+            session.scalar(select(ConsentEvidence).where(ConsentEvidence.id==permission.consent_id).with_for_update())
+            permission.revoked_at=clock();permission.link_hash=None;permission.session_hash=None
         connection.status = "disconnected"
         session.commit()
         session.refresh(connection)
@@ -565,7 +572,7 @@ def verifier_me(request: Request):
                         "goal": profile.goal,
                     },
                 }
-                for connection, profile in connection_rows
+                for connection, profile in connection_rows if eligible(session, profile.id) or (connection.role=="band_director" and ordinary_director_connection(session,profile.id,verifier.id))
             ],
         }
 
@@ -655,7 +662,7 @@ def list_verifier_practice_charts(request: Request, response: Response, connecti
                 StudentVerifierConnection.verifier_id
                 == verifier.id,
                 StudentVerifierConnection.status == "accepted",
-                StudentVerifierConnection.role == "verifier",
+                StudentVerifierConnection.role.in_(("verifier","band_director")),
                 WoodchuckProfile.status == "active",
                 PracticeChart.profile_id == selected_profile_id if selected_profile_id is not None else True,
             )
@@ -672,7 +679,7 @@ def list_verifier_practice_charts(request: Request, response: Response, connecti
                     chart,
                     profile,
                 )
-                for verification, chart, profile in rows
+                for verification, chart, profile in rows if eligible(session,profile.id) or director_chart_visible(session,chart,verifier.id)
             ]
         }
 

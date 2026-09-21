@@ -2406,7 +2406,7 @@
         if (!response.ok) throw new Error("Burrow standings unavailable");
         let payload = await response.json();
         const browserBest = storedBurrowBest();
-        if (browserBest > payload.best_score) {
+        if (payload.allow_local_score_import !== false && browserBest > payload.best_score) {
           response = await fetch("/xp/plunge-best", {
             method: "POST",
             credentials: "same-origin",

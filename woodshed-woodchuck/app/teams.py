@@ -1,4 +1,5 @@
 from __future__ import annotations
+from .age_privacy import can_publish
 
 from datetime import datetime, time, timezone
 import secrets
@@ -12,6 +13,7 @@ from sqlalchemy.orm import Session
 from .account_routes import current_profile
 from .contests import CENTRAL, central_week_boundaries, ensure_current_contest_data
 from .db import SessionLocal
+from .age_privacy import team_public, sharing_allowed
 from .models import (
     ProfileCapability,
     Season,
@@ -275,7 +277,7 @@ def selection_payload(session: Session, *, profile: WoodchuckProfile, now: datet
     next_at = datetime.combine(week.week_end, time.min, CENTRAL).astimezone(timezone.utc)
     return {
         "season": {"key": season.key, "name": season.name},
-        "teams": [team_payload(team) for team in teams],
+        "teams": [team_payload(team) for team in teams if team_public(session, team.id)],
         "membership": {
             "team": team_payload(current_team) if current_team else None,
             "selected_week_start": membership.selected_week_start.isoformat() if membership else None,
@@ -398,13 +400,13 @@ def director_team_payload(
             ),
             "members": [
                 {"profile_id": member.profile_id, "display_name": member_profile.display_name}
-                for member, member_profile in membership_rows
+                for member, member_profile in membership_rows if sharing_allowed(session, member_profile.id)
             ],
             "pending_requests": [
                 {"id": join_request.id, "profile_id": join_request.profile_id,
                  "display_name": request_profile.display_name,
                  "requested_at": join_request.requested_at.isoformat()}
-                for join_request, request_profile in request_rows
+                for join_request, request_profile in request_rows if sharing_allowed(session, request_profile.id)
             ],
         },
         "approved_emblems": [emblem_payload(key) for key in APPROVED_EMBLEMS],
@@ -622,6 +624,10 @@ def resolve_private_team_request(
         if action not in {"approve", "reject"}:
             raise HTTPException(status_code=400, detail="Choose approve or reject.")
         if action == "approve":
+            from .age_privacy import require_eligible
+            require_eligible(session,join_request.profile_id)
+            if not sharing_allowed(session,join_request.profile_id):
+                raise HTTPException(403,"Team sharing is unavailable for this account.")
             student = session.get(WoodchuckProfile, join_request.profile_id)
             if student is None or student.status != "active":
                 raise HTTPException(status_code=404, detail="Student was not found.")
@@ -670,6 +676,9 @@ def remove_private_team_member(team_id: int, profile_id: int, request: Request):
 def report_team(team_id: int, request: Request, submitted: TeamReportCreate):
     with SessionLocal() as session:
         profile = current_profile(request, session)
+        from .age_privacy import sharing_allowed
+        if profile and request.method != "GET" and not sharing_allowed(session, profile.id):
+            raise HTTPException(403, "This account cannot share identifying information with other users.")
         if profile is None:
             raise HTTPException(status_code=401, detail="Student sign-in is required.")
         team = session.get(Team, team_id)

@@ -89,11 +89,25 @@ def create_practice_chart_verification_request(
     detected_playing_seconds: int | None = None,
     award_dandelions: bool = False,
 ) -> CreatedPracticeChartRequest:
-    if profile.id is None:
-        raise ValueError("The student account must be saved first.")
-
+    from .age_privacy import require_eligible, ordinary_director_connection
+    from .child_authorization import protected_child, permitted_director
+    require_eligible(session,profile.id)
     if type(practice_date) is not date:
         raise ValueError("A valid practice date is required.")
+
+    if protected_child(session,profile.id):
+        from .age_privacy import can_publish
+        if not can_publish(session,profile.id):include_contests=False
+        include_team_contests=False;team_id=None;ordinary_email_preset_id=None
+        if verifier_id is not None and not permitted_director(session,profile.id,verifier_id,review=True):
+            from .age_privacy import ordinary_director_connection
+            from .age_models import AccountPrivacy
+            from .contests import CENTRAL
+            rule=session.get(AccountPrivacy,profile.id)
+            if not ordinary_director_connection(session,profile.id,verifier_id) or practice_date<=rule.public_from.astimezone(CENTRAL).date():
+                raise ValueError('A new director may review only eligible post-transition practice.')
+    if profile.id is None:
+        raise ValueError("The student account must be saved first.")
 
     if isinstance(minutes, bool) or not isinstance(minutes, int):
         raise ValueError("Practice minutes must be a whole number.")
@@ -159,14 +173,12 @@ def create_practice_chart_verification_request(
                 StudentVerifierConnection.profile_id == profile.id,
                 StudentVerifierConnection.verifier_id == verifier_id,
                 StudentVerifierConnection.status == "accepted",
-                StudentVerifierConnection.role == "verifier",
+                StudentVerifierConnection.role.in_(("verifier", "band_director")),
             )
         )
 
-        if connection is None:
-            raise ValueError(
-                "Choose an accepted Verifier connection for this student."
-            )
+        if connection is None or (connection.role=='band_director' and not (permitted_director(session,profile.id,verifier_id,review=True) or ordinary_director_connection(session,profile.id,verifier_id))):
+            raise ValueError('Choose an accepted, authorized chart reviewer.')
 
     state = lock_state(session, profile.id) if award_dandelions else None
 
@@ -346,6 +358,7 @@ def respond_to_practice_chart_verification(
     verification_id: int,
     decision: str,
     response_note: str = "",
+    request=None,
 ) -> PracticeChartVerification:
     if verifier.id is None:
         raise ValueError("The verifier account must be saved first.")
@@ -392,12 +405,24 @@ def respond_to_practice_chart_verification(
     if chart is None:
         raise LookupError("The requested P-Chart was not found.")
 
+    from .age_privacy import require_eligible
+    require_eligible(session,chart.profile_id)
+    from .child_authorization import protected_child, director_authenticated
+    from .age_privacy import director_chart_visible
+    if protected_child(session,chart.profile_id) and not director_chart_visible(session,chart,verifier.id):
+        if request is None:raise ValueError('Verify director access before reviewing private charts.')
+        permission=director_authenticated(session,request,review=True)
+        if permission.profile_id!=chart.profile_id:raise ValueError('Chart belongs to another student.')
+        from .models import StudentVerifierConnection as Connection
+        if session.get(Connection,permission.connection_id).verifier_id!=verifier.id:raise ValueError('Wrong chart reviewer.')
+        verification=session.scalar(select(PracticeChartVerification).where(PracticeChartVerification.id==verification_id).with_for_update().execution_options(populate_existing=True))
+        if verification.status!='pending':raise ValueError('This chart has already been answered.')
     connection = session.scalar(
         select(StudentVerifierConnection).where(
             StudentVerifierConnection.profile_id == chart.profile_id,
             StudentVerifierConnection.verifier_id == verifier.id,
             StudentVerifierConnection.status == "accepted",
-            StudentVerifierConnection.role == "verifier",
+            StudentVerifierConnection.role.in_(("verifier", "band_director")),
         )
     )
 

@@ -82,6 +82,9 @@ def plunge_best_payload(
         )
     ).all()
 
+    from .age_privacy import can_publish
+    from .age_models import AccountPrivacy
+    profiles=[profile for profile in profiles if profile.id==profile_id or (can_publish(session,profile.id) and profile.plunge_best_score > session.get(AccountPrivacy,profile.id).private_plunge_best)]
     ranked_rows: list[dict[str, object]] = []
     previous_score: int | None = None
     rank = 0
@@ -117,6 +120,7 @@ def plunge_best_payload(
             visible_rows.append(current_row)
     return {
         "best_score": int(current_score),
+        "allow_local_score_import": session.get(AccountPrivacy,profile_id) is None,
         "leaderboard": visible_rows,
     }
 

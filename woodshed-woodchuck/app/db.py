@@ -33,6 +33,9 @@ def get_database_url() -> str:
 
 
 DATABASE_URL = get_database_url()
+if os.getenv('KWS_TEST_RUNTIME_MODE') == 'local':
+    from .kws_test_runtime import validate_database
+    validate_database()  # Reject TCP/production URLs before constructing any engine.
 
 engine_options: dict[str, object] = {
     "pool_pre_ping": True,

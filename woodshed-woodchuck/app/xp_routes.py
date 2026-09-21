@@ -83,6 +83,11 @@ def update_plunge_best(request: Request, submitted: PlungeBestSubmission):
         profile = current_profile(request, session)
         if profile is None:
             raise HTTPException(status_code=401, detail="Student sign-in is required.")
+        # This endpoint is the legacy device-score importer, not normal Arcade
+        # completion. Old cached clients must not publish pre-screen history.
+        from .age_models import AccountPrivacy
+        if session.get(AccountPrivacy, profile.id) is not None:
+            raise HTTPException(409, "Historical device scores remain private on the device.")
         try:
             best_score, updated = record_plunge_best_score(
                 session,

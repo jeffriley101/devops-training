@@ -20,6 +20,7 @@ from .login_limits import enforce_login_limit
 from .content import GENERAL_BONUS_CHALLENGE, QUEST_POOL
 from .db import SessionLocal
 from .hall_public import public_hall_payload
+from .age_privacy import profile_public, can_publish, chart_public, team_public, filter_result_rows
 from .instruments import INSTRUMENTS_BY_LABEL, canonical_instrument_key
 from .models import (
     CampPointAward,
@@ -446,6 +447,8 @@ def weekly_practice_by_instrument(
 
     open_totals: dict[str, tuple[str, int]] = {}
     for chart in charts:
+        if not chart_public(session, chart):
+            continue
         key, display_name = normalize_instrument(chart.instrument)
         if not key:
             continue
@@ -496,6 +499,7 @@ def student_score_rows(
     behind_key: str,
     emblem_keys: dict[int, str | None] | None = None,
 ) -> tuple[list[dict[str, object]], dict[str, object]]:
+    scores = {pid: value for pid, value in scores.items() if pid == current_profile_id or profile_public(profiles.get(pid))}
     ordered = sorted(
         scores.items(),
         key=lambda item: (
@@ -650,6 +654,8 @@ def weekly_student_points(
         session, contest_week
     )
 
+    charts = [c for c in charts if c.profile_id == current_profile_id or chart_public(session, c)]
+
     open_scores: dict[int, int] = {}
     verified_scores: dict[int, int] = {}
     pristine_scores: dict[int, int] = {}
@@ -781,6 +787,8 @@ def weekly_camp_points(
     )).all()
     scores: dict[int, int] = {}
     for award in awards:
+        if award.profile_id != current_profile_id and not can_publish(session, award.profile_id, at=award.created_at):
+            continue
         if _is_contest_placement_award(award):
             # Placement awards remain permanent in the ledger, but never feed
             # back into the activity contest that produced them.
@@ -1071,6 +1079,7 @@ def _scoring_seconds(chart, week: ContestWeek) -> int:
 def _weekly_team_scores(
     session: Session, contest_week: ContestWeek, *,
     source_cutoff: datetime | None = None,
+    public_only: bool = False,
 ) -> dict[str, dict[str, object]]:
     """Build weekly team totals, meaningful averages, and TPR divisions."""
     mode = _practice_scoring_mode(contest_week)
@@ -1079,6 +1088,8 @@ def _weekly_team_scores(
     )
     contributions = {"open": {}, "verified": {}, "pristine": {}}
     for chart in charts:
+        if public_only and not chart_public(session, chart):
+            continue
         if not chart.include_team_contests or chart.team_id is None:
             continue
         divisions = ["open"]
@@ -1090,6 +1101,8 @@ def _weekly_team_scores(
             key = (chart.team_id, chart.profile_id)
             contributions[division][key] = contributions[division].get(key, 0) + _scoring_seconds(chart, contest_week)
     eligible_rosters = _eligible_weekly_team_rosters(session, contest_week)
+    if public_only:
+        eligible_rosters = {tid: {pid for pid in ids if can_publish(session, pid)} for tid, ids in eligible_rosters.items()}
     result: dict[str, dict[str, object]] = {}
     for division in ("open", "verified", "pristine"):
         scores: dict[int, int] = {}
@@ -1131,6 +1144,7 @@ def _weekly_team_scores(
 def _weekly_team_activity_point_scores(
     session: Session, contest_week: ContestWeek, *,
     source_cutoff: datetime | None = None,
+    public_only: bool = False,
 ) -> dict[int, int]:
     """Return normal weekly BOARD points using immutable team attribution."""
     start_at, end_at = _week_utc_bounds(contest_week)
@@ -1144,6 +1158,8 @@ def _weekly_team_activity_point_scores(
         filters.append(CampPointAward.created_at <= aware_utc(source_cutoff))
     scores: dict[int, int] = {}
     for award in session.scalars(select(CampPointAward).where(*filters)).all():
+        if public_only and not (can_publish(session, award.profile_id, at=award.created_at) and can_publish(session, award.profile_id, at=award.occurred_at)):
+            continue
         if _is_contest_placement_award(award):
             continue
         scores[award.team_id] = scores.get(award.team_id, 0) + award.points_awarded
@@ -1153,6 +1169,7 @@ def _weekly_team_activity_point_scores(
 def _lifetime_team_practice_scores(
     session: Session, through_week: ContestWeek, *,
     source_cutoff: datetime | None = None,
+    public_only: bool = False,
 ) -> dict[int, float]:
     """Return uncapped qualifying team practice through the scoring week."""
     _practice_scoring_mode(through_week)
@@ -1166,6 +1183,8 @@ def _lifetime_team_practice_scores(
         filters.append(PracticeChart.created_at <= aware_utc(source_cutoff))
     scores: dict[int, int] = {}
     for chart in session.scalars(select(PracticeChart).where(*filters)).all():
+        if public_only and not chart_public(session, chart):
+            continue
         scores[chart.team_id] = scores.get(chart.team_id, 0) + _scoring_seconds(chart, through_week)
     return {key: seconds / 60 for key, seconds in scores.items()}
 
@@ -1260,16 +1279,26 @@ def _seasonal_team_point_scores(
 def team_leaderboards(
     session: Session, *, season: Season, contest_week: ContestWeek,
     source_cutoff: datetime | None = None,
+    _include_private: bool = False
 ) -> dict[str, dict[str, list[dict[str, object]]]]:
     weekly = _weekly_team_scores(
-        session, contest_week, source_cutoff=source_cutoff
+        session, contest_week, source_cutoff=source_cutoff, public_only=not _include_private
     )
     lifetime_practice = _lifetime_team_practice_scores(
-        session, contest_week, source_cutoff=source_cutoff
+        session, contest_week, source_cutoff=source_cutoff, public_only=not _include_private
     )
     weekly_activity_points = _weekly_team_activity_point_scores(
-        session, contest_week, source_cutoff=source_cutoff
+        session, contest_week, source_cutoff=source_cutoff, public_only=not _include_private
     )
+    if not _include_private:
+        visible = {tid for tid in set(lifetime_practice) | set(weekly_activity_points) |
+                   {tid for division in weekly.values() for tid in division['totals']}
+                   if team_public(session, tid, identity_only=True)}
+        for division in weekly.values():
+            for metric in division:
+                division[metric] = {tid: value for tid, value in division[metric].items() if tid in visible}
+        lifetime_practice = {tid: value for tid, value in lifetime_practice.items() if tid in visible}
+        weekly_activity_points = {tid: value for tid, value in weekly_activity_points.items() if tid in visible}
     payload = {
         "team-weekly-practice": {}, "team-weekly-average-practice": {},
         "team-lifetime-practice": {}, "team-weekly-activity-points": {},
@@ -1342,6 +1371,8 @@ def _grant_once(
     category_key: str | None = None,
     amount: int = 1,
 ) -> bool:
+    from .age_privacy import eligible
+    if not eligible(session,profile_id):return False
     pending = next((
         row for row in session.new
         if isinstance(row, RewardGrant)
@@ -1716,6 +1747,8 @@ def _reward_contest_result(
     session: Session, *, result: ContestResult, contest: Contest,
     recipients: set[int], snapshot_team_ids: dict[int, int | None], now: datetime,
 ) -> None:
+    from .age_privacy import eligible
+    recipients = {pid for pid in recipients if eligible(session,pid)}
     amount = PLACEMENT_DANDELIONS[result.rank]
     for profile_id in recipients:
         source = (
@@ -1946,7 +1979,8 @@ def finalize_contest_week(
         if snapshot.team_id is not None and snapshot.profile_id in has_chart:
             team_members.setdefault(snapshot.team_id, set()).add(snapshot.profile_id)
     boards = team_leaderboards(
-        session, season=season, contest_week=week, source_cutoff=source_cutoff
+        session, season=season, contest_week=week, source_cutoff=source_cutoff,
+        _include_private=True,
     )
     legacy_keys = set(session.scalars(select(Contest.key).where(
         Contest.key.in_(LEGACY_TEAM_CONTEST_REPLACEMENTS.values())
@@ -2008,13 +2042,15 @@ def finalize_contest_week(
 
 
 def contest_results_payload(
-    session: Session, contest_week: ContestWeek
+    session: Session, contest_week: ContestWeek, *, _include_private: bool = False
 ) -> dict[str, object]:
     rows = session.execute(select(ContestResult, Contest).join(
         Contest, Contest.id == ContestResult.contest_id
     ).where(ContestResult.contest_week_id == contest_week.id).order_by(
         Contest.key, ContestResult.division, ContestResult.rank, ContestResult.display_name_snapshot
     )).all()
+    if not _include_private:
+        rows = filter_result_rows(session, rows)
     team_ids = {result.team_id for result, _contest in rows if result.team_id is not None}
     teams = {
         team.id: team
@@ -2270,6 +2306,8 @@ def hall_of_champions_payload(
         .order_by(ContestWeek.week_start.desc(), ContestResult.id.desc())
     ).all()
 
+    if not _include_internal:
+        rows = filter_result_rows(session, rows)
     team_ids = {
         result.team_id for result, _contest, _season in rows
         if result.subject_type == "team" and result.team_id is not None
@@ -2396,11 +2434,17 @@ def hall_of_champions_payload(
         progress = crown_by_profile.get(profile_id)
         champion["divisions"] = sorted(champion["divisions"])
         _finalize_champion_achievements(champion)
+        # Public counters must not import older private crown history. Internal
+        # projections retain the actual earned benefits and progress unchanged.
+        public_wins = sum(result.profile_id == profile_id and result.medal == "gold"
+                          and contest.key == "weekly-points-leaders"
+                          for result, contest, _season in rows)
+        visible_crowns = min(crown_counts.get(profile_id, 0), public_wins // 10)
         champion["crown"] = {
-            "qualifying_wins": progress.qualifying_wins if progress else 0,
+            "qualifying_wins": (progress.qualifying_wins if progress else 0) if _include_internal else public_wins % 10,
             "target_wins": 10,
-            "earned": crown_counts.get(profile_id, 0) > 0,
-            "earned_count": crown_counts.get(profile_id, 0),
+            "earned": crown_counts.get(profile_id, 0) > 0 if _include_internal else visible_crowns > 0,
+            "earned_count": crown_counts.get(profile_id, 0) if _include_internal else visible_crowns,
         }
         students.append(champion)
 
@@ -2443,6 +2487,8 @@ def hall_of_champions_payload(
         "team_practice_rating": "Team Practice Rating",
     }
     for result, event, team, season in director_rows:
+        if not _include_internal and not team_public(session, result.team_id, at=event.starts_at):
+            continue
         event_payload = director_events.setdefault(event.id, {
             "id": event.id,
             "title": event.title,
@@ -3409,7 +3455,7 @@ def finalize_week_route(
             contest_week = finalize_contest_week(
                 session, week_start=week_start, now=datetime.now(timezone.utc)
             )
-        return contest_results_payload(session, contest_week)
+        return contest_results_payload(session, contest_week, _include_private=True)
 
 
 @router.get("/weeks/finalized")

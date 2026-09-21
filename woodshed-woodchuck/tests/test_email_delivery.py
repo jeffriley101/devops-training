@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import smtplib
+import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -49,8 +50,10 @@ def mail_database(tmp_path, monkeypatch):
     engine = create_engine(f"sqlite:///{tmp_path / 'mail.db'}", connect_args={"check_same_thread": False})
     Base.metadata.create_all(engine)
     sessions = sessionmaker(bind=engine, expire_on_commit=False)
-    for module in (account_routes, verifier_routes, practice_chart_routes):
-        monkeypatch.setattr(module, "SessionLocal", sessions)
+    # Session revocation and all route handlers must use the same disposable DB.
+    for name, module in list(sys.modules.items()):
+        if name.startswith('app.') and hasattr(module, 'SessionLocal'):
+            monkeypatch.setattr(module, "SessionLocal", sessions)
     for key, value in SMTP_ENV.items(): monkeypatch.setenv(key, value)
     CapturingSMTP.messages, CapturingSMTP.logins, CapturingSMTP.tls = [], [], 0
     monkeypatch.setattr(email_service.smtplib, "SMTP", CapturingSMTP)
@@ -61,7 +64,7 @@ def mail_database(tmp_path, monkeypatch):
 def create_student(client: TestClient) -> int:
     state = {"version": 4, "account": {}, "profile": {}, "progress": {"credits": 0}, "practiceLog": []}
     response = client.post("/account/create", data={
-        "display_name": "Alex <Woodchuck>", "pin": "2468", "instrument": "Flute",
+        "age_band": "adult", "display_name": "Alex <Woodchuck>", "pin": "2468", "instrument": "Flute",
         "level": "Beginner", "goal": "Build daily consistency", "initial_state": json.dumps(state),
     })
     assert response.status_code == 200

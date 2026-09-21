@@ -25,6 +25,8 @@ SESSION_LIFETIME = 14 * 24 * 60 * 60
 NONCE = "woodshed_auth_session"
 ISSUED = "woodshed_auth_issued"
 AUTH_KEYS = (
+    "child_parent_consent", "child_parent_secret",
+    "child_director_permission", "child_director_secret",
     "woodchuck_profile_id",
     "trusted_verifier_id",
     "site_admin_fingerprint",

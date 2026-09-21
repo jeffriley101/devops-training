@@ -12,6 +12,8 @@ def lock_state(session, profile_id):
     Refresh cached JSON after waiting for another writer. Flush our own pending
     state first so multiple rewards in one transaction keep their accumulated sum.
     """
+    from .age_privacy import require_eligible
+    require_eligible(session,profile_id)
     with session.no_autoflush:
         session.execute(select(WoodchuckProfile.id).where(
             WoodchuckProfile.id == profile_id,

@@ -65,6 +65,8 @@ def record_event(session_factory, *, profile_id, event_type, occurred_at):
         instant = as_utc(occurred_at)
         activity_date = instant.astimezone(CENTRAL).date()
         with session_factory() as session:
+            from .age_privacy import eligible, can_publish
+            if not eligible(session,profile_id) or not can_publish(session,profile_id,at=instant):return
             if session.scalar(select(WoodchuckProfile.id).where(
                 WoodchuckProfile.id == profile_id, WoodchuckProfile.status == "active",
             )) is None:

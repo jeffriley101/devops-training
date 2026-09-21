@@ -32,6 +32,10 @@ def client(monkeypatch):
         db.add(WoodchuckProfile(woodchuck_id='WC-OTHER', display_name='Other',
             pin_hash=hash_pin('1234'), instrument='Flute', level='Beginner', goal='Practice'))
         db.commit()
+        from app.age_privacy import declare_age
+        declare_age(db, 1, 'adult')
+        declare_age(db, 2, 'adult')
+        db.commit()
     with TestClient(main.app) as test_client:
         yield test_client
     engine.dispose()

@@ -1,4 +1,5 @@
 from __future__ import annotations
+from .age_privacy import can_publish, team_public, chart_public
 
 from collections import defaultdict
 from datetime import date, datetime, time, timedelta, timezone
@@ -155,7 +156,8 @@ def dashboard_payload(
     charts = _dashboard_practice_rows(
         session, team_id=selected_id, week_start=week_start, week_end=week_end
     )
-    charts = [chart for chart in charts if chart.profile_id in roster]
+    roster = {pid for pid in roster if can_publish(session, pid)}
+    charts = [chart for chart in charts if chart.profile_id in roster and chart_public(session, chart)]
     member_seconds: dict[int, int] = defaultdict(int)
     daily_seconds: dict[date, int] = defaultdict(int)
     instrument_seconds: dict[str, int] = defaultdict(int)
@@ -285,9 +287,9 @@ def director_contest_payload(
                 "name": public_team_identity(team)[0],
                 "emblem": emblem_payload(team.emblem_key),
             }
-            for entry in entries if (team := teams.get(entry.team_id)) is not None
+            for entry in entries if (team := teams.get(entry.team_id)) is not None and team_public(session, team.id, at=contest.starts_at)
         ],
-        "results": [_result_payload(result) for result in results],
+        "results": [_result_payload(result) for result in results if team_public(session, result.team_id, at=contest.starts_at)],
     }
 
 

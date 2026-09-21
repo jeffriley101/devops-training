@@ -72,3 +72,32 @@ def verifier_dashboard_snapshot(session, *, verifier_id: int, connection_id=None
                              practice_streak=profile_practice_streak(session, profile_id=profile_id, today=today),
                              achievements=recent_achievements(session, profile_id=profile_id))
     return result
+
+
+def private_student_metrics(session, *, profile_id, today=None):
+    """Shared private calculations; caller must authorize the subject first."""
+    today = today or datetime.now(CENTRAL).date()
+    charts = session.scalars(select(PracticeChart).where(PracticeChart.profile_id == profile_id)).all()
+    approved = set(session.scalars(select(PracticeChartVerification.practice_chart_id).join(
+        PracticeChart, PracticeChart.id == PracticeChartVerification.practice_chart_id,
+    ).where(PracticeChart.profile_id == profile_id, PracticeChartVerification.status == "approved")))
+    metrics = student_practice_snapshot(charts, approved, today=today)
+    metrics.pop("rating_week_values")
+    season, _ = current_roster_period(session, today=today)
+    season_data = team_data = None
+    if season is not None:
+        season_charts = [chart for chart in charts if chart.practice_date >= season.starts_on
+                         and (season.ends_on is None or chart.practice_date <= season.ends_on)]
+        season_totals = practice_totals(season_charts, approved)
+        season_data = {"name": season.name, "starts_on": season.starts_on, "ends_on": season.ends_on,
+                       "minutes": season_totals["total"], "charts": season_totals["charts"],
+                       "days": season_totals["days"], "verified": season_totals["verified"],
+                       "pristine": season_totals["pristine"]}
+        membership = active_membership(session, profile_id=profile_id, season_id=season.id)
+        team = session.get(Team, membership.team_id) if membership else None
+        if team is not None and team.season_id == season.id:
+            name, _ = public_team_identity(team)
+            team_data = {"name": name}
+    return dict(metrics, season=season_data, team=team_data,
+                practice_streak=profile_practice_streak(session, profile_id=profile_id, today=today),
+                achievements=recent_achievements(session, profile_id=profile_id))

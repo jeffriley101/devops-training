@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .practice_duration import chart_seconds, format_seconds
+from .age_privacy import director_chart_visible, director_scope_start
 from .models import PracticeChart, PracticeChartVerification
 from .practice_chart_routes import CENTRAL, practice_totals_payload
 from .verifiers import band_director_students
@@ -23,13 +24,13 @@ def band_director_practice_students(
     season, week = current_roster_period(session, today=today)
     for student in band_director_students(session, verifier_id=verifier_id):
         profile_id = student.pop("profile_id")
-        totals = practice_totals_payload(session, profile_id, today=today)
+        totals = practice_totals_payload(session, profile_id, today=today, verifier_id=verifier_id)
         charts = session.scalars(
             select(PracticeChart)
             .where(PracticeChart.profile_id == profile_id)
             .order_by(PracticeChart.created_at.desc(), PracticeChart.id.desc())
-            .limit(RECENT_CHART_LIMIT)
         ).all()
+        charts=[chart for chart in charts if director_chart_visible(session,chart,verifier_id)][:RECENT_CHART_LIMIT]
         reviews = session.scalars(
             select(PracticeChartVerification)
             .where(PracticeChartVerification.practice_chart_id.in_([chart.id for chart in charts]))
@@ -68,6 +69,6 @@ def band_director_practice_students(
             "this_week_minutes": totals["this_week_minutes"],
             "this_week_display": totals["this_week_display"],
             "recent_charts": recent_charts,
-            **student_contest_context(session, profile_id=profile_id, season=season, week=week),
+            **({"team":None,"contest":None} if director_scope_start(session,profile_id) is not None else student_contest_context(session, profile_id=profile_id, season=season, week=week)),
         })
     return students
