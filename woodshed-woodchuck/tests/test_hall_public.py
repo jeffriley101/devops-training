@@ -10,6 +10,7 @@ from sqlalchemy.pool import StaticPool
 
 from app import account_routes, contests, main
 from app.db import Base
+from app.age_privacy import declare_age
 from app.models import (Contest, ContestResult, ContestWeek, DirectorTeamContest,
                         DirectorTeamContestResult, Season, Team, WoodchuckProfile)
 from app.security import hash_pin
@@ -38,6 +39,8 @@ def hall_db(monkeypatch):
                         timezone="America/Chicago", starts_on=date(2026, 7, 27),
                         status="active")
         session.add_all([season, *people]); session.flush()
+        for person in people:
+            declare_age(session, person.id, "adult", at=NOW-timedelta(days=30))
         week = ContestWeek(season_id=season.id, week_start=date(2026, 7, 27),
                            week_end=date(2026, 8, 3), verification_deadline_at=NOW,
                            finalize_after=NOW, finalized_at=NOW, status="finalized")

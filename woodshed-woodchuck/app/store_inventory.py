@@ -152,13 +152,14 @@ def crown_inventory_payload(
     award: CrownAward,
     placement: RewardInventoryPlacement | None,
 ) -> dict[str, object]:
+    is_goat = award.category_key == "weekly-points-leaders"
     return {
         "id": crown_inventory_key(award.id),
         "item_key": f"crown:{award.category_key}",
-        "name": crown_name(award.category_key),
-        "emoji": CROWN_EMOJI,
+        "name": "GOAT Reward" if is_goat else crown_name(award.category_key),
+        "emoji": "🐐" if is_goat else CROWN_EMOJI,
         "shelf": "earned",
-        "acquisition_source": "crown",
+        "acquisition_source": "goat" if is_goat else "crown",
         "purchase_price": None,
         "placement_x": placement.placement_x if placement else None,
         "placement_y": placement.placement_y if placement else None,

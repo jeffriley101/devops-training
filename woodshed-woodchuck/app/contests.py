@@ -20,7 +20,10 @@ from .login_limits import enforce_login_limit
 from .content import GENERAL_BONUS_CHALLENGE, QUEST_POOL
 from .db import SessionLocal
 from .hall_public import public_hall_payload
-from .age_privacy import profile_public, can_publish, chart_public, team_public, filter_result_rows
+from .age_privacy import (
+    profile_public, can_publish, chart_public, team_public, filter_result_rows,
+    filter_hall_result_rows, hall_history_allowed,
+)
 from .instruments import INSTRUMENTS_BY_LABEL, canonical_instrument_key
 from .models import (
     CampPointAward,
@@ -2307,7 +2310,7 @@ def hall_of_champions_payload(
     ).all()
 
     if not _include_internal:
-        rows = filter_result_rows(session, rows)
+        rows = filter_hall_result_rows(session, rows)
     team_ids = {
         result.team_id for result, _contest, _season in rows
         if result.subject_type == "team" and result.team_id is not None
@@ -2434,17 +2437,25 @@ def hall_of_champions_payload(
         progress = crown_by_profile.get(profile_id)
         champion["divisions"] = sorted(champion["divisions"])
         _finalize_champion_achievements(champion)
-        # Public counters must not import older private crown history. Internal
-        # projections retain the actual earned benefits and progress unchanged.
+        # Current 13+ accounts may restore their durable individual Hall/crown
+        # history without reopening raw weekly results or private practice data.
+        restore_history = (
+            not _include_internal
+            and hall_history_allowed(session, profile_id)
+        )
         public_wins = sum(result.profile_id == profile_id and result.medal == "gold"
                           and contest.key == "weekly-points-leaders"
                           for result, contest, _season in rows)
         visible_crowns = min(crown_counts.get(profile_id, 0), public_wins // 10)
+        use_durable = _include_internal or restore_history
+        durable_count = crown_counts.get(profile_id, 0)
         champion["crown"] = {
-            "qualifying_wins": (progress.qualifying_wins if progress else 0) if _include_internal else public_wins % 10,
+            "qualifying_wins": (
+                progress.qualifying_wins if progress else 0
+            ) if use_durable else public_wins % 10,
             "target_wins": 10,
-            "earned": crown_counts.get(profile_id, 0) > 0 if _include_internal else visible_crowns > 0,
-            "earned_count": crown_counts.get(profile_id, 0) if _include_internal else visible_crowns,
+            "earned": durable_count > 0 if use_durable else visible_crowns > 0,
+            "earned_count": durable_count if use_durable else visible_crowns,
         }
         students.append(champion)
 

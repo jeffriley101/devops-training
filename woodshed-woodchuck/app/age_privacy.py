@@ -150,6 +150,44 @@ def filter_result_rows(session, rows):
         team_result_safe(row)]
 
 
+def hall_history_allowed(session, profile_id):
+    rule = session.get(AccountPrivacy, profile_id, populate_existing=True)
+    return bool(
+        rule
+        and rule.age_band in ('13to17', 'adult')
+        and not rule.consent_id
+        and rule.public_from is not None
+    )
+
+
+def filter_hall_result_rows(session, rows):
+    """Hall-only compatibility for finalized legacy individual results.
+
+    Keep the ordinary historical privacy filter everywhere else. A student result
+    rejected only because it predates the new age-screen publication boundary may
+    reappear in the Hall once the account currently declares 13+ or adult.
+    Unscreened, unknown, under-13 and consent-linked accounts remain excluded.
+    Team and instrument rows receive no compatibility exception.
+    """
+    strict = filter_result_rows(session, rows)
+    visible_ids = {row[0].id for row in strict}
+    output = []
+    for row in rows:
+        result = row[0]
+        if result.id in visible_ids:
+            output.append(row)
+            continue
+        if result.subject_type != 'student' or result.profile_id is None:
+            continue
+        if not hall_history_allowed(session, result.profile_id):
+            continue
+        rule = session.get(AccountPrivacy, result.profile_id, populate_existing=True)
+        if utc(result.created_at) >= utc(rule.public_from):
+            continue
+        output.append(row)
+    return output
+
+
 
 def chart_public(session, chart):
     from zoneinfo import ZoneInfo

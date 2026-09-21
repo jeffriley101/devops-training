@@ -324,9 +324,22 @@ def test_hall_and_raw_results_exclude_unknown_and_earlier_private_history(age_db
     for path in ('/contests/hall-of-champions','/contests/weeks/2026-09-14/results'):
         r=c.get(path);assert r.status_code==200,r.text;assert 'Synthetic A' not in r.text
         assert r.headers['cache-control']=='no-store'
-    with age_db() as s:declare_age(s,1,'adult');s.commit()
-    for path in ('/contests/hall-of-champions','/contests/weeks/2026-09-14/results'):
-        assert 'Synthetic A' not in c.get(path).text
+    with age_db() as s:declare_age(s,1,'13to17');s.commit()
+    # Hall-only legacy compatibility restores the immutable finalized personal
+    # snapshot for a current 13+ account. Raw weekly history keeps the stricter
+    # public_from boundary.
+    r=c.get('/contests/hall-of-champions')
+    assert r.status_code==200 and 'Synthetic A' in r.text
+    assert 'Synthetic A' not in c.get('/contests/weeks/2026-09-14/results').text
+
+    # A snapshot created after screening for a week that began before the
+    # publication boundary is not a legacy snapshot and stays hidden.
+    with age_db() as s:
+        result=s.scalar(select(ContestResult))
+        result.created_at=now+timedelta(minutes=1)
+        s.commit()
+    assert 'Synthetic A' not in c.get('/contests/hall-of-champions').text
+
     # A new snapshot in a genuinely later qualifying week may be public.
     with age_db() as s:
         result=s.scalar(select(ContestResult));result.created_at=now+timedelta(days=20)
@@ -334,7 +347,7 @@ def test_hall_and_raw_results_exclude_unknown_and_earlier_private_history(age_db
     r=c.get('/contests/hall-of-champions');assert r.status_code==200 and 'Synthetic A' in r.text
 
     crown=r.json()['students'][0]['crown']
-    assert crown['qualifying_wins']==1 and crown['earned_count']==0 and crown['earned'] is False
+    assert crown['qualifying_wins']==7 and crown['earned_count']==1 and crown['earned'] is True
     from app.contests import hall_of_champions_payload
     with age_db() as s:
         internal=hall_of_champions_payload(s,_include_internal=True)['students'][0]['crown']

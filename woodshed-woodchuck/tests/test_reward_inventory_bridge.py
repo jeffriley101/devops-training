@@ -9,8 +9,9 @@ from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app import account_routes, store_routes
+from app import account_routes, store_routes, session_revocations
 from app.db import Base
+from app.age_privacy import declare_age
 from app.main import app
 from app.models import (
     CrownAward,
@@ -36,6 +37,7 @@ def bridge_database(monkeypatch: pytest.MonkeyPatch):
     Base.metadata.create_all(engine)
     monkeypatch.setattr(account_routes, "SessionLocal", factory)
     monkeypatch.setattr(store_routes, "SessionLocal", factory)
+    monkeypatch.setattr(session_revocations, "SessionLocal", factory)
     yield factory
     Base.metadata.drop_all(engine)
     engine.dispose()
@@ -53,6 +55,10 @@ def add_profile(factory, suffix: str, *, credits: int = 50) -> int:
         )
         session.add(profile)
         session.flush()
+        declare_age(
+            session, profile.id, "adult",
+            at=datetime(2025, 1, 1, tzinfo=timezone.utc),
+        )
         session.add(WoodchuckState(
             profile_id=profile.id,
             state_json={"progress": {"credits": credits}},
@@ -106,6 +112,22 @@ def test_earned_crowns_are_virtual_inventory_without_store_copies(bridge_databas
     ]
     with bridge_database() as session:
         assert session.scalar(select(func.count()).select_from(OwnedItemCopy)) == 0
+
+
+def test_weekly_points_crown_is_presented_as_goat_reward(bridge_database) -> None:
+    client, profile_id = signed_client(bridge_database, "GOAT-CROWN")
+    award_id = earn_crown(bridge_database, profile_id, "weekly-points-leaders")
+
+    response = client.get("/store/inventory")
+    assert response.status_code == 200
+    item = next(
+        row for row in response.json()["items"]
+        if row["id"] == f"crown:{award_id}"
+    )
+    assert item["item_key"] == "crown:weekly-points-leaders"
+    assert item["name"] == "GOAT Reward"
+    assert item["emoji"] == "🐐"
+    assert item["acquisition_source"] == "goat"
 
 
 def test_crown_placement_and_return_never_change_crown_ownership(bridge_database) -> None:

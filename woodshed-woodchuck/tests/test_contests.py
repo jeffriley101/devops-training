@@ -1843,6 +1843,12 @@ def test_hall_aggregates_students_instruments_divisions_and_prior_seasons(
         for index in range(1, 4)
     ]
     session.flush()
+    from app.age_privacy import declare_age
+    for student in students:
+        declare_age(
+            session, student.id, "adult",
+            at=datetime(2025, 1, 1, tzinfo=timezone.utc),
+        )
 
     def result(
         *, week: ContestWeek, contest: Contest, division: str, medal: str,
