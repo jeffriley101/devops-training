@@ -7560,3 +7560,182 @@ select {
   width: fit-content;
   min-height: 44px;
 }
+
+.family-intro {
+  margin-bottom: 1.25rem;
+}
+
+.family-intro h2,
+.family-section h3 {
+  margin-top: 0;
+}
+
+.family-account-scope {
+  font-size: 1.05rem;
+}
+
+.family-section {
+  margin: 1rem 0;
+  padding: 1rem;
+  border: 1px solid #d8c49c;
+  border-radius: 12px;
+  background: rgba(255,255,255,.32);
+}
+
+.family-notice {
+  max-height: 24rem;
+  overflow-y: auto;
+}
+
+.family-check {
+  display: flex !important;
+  grid-template-columns: none !important;
+  align-items: flex-start;
+  gap: .65rem !important;
+  padding: .55rem 0;
+}
+
+.family-check input {
+  flex: 0 0 auto;
+  margin-top: .2rem;
+}
+
+.family-optional {
+  background: rgba(255,255,255,.18);
+}
+
+.family-fine-print {
+  font-size: .9rem;
+  line-height: 1.45;
+  opacity: .82;
+}
+
+.family-primary-action {
+  width: 100% !important;
+  justify-self: stretch;
+  font-weight: 800;
+}
+
+.family-parent-hero {
+  margin-bottom: 1.2rem;
+}
+
+.family-kicker {
+  margin: 0 0 .35rem;
+  font-size: .78rem;
+  font-weight: 800;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+  opacity: .7;
+}
+
+.family-parent-hero h2 {
+  margin: 0 0 .5rem;
+  font-size: clamp(1.6rem, 5vw, 2.1rem);
+}
+
+.family-lede {
+  margin: 0;
+  font-size: 1.08rem;
+  line-height: 1.5;
+}
+
+.family-scope-card {
+  margin-top: 1rem;
+  padding: .9rem 1rem;
+  border-radius: 10px;
+  background: #f6dfac;
+  border: 1px solid #d6b66f;
+  line-height: 1.45;
+}
+
+.family-steps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: .65rem;
+  margin-top: 1rem;
+}
+
+.family-steps > div {
+  display: grid;
+  gap: .2rem;
+  padding: .8rem;
+  border-radius: 10px;
+  background: rgba(255,255,255,.42);
+}
+
+.family-steps span {
+  display: grid;
+  place-items: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 50%;
+  background: #6b3f1f;
+  color: white;
+  font-weight: 800;
+}
+
+.family-steps small {
+  line-height: 1.3;
+}
+
+.family-summary ul {
+  padding-left: 1.25rem;
+  line-height: 1.5;
+}
+
+.family-summary li + li {
+  margin-top: .4rem;
+}
+
+.family-notice-details {
+  margin-top: 1rem;
+  border-top: 1px solid #d8c49c;
+  padding-top: .8rem;
+}
+
+.family-notice-details summary {
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.family-notice-details .family-notice {
+  margin-top: .85rem;
+  max-height: 20rem;
+}
+
+.family-status {
+  margin: 1rem 0;
+  padding: 1rem;
+  border: 1px solid #d6b66f;
+  border-radius: 10px;
+  background: #f6dfac;
+}
+
+.family-status h3 {
+  margin-top: 0;
+}
+
+.family-withdraw {
+  margin-top: 1.5rem;
+  font-size: .9rem;
+}
+
+@media (max-width: 560px) {
+  .family-steps {
+    grid-template-columns: 1fr;
+  }
+}
+
+.family-kws-explainer {
+  margin-top: 1rem;
+  padding: .9rem 1rem;
+  border-left: 4px solid #6b3f1f;
+  background: rgba(255,255,255,.38);
+  border-radius: 8px;
+}
+
+.family-kws-explainer p {
+  margin: .35rem 0 0;
+  line-height: 1.5;
+}

@@ -6,19 +6,57 @@
 {% elif kind == 'request' %}
 {% if available %}<p>{{ kws_label|default('KWS') }}. Ask your parent to authorize Free private practice. Director sharing is optional and your parent chooses it separately. No new child name, PIN or practice history is collected here.</p><form method="post">{{ csrf_field() }}<input type="hidden" name="confirm_account" value="{{ confirm_account }}"><label>Parent email<input name="parent_email" type="email" required maxlength="254"></label><button>Ask my parent</button></form>
 {% else %}<p>Parent authorization is not open yet. Guest tools and help remain available. No parent email is collected here.</p>{% endif %}
-{% elif kind == 'approve' %}<h2>Parent permission — {{ kws_label|default('KWS') }}</h2><p>Permission applies only to: <strong>{{ account_label }}</strong>.</p><pre class="family-notice">{{ notice }}</pre>
+{% elif kind == 'approve' %}
+<section class="family-parent-hero">
+<p class="family-kicker">Woodshed Woodchuck</p>
+<h2>Parent permission for Woodshed Woodchuck</h2>
+<p class="family-lede"><strong>Woodshed Woodchuck</strong> is a music-practice app for students. Because this account is for a child under 13, a parent or legal guardian must give permission before the account can be created.</p>
+<div class="family-kws-explainer">
+<strong>Why am I seeing KWS?</strong>
+<p>Woodshed Woodchuck uses Epic Kids Web Services (KWS) as its adult-verification provider. KWS verifies that you are an adult. Woodshed Woodchuck handles your permission choices and the child account.</p>
+</div>
+<div class="family-scope-card">
+<strong>You're approving:</strong> {{ account_label }}.
+</div>
+<div class="family-steps" aria-label="Permission process">
+<div><span>1</span><strong>Review</strong><small>Choose what you allow.</small></div>
+<div><span>2</span><strong>Verify</strong><small>KWS confirms you are an adult.</small></div>
+<div><span>3</span><strong>Create</strong><small>The child account is created after approval.</small></div>
+</div>
+</section>
+
+<section class="family-section family-summary">
+<h3>What you need to know</h3>
+<ul>
+<li>Your child can save private practice charts and practice history.</li>
+<li>Under-13 individual results are not shown publicly or to other students.</li>
+<li>Director sharing is optional and requires your separate choice below.</li>
+<li>Epic Kids Web Services (KWS) handles adult verification. Woodshed does not receive card details.</li>
+<li>You can later withdraw permission or request access, correction, or deletion.</li>
+</ul>
+<details class="family-notice-details">
+<summary>Read the full Parent Notice</summary>
+<div class="family-notice">{{ notice }}</div>
+</details>
+</section>
 {% if activation_token %}<p>Adult verification completed for your selected permissions. Parent access still requires its separate emailed link.</p><p><a href="/family/activate/{{ activation_token }}">Activate Free private practice</a></p>
-{% elif verification_state %}<p>Verification status: {{ verification_state }}. Acceptance of an email request does not mean verification succeeded. Complete the KWS email journey and reopen this same permission link. If delivery is uncertain, do not repeatedly resend.</p>
-{% else %}<form method="post">{{ csrf_field() }}<input type="hidden" name="notice_version" value="{{ notice_version }}">
-<label><input type="checkbox" name="guardian_attestation" value="yes"> I am this child's parent or legal guardian and am authorized to decide these permissions.</label>
-<label><input type="checkbox" name="notice_accepted" value="yes"> I have read and accept the current parent notice above.</label>
-<label><input type="checkbox" name="account_allowed" value="yes"> Allow my child to save Free private practice charts and history.</label>
-<p>Director sharing is optional. Leave it unchecked for Free private practice only.</p>
-<label><input type="checkbox" name="director_allowed" value="yes"> Also share the described private practice information with this named director.</label>
-<label>Director name (only if sharing)<input name="director_name" maxlength="80" value="{{ director_name }}"></label><label>Director email (only if sharing)<input name="director_email" type="email" maxlength="254" value="{{ director_email }}"></label>
-<label><input type="checkbox" name="review_allowed" value="yes"> Also allow this director to approve or reject charts submitted for review.</label>
-<p>Adult verification does not establish guardianship, grant Full, or log you in. If account permission is unchecked, this request is declined without sending a KWS email.</p><button>Save choices and continue with KWS</button></form>{% endif %}
-<p><a href="/family/withdraw/{{ withdrawal_token }}">Withdraw this permission request</a></p>
+{% elif verification_state %}
+<section class="family-status">
+<h3>Adult verification in progress</h3>
+<p>Check your email for the KWS adult-verification message. Complete that verification, then reopen this Woodshed permission link to continue.</p>
+</section>
+{% else %}<form method="post" class="family-permission-form">{{ csrf_field() }}<input type="hidden" name="notice_version" value="{{ notice_version }}">
+<section class="family-section family-required-choices">
+<h3>Required permission</h3>
+<label class="family-check"><input type="checkbox" name="guardian_attestation" value="yes"><span>I am this child's parent or legal guardian and am authorized to decide these permissions.</span></label>
+<label class="family-check"><input type="checkbox" name="notice_accepted" value="yes"><span>I have read and accept the parent notice above.</span></label>
+<label class="family-check"><input type="checkbox" name="account_allowed" value="yes"><span>Allow my child to save Free private practice charts and history.</span></label>
+</section>
+
+<p class="family-fine-print">Adult verification does not establish guardianship, grant Full, or log you in. If account permission is unchecked, this request is declined without sending a KWS email.</p>
+<button class="family-primary-action">Continue to adult verification with KWS</button>
+</form>{% endif %}
+<p class="family-withdraw"><a href="/family/withdraw/{{ withdrawal_token }}">Withdraw this permission request</a></p>
 {% elif kind == 'kws-result' %}{% if activation_token %}<p>KWS adult verification completed for your previously selected permissions.</p><p><a href="/family/activate/{{ activation_token }}">Activate Free private practice</a></p>{% else %}<p>This result did not create new permission. If already verified, reopen your original Woodshed permission email link for activation. Withdrawn, expired or declined requests remain closed.</p>{% endif %}<p>You have not been logged in as a parent. Parent access uses its separate emailed verification link.</p>
 {% elif kind == 'activate' %}<p>Activate Free private practice. This does not enroll in a cohort, grant Full or change billing.</p><form method="post">{{ csrf_field() }}<input type="hidden" name="confirm_account" value="{{ confirm_account }}">{% if not existing %}<label>Woodchuck name<input name="display_name" maxlength="40" required></label><label>Four-digit student PIN<input name="pin" type="password" pattern="[0-9]{4}" required></label><label>Instrument<input name="instrument" required maxlength="50"></label><label>Level<input name="level" required maxlength="50"></label><label>Goal<input name="goal" required maxlength="100"></label>{% else %}<p>Existing account: {{ confirm_account }}. Saved data and membership stay intact.</p>{% endif %}<button>Activate Free private practice</button></form>
 {% elif kind == 'practice' %}<p>Account {{ woodchuck_id }}. Saving charts and revisiting history are Free.</p>{% if director %}<p>Director: {{ director.name }} — {% if director.connected %}connected{% else %}acceptance/verification pending{% endif %}. Chart review: {{ 'allowed' if director.can_review else 'not authorized' }}.</p><form method="post" action="/family/director-link">{{ csrf_field() }}<button>Send director verification link</button></form>{% if director.connected %}<form method="post" action="/family/disconnect">{{ csrf_field() }}<input type="hidden" name="connection_id" value="{{ director.connection_id }}"><button name="confirm" value="yes">Disconnect director</button></form>{% endif %}{% else %}<p>Use <a href="/trusted-verifiers">existing director connections</a> for eligible 13+ accounts. Parent-authorized connections appear here when available.</p>{% endif %}
@@ -36,5 +74,5 @@
 {% elif kind == 'withdraw' %}<p>Withdrawal pauses account activity and parent/director access. It does not delete saved data or change memberships.</p><form method="post">{{ csrf_field() }}<button name="withdraw" value="yes">Withdraw permission</button></form>
 {% endif %}
 <p><a href="/family/practice">Student private practice</a> · <a href="/family/parent-access">Verify parent access</a> · <a href="/family/director-access">Verify director access</a> · <a href="/family/notice">Parent notice</a> · <a href="/account/help">Help/privacy requests</a> · <a href="/guest">Guest / student sign out</a></p>
-<form method="post" action="/family/logout">{{ csrf_field() }}<button>Close adult access</button></form>
+<form method="post" action="/family/logout">{{ csrf_field() }}<button>{% if kind in ('approve','kws-result','activate','parent-access','parent-open','parent','withdraw') %}Close Parent Access{% else %}Close adult access{% endif %}</button></form>
 </main></body></html>
