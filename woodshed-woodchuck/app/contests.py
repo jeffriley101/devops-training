@@ -1091,8 +1091,14 @@ def _weekly_team_scores(
     )
     contributions = {"open": {}, "verified": {}, "pristine": {}}
     for chart in charts:
-        if public_only and not chart_public(session, chart):
-            continue
+        if public_only:
+            visible = (
+                can_publish(session, chart.profile_id)
+                if contest_week.status == "open"
+                else chart_public(session, chart)
+            )
+            if not visible:
+                continue
         if not chart.include_team_contests or chart.team_id is None:
             continue
         divisions = ["open"]
@@ -1161,8 +1167,17 @@ def _weekly_team_activity_point_scores(
         filters.append(CampPointAward.created_at <= aware_utc(source_cutoff))
     scores: dict[int, int] = {}
     for award in session.scalars(select(CampPointAward).where(*filters)).all():
-        if public_only and not (can_publish(session, award.profile_id, at=award.created_at) and can_publish(session, award.profile_id, at=award.occurred_at)):
-            continue
+        if public_only:
+            visible = (
+                can_publish(session, award.profile_id)
+                if contest_week.status == "open"
+                else (
+                    can_publish(session, award.profile_id, at=award.created_at)
+                    and can_publish(session, award.profile_id, at=award.occurred_at)
+                )
+            )
+            if not visible:
+                continue
         if _is_contest_placement_award(award):
             continue
         scores[award.team_id] = scores.get(award.team_id, 0) + award.points_awarded
@@ -1294,9 +1309,12 @@ def team_leaderboards(
         session, contest_week, source_cutoff=source_cutoff, public_only=not _include_private
     )
     if not _include_private:
-        visible = {tid for tid in set(lifetime_practice) | set(weekly_activity_points) |
-                   {tid for division in weekly.values() for tid in division['totals']}
-                   if team_public(session, tid, identity_only=True)}
+        # Live BOARD team rows expose only team identity + aggregate scores.
+        # Private/under-13 member activity is filtered at the contribution level;
+        # it must not hide the whole team's current-week row.
+        visible = set(lifetime_practice) | set(weekly_activity_points) | {
+            tid for division in weekly.values() for tid in division["totals"]
+        }
         for division in weekly.values():
             for metric in division:
                 division[metric] = {tid: value for tid, value in division[metric].items() if tid in visible}

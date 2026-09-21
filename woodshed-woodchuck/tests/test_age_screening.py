@@ -479,9 +479,9 @@ def test_live_team_boards_exclude_private_sources_retain_new_eligible_totals_and
         public=team_leaderboards(s,season=season,contest_week=week)
         private=team_leaderboards(s,season=season,contest_week=week,_include_private=True)
         rows=public['team-weekly-practice']['open']
-        assert [(r['team_id'],r['score'],r['rank']) for r in rows]==[(teams[1].id,20,1),(teams[0].id,10,2)]
+        assert [(r['team_id'],r['score'],r['rank']) for r in rows]==[(teams[0].id,910,1),(teams[1].id,20,2)]
         assert public['team-lifetime-practice']['open'][1]['score']==10
-        assert public['team-weekly-activity-points']['open'][0]['score']==7
+        assert public['team-weekly-activity-points']['open'][0]['score']==194
         assert private['team-weekly-practice']['open'][0]['score']==910
         assert private['team-weekly-activity-points']['open'][0]['score']==194
         assert not team_public(s,teams[0].id) and team_public(s,teams[0].id,identity_only=True)
@@ -494,8 +494,8 @@ def test_live_team_boards_exclude_private_sources_retain_new_eligible_totals_and
     assert state(age_db)==saved
 
 
-def test_live_team_with_restricted_identity_stays_hidden(age_db):
-    from app.models import Season,ContestWeek,TeamFamily,Team,TeamMembership
+def test_live_team_with_restricted_member_keeps_public_team_aggregate(age_db):
+    from app.models import Season,ContestWeek,TeamFamily,Team,TeamMembership,CampPointAward
     from app.contests import team_leaderboards
     now=datetime.now(timezone.utc)
     with age_db() as s:
@@ -505,8 +505,14 @@ def test_live_team_with_restricted_identity_stays_hidden(age_db):
         declare_age(s,1,'adult',at=now-timedelta(days=20));declare_age(s,2,'under13',at=now-timedelta(days=20))
         for pid in (1,2):s.add(TeamMembership(season_id=season.id,team_id=team.id,profile_id=pid,selected_week_start=date(2026,9,14),started_at=now-timedelta(days=20)))
         week=ContestWeek(season_id=season.id,week_start=date(2026,9,14),week_end=date(2026,9,21),status='open',verification_deadline_at=now,finalize_after=now,practice_scoring_mode='precise_seconds');s.add(week);s.flush()
-        s.add(PracticeChart(profile_id=1,team_id=team.id,practice_date=date(2026,9,16),minutes=10,instrument='Flute',credits_awarded=0,include_contests=True,include_team_contests=True,created_at=now));s.commit()
-        assert team_leaderboards(s,season=season,contest_week=week)['team-weekly-practice']['open']==[]
+        s.add(PracticeChart(profile_id=1,team_id=team.id,practice_date=date(2026,9,16),minutes=10,instrument='Flute',credits_awarded=0,include_contests=True,include_team_contests=True,created_at=now))
+        activity_at=datetime(2026,9,16,12,tzinfo=timezone.utc)
+        s.add(CampPointAward(profile_id=1,team_id=team.id,activity_type='care',points_awarded=7,created_at=activity_at,occurred_at=activity_at,duplicate_key='public-team-points'))
+        s.add(CampPointAward(profile_id=2,team_id=team.id,activity_type='care',points_awarded=99,created_at=activity_at,occurred_at=activity_at,duplicate_key='private-team-points'))
+        s.commit()
+        boards=team_leaderboards(s,season=season,contest_week=week)
+        assert boards['team-weekly-practice']['open'][0]['score']==10
+        assert boards['team-weekly-activity-points']['open'][0]['score']==7
 
 
 def test_weekly_historical_snapshot_not_hidden_by_unrelated_older_private_chart(age_db):
