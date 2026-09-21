@@ -23,20 +23,16 @@ This isolated Test integration uses Epic Kids Web Services (KWS) to verify an ad
 Proposed timings: unverified requests expire after 48 hours; activation expires 72 hours after verification. Signed results have a local 24-hour freshness limit with five minutes of clock skew. These are tested technical settings, not approved retention periods. This candidate does not run deletion/anonymization or retention cleanup. A reviewed retention/deletion procedure and scheduler are required before production activation.
 Contact Woodshed Woodchuck LLC, 302 Heyden Dr., Eureka, MO 63025. Phone (314) 514-5611; email woodshedwoodchuck@gmail.com. Request access, correction, withdrawal or deletion through support. This draft and the authorization method require review before launch.'''
 NOTICE_SHA256 = hashlib.sha256(NOTICE.encode()).hexdigest()
-PRODUCTION_NOTICE_VERSION = 'private-practice-kws-production-v1'
-PRODUCTION_NOTICE = NOTICE.replace(
-    'This isolated Test integration uses Epic Kids Web Services (KWS) to verify an adult.',
-    'This Production integration uses Epic Kids Web Services (KWS) to verify an adult.'
-).replace(
-    'Provider suitability, policy and retention review remain outstanding; production activation is closed.',
-    'Production use remains closed unless an operator deliberately enables the separate Production configuration after required review.'
-).replace(
-    'These are tested technical settings, not approved retention periods.',
-    'These are Woodshed technical settings, not provider retention guarantees.'
-).replace(
-    'A reviewed retention/deletion procedure and scheduler are required before production activation.',
-    'A reviewed retention/deletion procedure and scheduler are required before Production is enabled.'
-)
+PRODUCTION_NOTICE_VERSION = 'private-practice-kws-production-v2'
+PRODUCTION_NOTICE = """Parent permission for private Woodshed practice
+Your child may use Free private practice: save practice charts and revisit their history. Full membership is optional and controls existing Insights; permission does not buy or grant access.
+After authorization we store their chosen name, account ID, hashed PIN, instrument, level, goal, private practice dates/durations/details/notes, progress, game results, rewards and account activity. Guest microphone processing is local. Guest history is not imported. Under-13 individual results remain excluded from public and other-student standings.
+Account permission covers Free private practice. Director sharing is optional and separately selectable: declining it does not prevent Free private practice. Only if selected, you authorize the specific named director to see your child's identity, instrument, practice charts, dates, durations, details/notes and basic practice metrics. The director must accept the connection and verify private access. If you separately check chart review, that director may approve/reject submitted charts and return a review note. Approval is per connection; it does not make results public. You can withdraw director sharing without ending private practice, or withdraw account permission. Your child may disconnect the director.
+You receive private parent access through an expiring emailed link. It covers only your child and their membership-appropriate metrics. Matching an email, paying for membership or holding a verifier PIN does not substitute for authorization. After your explicit declaration that your child is 13 or older, future qualifying activity may become public; earlier private history remains private. Existing parent/director permissions retain their scope and withdrawal controls. Your student may then establish new ordinary director connections without new parent permission; those new directors receive only qualifying practice after the transition, not earlier private charts or cumulative history. The transition day is excluded because practice dates have day-level precision.
+Render hosts the application and database. Configured Gmail SMTP processes recipient addresses, message contents and private links used for Woodshed email delivery.
+Woodshed uses Epic Kids Web Services (KWS) to verify an adult. KWS receives the parent email, configured location/language and an opaque request reference. Card verification occurs with KWS; Woodshed does not receive card details. Adult verification alone does not establish guardianship or consent: you must separately attest that you are this child's parent or legal guardian and explicitly accept this notice and selected permissions. Verification does not log you in as a parent, require Full membership or grant every permission.
+Unverified requests expire after 48 hours. The Woodshed activation link expires 72 hours after verification. Signed verification results have a local 24-hour freshness limit with five minutes of clock skew.
+Contact Woodshed Woodchuck LLC, 302 Heyden Dr., Eureka, MO 63025. Phone (314) 514-5611; email woodshedwoodchuck@gmail.com. Request access, correction, withdrawal or deletion through support."""
 PRODUCTION_NOTICE_SHA256 = hashlib.sha256(PRODUCTION_NOTICE.encode()).hexdigest()
 PENDING_TTL=timedelta(hours=48)
 CONFIRMATION_DELAY=timedelta(hours=24)
