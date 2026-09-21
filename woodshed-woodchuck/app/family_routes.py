@@ -97,7 +97,7 @@ def approval(request:Request,token:str):
         version,notice_text,_=service.notice_policy()
         return page(request,'approve',notice=notice_text,notice_version=version,kws_label=kws_label(),director_name=r.director_name,director_email=r.director_email,
                     verification_state=v.state if v else None,activation_token=service.derived_token(r,'activate') if v and v.state=='verified' else None,
-                    withdrawal_token=service.derived_token(r,'withdraw'),account_label=target.woodchuck_id if target else 'one new Free child account')
+                    withdrawal_token=service.derived_token(r,'withdraw'),account_label=target.woodchuck_id if target else 'one new Free under-13 child account')
 
 @router.post('/family/approve/{token}')
 async def approve(request:Request,token:str):

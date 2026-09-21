@@ -1,12 +1,12 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Woodshed private practice</title><link rel="stylesheet" href="/static/css/styles.css"></head><body><main class="card">
-<h1>Private practice</h1>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Woodshed private practice</title><link rel="stylesheet" href="/static/css/styles.css"></head><body class="family-page"><main class="card family-card">
+<h1 class="family-title">Private practice</h1>
 {% macro csrf_field() %}<input type="hidden" name="csrf" value="{{ csrf }}">{% endmacro %}
 {% if kind == 'message' %}<p role="status">{{ message }}</p>{% if woodchuck_id %}<p>Your Woodchuck ID: <strong>{{ woodchuck_id }}</strong></p>{% endif %}
-{% elif kind == 'notice' %}<pre style="white-space:pre-wrap">{{ notice }}</pre>
+{% elif kind == 'notice' %}<pre class="family-notice">{{ notice }}</pre>
 {% elif kind == 'request' %}
 {% if available %}<p>{{ kws_label|default('KWS') }}. Ask your parent to authorize Free private practice. Director sharing is optional and your parent chooses it separately. No new child name, PIN or practice history is collected here.</p><form method="post">{{ csrf_field() }}<input type="hidden" name="confirm_account" value="{{ confirm_account }}"><label>Parent email<input name="parent_email" type="email" required maxlength="254"></label><button>Ask my parent</button></form>
 {% else %}<p>Parent authorization is not open yet. Guest tools and help remain available. No parent email is collected here.</p>{% endif %}
-{% elif kind == 'approve' %}<h2>Parent permission — {{ kws_label|default('KWS') }}</h2><p>Permission applies only to: <strong>{{ account_label }}</strong>.</p><pre style="white-space:pre-wrap">{{ notice }}</pre>
+{% elif kind == 'approve' %}<h2>Parent permission — {{ kws_label|default('KWS') }}</h2><p>Permission applies only to: <strong>{{ account_label }}</strong>.</p><pre class="family-notice">{{ notice }}</pre>
 {% if activation_token %}<p>Adult verification completed for your selected permissions. Parent access still requires its separate emailed link.</p><p><a href="/family/activate/{{ activation_token }}">Activate Free private practice</a></p>
 {% elif verification_state %}<p>Verification status: {{ verification_state }}. Acceptance of an email request does not mean verification succeeded. Complete the KWS email journey and reopen this same permission link. If delivery is uncertain, do not repeatedly resend.</p>
 {% else %}<form method="post">{{ csrf_field() }}<input type="hidden" name="notice_version" value="{{ notice_version }}">
