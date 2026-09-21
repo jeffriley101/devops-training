@@ -161,6 +161,8 @@
           throw new Error("Rendered account session is no longer current");
         }
         verifying = false;
+        const shell = document.querySelector(".app-shell");
+        if (shell) shell.hidden = false;
         // Load real consumers in their original order only after verification.
         // Keep the shell hidden until every script is ready; JSON bootstrap is
         // outside the inert template but no state consumer ran before this gate.
@@ -178,8 +180,6 @@
         }
         await Promise.all(loads);
         check();
-        const shell = document.querySelector(".app-shell");
-        if (shell) shell.hidden = false;
         return true;
       });
     } catch (_error) { stop(); return false; }
