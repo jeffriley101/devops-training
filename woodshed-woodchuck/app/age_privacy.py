@@ -181,9 +181,6 @@ def filter_hall_result_rows(session, rows):
             continue
         if not hall_history_allowed(session, result.profile_id):
             continue
-        rule = session.get(AccountPrivacy, result.profile_id, populate_existing=True)
-        if utc(result.created_at) >= utc(rule.public_from):
-            continue
         output.append(row)
     return output
 

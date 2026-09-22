@@ -1842,6 +1842,91 @@ def test_prior_finalized_band_camp_week_results_remain_browsable(
     assert payload["results"][0]["display_name"] == "Prior Winner"
 
 
+def test_age_verified_historical_student_results_restore_to_medal_board_and_hall(
+    database: tuple[Session, sessionmaker[Session]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session, factory = database
+    from app.age_models import AccountPrivacy
+
+    bucky = add_student(session, woodchuck_id="WC-BUCKY", instrument="Flute")
+    jeff = add_student(session, woodchuck_id="WC-JEFF", instrument="Flute")
+    dawn = add_student(session, woodchuck_id="WC-DAWN", instrument="Flute")
+
+    # Model the production state: contest week activity predates age screening.
+    public_at = datetime(2026, 9, 21, 2, 45, tzinfo=timezone.utc)
+    for profile, age_band in ((bucky, "adult"), (jeff, "adult"), (dawn, "under13")):
+        rule = session.get(AccountPrivacy, profile.id)
+        assert rule is not None
+        rule.age_band = age_band
+        rule.declared_at = public_at
+        rule.public_from = public_at if age_band == "adult" else None
+        rule.consent_id = None
+    session.flush()
+
+    season = Season(
+        key="fall-2026",
+        name="Fall 2026",
+        timezone="America/Chicago",
+        starts_on=date(2026, 9, 14),
+        status="closed",
+    )
+    contest = Contest(
+        key="weekly-camp-points",
+        name="Board Activity Points this Week",
+        metric_type="points",
+        subject_type="student",
+    )
+    session.add_all([season, contest])
+    session.flush()
+
+    week = ContestWeek(
+        season_id=season.id,
+        week_start=date(2026, 9, 14),
+        week_end=date(2026, 9, 21),
+        verification_deadline_at=datetime(2026, 9, 21, 17, tzinfo=timezone.utc),
+        finalize_after=datetime(2026, 9, 21, 17, 5, tzinfo=timezone.utc),
+        status="finalized",
+        finalized_at=datetime(2026, 9, 21, 17, 10, tzinfo=timezone.utc),
+    )
+    session.add(week)
+    session.flush()
+
+    result_created = datetime(2026, 9, 21, 17, 10, 23, tzinfo=timezone.utc)
+    session.add_all([
+        ContestResult(
+            contest_week_id=week.id, contest_id=contest.id, division="open",
+            subject_type="student", subject_key=str(bucky.id), profile_id=bucky.id,
+            display_name_snapshot="Bucky", score=10, rank=1, medal="gold",
+            created_at=result_created,
+        ),
+        ContestResult(
+            contest_week_id=week.id, contest_id=contest.id, division="open",
+            subject_type="student", subject_key=str(jeff.id), profile_id=jeff.id,
+            display_name_snapshot="Jeff", score=10, rank=1, medal="gold",
+            created_at=result_created,
+        ),
+        ContestResult(
+            contest_week_id=week.id, contest_id=contest.id, division="open",
+            subject_type="student", subject_key=str(dawn.id), profile_id=dawn.id,
+            display_name_snapshot="Dawn", score=8, rank=3, medal="bronze",
+            created_at=result_created,
+        ),
+    ])
+    session.commit()
+    monkeypatch.setattr(contest_module, "SessionLocal", factory)
+
+    medal = contest_module.contest_week_results(
+        week.week_start, request_with_session(jeff.id)
+    )
+    medal_names = {row["display_name"] for row in medal["results"]}
+    assert medal_names == {"Bucky", "Jeff"}
+
+    hall = hall_of_champions_payload(session)
+    hall_names = {row["display_name"] for row in hall["students"]}
+    assert hall_names == {"Bucky", "Jeff"}
+
+
 def test_hall_aggregates_students_instruments_divisions_and_prior_seasons(
     database: tuple[Session, sessionmaker[Session]],
 ) -> None:
