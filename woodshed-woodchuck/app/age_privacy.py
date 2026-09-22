@@ -150,13 +150,14 @@ def filter_result_rows(session, rows):
         team_result_safe(row)]
 
 
-def hall_history_allowed(session, profile_id):
+def hall_history_allowed(session, profile_id, *, created_at=None):
     rule = session.get(AccountPrivacy, profile_id, populate_existing=True)
     return bool(
         rule
         and rule.age_band in ('13to17', 'adult')
         and not rule.consent_id
         and rule.public_from is not None
+        and (created_at is None or utc(created_at) < utc(rule.public_from))
     )
 
 
@@ -179,7 +180,7 @@ def filter_hall_result_rows(session, rows):
             continue
         if result.subject_type != 'student' or result.profile_id is None:
             continue
-        if not hall_history_allowed(session, result.profile_id):
+        if not hall_history_allowed(session, result.profile_id, created_at=result.created_at):
             continue
         output.append(row)
     return output
