@@ -13,10 +13,32 @@
 <a class="btn btn-secondary" href="/admin/membership">Site Admin</a>
 {% endcall %}
 <section class="card">
+  <h2>Tester cohort</h2>
+  <div class="button-row">
+    <a class="btn {{ 'btn-primary' if not selected_cohort else 'btn-secondary' }}" href="/admin/analytics">All accounts</a>
+    <a class="btn {{ 'btn-primary' if selected_cohort == 'PILOT-D1' else 'btn-secondary' }}" href="/admin/analytics?cohort=PILOT-D1">PILOT-D1</a>
+    <a class="btn {{ 'btn-primary' if selected_cohort == 'C001' else 'btn-secondary' }}" href="/admin/analytics?cohort=C001">C001</a>
+  </div>
+  {% if selected_cohort %}
+  <p><strong>{{ selected_cohort }}</strong> activity is counted only at or after each tester's recorded join time.</p>
+  {% else %}
+  <p>Showing all active student accounts. Choose a tester cohort to measure activity from each tester's join time forward.</p>
+  {% endif %}
+</section>
+<section class="card">
   <h2>Overview</h2>
   <p>{{ report.first_day }} through {{ report.today }} (30 calendar days). As of {{ report.as_of.strftime('%Y-%m-%d %H:%M %Z') }}.</p>
-  <p>All non-deleted student accounts, including staff/test accounts. There is no separate tester cohort.</p>
+  {% if selected_cohort %}
+  <p>Tester cohort: <strong>{{ selected_cohort }}</strong>.</p>
+  {% else %}
+  <p>All non-deleted student accounts, including staff/test accounts.</p>
+  {% endif %}
   <ul>
+    {% if selected_cohort %}
+    <li>Enrolled active testers: <strong>{{ report.enrolled }}</strong></li>
+    <li>Active on join day: <strong>{{ report.day1_active }}</strong></li>
+    <li>Returned after join day: <strong>{{ report.returned_after_day1 }}</strong></li>
+    {% endif %}
     <li>Student accounts: <strong>{{ report.accounts }}</strong>; created in this window: <strong>{{ report.new_accounts }}</strong></li>
     <li>Active today: <strong>{{ report.active_today }}</strong></li>
     <li>Active in the last 7 calendar days: <strong>{{ report.active_7 }}</strong></li>

@@ -1,7 +1,7 @@
 """One read-only report inside the existing site-admin boundary."""
 from pathlib import Path
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.templating import Jinja2Templates
 
 from .analytics import build_report
@@ -14,11 +14,18 @@ templates = Jinja2Templates(directory=str(Path(__file__).resolve().parent.parent
 
 
 @router.get("/admin/analytics")
-def analytics_page(request: Request):
+def analytics_page(request: Request, cohort: str | None = None):
     require_site_admin(request)
-    report = build_report(SessionLocal)
+    allowed = {None, "PILOT-D1", "C001"}
+    if cohort not in allowed:
+        raise HTTPException(400, "Unknown tester cohort.")
+    report = build_report(SessionLocal, cohort_key=cohort)
     return templates.TemplateResponse(
         request=request, name="analytics_admin.html",
-        context={"title": "Pre-beta activity", "report": report},
+        context={
+            "title": "Pre-beta activity",
+            "report": report,
+            "selected_cohort": cohort,
+        },
         headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"},
     )

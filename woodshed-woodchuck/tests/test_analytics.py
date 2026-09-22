@@ -13,11 +13,15 @@ from sqlalchemy.orm import sessionmaker
 from starlette.background import BackgroundTask
 from starlette.responses import Response
 
-from app import account_routes, analytics, analytics_routes, arcade_routes, main, practice_chart_routes
+from app import (
+    account_routes, analytics, analytics_routes, arcade_routes, main,
+    practice_chart_routes, session_revocations,
+)
 from app.db import Base
+from app.age_privacy import declare_age
 from app.models import (AnalyticsEvent, ArcadePlaySession, CampPointAward, Contest,
     ContestResult, ContestWeek, DailyTriviaAttempt, OwnedItemCopy, PracticeChart,
-    QuestCompletion, RewardGrant, Season, WoodchuckProfile, WoodchuckState)
+    QuestCompletion, RewardGrant, Season, TesterEnrollment as Enrollment, WoodchuckProfile, WoodchuckState)
 from app.security import hash_pin
 
 NOW = datetime(2026, 9, 15, 18, tzinfo=timezone.utc)
@@ -32,7 +36,10 @@ def db(tmp_path, monkeypatch):
         connection.execute("PRAGMA synchronous=OFF")  # Disposable fixture database only.
     Base.metadata.create_all(engine)
     factory = sessionmaker(engine, expire_on_commit=False)
-    for module in (main, account_routes, analytics_routes, arcade_routes, practice_chart_routes):
+    for module in (
+        main, account_routes, analytics_routes, arcade_routes,
+        practice_chart_routes, session_revocations,
+    ):
         monkeypatch.setattr(module, "SessionLocal", factory)
     monkeypatch.setattr(analytics, "_retry_after", 0)
     monkeypatch.setattr(analytics, "_last_warning", float("-inf"))
@@ -48,6 +55,11 @@ def db(tmp_path, monkeypatch):
                 status="deleted" if number == 3 else "active",
                 created_at=NOW - timedelta(days=60)))
         session.flush()
+        for profile_id in (1, 2, 4):
+            declare_age(
+                session, profile_id, "adult",
+                at=NOW - timedelta(days=60),
+            )
         session.add(WoodchuckState(profile_id=1, state_json={"progress": {"credits": 10}}))
         session.commit()
     yield factory
@@ -221,6 +233,57 @@ def seed_activity(db):
         analytics.record_event(db, profile_id=profile_id, event_type=event_type, occurred_at=instant)
 
 
+
+def test_admin_analytics_accepts_known_cohort_filters_and_rejects_unknown(db, monkeypatch):
+    result = admin_client()
+    seen = []
+
+    def fake_report(_factory, *, cohort_key=None, **_kwargs):
+        seen.append(cohort_key)
+        return {
+            "first_day": date(2026, 8, 17),
+            "today": date(2026, 9, 15),
+            "as_of": NOW.astimezone(analytics.CENTRAL),
+            "cohort_key": cohort_key,
+            "enrolled": 0 if cohort_key else None,
+            "day1_active": 0,
+            "returned_after_day1": 0,
+            "events_available": True,
+            "recording_enabled": True,
+            "accounts": 0, "new_accounts": 0,
+            "active_today": 0, "active_7": 0, "active_30": 0, "returning": 0,
+            "daily": [],
+            "features": [],
+            "practice_charts": 0, "practicing_students": 0,
+            "practice_duration": "0 seconds",
+            "contest_charts": 0, "team_contest_charts": 0,
+            "reward_count": 0, "medal_count": 0,
+            "games": [],
+            "arcade_without_start": 0,
+            "pristine_without_save": 0,
+            "students": [],
+            "recent": [],
+        }
+
+    monkeypatch.setattr(analytics_routes, "build_report", fake_report)
+
+    all_page = result.get("/admin/analytics")
+    pilot_page = result.get("/admin/analytics?cohort=PILOT-D1")
+    c001_page = result.get("/admin/analytics?cohort=C001")
+    assert all_page.status_code == pilot_page.status_code == c001_page.status_code == 200
+    assert seen == [None, "PILOT-D1", "C001"]
+    assert "All accounts" in pilot_page.text
+    assert "PILOT-D1" in pilot_page.text
+    assert "C001" in pilot_page.text
+    assert "Enrolled active testers" in pilot_page.text
+    assert "Active on join day" in pilot_page.text
+    assert "Returned after join day" in pilot_page.text
+    assert "Enrolled active testers" not in all_page.text
+
+    bad = result.get("/admin/analytics?cohort=NOT-A-COHORT")
+    assert bad.status_code == 400
+
+
 def test_report_authoritative_sources_returning_duration_and_workflow_gaps(db):
     seed_activity(db)
     report = analytics.build_report(db, now=NOW)
@@ -241,6 +304,118 @@ def test_report_authoritative_sources_returning_duration_and_workflow_gaps(db):
     assert response.status_code == 200
     for secret in ("Private Name", "Private Winner", "secret-one", "private answer", "WC-AN-"):
         assert secret not in response.text
+
+
+
+def test_cohort_report_filters_profiles_and_ignores_pre_join_activity(db):
+    joined = NOW - timedelta(days=1)
+
+    with db() as session:
+        session.add_all([
+            Enrollment(profile_id=1, cohort_key="PILOT-D1", joined_at=joined),
+            Enrollment(profile_id=2, cohort_key="C001", joined_at=joined),
+        ])
+        session.add_all([
+            # Profile 1: pre-join practice must not count.
+            PracticeChart(
+                profile_id=1, practice_date=NOW.date(), minutes=20,
+                instrument="Flute", source="p-book",
+                created_at=joined - timedelta(minutes=1),
+            ),
+            # Profile 1: post-join practice counts.
+            PracticeChart(
+                profile_id=1, practice_date=NOW.date(), minutes=5,
+                instrument="Flute", source="p-book",
+                created_at=joined + timedelta(minutes=1),
+            ),
+            # Profile 2 belongs to another cohort and must not count.
+            PracticeChart(
+                profile_id=2, practice_date=NOW.date(), minutes=9,
+                instrument="Flute", source="p-book",
+                created_at=NOW,
+            ),
+            RewardGrant(
+                profile_id=1,
+                source_key="pilot-login",
+                category_key="login-streak",
+                reward_type="dandelion",
+                amount=1,
+                created_at=joined + timedelta(minutes=2),
+            ),
+        ])
+        session.commit()
+
+    report = analytics.build_report(db, now=NOW, cohort_key="PILOT-D1")
+
+    assert report["cohort_key"] == "PILOT-D1"
+    assert report["enrolled"] == 1
+    assert report["accounts"] == 1
+    assert report["practice_charts"] == 1
+    assert report["practicing_students"] == 1
+    assert report["practice_duration"] == "5 minutes"
+    assert report["active_30"] == 1
+    assert report["day1_active"] == 1
+
+    c001 = analytics.build_report(db, now=NOW, cohort_key="C001")
+    assert c001["enrolled"] == 1
+    assert c001["accounts"] == 1
+    assert c001["practice_charts"] == 1
+
+
+
+def test_cohort_report_filters_profiles_and_ignores_pre_join_activity(db):
+    joined = NOW - timedelta(days=1)
+
+    with db() as session:
+        session.add_all([
+            Enrollment(profile_id=1, cohort_key="PILOT-D1", joined_at=joined),
+            Enrollment(profile_id=2, cohort_key="C001", joined_at=joined),
+        ])
+        session.add_all([
+            # Profile 1: pre-join practice must not count.
+            PracticeChart(
+                profile_id=1, practice_date=NOW.date(), minutes=20,
+                instrument="Flute", source="p-book",
+                created_at=joined - timedelta(minutes=1),
+            ),
+            # Profile 1: post-join practice counts.
+            PracticeChart(
+                profile_id=1, practice_date=NOW.date(), minutes=5,
+                instrument="Flute", source="p-book",
+                created_at=joined + timedelta(minutes=1),
+            ),
+            # Profile 2 belongs to another cohort and must not count.
+            PracticeChart(
+                profile_id=2, practice_date=NOW.date(), minutes=9,
+                instrument="Flute", source="p-book",
+                created_at=NOW,
+            ),
+            RewardGrant(
+                profile_id=1,
+                source_key="pilot-login",
+                category_key="login-streak",
+                reward_type="dandelion",
+                amount=1,
+                created_at=joined + timedelta(minutes=2),
+            ),
+        ])
+        session.commit()
+
+    report = analytics.build_report(db, now=NOW, cohort_key="PILOT-D1")
+
+    assert report["cohort_key"] == "PILOT-D1"
+    assert report["enrolled"] == 1
+    assert report["accounts"] == 1
+    assert report["practice_charts"] == 1
+    assert report["practicing_students"] == 1
+    assert report["practice_duration"] == "5 minutes"
+    assert report["active_30"] == 1
+    assert report["day1_active"] == 1
+
+    c001 = analytics.build_report(db, now=NOW, cohort_key="C001")
+    assert c001["enrolled"] == 1
+    assert c001["accounts"] == 1
+    assert c001["practice_charts"] == 1
 
 
 def test_report_central_day_window_and_dst(db):

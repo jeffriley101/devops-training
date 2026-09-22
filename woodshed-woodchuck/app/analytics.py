@@ -21,7 +21,7 @@ from starlette.background import BackgroundTask
 from .models import (
     AnalyticsEvent, ArcadePlaySession, CampPointAward, ContestResult,
     DailyTriviaAttempt, OwnedItemCopy, PracticeChart, QuestCompletion,
-    RewardGrant, SEASON_TIMEZONE, WoodchuckProfile, utc_now,
+    RewardGrant, SEASON_TIMEZONE, TesterEnrollment, WoodchuckProfile, utc_now,
 )
 from .practice_duration import chart_seconds_sql, format_seconds
 
@@ -105,7 +105,7 @@ def observe_response(response, *, session_factory, profile_id, event_type):
     return response
 
 
-def build_report(session_factory, *, now=None):
+def build_report(session_factory, *, now=None, cohort_key=None):
     """30 Central calendar days including today, up to the supplied instant.
 
     Read only selected fields. Automated rewards/results are context, never
@@ -115,6 +115,32 @@ def build_report(session_factory, *, now=None):
     today = now.astimezone(CENTRAL).date()
     first_day = today - timedelta(days=29)
     start = datetime.combine(first_day, time.min, CENTRAL).astimezone(timezone.utc)
+
+    cohort_members = None
+    if cohort_key is not None:
+        from .tester_enrollments import normalize_cohort_key
+        cohort_key = normalize_cohort_key(cohort_key)
+        with session_factory() as session:
+            cohort_members = {
+                profile_id: as_utc(joined_at)
+                for profile_id, joined_at in session.execute(
+                    select(TesterEnrollment.profile_id, TesterEnrollment.joined_at)
+                    .join(WoodchuckProfile, WoodchuckProfile.id == TesterEnrollment.profile_id)
+                    .where(
+                        TesterEnrollment.cohort_key == cohort_key,
+                        WoodchuckProfile.status == "active",
+                    )
+                ).all()
+            }
+
+    def included(profile_id, timestamp=None):
+        if cohort_members is None:
+            return True
+        joined_at = cohort_members.get(profile_id)
+        if joined_at is None:
+            return False
+        return timestamp is None or as_utc(timestamp) >= joined_at
+
     activity = []
     counts = Counter()
     people = defaultdict(set)
@@ -141,18 +167,22 @@ def build_report(session_factory, *, now=None):
         events = []
         _warn("report", error)
     for profile_id, timestamp, event_type in events:
-        add(profile_id, timestamp, EVENT_LABELS[event_type])
+        if included(profile_id, timestamp):
+            add(profile_id, timestamp, EVENT_LABELS[event_type])
 
     with session_factory() as session:
         def rows(model, timestamp, *extra, conditions=()):
-            return session.execute(select(model.profile_id, timestamp, *extra).join(
+            result = session.execute(select(model.profile_id, timestamp, *extra).join(
                 WoodchuckProfile, WoodchuckProfile.id == model.profile_id,
             ).where(WoodchuckProfile.status == "active", timestamp >= start,
                     timestamp <= now, *conditions)).all()
+            return [row for row in result if included(row[0], row[1])]
 
         accounts = session.execute(select(WoodchuckProfile.id, WoodchuckProfile.created_at).where(
             WoodchuckProfile.status == "active",
         )).all()
+        if cohort_members is not None:
+            accounts = [row for row in accounts if row[0] in cohort_members]
         # Daily dandelion grants already form a durable daily sign-in ledger.
         for profile_id, timestamp in rows(RewardGrant, RewardGrant.created_at, conditions=(
             RewardGrant.category_key == "login-streak", RewardGrant.reward_type == "dandelion",
@@ -182,10 +212,11 @@ def build_report(session_factory, *, now=None):
                 add(profile_id, timestamp, label)
 
         def context_count(model, *conditions):
-            return session.scalar(select(func.count()).select_from(model).join(
+            result = session.execute(select(model.profile_id, model.created_at).join(
                 WoodchuckProfile, WoodchuckProfile.id == model.profile_id,
             ).where(WoodchuckProfile.status == "active", model.created_at >= start,
-                    model.created_at <= now, *conditions))
+                    model.created_at <= now, *conditions)).all()
+            return sum(1 for profile_id, timestamp in result if included(profile_id, timestamp))
 
         reward_count = context_count(RewardGrant)
         medal_count = context_count(ContestResult, ContestResult.subject_type == "student")
@@ -215,8 +246,22 @@ def build_report(session_factory, *, now=None):
         seconds_by_profile[profile_id] += seconds
 
     days = [first_day + timedelta(days=index) for index in range(30)]
+
+    day1_active = 0
+    returned_after_day1 = 0
+    if cohort_members is not None:
+        for profile_id, joined_at in cohort_members.items():
+            joined_day = joined_at.astimezone(CENTRAL).date()
+            active_days = by_profile.get(profile_id, set())
+            day1_active += int(joined_day in active_days)
+            returned_after_day1 += int(any(day > joined_day for day in active_days))
+
     return {
         "today": today, "first_day": first_day, "as_of": now.astimezone(CENTRAL),
+        "cohort_key": cohort_key,
+        "enrolled": len(cohort_members) if cohort_members is not None else None,
+        "day1_active": day1_active,
+        "returned_after_day1": returned_after_day1,
         "events_available": events_available,
         "recording_enabled": os.getenv("WOODSHED_ANALYTICS_ENABLED", "1") != "0",
         "accounts": len(accounts),
