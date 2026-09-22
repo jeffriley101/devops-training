@@ -391,5 +391,5 @@ def test_sensitive_callback_payload_and_secrets_are_not_logged(age_db, captured,
 def test_permission_page_labels_original_subject(age_db, captured, existing):
     child, parent, url, payload = prepare(captured, existing=existing)
     result = parent.get(url)
-    assert result.context['account_label'] == ('WC-AGE-A' if existing else 'one new Free child account')
+    assert result.context['account_label'] == ('WC-AGE-A' if existing else 'one new Free under-13 child account')
     assert 'WC-AGE-B' not in result.text
