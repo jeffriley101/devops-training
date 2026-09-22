@@ -303,6 +303,7 @@ def test_hall_javascript_renders_lifetime_woodchuck_team_and_special_sections() 
     assert 'renderSpecialChampionships()' in hall
     assert 'function medalSummary(medals)' in hall
     assert 'champion.rank' in hall
+    assert '["open", "verified", "pristine"].includes(achievement.division)' in hall
     assert 'renderLifetimeLeaders("Instruments"' not in hall
     assert "Pristine" not in hall and "MVP" not in hall
     assert 'retryButton.addEventListener("click", loadChampions)' in javascript

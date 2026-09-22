@@ -3648,7 +3648,7 @@
             typeof achievement.season.name === "string" &&
             achievement.contest && typeof achievement.contest.key === "string" &&
             typeof achievement.contest.name === "string" &&
-            ["open", "verified"].includes(achievement.division) &&
+            ["open", "verified", "pristine"].includes(achievement.division) &&
             validCounts(achievement.medals)
         ) &&
         (type !== "students" || (
