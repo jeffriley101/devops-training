@@ -4,6 +4,7 @@
 <section class="card">
   <div class="section-head">
     <h2>Create Your Woodchuck</h2>
+    {% if c001_registration %}<p class="chip">C001 Pre-Beta registration</p>{% endif %}
     <p class="body-copy">
       Start by choosing your age band. If registration is available,
       you can then create your Woodchuck ID and four-digit PIN.
@@ -21,7 +22,7 @@
         <button class="btn btn-primary" type="submit">Continue</button>
       </form>
       {% elif selected_age == 'under13' %}
-      <p>Private practice needs parent authorization. <a href="/family/request">Ask your parent for permission</a>. No child account is created before authorization.</p>
+      <p>Private practice needs parent authorization. <a href="/family/request">Ask your parent for permission</a>. No child account is created before authorization.{% if c001_registration %} Your C001 claim will stay with the parent request across devices.{% endif %}</p>
       {% elif selected_age not in ('13to17', 'adult') %}
       <p role="status">Account registration is unavailable for this age selection. Guest tools remain available.</p>
       {% endif %}

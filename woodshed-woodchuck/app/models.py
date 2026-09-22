@@ -105,6 +105,35 @@ class WoodchuckProfile(Base):
     )
 
 
+class TesterEnrollment(Base):
+    """Durable tester history; access is derived without a Membership seat."""
+
+    __tablename__ = "tester_enrollments"
+    __table_args__ = (
+        UniqueConstraint(
+            "profile_id",
+            "cohort_key",
+            name="uq_tester_enrollment_profile_cohort",
+        ),
+        CheckConstraint(
+            "length(cohort_key) >= 1",
+            name="ck_tester_enrollment_cohort_key",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    profile_id: Mapped[int] = mapped_column(
+        ForeignKey("woodchuck_profiles.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    cohort_key: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    joined_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+    )
+
+
 
 class WoodchuckState(Base):
     __tablename__ = "woodchuck_states"

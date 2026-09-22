@@ -70,9 +70,11 @@ def notice(request:Request):
 
 @router.get('/family/request')
 def request_page(request:Request):
+    from .tester_enrollments import registration_context
     with SessionLocal() as s:
         p=current_profile(request,s)
-        return page(request,'request',available=service.under13_available(),confirm_account=p.woodchuck_id if p else 'new',kws_label=kws_label())
+        claim=registration_context(request) if p is None else None
+        return page(request,'request',available=service.under13_available(),confirm_account=p.woodchuck_id if p else 'new',kws_label=kws_label(),c001_registration=bool(claim))
 
 @router.post('/family/request')
 async def request_permission(request:Request):
@@ -81,9 +83,12 @@ async def request_permission(request:Request):
     enforce_login_limit(request,'student',str(data.get('parent_email','')))
     with SessionLocal() as s:
         p=current_profile(request,s)
+        from .tester_enrollments import clear_registration_context,registration_context
+        claim=registration_context(request) if p is None else None
         if data.get('confirm_account')!=(p.woodchuck_id if p else 'new'):raise HTTPException(409,'Account changed; reload the form.')
-        try:service.request_consent(s,parent_email=data.get('parent_email',''),director_email=data.get('director_email',''),director_name=data.get('director_name',''),profile=p);s.commit()
+        try:service.request_consent(s,parent_email=data.get('parent_email',''),director_email=data.get('director_email',''),director_name=data.get('director_name',''),profile=p,cohort_key=claim if claim else None);s.commit()
         except ValueError as e:raise HTTPException(409,str(e))
+        if claim:clear_registration_context(request)
     return page(request,'message',message='The parent request was sent. No new child account, membership or director invitation was created.')
 
 @router.get('/family/approve/{token}')
@@ -122,7 +127,7 @@ def activation_page(request:Request,token:str):
         if not r.confirmed_at:raise HTTPException(409,'Confirmation pending.')
         p=current_profile(request,s)
         if r.profile_id!=(p.id if p else None):return page(request,'message',message='Sign in to the originally approved existing account, or sign out if approval was for a new account. Then reopen this link.')
-        return page(request,'activate',confirm_account=p.woodchuck_id if p else 'new',existing=bool(p))
+        return page(request,'activate',confirm_account=p.woodchuck_id if p else 'new',existing=bool(p),cohort_key=r.cohort_key)
 
 @router.post('/family/activate/{token}')
 async def activate(request:Request,token:str):

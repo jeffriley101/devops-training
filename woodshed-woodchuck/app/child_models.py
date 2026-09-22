@@ -22,6 +22,10 @@ class PendingConsent(Base):
     confirmation_due: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     notice_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    # Generic registration context survives the cross-device parent/KWS path.
+    # It is only an eventual enrollment claim; it grants no account or access.
+    cohort_key: Mapped[str | None] = mapped_column(String(40))
+    cohort_claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 class ConsentEvidence(Base):
     __tablename__ = 'child_consent_evidence'

@@ -97,7 +97,10 @@ def student_has_full_access(session, profile_id, at=None):
         return False
     membership = session.scalar(select(Membership).join(MembershipSeat).where(
         MembershipSeat.profile_id == profile_id, MembershipSeat.removed_at.is_(None)))
-    return membership_is_active(membership, at)
+    if membership_is_active(membership, at):
+        return True
+    from .tester_enrollments import tester_has_lifetime_access
+    return tester_has_lifetime_access(session, profile_id, at=at)
 
 
 def owned_membership(session, membership_id, actor, *, lock=False):

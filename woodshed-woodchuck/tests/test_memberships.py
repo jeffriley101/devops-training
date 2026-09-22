@@ -18,6 +18,7 @@ from app.models import (WoodchuckProfile, TrustedVerifier, StudentVerifierConnec
 from app.billing_config import BillingConfig, PLANS, available_plans, new_subscription_plan
 from app import billing_providers as providers
 from app.email_service import EmailService
+from app.age_privacy import declare_age
 
 NOW = datetime(2026, 9, 13, tzinfo=timezone.utc)
 ADMIN = m.Actor("admin")
@@ -43,6 +44,9 @@ def db(tmp_path, monkeypatch):
     with factory() as session:
         session.add_all([WoodchuckProfile(id=i, woodchuck_id=f"WC-MEMBER{i}", display_name=f"Student {i}",
             pin_hash="not-shown", instrument="Trumpet", level="Beginner", goal="Practice") for i in range(1, 10)])
+        session.flush()
+        for i in range(1, 10):
+            declare_age(session, i, "adult")
         session.add_all([TrustedVerifier(id=i, email=f"payer{i}@example.test", display_name=f"Adult {i}",
                                          pin_hash="secret") for i in (1, 2)])
         session.commit()

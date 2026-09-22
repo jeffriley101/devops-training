@@ -168,6 +168,9 @@ def create_account(
 ):
     from .age_screen import registration_age
     from .age_privacy import declare_age
+    from .tester_enrollments import (clear_registration_context, clock as tester_clock,
+                                     enroll_tester, registration_context)
+    tester_claim = registration_context(request)
     try:
         age_band = registration_age(age_band)
     except ValueError as exc:
@@ -216,6 +219,8 @@ def create_account(
                 commit=False,
             )
             declare_age(session, profile.id, age_band)
+            if tester_claim is not None:
+                enroll_tester(session, profile.id, tester_claim, tester_clock())
             authoritative_state = preserve_server_values(submitted_state)
             account = {}
             account.update({
@@ -254,6 +259,7 @@ def create_account(
         request.session[SESSION_PROFILE_ID] = profile.id
         request.session[SESSION_PROFILE_VERSION] = profile.session_version
         request.session[SESSION_PAGE_GENERATION] = secrets.token_urlsafe(24)
+        clear_registration_context(request)
 
         return {
             "authenticated": True,

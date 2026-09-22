@@ -176,7 +176,13 @@
   <p>Practice timers and saved P-Charts/P-Book, Pristine Practice, Arcade games, contests, rewards, inventory/shop and teams need an account and are not enabled here.</p>
   {% endif %}
   <p id="guest-feedback" class="body-copy" role="status" aria-live="polite"></p>
-  <p>C001 registration is not available yet. Guest exploration does not establish eligibility, create an account or grant Full Access.</p>
+  {% if c001_registration %}
+  <h2>C001 Pre-Beta</h2>
+  <p>You can keep exploring as a Guest, or create a new C001 tester account. Guest exploration still creates no account, enrollment or Full Access.</p>
+  <a class="btn btn-primary" href="/setup">Create a C001 Pre-Beta account</a>
+  {% else %}
+  <p>C001 registration starts only from the official C001 entry link. Guest exploration does not establish eligibility, create an account or grant Full Access.</p>
+  {% endif %}
 </section>
 </main></div>
 {% if account_id %}<template id="account-scripts">{% else %}

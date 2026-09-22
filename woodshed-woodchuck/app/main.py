@@ -69,6 +69,12 @@ from .board_seasons import board_season_presentation
 from .seasons import season_covering_date
 from .session_config import session_secret, secure_session_cookie, is_production
 from .login_limits import protection_status
+from .tester_enrollments import (
+    C001,
+    SESSION_REGISTRATION_CONTEXT,
+    establish_registration_context,
+    registration_context,
+)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -366,14 +372,18 @@ def guest_page(request: Request):
         account_id = profile.woodchuck_id if profile is not None else ""
         if profile is not None:
             page_generation(request)
-    # Adult/admin sessions also need explicit logout before local exploration.
-    blocked = bool(request.session)
+    # The signed C001 claim is registration context, not authentication. All
+    # other account/adult/admin session state still requires explicit logout.
+    tester_claim = registration_context(request)
+    context_only = bool(tester_claim) and set(request.session) == {SESSION_REGISTRATION_CONTEXT}
+    blocked = bool(profile is not None or (request.session and not context_only))
     signing_in = request.url.path == "/guest/login" and not blocked
     response = templates.TemplateResponse(
         request=request, name="guest.html",
         context={"blocked": blocked, "signing_in": signing_in,
                  "account_id": account_id, "instruments": INSTRUMENT_OPTIONS,
-                 "levels": LEVEL_OPTIONS, "goals": GOAL_OPTIONS},
+                 "levels": LEVEL_OPTIONS, "goals": GOAL_OPTIONS,
+                 "c001_registration": bool(tester_claim) and not blocked},
     )
     response.headers["Cache-Control"] = "no-store"
     response.headers["Referrer-Policy"] = "no-referrer"
@@ -382,6 +392,16 @@ def guest_page(request: Request):
         + ("'self'" if blocked or signing_in else "'none'")
         + "; form-action 'none'; frame-ancestors 'none'; base-uri 'none'"
     )
+    return response
+
+
+@app.get("/prebeta/C001")
+def prebeta_c001(request: Request):
+    """Deliberate, public C001 entry; no account or enrollment is created."""
+    establish_registration_context(request, C001)
+    response = RedirectResponse(url="/guest", status_code=303)
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Referrer-Policy"] = "no-referrer"
     return response
 
 
@@ -395,6 +415,7 @@ def setup(request: Request):
         instruments=INSTRUMENT_OPTIONS,
         levels=LEVEL_OPTIONS,
         goals=GOAL_OPTIONS,
+        c001_registration=registration_context(request) is not None,
         active_nav=None,
     )
 

@@ -12,6 +12,7 @@ from app.main import app
 from app.db import Base
 from app.models import WoodchuckProfile, WoodchuckState
 from app.security import hash_pin
+from app.age_privacy import declare_age
 
 
 @pytest.fixture
@@ -28,6 +29,7 @@ def guest_db(monkeypatch):
                 pin_hash=hash_pin('2468'), instrument='Flute', level='Beginner', goal='Practice every day')
             session.add(profile)
             session.flush()
+            declare_age(session, profile.id, 'adult')
             session.add(WoodchuckState(profile_id=profile.id, revision=7, state_json={
                 'account': {'woodchuckId': profile.woodchuck_id, 'authenticated': True, 'serverRevision': 7},
                 'profile': {'woodchuckName': profile.display_name, 'instrument':'Flute', 'level':'Beginner', 'goal':'Practice every day'},
@@ -55,9 +57,9 @@ def test_guest_gets_never_bootstrap_accounts_set_session_or_persist_activity(gue
         assert 'WC-GUEST-' not in response.text
         assert 'account-state-bootstrap' not in response.text
         assert 'account-create-form' not in response.text
-        assert 'C001 registration is not available' in response.text
+        assert 'C001 registration starts only from the official C001 entry link' in response.text
     assert "connect-src 'none'" in client.get('/guest').headers['content-security-policy']
-    assert 'account-create-form' in client.get('/setup').text  # Ordinary entry is retained.
+    assert 'account-create-form' in client.get('/setup?age=adult').text  # Ordinary entry is retained.
     assert counts(guest_db) == before
 
 
