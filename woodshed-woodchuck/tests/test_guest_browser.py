@@ -19,12 +19,14 @@ from app.main import app
 from app.db import Base, engine, SessionLocal
 from app.models import WoodchuckProfile, WoodchuckState
 from app.security import hash_pin
+from app.age_privacy import declare_age
 Base.metadata.create_all(engine)
 with SessionLocal() as session:
     for label,credits in [('A',37),('B',83)]:
         p=WoodchuckProfile(woodchuck_id='WC-GUEST-'+label,display_name='Synthetic '+label,
             pin_hash=hash_pin('2468'),instrument='Flute',level='Beginner',goal='Practice every day')
         session.add(p);session.flush()
+        declare_age(session, p.id, '13to17')
         session.add(WoodchuckState(profile_id=p.id,revision=7,state_json={
             'account':{'woodchuckId':p.woodchuck_id,'authenticated':True,'serverRevision':7},
             'profile':{'woodchuckName':p.display_name,'instrument':'Flute','level':'Beginner','goal':'Practice every day'},

@@ -73,6 +73,7 @@ from .tester_enrollments import (
     C001,
     SESSION_REGISTRATION_CONTEXT,
     establish_registration_context,
+    c001_registration_open,
     registration_context,
 )
 
@@ -398,11 +399,30 @@ def guest_page(request: Request):
 @app.get("/prebeta/C001")
 def prebeta_c001(request: Request):
     """Deliberate, public C001 entry; no account or enrollment is created."""
-    establish_registration_context(request, C001)
+    try:
+        establish_registration_context(request, C001)
+    except ValueError as error:
+        return templates.TemplateResponse(
+            request=request, name="c001_entry.html",
+            context={"message": str(error)}, status_code=503,
+            headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"},
+        )
     response = RedirectResponse(url="/guest", status_code=303)
     response.headers["Cache-Control"] = "no-store"
     response.headers["Referrer-Policy"] = "no-referrer"
     return response
+
+
+@app.get("/prebeta/C001/display")
+def c001_display(request: Request):
+    # The established public site URL is independent of Host, cookies and query strings.
+    entry_url = SHOP_SHARE_URL.rstrip("/") + "/prebeta/C001"
+    return templates.TemplateResponse(
+        request=request, name="c001_entry.html",
+        context={"entry_url": entry_url, "entry_qr": qr_data_uri(entry_url),
+                 "registration_open": c001_registration_open()},
+        headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"},
+    )
 
 
 @app.get("/setup")

@@ -82,6 +82,22 @@ def test_signed_in_guest_url_requires_explicit_logout_and_does_not_enroll(guest_
     assert after == before  # Only authenticated-session retirement may persist.
 
 
+@pytest.mark.parametrize('signed_in', [False, True])
+def test_guest_confirmation_copy_describes_browser_session_with_or_without_student(guest_db, signed_in):
+    client = TestClient(app)
+    if signed_in:
+        client.post('/account/login', data={'woodchuck_id': 'WC-GUEST-A', 'pin': '2468'})
+    # Family pages establish CSRF session state even without a student account.
+    family = client.get('/family/notice')
+    assert 'Open Guest tools (may ask you to clear this browser session)' in family.text
+    response = client.get('/guest')
+    assert 'Woodshed session data is active in this browser and must be cleared before using Guest tools.' in response.text
+    assert 'Opening this page has not cleared your browser session or joined C001.' in response.text
+    assert '>Clear browser session and explore as Guest</button>' in response.text
+    assert '>Keep this browser session</a>' in response.text
+    assert 'A signed-in session is active' not in response.text
+
+
 SUBMISSIONS = [
     ('post', '/practice-charts', {'practice_date':str(date.today()), 'minutes':10, 'note':'synthetic'}),
     ('post', '/practice-charts/pristine', {'detected_playing_seconds':60, 'submission_key':'synthetic-guest'}),

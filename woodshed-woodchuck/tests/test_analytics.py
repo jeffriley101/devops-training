@@ -43,6 +43,8 @@ def db(tmp_path, monkeypatch):
         monkeypatch.setattr(module, "SessionLocal", factory)
     monkeypatch.setattr(analytics, "_retry_after", 0)
     monkeypatch.setattr(analytics, "_last_warning", float("-inf"))
+    # Alembic's logging setup in migration tests disables existing loggers.
+    monkeypatch.setattr(analytics.logger, "disabled", False)
     monkeypatch.setenv("WOODSHED_ANALYTICS_ENABLED", "1")
     monkeypatch.setenv("SITE_ADMIN_TOKEN", "analytics-test-admin")
     monkeypatch.setattr(analytics, "utc_now", lambda: NOW)
@@ -278,6 +280,11 @@ def test_admin_analytics_accepts_known_cohort_filters_and_rejects_unknown(db, mo
     assert "Enrolled active testers" in pilot_page.text
     assert "Active on join day" in pilot_page.text
     assert "Returned after join day" in pilot_page.text
+    assert "C001 new registration claims: <strong>Open</strong>" in c001_page.text
+    monkeypatch.setenv("C001_REGISTRATION_DISABLED", "true")
+    closed = result.get("/admin/analytics?cohort=C001")
+    assert "C001 new registration claims: <strong>Closed</strong>" in closed.text
+    assert '/prebeta/C001/display' in closed.text
     assert "Enrolled active testers" not in all_page.text
 
     bad = result.get("/admin/analytics?cohort=NOT-A-COHORT")

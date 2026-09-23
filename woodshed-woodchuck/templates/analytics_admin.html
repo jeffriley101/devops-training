@@ -14,6 +14,8 @@
 {% endcall %}
 <section class="card">
   <h2>Tester cohort</h2>
+  <p>C001 new registration claims: <strong>{{ 'Open' if c001_registration_open else 'Closed' }}</strong>.
+    <a href="/prebeta/C001/display">Display / print C001 entry QR</a>.</p>
   <div class="button-row">
     <a class="btn {{ 'btn-primary' if not selected_cohort else 'btn-secondary' }}" href="/admin/analytics">All accounts</a>
     <a class="btn {{ 'btn-primary' if selected_cohort == 'PILOT-D1' else 'btn-secondary' }}" href="/admin/analytics?cohort=PILOT-D1">PILOT-D1</a>
