@@ -103,7 +103,8 @@ def request_consent(session,*,parent_email,director_email='',director_name='',pr
         rule=session.get(AccountPrivacy,profile.id)
         if rule and consent_active(session,rule):raise ValueError('Current account permission already exists.')
         declare_age(session,profile.id,'under13')
-    if session.scalar(select(PendingConsent.id).where(PendingConsent.parent_email==email,PendingConsent.expires_at>now)):
+    if session.scalar(select(PendingConsent.id).where(PendingConsent.parent_email==email,
+            PendingConsent.notice_version==version,PendingConsent.expires_at>now)):
         raise ValueError('An unexpired request exists. Check the parent inbox.')
     if session.scalar(select(func.count(PendingConsent.id)).where(PendingConsent.created_at>now-timedelta(hours=1)))>=125:
         raise ValueError('Permission requests are temporarily busy.')
