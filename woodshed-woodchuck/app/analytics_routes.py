@@ -7,6 +7,7 @@ from fastapi.templating import Jinja2Templates
 from .analytics import build_report
 from .db import SessionLocal
 from .site_admin import require_site_admin
+from .tester_enrollments import c001_registration_open
 
 
 router = APIRouter()
@@ -26,6 +27,7 @@ def analytics_page(request: Request, cohort: str | None = None):
             "title": "Pre-beta activity",
             "report": report,
             "selected_cohort": cohort,
+            "c001_registration_open": c001_registration_open(),
         },
         headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"},
     )

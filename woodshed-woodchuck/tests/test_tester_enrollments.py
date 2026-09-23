@@ -29,6 +29,7 @@ CLAIMED = datetime(2026, 9, 20, 15, 30, 12, 345678, tzinfo=timezone.utc)
 
 @pytest.fixture
 def tester_db(monkeypatch):
+    monkeypatch.delenv("C001_REGISTRATION_DISABLED", raising=False)
     engine = create_engine(
         "sqlite://",
         poolclass=StaticPool,
@@ -245,6 +246,8 @@ def test_c001_under13_claim_survives_cross_device_activation_and_retry(tester_db
     from app import kws_verification
     monkeypatch.setattr(kws_verification, "verified_for_activation", lambda session, row: verification)
 
+    # Closure stops new claims, but must not strand an established parent flow.
+    monkeypatch.setenv("C001_REGISTRATION_DISABLED", "true")
     # This is a fresh database session with no original browser/session context.
     with tester_db() as parent_device_session:
         created, evidence, permission = consent.activate(

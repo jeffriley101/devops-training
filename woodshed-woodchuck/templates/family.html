@@ -73,6 +73,6 @@
 <form method="post" action="/family/parent/withdraw">{{ csrf_field() }}<label><input type="checkbox" name="withdraw" value="yes" required> Withdraw account permission and pause activity</label><button>Confirm withdrawal</button></form>
 {% elif kind == 'withdraw' %}<p>Withdrawal pauses account activity and parent/director access. It does not delete saved data or change memberships.</p><form method="post">{{ csrf_field() }}<button name="withdraw" value="yes">Withdraw permission</button></form>
 {% endif %}
-<p><a href="/family/practice">Student private practice</a> · <a href="/family/parent-access">Verify parent access</a> · <a href="/family/director-access">Verify director access</a> · <a href="/family/notice">Parent notice</a> · <a href="/account/help">Help/privacy requests</a> · <a href="/guest">Guest / student sign out</a></p>
+<p><a href="/family/practice">Student private practice</a> · <a href="/family/parent-access">Verify parent access</a> · <a href="/family/director-access">Verify director access</a> · <a href="/family/notice">Parent notice</a> · <a href="/account/help">Help/privacy requests</a> · <a href="/guest">Open Guest tools (may ask you to clear this browser session)</a></p>
 <form method="post" action="/family/logout">{{ csrf_field() }}<button>{% if kind in ('approve','kws-result','activate','parent-access','parent-open','parent','withdraw') %}Close Parent Access{% else %}Close adult access{% endif %}</button></form>
 </main></body></html>

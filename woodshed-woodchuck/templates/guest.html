@@ -12,9 +12,9 @@
   <p class="chip">Guest exploration</p>
   <h1>Try Woodshed's practice tools</h1>
   {% if blocked %}
-  <p>A signed-in session is active in this browser. Confirm sign out before using Guest tools. Opening this page has not signed you out or joined C001.</p>
-  <button id="guest-confirm-logout" class="btn btn-primary" type="button">Confirm sign out and explore as Guest</button>
-  <a class="btn btn-secondary" href="/">Keep my signed-in session</a>
+  <p>Woodshed session data is active in this browser and must be cleared before using Guest tools. Opening this page has not cleared your browser session or joined C001.</p>
+  <button id="guest-confirm-logout" class="btn btn-primary" type="button">Clear browser session and explore as Guest</button>
+  <a class="btn btn-secondary" href="/">Keep this browser session</a>
   {% elif signing_in %}
   <h2>Sign in to an existing account</h2>
   <p>Your account's saved progress will load. Guest preferences and activity will not transfer.</p>

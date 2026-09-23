@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 from datetime import date, datetime, time, timedelta, timezone
 import re
 from zoneinfo import ZoneInfo
@@ -84,6 +85,11 @@ def tester_has_lifetime_access(session, profile_id: int, *, at: datetime | None 
     ).limit(1)) is not None
 
 
+def c001_registration_open() -> bool:
+    """Manual entry switch; established claims and enrollments remain valid."""
+    return os.getenv("C001_REGISTRATION_DISABLED", "").strip().lower() in {"", "0", "false", "no", "off"}
+
+
 def establish_registration_context(request, cohort_key: str) -> None:
     key = normalize_cohort_key(cohort_key)
     if key != C001:
@@ -91,6 +97,8 @@ def establish_registration_context(request, cohort_key: str) -> None:
     existing = registration_context(request)
     if existing == key:
         return
+    if not c001_registration_open():
+        raise ValueError("C001 registration is currently closed. Guest tools remain available.")
     request.session[SESSION_REGISTRATION_CONTEXT] = {"cohort_key": key}
 
 

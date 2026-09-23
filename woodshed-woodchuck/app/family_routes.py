@@ -14,7 +14,26 @@ from .age_privacy import require_eligible,eligible
 from . import child_authorization as service,parent_access
 from .child_models import ConsentEvidence,DirectorPermission,PendingConsent
 from .models import WoodchuckProfile,PracticeChart,PracticeChartVerification,StudentVerifierConnection,TrustedVerifier
-router=APIRouter(route_class=PrivateRoute)
+class FamilyPageRoute(PrivateRoute):
+    """Render page validation errors without changing JSON data endpoints."""
+    def get_route_handler(self):
+        handler = super().get_route_handler()
+        async def family_page(request):
+            try:
+                return await handler(request)
+            except HTTPException as error:
+                from .age_privacy import AgeScreenRequired
+                if (isinstance(error, AgeScreenRequired) or request.url.path.endswith('/data')
+                        or 'application/json' in request.headers.get('accept', '')):
+                    raise
+                response = page(request, 'message', message=error.detail)
+                response.status_code = error.status_code
+                response.headers.update(error.headers or {})
+                return response
+        return family_page
+
+
+router=APIRouter(route_class=FamilyPageRoute)
 templates=Jinja2Templates(directory=str(Path(__file__).resolve().parent.parent/'templates'))
 
 def page(request,kind,**context):

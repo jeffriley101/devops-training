@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>C001 Pre-Beta · Woodshed Woodchuck</title>
+<link rel="stylesheet" href="/static/css/styles.css">
+<style>
+  .c001-entry { max-width: 42rem; margin: 2rem auto; padding: 2rem; text-align: center; }
+  .c001-qr { display: block; width: 320px; max-width: 100%; height: auto; margin: 1rem auto; background: white; }
+  @media print { body, .c001-entry { background: white; color: black; box-shadow: none; } }
+</style></head>
+<body><main class="card c001-entry">
+<h1>Woodshed Woodchuck</h1><h2>C001 Pre-Beta</h2>
+{% if message %}<p role="status">{{ message }}</p><p><a href="/guest">Explore Guest tools</a></p>
+{% else %}
+{% if registration_open %}<p>Scan to explore Guest tools or begin C001 registration.</p>
+{% else %}<p>Scan to explore Guest tools. New C001 registration is currently closed.</p>{% endif %}
+<img class="c001-qr" src="{{ entry_qr }}" width="320" height="320" alt="QR code for the public C001 entry URL below">
+<p><a href="{{ entry_url }}">{{ entry_url }}</a></p>
+{% if not registration_open %}<p role="status">New C001 registration claims are currently closed. Guest tools remain available.</p>{% endif %}
+<p>Account creation follows age and parent-permission requirements.</p>
+{% endif %}
+</main></body></html>
