@@ -192,6 +192,33 @@ def test_gate_and_expired_forged_approval_no_records(age_db,captured,monkeypatch
     with age_db() as s:assert s.scalar(select(func.count(ConsentEvidence.id)))==0
 
 
+def test_obsolete_notice_pending_request_does_not_block_current_notice(age_db,captured):
+    mail,now=captured
+    with age_db() as s:
+        old=PendingConsent(profile_id=None,parent_email='same-parent@example.test',director_email='',director_name='',review_allowed=False,
+            approve_hash='o'*64,created_at=now[0],expires_at=now[0]+timedelta(hours=1),notice_version='obsolete-notice')
+        s.add(old);s.commit();old_id=old.id
+        fresh=service.request_consent(s,parent_email='same-parent@example.test')
+        s.commit();fresh_id=fresh.id
+    with age_db() as s:
+        rows=list(s.scalars(select(PendingConsent).order_by(PendingConsent.id)))
+        assert [row.id for row in rows]==[old_id,fresh_id]
+        assert rows[0].notice_version=='obsolete-notice'
+        assert rows[1].notice_version==service.NOTICE_VERSION
+    assert len(mail)==1
+
+
+def test_current_notice_pending_request_still_blocks_duplicate(age_db,captured):
+    mail,_=captured
+    with age_db() as s:
+        first=service.request_consent(s,parent_email='same-parent@example.test')
+        s.commit();first_id=first.id
+        with pytest.raises(ValueError,match='unexpired request exists'):
+            service.request_consent(s,parent_email='same-parent@example.test')
+        assert list(s.scalars(select(PendingConsent.id)))==[first_id]
+    assert len(mail)==1
+
+
 def test_existing_accepted_connection_reused_and_disconnect(age_db,captured):
     mail,now=captured;c,p,pid,wid=authorize(age_db,captured);d=connect(mail)
     with age_db() as s:cid=s.scalar(select(StudentVerifierConnection.id))
