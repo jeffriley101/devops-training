@@ -1006,6 +1006,30 @@ class ArcadeHighScore(Base):
     )
 
 
+class ArcadeAttemptPack(Base):
+    __tablename__ = "arcade_attempt_packs"
+    __table_args__ = (
+        CheckConstraint("attempts_used BETWEEN 0 AND 3", name="ck_arcade_pack_attempts"),
+        CheckConstraint("cost = 100", name="ck_arcade_pack_cost"),
+        Index("ix_arcade_packs_profile_game", "profile_id", "game_key"),
+    )
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    profile_id: Mapped[int] = mapped_column(ForeignKey("woodchuck_profiles.id", ondelete="CASCADE"), nullable=False)
+    game_key: Mapped[str] = mapped_column(String(30), nullable=False)
+    cost: Mapped[int] = mapped_column(Integer, nullable=False, default=100)
+    attempts_used: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+
+class ArcadeStartRequest(Base):
+    __tablename__ = "arcade_start_requests"
+    __table_args__ = (UniqueConstraint("profile_id", "request_id", name="uq_arcade_start_request"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    profile_id: Mapped[int] = mapped_column(ForeignKey("woodchuck_profiles.id", ondelete="CASCADE"), nullable=False)
+    request_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    play_id: Mapped[int] = mapped_column(ForeignKey("arcade_play_sessions.id", ondelete="CASCADE"), nullable=False)
+
+
 class ArcadePlaySession(Base):
     __tablename__ = "arcade_play_sessions"
     __table_args__ = (
@@ -1029,7 +1053,7 @@ class ArcadePlaySession(Base):
             name="ck_arcade_play_session_daily_date_scope",
         ),
         CheckConstraint(
-            "entry_cost = 1", name="ck_arcade_play_session_entry_cost"
+            "entry_cost IN (0, 1, 100)", name="ck_arcade_play_session_entry_cost"
         ),
         CheckConstraint(
             "submitted_score IS NULL OR submitted_score >= 0",
@@ -1045,6 +1069,11 @@ class ArcadePlaySession(Base):
             "game_key",
             "completed_at",
         ),
+        UniqueConstraint("pack_id", "attempt_number", name="uq_arcade_pack_attempt"),
+        Index("ix_arcade_play_game_completed", "game_key", "completed_at"),
+        CheckConstraint("(pack_id IS NULL AND attempt_number IS NULL) OR "
+                        "(pack_id IS NOT NULL AND attempt_number IS NOT NULL AND attempt_number BETWEEN 1 AND 3)",
+                        name="ck_arcade_pack_attempt_number"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -1060,8 +1089,10 @@ class ArcadePlaySession(Base):
     )
     daily_play_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     entry_cost: Mapped[int] = mapped_column(
-        Integer, default=1, server_default="1", nullable=False
+        Integer, default=0, server_default="0", nullable=False
     )
+    pack_id: Mapped[int | None] = mapped_column(ForeignKey("arcade_attempt_packs.id"), nullable=True)
+    attempt_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

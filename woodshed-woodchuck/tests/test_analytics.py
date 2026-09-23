@@ -1,4 +1,5 @@
 """Identity, authorization, read-only aggregation and isolated failure contracts."""
+from uuid import uuid4
 import base64
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
@@ -467,7 +468,7 @@ def test_missing_event_table_never_breaks_pages_or_primary_actions(db, path, cap
         assert result.get(path).status_code == 200
     # Login, reward, game debit/completion and saved practice still commit.
     assert result.post("/account/login", data={"woodchuck_id": "WC-AN-1", "pin": "2468"}).status_code == 200
-    start = result.post("/arcade/plays", json={"game_key": "blue"})
+    start = result.post("/arcade/plays", json={'request_id': uuid4().hex, 'game_key': "blue"})
     assert start.status_code == 200
     token = start.json()["play_token"]
     assert result.post(f"/arcade/plays/{token}/complete", json={"score": 10}).status_code == 200

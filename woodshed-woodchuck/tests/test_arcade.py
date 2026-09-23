@@ -1,4 +1,5 @@
 from __future__ import annotations
+from uuid import uuid4
 
 from pathlib import Path
 import subprocess
@@ -13,7 +14,7 @@ from app import account_routes, arcade_routes, main
 from app.arcade_scores import arcade_score_payload, record_arcade_high_score
 from app.db import Base
 from app.main import app
-from app.models import ArcadeHighScore, WoodchuckProfile, WoodchuckState
+from app.models import ArcadeHighScore, ArcadePlaySession, WoodchuckProfile, WoodchuckState
 from app.security import hash_pin
 
 
@@ -43,6 +44,8 @@ def arcade_database(monkeypatch: pytest.MonkeyPatch):
     )
     factory = sessionmaker(bind=engine, expire_on_commit=False, autoflush=False)
     Base.metadata.create_all(engine)
+    from app import session_revocations
+    monkeypatch.setattr(session_revocations, "SessionLocal", factory)
     monkeypatch.setattr(account_routes, "SessionLocal", factory)
     monkeypatch.setattr(arcade_routes, "SessionLocal", factory)
     monkeypatch.setattr(main, "SessionLocal", factory)
@@ -70,9 +73,13 @@ def add_profile(
         )
         session.add(profile)
         session.flush()
+        from app.age_privacy import declare_age
+        from datetime import datetime, timezone
+        if profile.status == "active":
+            declare_age(session, profile.id, "adult", at=datetime(2000, 1, 1, tzinfo=timezone.utc))
         session.add(WoodchuckState(
             profile_id=profile.id,
-            state_json={"progress": {"credits": 20}},
+            state_json={"progress": {"credits": 300}},
             revision=0,
         ))
         session.commit()
@@ -91,7 +98,7 @@ def signed_client(factory, suffix: str) -> tuple[TestClient, WoodchuckProfile]:
 
 
 def submit_paid_score(client: TestClient, game_key: str, score: int):
-    started = client.post("/arcade/plays", json={"game_key": game_key})
+    started = client.post("/arcade/plays", json={'request_id': uuid4().hex, 'game_key': game_key})
     assert started.status_code == 200
     return client.post(
         f"/arcade/scores/{game_key}",
@@ -147,7 +154,8 @@ def test_arcade_room_renders_nine_touch_friendly_cabinets() -> None:
     assert ARCADE.count('class="arcade-cabinet-marquee"') == 9
     assert ARCADE.count('class="arcade-cabinet-control-panel" aria-hidden="true"') == 9
     assert ARCADE.count('data-arcade-personal-best=') == 9
-    assert ARCADE.count("1🌼 TO PLAY · WIN UP TO 5🌼") == 9
+    assert ARCADE.count("100 Dandelions · 3 attempts") == 7
+    assert ARCADE.count("Always free") == 2
     assert "arcade-cabinet-copy" not in ARCADE
     for retired_copy in (
         "Burrow, collect, and build your band.",
@@ -165,14 +173,14 @@ def test_arcade_room_renders_nine_touch_friendly_cabinets() -> None:
     assert "min-height: 17rem" in CSS[CSS.index(".arcade-cabinet-link {"):]
     mobile = CSS[CSS.index("@media (max-width: 760px)"):]
     assert ".arcade-cabinet-grid { grid-template-columns: 1fr; }" in mobile
-    assert '/static/js/arcade.js?v=14' in ARCADE
-    assert '/static/js/arcade-economy.js?v=5' in ARCADE
+    assert '/static/js/arcade.js?v=15' in ARCADE
+    assert '/static/js/arcade-economy.js?v=6' in ARCADE
 
 
 def test_arcade_pages_route_game_specific_soundtracks() -> None:
     assert '/static/js/arcade-soundtrack.js' not in ARCADE
     for template in (GAME, PLUNGE, SCALE, HISTORY, WHEEL, THIRDS, NINES, INTERVAL):
-        assert '/static/js/arcade-soundtrack.js?v=7' in template
+        assert '/static/js/arcade-soundtrack.js?v=8' in template
     assert 'data-arcade-soundtrack="{{ arcade_game.key }}"' in GAME
     assert 'data-arcade-soundtrack="plunge-burrow"' in PLUNGE
     assert 'data-arcade-soundtrack="scale-keyboard"' in SCALE
@@ -247,7 +255,7 @@ def test_soundtrack_toggle_preserves_authoritative_master_audio_state() -> None:
     assert "let playbackActivated = false" in SOUNDTRACK_JS
     assert 'const label = musicOn ? "Mute Arcade soundtrack" : "Turn on Arcade music"' in SOUNDTRACK_JS
     assert "playbackActivated = true" in SOUNDTRACK_JS
-    initializer = SOUNDTRACK_JS[SOUNDTRACK_JS.index('document.addEventListener("DOMContentLoaded"'):]
+    initializer = SOUNDTRACK_JS[SOUNDTRACK_JS.index('function wireSoundtrackControls()'):]
     assert "audio.currentTime = 0" in initializer
     assert "\n    playSoundtrack();" not in initializer
     assert "localStorage" not in SOUNDTRACK_JS
@@ -321,7 +329,7 @@ def test_arcade_landing_renders_personal_bests_from_existing_score_payload() -> 
     assert "data-arcade-personal-best" in ARCADE_JS
     assert "renderPersonalBest(gameKey, payload.best_score)" in room
     assert "data-arcade-personal-best" in room
-    assert ARCADE.index('/static/js/arcade-economy.js?v=5') < ARCADE.index('/static/js/arcade.js?v=14')
+    assert ARCADE.index('/static/js/arcade-economy.js?v=6') < ARCADE.index('/static/js/arcade.js?v=15')
     assert ARCADE.count('data-arcade-leaderboard=') == 8
     assert 'data-arcade-leaderboard="history-mystery"' not in ARCADE
 
@@ -577,6 +585,12 @@ def test_top_five_uses_olympic_ties_and_public_active_names(
         with arcade_database() as session:
             session.add(ArcadeHighScore(
                 profile_id=profile.id, game_key="blue", best_score=score
+            ))
+            from datetime import datetime, timezone
+            now = datetime.now(timezone.utc)
+            session.add(ArcadePlaySession(
+                profile_id=profile.id, game_key="blue", play_token=uuid4().hex,
+                started_at=now, completed_at=now, submitted_score=score, entry_cost=1,
             ))
             session.commit()
 

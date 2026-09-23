@@ -127,6 +127,17 @@
     document.querySelectorAll("[data-arcade-balance]").forEach(function (output) {
       if (Number.isInteger(balance)) output.textContent = String(balance);
     });
+    document.querySelectorAll("[data-arcade-price]").forEach(function (output) {
+      if (output.dataset.arcadePrice && output.dataset.arcadePrice !== payload.game_key) return;
+      if (payload.free_reason !== undefined) output.textContent = payload.free_reason === "always_free"
+        ? "Always free" : payload.free_reason === "full_access" ? "Free with Full Access"
+        : "100 Dandelions · 3 attempts";
+    });
+    document.querySelectorAll("[data-arcade-attempts]").forEach(function (output) {
+      if (output.dataset.arcadeAttempts && output.dataset.arcadeAttempts !== payload.game_key) return;
+      if (payload.free_reason === "always_free" || payload.free_reason === "full_access") output.textContent = "";
+      else if (Number.isInteger(payload.attempts_remaining)) output.textContent = `${payload.attempts_remaining} purchased attempts remaining`;
+    });
     document.querySelectorAll("[data-arcade-economy-message]").forEach(function (message) {
       if (payload.reward_eligible === false) {
         message.textContent = "Daily prize plays complete — scores still count.";
@@ -149,6 +160,12 @@
 
   function startPlay(gameKey) {
     const requestAccount = root.WWState?.accountRequest();
+    const storageKey = `woodshed:arcade-start:${requestAccount?.identity || "account"}:${gameKey}`;
+    let requestId = pendingStarts.get(storageKey);
+    try { requestId = requestId || root.sessionStorage?.getItem(storageKey); } catch (_) {}
+    requestId = requestId || (root.crypto?.randomUUID?.() || `start-${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`);
+    pendingStarts.set(storageKey, requestId);
+    try { root.sessionStorage?.setItem(storageKey, requestId); } catch (_) {}
     return arcadeRequest({
       gameKey,
       operation: "start",
@@ -157,18 +174,22 @@
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ game_key: gameKey }),
+        body: JSON.stringify({ game_key: gameKey, request_id: requestId }),
       },
     }).then(function (payload) {
       if (root.WWState && !root.WWState.stateForResponse(requestAccount)) return payload;
+      pendingStarts.delete(storageKey);
+      try { root.sessionStorage?.removeItem(storageKey); } catch (_) {}
+      if (payload.already_completed || payload.attempt_closed) throw new Error("That attempt is no longer available. Select New Game for another attempt.");
       if (typeof payload.play_token === "string") {
         playTokens.set(payload.play_token, gameKey);
       }
       renderStatus(payload, requestAccount);
       document.querySelectorAll("[data-arcade-economy-message]").forEach(function (message) {
-        message.textContent = payload.reward_eligible === false
-          ? "-1 🌼 · Daily prize plays complete — scores still count."
-          : "-1 🌼";
+        message.textContent = payload.resumed ? "Resuming the same attempt. No extra charge."
+          : payload.charged_now > 0 ? "100 Dandelions paid · 3 attempts included; this attempt has started."
+          : "Attempt started. No charge.";
+        if (payload.reward_eligible === false) message.textContent += " Daily prize plays complete — scores still count.";
       });
       return payload;
     });
@@ -232,6 +253,7 @@
   }
 
   const playTokens = new Map();
+  const pendingStarts = new Map();
 
   root.WoodshedArcadeEconomy = Object.freeze({
     ArcadeRequestError,

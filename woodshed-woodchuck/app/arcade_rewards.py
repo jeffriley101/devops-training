@@ -16,12 +16,13 @@ from .history_attempts import (
     HistoryAttemptError, accept_history_answer, history_score, history_snapshot,
     initialize_history,
 )
-from .models import ArcadePlaySession, WoodchuckProfile, WoodchuckState
+from .models import ArcadePlaySession, ArcadeAttemptPack, ArcadeStartRequest, WoodchuckProfile, WoodchuckState
+from .arcade_access import access_policy, CLASSROOM, PACK_COST, PACK_ATTEMPTS
 from .xp import plunge_best_payload, record_plunge_best_score
 
 
 ARCADE_TIMEZONE = ZoneInfo("America/Chicago")
-ARCADE_ENTRY_COST = 1
+ARCADE_ENTRY_COST = PACK_COST
 DAILY_REWARDED_PLAY_LIMIT = 10
 ARCADE_PLAY_GAME_KEYS = frozenset({
     "plunge-burrow",
@@ -165,7 +166,8 @@ def arcade_play_status(
     game_key: str,
     now: datetime | None = None,
 ) -> dict[str, object]:
-    key = validate_arcade_play_game_key(game_key)
+    key = game_key if game_key in CLASSROOM else validate_arcade_play_game_key(game_key)
+    policy = access_policy(session, profile_id, key)
     timestamp = _utc_now(now)
     profile_exists = session.scalar(select(WoodchuckProfile.id).where(
         WoodchuckProfile.id == profile_id,
@@ -192,10 +194,12 @@ def arcade_play_status(
             ArcadePlaySession.completed_at.is_(None),
         )) is not None
     return {
+        **policy,
         "game_key": key,
         "balance": _balance(state) if state is not None else 0,
         "state_revision": state.revision if state is not None else 0,
-        "entry_cost": ARCADE_ENTRY_COST,
+        "attempts_included": PACK_ATTEMPTS,
+        "attempts_remaining": remaining_attempts(session, profile_id, key),
         "completed_reward_plays": completed,
         "daily_reward_limit": DAILY_REWARDED_PLAY_LIMIT,
         "reward_eligible": completed < DAILY_REWARDED_PLAY_LIMIT,
@@ -204,12 +208,19 @@ def arcade_play_status(
     }
 
 
+def remaining_attempts(session, profile_id, game_key):
+    return int(session.scalar(select(func.sum(PACK_ATTEMPTS - ArcadeAttemptPack.attempts_used)).where(
+        ArcadeAttemptPack.profile_id == profile_id, ArcadeAttemptPack.game_key == game_key,
+        ArcadeAttemptPack.attempts_used < PACK_ATTEMPTS)) or 0)
+
+
 def start_arcade_play(
     session: Session,
     *,
     profile_id: int,
     game_key: str,
     now: datetime | None = None,
+    request_id: str | None = None,
 ) -> ArcadePlayStartResult:
     key = validate_arcade_play_game_key(game_key)
     timestamp = _utc_now(now)
@@ -224,6 +235,23 @@ def start_arcade_play(
 
     daily_play_date = None
     state = _state_for_update(session, profile_id)
+    policy = access_policy(session, profile_id, key)
+    prior_request = session.scalar(select(ArcadeStartRequest).where(
+        ArcadeStartRequest.profile_id == profile_id,
+        ArcadeStartRequest.request_id == request_id)) if request_id else None
+    if prior_request:
+        prior = session.get(ArcadePlaySession, prior_request.play_id)
+        if prior.game_key != key:
+            raise ArcadePlayConflictError('That start request belongs to another game.')
+        completed = _completed_plays_today(session, profile_id=profile_id, game_key=key, now=timestamp)
+        return ArcadePlayStartResult(prior, _balance(state), completed < DAILY_REWARDED_PLAY_LIMIT,
+                                     completed, state.revision, resumed=True)
+
+    def remember(play):
+        if request_id:
+            session.add(ArcadeStartRequest(profile_id=profile_id, request_id=request_id, play_id=play.id))
+            session.flush()
+
     if key == "history-mystery":
         daily_play_date = _central_play_date(timestamp)
         prior = session.scalar(select(ArcadePlaySession).where(
@@ -233,6 +261,7 @@ def start_arcade_play(
         ).with_for_update())
         if prior is not None and prior.completed_at is None:
             initialize_history(state, prior)
+            remember(prior)
             return ArcadePlayStartResult(prior, _balance(state), True, 0, state.revision, resumed=True)
         if prior is not None:
             raise ArcadeDailyLimitError(
@@ -240,7 +269,7 @@ def start_arcade_play(
             )
 
     # A browser can lose the response after this transaction commits.  Do not
-    # charge a second dandelion when the student safely retries the same game:
+    # debit again or consume another slot when the student retries the same game:
     # the profile row lock above serializes concurrent start requests and this
     # returns the already-authorized, unfinished run instead.
     if key != "history-mystery":
@@ -255,6 +284,7 @@ def start_arcade_play(
             .with_for_update()
         )
         if unfinished_play is not None:
+            remember(unfinished_play)
             completed = _completed_plays_today(
                 session, profile_id=profile_id, game_key=key, now=timestamp
             )
@@ -268,12 +298,25 @@ def start_arcade_play(
             )
 
     current_balance = _balance(state)
-    if current_balance < ARCADE_ENTRY_COST:
-        raise InsufficientArcadeBalanceError(
-            "You need 1 dandelion to start a new Arcade game."
-        )
-    new_balance = current_balance - ARCADE_ENTRY_COST
-    _set_balance(state, new_balance)
+    pack = None
+    charge = 0
+    if not policy['free_reason']:
+        pack = session.scalar(select(ArcadeAttemptPack).where(
+            ArcadeAttemptPack.profile_id == profile_id, ArcadeAttemptPack.game_key == key,
+            ArcadeAttemptPack.attempts_used < PACK_ATTEMPTS).order_by(ArcadeAttemptPack.id).with_for_update()
+            .execution_options(populate_existing=True))
+        if pack is None:
+            if current_balance < PACK_COST:
+                raise InsufficientArcadeBalanceError('You need 100 Dandelions for 3 attempts.')
+            charge = PACK_COST
+            pack = ArcadeAttemptPack(profile_id=profile_id, game_key=key, cost=PACK_COST,
+                                     attempts_used=0, created_at=timestamp)
+            session.add(pack)
+            session.flush()
+        pack.attempts_used += 1
+    new_balance = current_balance - charge
+    if charge:
+        _set_balance(state, new_balance)
     completed = _completed_plays_today(
         session, profile_id=profile_id, game_key=key, now=timestamp
     )
@@ -283,7 +326,9 @@ def start_arcade_play(
         play_token=token_urlsafe(32),
         started_at=timestamp,
         daily_play_date=daily_play_date,
-        entry_cost=ARCADE_ENTRY_COST,
+        entry_cost=charge,
+        pack_id=pack.id if pack else None,
+        attempt_number=pack.attempts_used if pack else None,
     )
     session.add(play)
     try:
@@ -296,6 +341,7 @@ def start_arcade_play(
         raise
     if key == "history-mystery":
         initialize_history(state, play)
+    remember(play)
     return ArcadePlayStartResult(
         play=play,
         balance=new_balance,
@@ -336,6 +382,7 @@ def complete_arcade_play(
         select(ArcadePlaySession)
         .where(ArcadePlaySession.play_token == play_token)
         .with_for_update()
+        .execution_options(populate_existing=True)
     )
     if play is None or play.profile_id != profile_id:
         raise ValueError("That Arcade play is unavailable.")
@@ -356,6 +403,7 @@ def complete_arcade_play(
             "balance": _balance(state) if state is not None else 0,
             "state_revision": state.revision if state is not None else 0,
             "already_completed": True,
+            "attempts_remaining": remaining_attempts(session, profile_id, play.game_key),
         }
 
     if play.game_key == "history-mystery":
@@ -406,6 +454,7 @@ def complete_arcade_play(
         "reward_eligible": reward_eligible,
         "daily_reward_limit": DAILY_REWARDED_PLAY_LIMIT,
         "already_completed": False,
+        "attempts_remaining": remaining_attempts(session, profile_id, play.game_key),
         "updated": updated,
     }
 

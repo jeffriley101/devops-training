@@ -1,4 +1,5 @@
 from __future__ import annotations
+from uuid import uuid4
 
 from datetime import date, datetime, timezone
 import json
@@ -82,7 +83,7 @@ def history_database(monkeypatch: pytest.MonkeyPatch):
     engine.dispose()
 
 
-def add_profile(factory, suffix: str, *, credits: int = 20) -> WoodchuckProfile:
+def add_profile(factory, suffix: str, *, credits: int = 119) -> WoodchuckProfile:
     with factory() as session:
         profile = WoodchuckProfile(
             woodchuck_id=f"WC-HISTORY-{suffix}",
@@ -95,6 +96,10 @@ def add_profile(factory, suffix: str, *, credits: int = 20) -> WoodchuckProfile:
         )
         session.add(profile)
         session.flush()
+        from app.age_privacy import declare_age
+        from datetime import datetime, timezone
+        if profile.status == "active":
+            declare_age(session, profile.id, "adult", at=datetime(2000, 1, 1, tzinfo=timezone.utc))
         session.add(WoodchuckState(
             profile_id=profile.id,
             state_json={"progress": {"credits": credits}},
@@ -104,7 +109,7 @@ def add_profile(factory, suffix: str, *, credits: int = 20) -> WoodchuckProfile:
         return profile
 
 
-def signed_client(factory, suffix: str, *, credits: int = 20):
+def signed_client(factory, suffix: str, *, credits: int = 119):
     profile = add_profile(factory, suffix, credits=credits)
     client = TestClient(app)
     assert client.post(
@@ -156,7 +161,7 @@ def test_history_mystery_uses_thunderpants_through_shared_soundtrack() -> None:
     )
     assert 'data-arcade-soundtrack="history-mystery"' in TEMPLATE
     assert 'data-arcade-soundtrack-toggle' in TEMPLATE
-    assert '/static/js/arcade-soundtrack.js?v=7' in TEMPLATE
+    assert '/static/js/arcade-soundtrack.js?v=8' in TEMPLATE
     assert 'url: "/static/audio/arcade/thunderpants.mp3?v=2"' in soundtrack
     assert (ROOT / "static" / "audio" / "arcade" / "thunderpants.mp3").is_file()
 
@@ -241,26 +246,26 @@ console.log(JSON.stringify({ score: game.score, status: game.status,
 
 
 def test_daily_start_cost_limit_and_idempotent_completion(history_database) -> None:
-    client, profile = signed_client(history_database, "DAILY", credits=4)
+    client, profile = signed_client(history_database, "DAILY", credits=103)
     assert client.get("/arcade/history-mystery").status_code == 200
     with history_database() as session:
-        assert session.get(WoodchuckState, profile.id).state_json["progress"]["credits"] == 4
+        assert session.get(WoodchuckState, profile.id).state_json["progress"]["credits"] == 103
 
-    first = client.post("/arcade/plays", json={"game_key": "history-mystery"})
+    first = client.post("/arcade/plays", json={'request_id': uuid4().hex, 'game_key': "history-mystery"})
     assert first.status_code == 200
     assert first.json()["balance"] == 3
-    assert first.json()["entry_cost"] == 1
+    assert first.json()["entry_cost"] == 100
     assert client.get("/arcade/plays/status/history-mystery").json()[
         "daily_play_available"
     ] is False
-    second = client.post("/arcade/plays", json={"game_key": "history-mystery"})
+    second = client.post("/arcade/plays", json={'request_id': uuid4().hex, 'game_key': "history-mystery"})
     assert second.status_code == 200
     assert second.json()["resumed"] is True
     assert second.json()["play_token"] == first.json()["play_token"]
     assert second.json()["balance"] == 3
 
     answer_quiz(history_database, profile, first.json()['play_token'], 5)
-    assert client.post("/arcade/plays", json={"game_key": "history-mystery"}).status_code == 409
+    assert client.post("/arcade/plays", json={'request_id': uuid4().hex, 'game_key': "history-mystery"}).status_code == 409
 
     completed = client.post(
         f"/arcade/plays/{first.json()['play_token']}/complete", json={"score": 5}
@@ -284,7 +289,7 @@ def test_daily_start_cost_limit_and_idempotent_completion(history_database) -> N
 
 def test_zero_balance_and_score_bounds_are_server_enforced(history_database) -> None:
     empty, empty_profile = signed_client(history_database, "EMPTY", credits=0)
-    rejected = empty.post("/arcade/plays", json={"game_key": "history-mystery"})
+    rejected = empty.post("/arcade/plays", json={'request_id': uuid4().hex, 'game_key': "history-mystery"})
     assert rejected.status_code == 409
     with history_database() as session:
         assert session.scalar(select(ArcadePlaySession.id)) is None
@@ -292,8 +297,8 @@ def test_zero_balance_and_score_bounds_are_server_enforced(history_database) -> 
             "progress"
         ]["credits"] == 0
 
-    client, profile = signed_client(history_database, "BOUNDS", credits=2)
-    started = client.post("/arcade/plays", json={"game_key": "history-mystery"})
+    client, profile = signed_client(history_database, "BOUNDS", credits=101)
+    started = client.post("/arcade/plays", json={'request_id': uuid4().hex, 'game_key': "history-mystery"})
     too_high = client.post(
         f"/arcade/plays/{started.json()['play_token']}/complete", json={"score": 6}
     )
@@ -316,7 +321,7 @@ def test_exact_history_payout_tiers() -> None:
 
 
 def test_central_midnight_resets_daily_eligibility(history_database) -> None:
-    profile = add_profile(history_database, "MIDNIGHT", credits=3)
+    profile = add_profile(history_database, "MIDNIGHT", credits=102)
     before_midnight = datetime(2026, 9, 1, 4, 59, tzinfo=timezone.utc)
     after_midnight = datetime(2026, 9, 1, 5, 1, tzinfo=timezone.utc)
     with history_database() as session:
@@ -374,7 +379,7 @@ def test_database_constraint_blocks_duplicate_daily_start(history_database) -> N
 def test_personal_best_is_independent_and_lower_score_does_not_replace(
     history_database,
 ) -> None:
-    profile = add_profile(history_database, "BEST", credits=4)
+    profile = add_profile(history_database, "BEST", credits=103)
     first_day = datetime(2026, 8, 30, 18, tzinfo=timezone.utc)
     second_day = datetime(2026, 8, 31, 18, tzinfo=timezone.utc)
     with history_database() as session:

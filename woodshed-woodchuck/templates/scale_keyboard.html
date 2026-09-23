@@ -12,7 +12,8 @@
 
   <div class="arcade-economy-status" aria-label="Arcade cost and balance">
     <span>Balance 🌼 <output data-arcade-balance>—</output></span>
-    <span>1🌼 TO PLAY · WIN UP TO 5🌼</span>
+    <span data-arcade-price>Checking play access…</span>
+    <span data-arcade-attempts></span>
   </div>
   <p class="arcade-economy-message" data-arcade-economy-message role="status" aria-live="polite"></p>
 
@@ -41,7 +42,7 @@
 {% endblock %}
 
 {% block page_scripts %}
-<script src="/static/js/arcade-economy.js?v=5"></script>
+<script src="/static/js/arcade-economy.js?v=6"></script>
 <script src="/static/js/scale-keyboard-data.js?v=2"></script>
 <script src="/static/js/scale-keyboard.js?v=5"></script>
 <script src="/static/js/arcade-soundtrack.js?v=8"></script>

@@ -227,6 +227,7 @@ def test_create_atomically_returns_authoritative_state_and_credentials(
         level="Beginner",
         goal="Practice every day",
         initial_state=json.dumps(browser_state),
+        age_band="adult",
     )
 
     assert result["authenticated"] is True
@@ -282,6 +283,7 @@ def test_repeated_create_does_not_create_a_second_account(monkeypatch) -> None:
         "headers": [], "query_string": b"", "session": {},
     })
     fields = {
+        "age_band": "adult",
         "display_name": "New Chuck", "pin": "2468", "instrument": "Flute",
         "level": "Beginner", "goal": "Practice every day",
         "initial_state": json.dumps({"progress": {"credits": 0}}),
@@ -356,6 +358,8 @@ def test_stale_state_is_rejected_without_overwriting_newer_account_data(
         )
         session.add(profile)
         session.flush()
+        from app.age_privacy import declare_age
+        declare_age(session, profile.id, "adult")
         session.add(WoodchuckState(
             profile_id=profile.id,
             state_json={

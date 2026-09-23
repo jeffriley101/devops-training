@@ -1,5 +1,6 @@
 """Exercise emitted default Uvicorn logs over a loopback socket, not mock filters."""
 import json
+from uuid import uuid4
 import os
 from pathlib import Path
 import socket
@@ -17,12 +18,14 @@ from app.main import app
 from app.db import Base, engine, SessionLocal
 from app.models import WoodchuckProfile, WoodchuckState, TrustedVerifier
 from app.security import hash_pin
+from app.age_privacy import declare_age
 Base.metadata.create_all(engine)
 with SessionLocal() as s:
     p = WoodchuckProfile(woodchuck_id="WC-LOG-TEST", display_name="Synthetic",
         pin_hash=hash_pin("2468"), instrument="Flute", level="Beginner", goal="Practice")
     s.add(p)
     s.flush()
+    declare_age(s, p.id, 'adult')
     s.add(WoodchuckState(profile_id=p.id, state_json={"progress":{"credits":20}}, revision=0))
     s.add(TrustedVerifier(email="synthetic-verifier@example.test", display_name="Synthetic adult", pin_hash=hash_pin("2468")))
     s.commit()
@@ -92,7 +95,7 @@ def test_emitted_uvicorn_logs_exclude_capabilities_and_exception_payloads(tmp_pa
                      '/unknown/path-secret-marker?token=query-secret-marker']
             for path in paths:
                 request(path, {} if path.endswith('/accept') else None)
-            status, _, body = request('/arcade/plays', {'game_key': 'blue'}, cookie)
+            status, _, body = request('/arcade/plays', {'game_key': 'blue', 'request_id': uuid4().hex}, cookie)
             assert status == 200
             play_token = json.loads(body)['play_token']
             assert request(f'/arcade/plays/{play_token}/complete?token=query-secret-marker',

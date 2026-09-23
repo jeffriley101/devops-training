@@ -35,6 +35,7 @@ def test_tester_enrollment_upgrade_and_downgrade_are_scoped(tmp_path, monkeypatc
     assert "tester_enrollments" in inspector.get_table_names()
     pending_columns = {column["name"] for column in inspector.get_columns("child_pending_consents")}
     assert {"cohort_key", "cohort_claimed_at"} <= pending_columns
+    command.upgrade(config, "head")
     with engine.connect() as connection:
         assert compare_metadata(MigrationContext.configure(connection), Base.metadata) == []
     with engine.begin() as connection:
