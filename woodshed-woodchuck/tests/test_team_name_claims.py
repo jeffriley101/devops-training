@@ -101,3 +101,118 @@ def test_cross_season_concurrent_claim_is_atomic(family_db):
     with family_db() as s:
         assert counts(s) == (1, 1, 1)
         assert s.scalar(select(func.count()).select_from(TeamNameClaim)) == 1
+
+
+def old_writer_team(session, factory, *, family=None, season=None, private=False):
+    """Insert as the pre-claim application would, without invoking new helpers."""
+    if family is None:
+        family = TeamFamily()
+        session.add(family)
+        session.flush()
+    row = Team(family_id=family.id,
+        season_id=season.id if season else factory.test_ids[0],
+        display_name='Brass Cats', normalized_name='brass cats', emblem_key='emoji:cat',
+        visibility='private' if private else 'public', director_led=private,
+        join_code='OLDCLASS' if private else None)
+    session.add(row)
+    session.commit()
+    assert session.get(TeamNameClaim, row.normalized_name) is None
+    return row
+
+
+def test_old_writer_name_cannot_be_taken_by_new_family(family_db):
+    with family_db() as s:
+        original = old_writer_team(s, family_db)
+        later = Season(key='later', name='Later', starts_on=date(2027, 7, 5), status='planned')
+        s.add(later); s.commit()
+        before = counts(s)
+        with pytest.raises(ValueError, match=TEAM_NAME_TAKEN):
+            create(s, family_db, season=later, other=True)
+        s.commit()
+        assert counts(s) == before  # Includes rollback of the new TeamFamily.
+        assert s.get(Team, original.id).family_id == original.family_id
+        # The caller owns the transaction: failed creation rolls recovery back
+        # too. Existing public rows still protect the name on every retry.
+        assert s.get(TeamNameClaim, 'brass cats') is None
+        claim_public_team_name(s, normalized_name='brass cats', family_id=original.family_id)
+        s.commit()
+        assert s.get(TeamNameClaim, 'brass cats').family_id == original.family_id
+
+
+@pytest.mark.parametrize('seasonal_rows', [1, 2])
+@pytest.mark.parametrize('requesting_owner', [True, False])
+def test_old_writer_family_recovers_one_claim(family_db, seasonal_rows, requesting_owner):
+    with family_db() as s:
+        original = old_writer_team(s, family_db)
+        if seasonal_rows == 2:
+            later = Season(key='later', name='Later', starts_on=date(2027, 7, 5), status='planned')
+            s.add(later); s.commit()
+            old_writer_team(s, family_db, family=s.get(TeamFamily, original.family_id), season=later)
+        if requesting_owner:
+            requested_id = original.family_id
+        else:
+            requester = TeamFamily(); s.add(requester); s.commit()
+            requested_id = requester.id
+        before = counts(s)
+        if requesting_owner:
+            claim_public_team_name(s, normalized_name='brass cats', family_id=requested_id)
+        else:
+            with pytest.raises(ValueError, match=TEAM_NAME_TAKEN):
+                claim_public_team_name(s, normalized_name='brass cats', family_id=requested_id)
+        s.commit()
+        assert s.get(TeamNameClaim, 'brass cats').family_id == original.family_id
+        assert s.scalar(select(func.count()).select_from(TeamNameClaim)) == 1
+        assert counts(s) == before
+
+
+def test_old_writer_class_does_not_establish_public_ownership(family_db):
+    with family_db() as s:
+        classroom = old_writer_team(s, family_db, private=True)
+        later = Season(key='later', name='Later', starts_on=date(2027, 7, 5), status='planned')
+        s.add(later); s.commit()
+        public = create(s, family_db, season=later, other=True)
+        assert public.family_id != classroom.family_id
+        assert s.get(TeamNameClaim, 'brass cats').family_id == public.family_id
+
+
+def test_ambiguous_old_writer_ownership_fails_closed(family_db):
+    with family_db() as s:
+        original = old_writer_team(s, family_db)
+        later = Season(key='later', name='Later', starts_on=date(2027, 7, 5), status='planned')
+        s.add(later); s.commit()
+        other = old_writer_team(s, family_db, season=later)
+        requester = TeamFamily(); s.add(requester); s.commit()
+        before = counts(s)
+        for family_id in (original.family_id, other.family_id, requester.id):
+            with pytest.raises(ValueError, match=TEAM_NAME_TAKEN):
+                claim_public_team_name(s, normalized_name='brass cats', family_id=family_id)
+            s.commit()
+            assert s.get(TeamNameClaim, 'brass cats') is None
+        assert counts(s) == before
+        assert s.get(Team, original.id).family_id != s.get(Team, other.id).family_id
+
+
+def test_concurrent_missing_claim_recovery_preserves_old_owner(family_db):
+    with family_db() as s:
+        if s.get_bind().dialect.name != 'postgresql':
+            pytest.skip('PostgreSQL concurrent transactions')
+        original = old_writer_team(s, family_db)
+        other = TeamFamily(); s.add(other); s.commit()
+        owner_id, other_id = original.family_id, other.id
+    barrier = Barrier(2)
+    def worker(family_id):
+        with family_db() as s:
+            barrier.wait(timeout=10)
+            try:
+                claim_public_team_name(s, normalized_name='brass cats', family_id=family_id)
+                outcome = 'recovered'
+            except ValueError as error:
+                outcome = str(error)
+            s.commit()
+            return outcome
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        futures = [pool.submit(worker, family_id) for family_id in (owner_id, other_id)]
+        assert [f.result(timeout=20) for f in futures] == ['recovered', TEAM_NAME_TAKEN]
+    with family_db() as s:
+        assert s.get(TeamNameClaim, 'brass cats').family_id == owner_id
+        assert s.scalar(select(func.count()).select_from(TeamNameClaim)) == 1
