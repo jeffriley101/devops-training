@@ -108,12 +108,78 @@ process.stdin.on('end', async () => {
       message:document.getElementById('history-mystery-message').textContent}))`);
     await send('Page.navigate', {url: config.origin + '/arcade'}, sessionId);
     await until('document.readyState === "complete" && document.querySelector("[data-arcade-attempts=history-mystery]")?.textContent.includes("2 purchased")');
+    await until('!!window.WoodshedArcadeArt');
+    await evaluate(`(async () => {
+      for (const img of document.querySelectorAll('.arcade-art-image')) {
+        img.scrollIntoView();
+        await img.decode();
+        if (img.naturalWidth !== 256 || img.naturalHeight !== 256) throw Error('Incorrect lobby tile size');
+      }
+    })()`);
+    await until('document.querySelectorAll(".arcade-cabinet-screen.arcade-art-active").length === 6');
+    await evaluate(`(() => {
+      if (document.querySelector('.arcade-cabinet-marquee')) throw Error('Redundant marquee');
+      for (const screen of document.querySelectorAll('.arcade-cabinet-screen')) {
+        const link=screen.closest('a');
+        if (!link.getAttribute('aria-label')?.startsWith('Play ')) throw Error('Missing game label');
+        const fallback=screen.querySelector('.arcade-art-fallback');
+        const style=getComputedStyle(screen);
+        if (screen.classList.contains('arcade-art-active')) {
+          const img=screen.querySelector('.arcade-art-image');
+          if (getComputedStyle(fallback).display !== 'none' || img.hidden ||
+              style.backgroundImage !== 'none' || style.padding !== '0px' ||
+              getComputedStyle(img).objectFit !== 'contain') throw Error('Mixed artwork');
+          const box=img.getBoundingClientRect();
+          if (Math.abs(box.width-box.height)>1) throw Error('Non-square approved art');
+        } else if (!screen.querySelector('.arcade-keeper-art') ||
+                   getComputedStyle(fallback).display === 'none' ||
+                   screen.querySelector('.arcade-art-image')) throw Error('Lost keeper fallback');
+      }
+      window.scrollTo(0,0);
+    })()`);
+    const metrics=await send('Page.getLayoutMetrics', {}, sessionId);
+    const shot=await send('Page.captureScreenshot', {format:'png', captureBeyondViewport:true,
+      clip:{x:0,y:0,width:config.width,height:metrics.cssContentSize.height,scale:1}}, sessionId);
+    require('node:fs').writeFileSync(config.artScreenshot, Buffer.from(shot.data,'base64'));
     const room = await evaluate(`({free:document.querySelector('[data-arcade-price=blue]').textContent,
       normal:document.querySelector('[data-arcade-price=thirds]').textContent,
+      standingsAbove:Array.from(document.querySelectorAll('.arcade-leaderboard')).every(board => {
+        const link=board.parentElement.querySelector('.arcade-cabinet-link');
+        return !link.contains(board) && board.getBoundingClientRect().bottom <= link.getBoundingClientRect().top;
+      }),
+      injectedArt:document.querySelectorAll('.arcade-art-image').length,
+      decks:document.querySelectorAll('.arcade-cabinet-control-panel[aria-hidden=true] .arcade-token-slot').length,
       reserved:document.querySelectorAll('.arcade-classroom li').length,
       classroomLinks:document.querySelectorAll('.arcade-classroom a').length,
       overflow:document.documentElement.scrollWidth > window.innerWidth})`);
-    process.stdout.write(JSON.stringify({initial, buttonHeight, ...final, room}));
+    // A genuine failed request restores Scale Keyboard's original visual and background.
+    await evaluate(`document.querySelector('[data-arcade-art="scale-keyboard"] .arcade-art-image').src =
+      '/static/img/arcade/intentionally-missing-smoke-test.png'`);
+    await until(`!document.querySelector('[data-arcade-art="scale-keyboard"]').classList.contains('arcade-art-active')`);
+    await evaluate(`(() => {
+      const screen=document.querySelector('[data-arcade-art="scale-keyboard"]');
+      if (!screen.querySelector('.arcade-art-image').hidden ||
+          getComputedStyle(screen.querySelector('.arcade-art-fallback')).display === 'none' ||
+          getComputedStyle(screen).backgroundImage === 'none') throw Error('Fallback not restored');
+    })()`);
+    await send('Page.navigate', {url: config.origin + '/practice/skill-building'}, sessionId);
+    await until('document.readyState === "complete" && document.querySelector(".arcade-classroom")');
+    await until('!!window.WoodshedArcadeArt');
+    await evaluate(`(async () => {
+      for (const img of document.querySelectorAll('.arcade-art-image')) {
+        img.scrollIntoView();
+        await img.decode();
+        if (img.naturalWidth !== 256 || img.naturalHeight !== 256) throw Error('Incorrect exercise tile size');
+      }
+    })()`);
+    const exercises = await evaluate(`({
+      count:document.querySelectorAll('.arcade-classroom li').length,
+      tiles:document.querySelectorAll('.arcade-classroom .arcade-art-image').length,
+      locked:Array.from(document.querySelectorAll('.arcade-classroom li')).every(card=>card.textContent.includes('Locked')),
+      links:document.querySelectorAll('.arcade-classroom a, .arcade-classroom button').length,
+      overflow:document.documentElement.scrollWidth > window.innerWidth
+    })`);
+    process.stdout.write(JSON.stringify({initial, buttonHeight, ...final, room, exercises}));
   } catch (error) {process.stderr.write(JSON.stringify(error, Object.getOwnPropertyNames(error))); process.exitCode=1;}
   finally {clearTimeout(timer); chrome.kill();}
 });
@@ -158,6 +224,7 @@ def test_history_browser_loss_refresh_and_completion(tmp_path, width, score):
             result = subprocess.run(['node', '-e', DRIVER], input=json.dumps({
                 'chrome': chrome, 'profile': str(tmp_path / 'chrome'), 'origin': origin,
                 'width': width, 'score': score, 'choices': choices,
+                'artScreenshot': str(tmp_path / f'arcade-{width}.png'),
             }), text=True, capture_output=True, timeout=75)
             assert result.returncode == 0, result.stderr
             payload = json.loads(result.stdout)
@@ -167,7 +234,9 @@ def test_history_browser_loss_refresh_and_completion(tmp_path, width, score):
             assert payload['buttonHeight'] >= 48
             assert f'Final score: {score} / 5' in payload['message']
             assert payload['room'] == {'free': 'Always free', 'normal': '100 Dandelions · 3 attempts',
-                                       'reserved': 5, 'classroomLinks': 0, 'overflow': False}
+                                       'reserved': 0, 'classroomLinks': 0, 'overflow': False,
+                                       'standingsAbove': True, 'injectedArt': 6, 'decks': 9}
+            assert payload['exercises'] == {'count': 5, 'tiles': 5, 'locked': True, 'links': 0, 'overflow': False}
         finally:
             process.terminate()
             try:

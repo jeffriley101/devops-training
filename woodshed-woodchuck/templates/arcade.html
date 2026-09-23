@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block dashboard_styles %}<link rel="stylesheet" href="/static/css/arcade-art.css?v=1">{% endblock %}
+{% block dashboard_styles %}<link rel="stylesheet" href="/static/css/arcade-art.css?v=3">{% endblock %}
 
 {% block content %}
 <section class="arcade-room" aria-label="Arcade">
@@ -12,164 +12,151 @@
   <p>History Mystery: one quiz per Central day; unused purchased attempts carry over.</p>
   <div class="arcade-cabinet-grid">
     <article class="arcade-cabinet arcade-cabinet-plunge">
-      <a class="arcade-cabinet-link" href="/plunge-burrow" aria-label="Play Plunge Burrow">
-        <strong class="arcade-cabinet-marquee">Plunge Burrow</strong>
-        <span data-arcade-art="plunge-burrow" class="arcade-cabinet-screen" aria-hidden="true">🕳️</span>
-        <span class="arcade-cabinet-economy" data-arcade-price="plunge-burrow">Always free</span>
-        <span data-arcade-attempts="plunge-burrow"></span>
-        <span class="arcade-cabinet-control-panel" aria-hidden="true"><i></i><i></i><i></i></span>
-        <span class="arcade-cabinet-best">Best <output data-arcade-personal-best="plunge-burrow">—</output></span>
-      </a>
       <section class="arcade-leaderboard" aria-label="Plunge Burrow Top 5">
         <h2>Top 5</h2>
         <ol data-arcade-leaderboard="plunge-burrow"><li>Loading…</li></ol>
       </section>
+      <a class="arcade-cabinet-link" href="/plunge-burrow" aria-label="Play Plunge Burrow">
+        <span data-arcade-art="plunge-burrow" class="arcade-cabinet-screen" aria-hidden="true"><span class="arcade-art-fallback">🕳️</span></span>
+        <span class="arcade-cabinet-economy" data-arcade-price="plunge-burrow">Always free</span>
+        <span data-arcade-attempts="plunge-burrow"></span>
+        <span class="arcade-cabinet-control-panel" aria-hidden="true"><span class="arcade-joystick"></span><span class="arcade-action-button"></span><span class="arcade-action-button"></span><span class="arcade-token-slot"><span>✺</span> Dandelions</span></span>
+        <span class="arcade-cabinet-best">Best <output data-arcade-personal-best="plunge-burrow">—</output></span>
+      </a>
     </article>
 
     <article class="arcade-cabinet arcade-cabinet-blue">
-      <a class="arcade-cabinet-link" href="/arcade/blue" aria-label="Play Blue">
-        <strong class="arcade-cabinet-marquee">Blue</strong>
-        <span data-arcade-art="blue" class="arcade-cabinet-screen" aria-hidden="true">🟦</span>
-        <span class="arcade-cabinet-economy" data-arcade-price="blue">Always free</span>
-        <span data-arcade-attempts="blue"></span>
-        <span class="arcade-cabinet-control-panel" aria-hidden="true"><i></i><i></i><i></i></span>
-        <span class="arcade-cabinet-best">Best <output data-arcade-personal-best="blue">—</output></span>
-      </a>
       <section class="arcade-leaderboard" aria-label="Blue Top 5">
         <h2>Top 5</h2>
         <ol data-arcade-leaderboard="blue"><li>Loading…</li></ol>
       </section>
+      <a class="arcade-cabinet-link" href="/arcade/blue" aria-label="Play Blue">
+        <span data-arcade-art="blue" class="arcade-cabinet-screen" aria-hidden="true"><span class="arcade-art-fallback">🟦</span></span>
+        <span class="arcade-cabinet-economy" data-arcade-price="blue">Always free</span>
+        <span data-arcade-attempts="blue"></span>
+        <span class="arcade-cabinet-control-panel" aria-hidden="true"><span class="arcade-joystick"></span><span class="arcade-action-button"></span><span class="arcade-action-button"></span><span class="arcade-token-slot"><span>✺</span> Dandelions</span></span>
+        <span class="arcade-cabinet-best">Best <output data-arcade-personal-best="blue">—</output></span>
+      </a>
     </article>
 
     <article class="arcade-cabinet arcade-cabinet-radio">
-      <a class="arcade-cabinet-link" href="/arcade/radio-tuner" aria-label="Play Radio Tuner">
-        <strong class="arcade-cabinet-marquee">Radio Tuner</strong>
-        <span data-arcade-art="radio-tuner" class="arcade-cabinet-screen" aria-hidden="true">📻</span>
-        <span class="arcade-cabinet-economy" data-arcade-price="radio-tuner">100 Dandelions · 3 attempts</span>
-        <span data-arcade-attempts="radio-tuner"></span>
-        <span class="arcade-cabinet-control-panel" aria-hidden="true"><i></i><i></i><i></i></span>
-        <span class="arcade-cabinet-best">Best <output data-arcade-personal-best="radio-tuner">—</output></span>
-      </a>
       <section class="arcade-leaderboard" aria-label="Radio Tuner Top 5">
         <h2>Top 5</h2>
         <ol data-arcade-leaderboard="radio-tuner"><li>Loading…</li></ol>
       </section>
+      <a class="arcade-cabinet-link" href="/arcade/radio-tuner" aria-label="Play Radio Tuner">
+        <span data-arcade-art="radio-tuner" class="arcade-cabinet-screen" aria-hidden="true"><span class="arcade-art-fallback">📻</span></span>
+        <span class="arcade-cabinet-economy" data-arcade-price="radio-tuner">100 Dandelions · 3 attempts</span>
+        <span data-arcade-attempts="radio-tuner"></span>
+        <span class="arcade-cabinet-control-panel" aria-hidden="true"><span class="arcade-joystick"></span><span class="arcade-action-button"></span><span class="arcade-action-button"></span><span class="arcade-token-slot"><span>✺</span> Dandelions</span></span>
+        <span class="arcade-cabinet-best">Best <output data-arcade-personal-best="radio-tuner">—</output></span>
+      </a>
     </article>
 
     <article class="arcade-cabinet arcade-cabinet-wheel">
-      <a class="arcade-cabinet-link" href="/arcade/wheel-of-woodchuck" aria-label="Play Wheel of Woodchuck">
-        <strong class="arcade-cabinet-marquee">Wheel of Woodchuck</strong>
-        <span data-arcade-art="wheel-of-woodchuck" class="arcade-cabinet-screen arcade-wheel-screen" aria-hidden="true"><i>♫</i></span>
-        <span class="arcade-cabinet-economy" data-arcade-price="wheel-of-woodchuck">100 Dandelions · 3 attempts</span>
-        <span data-arcade-attempts="wheel-of-woodchuck"></span>
-        <span class="arcade-cabinet-control-panel" aria-hidden="true"><i></i><i></i><i></i></span>
-        <span class="arcade-cabinet-best">Best <output data-arcade-personal-best="wheel-of-woodchuck">—</output></span>
-      </a>
       <section class="arcade-leaderboard" aria-label="Wheel of Woodchuck Top 5">
         <h2>Top 5</h2>
         <ol data-arcade-leaderboard="wheel-of-woodchuck"><li>Loading…</li></ol>
       </section>
+      <a class="arcade-cabinet-link" href="/arcade/wheel-of-woodchuck" aria-label="Play Wheel of Woodchuck">
+        <span data-arcade-art="wheel-of-woodchuck" class="arcade-cabinet-screen arcade-wheel-screen" aria-hidden="true"><span class="arcade-art-fallback"><i>♫</i></span></span>
+        <span class="arcade-cabinet-economy" data-arcade-price="wheel-of-woodchuck">100 Dandelions · 3 attempts</span>
+        <span data-arcade-attempts="wheel-of-woodchuck"></span>
+        <span class="arcade-cabinet-control-panel" aria-hidden="true"><span class="arcade-joystick"></span><span class="arcade-action-button"></span><span class="arcade-action-button"></span><span class="arcade-token-slot"><span>✺</span> Dandelions</span></span>
+        <span class="arcade-cabinet-best">Best <output data-arcade-personal-best="wheel-of-woodchuck">—</output></span>
+      </a>
     </article>
 
     <article class="arcade-cabinet arcade-cabinet-scale">
+      <section class="arcade-leaderboard" aria-label="Scale Keyboard Top 5">
+        <h2>Top 5</h2>
+        <ol data-arcade-leaderboard="scale-keyboard"><li>Loading…</li></ol>
+      </section>
       <a class="arcade-cabinet-link" href="/arcade/scale-keyboard" aria-label="Play Scale Keyboard">
-        <strong class="arcade-cabinet-marquee">Scale Keyboard</strong>
-        <span data-arcade-art="scale-keyboard" class="arcade-cabinet-screen arcade-scale-screen" aria-hidden="true">
+        <span data-arcade-art="scale-keyboard" class="arcade-cabinet-screen arcade-scale-screen" aria-hidden="true"><span class="arcade-art-fallback">
           <span class="keyboard-tie-person">
             <i class="keyboard-tie-hair"></i>
             <i class="keyboard-tie-head"><b></b><b></b><em></em></i>
             <i class="keyboard-tie-shirt"></i>
             <i class="keyboard-necktie"><b></b><b></b><b></b><b></b></i>
           </span>
-        </span>
+        </span></span>
         <span class="arcade-cabinet-economy" data-arcade-price="scale-keyboard">100 Dandelions · 3 attempts</span>
         <span data-arcade-attempts="scale-keyboard"></span>
-        <span class="arcade-cabinet-control-panel" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span class="arcade-cabinet-control-panel" aria-hidden="true"><span class="arcade-joystick"></span><span class="arcade-action-button"></span><span class="arcade-action-button"></span><span class="arcade-token-slot"><span>✺</span> Dandelions</span></span>
         <span class="arcade-cabinet-best">Best <output data-arcade-personal-best="scale-keyboard">—</output></span>
       </a>
-      <section class="arcade-leaderboard" aria-label="Scale Keyboard Top 5">
-        <h2>Top 5</h2>
-        <ol data-arcade-leaderboard="scale-keyboard"><li>Loading…</li></ol>
-      </section>
     </article>
 
     <article class="arcade-cabinet arcade-cabinet-thirds">
-      <a class="arcade-cabinet-link" href="/arcade/thirds" aria-label="Play Thirds">
-        <strong class="arcade-cabinet-marquee">Thirds</strong>
-        <span data-arcade-art="thirds" class="arcade-cabinet-screen arcade-thirds-screen" aria-hidden="true">
-          <i>C</i><b>3rd</b><i>E</i>
-        </span>
-        <span class="arcade-cabinet-economy" data-arcade-price="thirds">100 Dandelions · 3 attempts</span>
-        <span data-arcade-attempts="thirds"></span>
-        <span class="arcade-cabinet-control-panel" aria-hidden="true"><i></i><i></i><i></i></span>
-        <span class="arcade-cabinet-best">Best <output data-arcade-personal-best="thirds">—</output></span>
-      </a>
       <section class="arcade-leaderboard" aria-label="Thirds Top 5">
         <h2>Top 5</h2>
         <ol data-arcade-leaderboard="thirds"><li>Loading…</li></ol>
       </section>
+      <a class="arcade-cabinet-link" href="/arcade/thirds" aria-label="Play Thirds">
+        <span data-arcade-art="thirds" class="arcade-cabinet-screen arcade-thirds-screen" aria-hidden="true"><span class="arcade-art-fallback">
+          <i>C</i><b>3rd</b><i>E</i>
+        </span></span>
+        <span class="arcade-cabinet-economy" data-arcade-price="thirds">100 Dandelions · 3 attempts</span>
+        <span data-arcade-attempts="thirds"></span>
+        <span class="arcade-cabinet-control-panel" aria-hidden="true"><span class="arcade-joystick"></span><span class="arcade-action-button"></span><span class="arcade-action-button"></span><span class="arcade-token-slot"><span>✺</span> Dandelions</span></span>
+        <span class="arcade-cabinet-best">Best <output data-arcade-personal-best="thirds">—</output></span>
+      </a>
     </article>
 
     <article class="arcade-cabinet arcade-cabinet-nines">
-      <a class="arcade-cabinet-link" href="/arcade/dressed-to-the-nines" aria-label="Play Dressed to the Nines">
-        <strong class="arcade-cabinet-marquee">Dressed to the Nines</strong>
-        <span data-arcade-art="dressed-to-the-nines" class="arcade-cabinet-screen arcade-nines-screen arcade-keeper-screen arcade-keeper-nines" aria-hidden="true">
-          <i>2</i><b>+8</b><i>9</i>
-          <img class="arcade-keeper-art" src="/static/img/arcade/Woodshed_Arcade_8bit_Icons_KEEPER.png" width="2172" height="724" alt="" data-art-fallback />
-        </span>
-        <span class="arcade-cabinet-economy" data-arcade-price="dressed-to-the-nines">100 Dandelions · 3 attempts</span>
-        <span data-arcade-attempts="dressed-to-the-nines"></span>
-        <span class="arcade-cabinet-control-panel" aria-hidden="true"><i></i><i></i><i></i></span>
-        <span class="arcade-cabinet-best">Best <output data-arcade-personal-best="dressed-to-the-nines">—</output></span>
-      </a>
       <section class="arcade-leaderboard" aria-label="Dressed to the Nines Top 5">
         <h2>Top 5</h2>
         <ol data-arcade-leaderboard="dressed-to-the-nines"><li>Loading…</li></ol>
       </section>
+      <a class="arcade-cabinet-link" href="/arcade/dressed-to-the-nines" aria-label="Play Dressed to the Nines">
+        <span data-arcade-art="dressed-to-the-nines" class="arcade-cabinet-screen arcade-nines-screen arcade-keeper-screen arcade-keeper-nines" aria-hidden="true"><span class="arcade-art-fallback">
+          <i>2</i><b>+8</b><i>9</i>
+          <img class="arcade-keeper-art" src="/static/img/arcade/Woodshed_Arcade_8bit_Icons_KEEPER.png" width="2172" height="724" alt="" data-art-fallback />
+        </span></span>
+        <span class="arcade-cabinet-economy" data-arcade-price="dressed-to-the-nines">100 Dandelions · 3 attempts</span>
+        <span data-arcade-attempts="dressed-to-the-nines"></span>
+        <span class="arcade-cabinet-control-panel" aria-hidden="true"><span class="arcade-joystick"></span><span class="arcade-action-button"></span><span class="arcade-action-button"></span><span class="arcade-token-slot"><span>✺</span> Dandelions</span></span>
+        <span class="arcade-cabinet-best">Best <output data-arcade-personal-best="dressed-to-the-nines">—</output></span>
+      </a>
     </article>
 
     <article class="arcade-cabinet arcade-cabinet-intervals">
-      <a class="arcade-cabinet-link" href="/arcade/interval-basic-training" aria-label="Play Interval Basic Training">
-        <strong class="arcade-cabinet-marquee">Interval Basic Training</strong>
-        <span data-arcade-art="interval-basic-training" class="arcade-cabinet-screen arcade-interval-screen arcade-keeper-screen arcade-keeper-intervals" aria-hidden="true">
-          <i>C</i><b>↗</b><i>?</i>
-          <img class="arcade-keeper-art" src="/static/img/arcade/Woodshed_Arcade_8bit_Icons_KEEPER.png" width="2172" height="724" alt="" data-art-fallback />
-        </span>
-        <span class="arcade-cabinet-economy" data-arcade-price="interval-basic-training">100 Dandelions · 3 attempts</span>
-        <span data-arcade-attempts="interval-basic-training"></span>
-        <span class="arcade-cabinet-control-panel" aria-hidden="true"><i></i><i></i><i></i></span>
-        <span class="arcade-cabinet-best">Best <output data-arcade-personal-best="interval-basic-training">—</output></span>
-      </a>
       <section class="arcade-leaderboard" aria-label="Interval Basic Training Top 5">
         <h2>Top 5</h2>
         <ol data-arcade-leaderboard="interval-basic-training"><li>Loading…</li></ol>
       </section>
+      <a class="arcade-cabinet-link" href="/arcade/interval-basic-training" aria-label="Play Interval Basic Training">
+        <span data-arcade-art="interval-basic-training" class="arcade-cabinet-screen arcade-interval-screen arcade-keeper-screen arcade-keeper-intervals" aria-hidden="true"><span class="arcade-art-fallback">
+          <i>C</i><b>↗</b><i>?</i>
+          <img class="arcade-keeper-art" src="/static/img/arcade/Woodshed_Arcade_8bit_Icons_KEEPER.png" width="2172" height="724" alt="" data-art-fallback />
+        </span></span>
+        <span class="arcade-cabinet-economy" data-arcade-price="interval-basic-training">100 Dandelions · 3 attempts</span>
+        <span data-arcade-attempts="interval-basic-training"></span>
+        <span class="arcade-cabinet-control-panel" aria-hidden="true"><span class="arcade-joystick"></span><span class="arcade-action-button"></span><span class="arcade-action-button"></span><span class="arcade-token-slot"><span>✺</span> Dandelions</span></span>
+        <span class="arcade-cabinet-best">Best <output data-arcade-personal-best="interval-basic-training">—</output></span>
+      </a>
     </article>
 
     <article class="arcade-cabinet arcade-cabinet-history">
       <a class="arcade-cabinet-link" href="/arcade/history-mystery" aria-label="Play History Mystery">
-        <strong class="arcade-cabinet-marquee">History Mystery</strong>
-        <span data-arcade-art="history-mystery" class="arcade-cabinet-screen arcade-history-screen arcade-keeper-screen arcade-keeper-history" aria-hidden="true">
+        <span data-arcade-art="history-mystery" class="arcade-cabinet-screen arcade-history-screen arcade-keeper-screen arcade-keeper-history" aria-hidden="true"><span class="arcade-art-fallback">
           <i>?</i><b>♫</b><i>?</i>
           <img class="arcade-keeper-art" src="/static/img/arcade/Woodshed_Arcade_8bit_Icons_KEEPER.png" width="2172" height="724" alt="" data-art-fallback />
-        </span>
+        </span></span>
         <span class="arcade-cabinet-economy" data-arcade-price="history-mystery">100 Dandelions · 3 attempts</span>
         <span data-arcade-attempts="history-mystery"></span>
-        <span class="arcade-cabinet-control-panel" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span class="arcade-cabinet-control-panel" aria-hidden="true"><span class="arcade-joystick"></span><span class="arcade-action-button"></span><span class="arcade-action-button"></span><span class="arcade-token-slot"><span>✺</span> Dandelions</span></span>
         <span class="arcade-cabinet-best">Best <output data-arcade-personal-best="history-mystery">—</output></span>
       </a>
     </article>
   </div>
-  <section class="arcade-classroom" aria-label="Classroom Skill-Building games">
-    <h2>Classroom Skill-Building</h2>
-    <p>Locked · Requires authorized Classroom access. Personal Full Access does not unlock these games. Coming with Classroom.</p>
-    <ul>{% for key, label in classroom_games.items() %}<li><span data-arcade-art="{{ key }}" aria-hidden="true">?</span><strong>{{ label }}</strong> · Locked</li>{% endfor %}</ul>
-  </section>
+
 </section>
 {% endblock %}
 
 {% block page_scripts %}
-<script src="/static/js/arcade-economy.js?v=6"></script>
+<script src="/static/js/arcade-economy.js?v=7"></script>
 <script src="/static/js/arcade.js?v=15"></script>
-<script src="/static/js/arcade-art.js?v=1"></script>
+<script src="/static/js/arcade-art.js?v=5"></script>
 {% endblock %}

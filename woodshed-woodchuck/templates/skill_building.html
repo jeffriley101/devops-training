@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block dashboard_styles %}<link rel="stylesheet" href="/static/css/arcade-art.css?v=2">{% endblock %}
+{% block content %}
+<a class="btn btn-secondary" href="/store">Back to SHOP</a>
+  <section class="arcade-classroom" aria-label="Classroom Skill-Building games">
+    <h1>Skill Building Exercises</h1>
+    <p>Locked · Requires authorized Classroom access. Personal Full Access does not unlock these games. Exercises for private director-led Classes. Coming with Classroom.</p>
+    <ul>{% for key, label in classroom_games.items() %}<li><span data-arcade-art="{{ key }}" aria-hidden="true">?</span><strong>{{ label }}</strong> · Locked</li>{% endfor %}</ul>
+  </section>
+{% endblock %}
+
+{% block page_scripts %}
+<script src="/static/js/arcade-art.js?v=4"></script>
+{% endblock %}

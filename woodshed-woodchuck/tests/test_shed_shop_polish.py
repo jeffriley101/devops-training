@@ -120,7 +120,7 @@ def test_practice_room_is_local_expandable_and_has_tool_slots() -> None:
     assert "Open Spectrogram" in store
     assert 'href="/practice/pristine" aria-label="Open Pristine Practice"' in store
     assert 'href="/arcade" aria-label="Open Arcade Room"' in store
-    assert store.count('class="practice-room-emoji-control practice-room-door"') == 3
+    assert store.count('class="practice-room-emoji-control practice-room-door"') == 4
     assert "Pristine P-Chart — Coming Soon" not in store
     practice_section = store[store.index('data-shop-panel-content="practice-room"'):store.index('data-shop-panel-content="artist"')]
     assert 'href="https://brassspectrogram.netlify.app/"' in practice_section

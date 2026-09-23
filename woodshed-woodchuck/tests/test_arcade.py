@@ -106,20 +106,20 @@ def submit_paid_score(client: TestClient, game_key: str, score: int):
     )
 
 
-def test_practice_room_destinations_are_preserved_as_three_doors() -> None:
+def test_practice_room_destinations_are_preserved_as_four_doors() -> None:
     practice = STORE[
         STORE.index('data-shop-panel-content="practice-room"'):
         STORE.index('data-shop-panel-content="artist"')
     ]
-    assert practice.count('class="practice-room-emoji-control practice-room-door"') == 3
+    assert practice.count('class="practice-room-emoji-control practice-room-door"') == 4
     assert 'href="https://brassspectrogram.netlify.app/"' in practice
     assert 'target="_blank" rel="noopener noreferrer"' in practice
     assert 'href="/practice/pristine" aria-label="Open Pristine Practice"' in practice
     assert "<small>Coming Soon</small>" not in practice
     assert 'href="/arcade" aria-label="Open Arcade Room"' in practice
-    assert practice.count('class="practice-room-door-tag"') == 3
-    assert practice.count('class="practice-room-door-window" aria-hidden="true"') == 3
-    for letter in ("A", "B", "C"):
+    assert practice.count('class="practice-room-door-tag"') == 4
+    assert practice.count('class="practice-room-door-window" aria-hidden="true"') == 4
+    for letter in ("A", "B", "C", "D"):
         assert f'class="practice-room-door-tag">{letter}</span>' in practice
     for retired_tag in ("A — Brass", "B — Pristine", "C — Arcade"):
         assert retired_tag not in practice
@@ -151,7 +151,7 @@ def test_arcade_room_renders_nine_touch_friendly_cabinets() -> None:
     assert 'href="/arcade/interval-basic-training"' in ARCADE
     assert 'href="/arcade/history-mystery"' in ARCADE
     assert ARCADE.count("<h2>Top 5</h2>") == 8
-    assert ARCADE.count('class="arcade-cabinet-marquee"') == 9
+    assert 'class="arcade-cabinet-marquee"' not in ARCADE
     assert ARCADE.count('class="arcade-cabinet-control-panel" aria-hidden="true"') == 9
     assert ARCADE.count('data-arcade-personal-best=') == 9
     assert ARCADE.count("100 Dandelions · 3 attempts") == 7
@@ -174,7 +174,7 @@ def test_arcade_room_renders_nine_touch_friendly_cabinets() -> None:
     mobile = CSS[CSS.index("@media (max-width: 760px)"):]
     assert ".arcade-cabinet-grid { grid-template-columns: 1fr; }" in mobile
     assert '/static/js/arcade.js?v=15' in ARCADE
-    assert '/static/js/arcade-economy.js?v=6' in ARCADE
+    assert '/static/js/arcade-economy.js?v=7' in ARCADE
 
 
 def test_arcade_pages_route_game_specific_soundtracks() -> None:
@@ -329,7 +329,7 @@ def test_arcade_landing_renders_personal_bests_from_existing_score_payload() -> 
     assert "data-arcade-personal-best" in ARCADE_JS
     assert "renderPersonalBest(gameKey, payload.best_score)" in room
     assert "data-arcade-personal-best" in room
-    assert ARCADE.index('/static/js/arcade-economy.js?v=6') < ARCADE.index('/static/js/arcade.js?v=15')
+    assert ARCADE.index('/static/js/arcade-economy.js?v=7') < ARCADE.index('/static/js/arcade.js?v=15')
     assert ARCADE.count('data-arcade-leaderboard=') == 8
     assert 'data-arcade-leaderboard="history-mystery"' not in ARCADE
 
