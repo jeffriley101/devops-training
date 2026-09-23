@@ -157,7 +157,7 @@ def test_family_and_existing_creator_constraints(family_db, violation):
         assert session.get(TeamFamily, original_family_id) is not None
 
 
-def test_cross_season_schema_and_existing_hall_heuristic(family_db):
+def test_cross_season_hall_uses_family_not_name_or_creator(family_db):
     with family_db() as session:
         first = create(session, family_db)
         later = Season(key="schema-later", name="Later", starts_on=date(2027, 7, 5), status="planned")
@@ -168,18 +168,17 @@ def test_cross_season_schema_and_existing_hall_heuristic(family_db):
         session.add(second)
         session.commit()
         assert counts(session) == (1, 2, 1)
-        # H1A does not change the existing creator/name heuristic, even when a
-        # test explicitly models a future cross-season family.
+        # A renamed seasonal incarnation still belongs to the same family.
         first_result = ContestResult(team_id=first.id, subject_key=str(first.id))
         second_result = ContestResult(team_id=second.id, subject_key=str(second.id))
-        assert lifetime_team_identity(first_result, first) != lifetime_team_identity(second_result, second)
+        assert lifetime_team_identity(first_result, first) == lifetime_team_identity(second_result, second)
         second.normalized_name = first.normalized_name
         separate_family = TeamFamily()
         session.add(separate_family)
         session.flush()
         second.family_id = separate_family.id
         session.commit()
-        assert lifetime_team_identity(first_result, first) == lifetime_team_identity(second_result, second)
+        assert lifetime_team_identity(first_result, first) != lifetime_team_identity(second_result, second)
 
 
 def test_team_deletion_retains_family(family_db):

@@ -488,7 +488,7 @@ def test_live_team_boards_exclude_private_sources_retain_new_eligible_totals_and
         assert not team_public(s,teams[0].id) and team_public(s,teams[0].id,identity_only=True)
         contest=Contest(key='synthetic-team-snapshot',name='Stored team',metric_type='practice_minutes',subject_type='team');s.add(contest);s.flush()
         result=ContestResult(contest_week_id=week.id,contest_id=contest.id,division='open',subject_type='team',subject_key=str(teams[0].id),team_id=teams[0].id,display_name_snapshot='Synthetic team 1',score=910,precise_score=910.0,rank=1,medal='gold',created_at=new);s.add(result);s.commit()
-        assert filter_result_rows(s,[(result,contest,teams[0])])==[]
+        assert filter_result_rows(s,[(result,contest,teams[0])])==[(result,contest,teams[0])]
         assert s.get(ContestResult,result.id).score==910 and s.get(ContestResult,result.id).rank==1
         assert s.scalar(select(func.count(PracticeChart.id)))==3
         assert s.scalar(select(func.count(CampPointAward.id)))==3
@@ -533,8 +533,8 @@ def test_weekly_historical_snapshot_not_hidden_by_unrelated_older_private_chart(
             contest=Contest(key=key,name=key,metric_type='practice_minutes',subject_type='team');s.add(contest);s.flush()
             result=ContestResult(contest_week_id=week.id,contest_id=contest.id,division='open',subject_type='team',subject_key=str(team.id),team_id=team.id,display_name_snapshot='Safe team',score=score,precise_score=float(score),rank=1,medal='gold',created_at=future);s.add(result);s.flush();rows.append((result,contest,team))
         s.commit()
-        assert filter_result_rows(s,rows)==[rows[0]]
+        assert filter_result_rows(s,rows)==rows
         assert rows[1][0].score==910 and rows[1][0].rank==1
-        # A private source in that same week still suppresses its stored aggregate.
+        # Stored public Team medals expose aggregates, never member details.
         s.add(PracticeChart(profile_id=2,team_id=team.id,practice_date=future.date(),minutes=5,instrument='Flute',credits_awarded=0,include_contests=True,include_team_contests=True,created_at=future));s.commit()
-        assert filter_result_rows(s,rows)==[]
+        assert filter_result_rows(s,rows)==rows

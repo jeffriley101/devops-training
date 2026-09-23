@@ -192,10 +192,12 @@ def test_hall_preserves_pristine_division_and_historical_moderation(hall_db):
     assert student["by_division"]["open"]["total"] == 0
     assert student["by_division"]["verified"]["total"] == 0
     assert student["achievements"][0]["division"] == "pristine"
-    for row in (payload["teams"][0], payload["traveling_cups"]["coterie"]["teams"][0],
-                payload["director_team_contests"][0]["winners"][0]):
-        assert row["team_name"] == "Hidden Team"
-        assert row["emblem_key"] == "shield:silver"
+    assert payload["teams"] == []
+    assert payload["traveling_cups"]["coterie"]["teams"] == []
+    # The separate director event projection retains its existing masking.
+    row = payload["director_team_contests"][0]["winners"][0]
+    assert row["team_name"] == "Hidden Team"
+    assert row["emblem_key"] == "shield:silver"
     with hall_db() as session:
         assert session.scalar(select(ContestResult).where(ContestResult.subject_type == "team")).display_name_snapshot == "Team Alpha"
         assert session.scalar(select(DirectorTeamContestResult)).score == 42.5

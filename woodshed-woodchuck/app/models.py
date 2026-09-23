@@ -1189,13 +1189,24 @@ class Season(Base):
 
 
 class TeamFamily(Base):
-    """Persistent identity only; names and all operating state stay seasonal."""
+    """Persistent identity; public name claims outlive seasonal operating state."""
 
     __tablename__ = "team_families"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
+    )
+
+
+class TeamNameClaim(Base):
+    """Permanent public Team name ownership, independent of seasonal rows."""
+
+    __tablename__ = "team_name_claims"
+
+    normalized_name: Mapped[str] = mapped_column(String(100), primary_key=True)
+    family_id: Mapped[int] = mapped_column(
+        ForeignKey("team_families.id", ondelete="RESTRICT"), nullable=False, index=True
     )
 
 

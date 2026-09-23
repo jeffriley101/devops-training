@@ -100,10 +100,12 @@ def test_deleted_student_leaves_live_individual_boards_but_not_team_totals() -> 
     assert session.scalar(select(PracticeChart)).team_id == team.id
 
 
-def test_hidden_team_identity_is_masked_without_changing_result_or_score() -> None:
+def test_hidden_team_medals_are_omitted_without_changing_result_or_score() -> None:
     session = database()
     season, _contests, week = ensure_band_camp_data(session, now=NOW)
     student = add_profile(session, 2); session.commit()
+    from app.age_privacy import declare_age
+    declare_age(session, student.id, "adult", at=datetime(2025, 1, 1, tzinfo=timezone.utc))
     team, _ = create_and_join_team(
         session, profile=student, season=season, name="Private Original",
         emblem_key="emoji:goat", now=NOW,
@@ -123,8 +125,7 @@ def test_hidden_team_identity_is_masked_without_changing_result_or_score() -> No
     assert live["team-weekly-practice"]["open"][0]["emblem_key"] == "shield:silver"
     history = contest_results_payload(session, week)["results"]
     team_rows = [row for row in history if row["subject_type"] == "team"]
-    assert team_rows and all(row["team_name"] == "Hidden Team" for row in team_rows)
-    assert all(row["emblem_key"] == "shield:silver" for row in team_rows)
+    assert team_rows == []
     session.refresh(original)
     assert (original.display_name_snapshot, original.score) == (stored_name, stored_score)
     assert session.scalar(select(func.count()).select_from(RewardGrant)) == reward_count

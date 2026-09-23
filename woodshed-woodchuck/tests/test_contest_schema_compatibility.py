@@ -20,8 +20,8 @@ from tests.test_contest_week_provisioning import db, PAIR  # noqa: F401
 from tests.test_team_families import disposable_url
 from tests.team_factory import make_team
 
-OLD = "s9n0o1p2q3r4"
-NEW = "t0p1q2r3s4t5"
+OLD = "c15arcade001"
+NEW = "d16team001"
 
 
 def snapshot(engine):
@@ -58,7 +58,7 @@ def assert_refused_without_writes(url, engine, reason):
 
 
 @pytest.mark.parametrize("state", ["old", "unknown", "unsupported", "empty", "multiple",
-                                  "precise_score", "practice_scoring_mode", "family_index"])
+                                  "precise_score", "practice_scoring_mode", "family_index", "name_claims"])
 def test_schema_refusals_before_writes(db, state):
     with db[1].begin() as connection:
         if state in {"old", "unknown", "unsupported"}:
@@ -70,10 +70,12 @@ def test_schema_refusals_before_writes(db, state):
             connection.execute(text("INSERT INTO alembic_version VALUES (:v)"), {"v": OLD})
         elif state == "family_index":
             connection.execute(text("DROP INDEX ix_teams_family_id"))
+        elif state == "name_claims":
+            connection.execute(text("DROP TABLE team_name_claims"))
         else:
             table = "contest_results" if state == "precise_score" else "contest_weeks"
             connection.execute(text(f"ALTER TABLE {table} DROP COLUMN {state}"))
-    reason = ("required_schema_incomplete" if state in {"precise_score", "practice_scoring_mode"}
+    reason = ("required_schema_incomplete" if state in {"precise_score", "practice_scoring_mode", "name_claims"}
               else "team_family_constraints_missing" if state == "family_index" else "revision_not_approved")
     assert_refused_without_writes(*db, reason)
 
@@ -100,23 +102,24 @@ def test_real_previous_schema_requires_upgrade_then_plan_apply_repeat(tmp_path, 
             session.add(m.TeamMembership(season_id=source.id, team_id=team.id, profile_id=profile.id,
                 started_at=lifecycle.BOUNDARY - timedelta(days=7), selected_week_start=date(2026, 9, 21)))
             session.commit()
-        # Both mapped SELECTs fail on the actual old schema, even with no rows.
-        for model in (m.ContestWeek, m.ContestResult):
+        # The current continuity code requires the claim table, even if empty.
+        for model in (m.TeamNameClaim,):
             with engine.connect() as connection, pytest.raises(DBAPIError):
                 connection.execute(select(model))
-        assert_refused_without_writes(url, engine, "require t0p1q2r3s4t5; upgrade older schemas")
+        assert_refused_without_writes(url, engine, "require d16team001; upgrade older schemas")
         end, deadline, finalize = contest_week_schedule(date(2026, 9, 14))
         with engine.begin() as connection:
             source_id = connection.scalar(select(m.Season.id).where(m.Season.key == lifecycle.SOURCE))
             connection.execute(m.ContestWeek.__table__.insert().values(
                 season_id=source_id, week_start=date(2026, 9, 14), week_end=end,
                 verification_deadline_at=deadline + timedelta(hours=1),
-                finalize_after=finalize + timedelta(hours=1), status="finalized", finalized_at=finalize + timedelta(days=1)))
+                finalize_after=finalize + timedelta(hours=1), status="finalized", finalized_at=finalize + timedelta(days=1),
+                practice_scoring_mode="legacy_minutes"))
         before = snapshot(engine)
         command.upgrade(config, NEW)
         migrated = snapshot(engine)
         for table, rows in before.items():
-            if table not in {"alembic_version", "contest_weeks"}:
+            if table != "alembic_version":
                 assert migrated[table] == rows
         with Session(engine) as session:
             week = session.scalar(select(m.ContestWeek))

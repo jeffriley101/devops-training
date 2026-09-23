@@ -98,6 +98,16 @@ def director_scope_start(session, profile_id):
     rule=session.get(AccountPrivacy,profile_id)
     return rule.public_from if rule and rule.consent_id else None
 
+def public_team_identity_allowed(team):
+    """Publish only public Team identity, never member or activity details.
+
+    Also permits stored Team medal aggregates under the public Team policy.
+    Classes and hidden Teams are always excluded.
+    """
+    return bool(team is not None and team.visibility == 'public'
+                and team.moderation_status != 'hidden')
+
+
 def team_public(session, team_id, *, at=None, identity_only=False, week=None):
     from .models import Team, TeamMembership, TeamWeekMembershipSnapshot
     team = session.get(Team, team_id)
@@ -138,13 +148,10 @@ def filter_result_rows(session, rows):
         week=session.get(ContestWeek,result.contest_week_id)
         return datetime.combine(week.week_start,time.min,ZoneInfo('America/Chicago')).astimezone(timezone.utc)
     def team_result_safe(row):
-        result, contest = row[:2]
+        from .models import Team
+        result = row[0]
         if result.subject_type != 'team':return True
-        # These snapshots score a single week. Lifetime/legacy/unknown metrics
-        # retain the conservative all-history check; never subtract from a medal.
-        weekly = contest.key in ('team-weekly-practice', 'team-weekly-average-practice', 'team-weekly-activity-points')
-        week = session.get(ContestWeek, result.contest_week_id) if weekly else None
-        return team_public(session, result.team_id, at=period_start(result), week=week)
+        return public_team_identity_allowed(session.get(Team, result.team_id)) if result.team_id else False
     return [row for row in rows if instrument_safe(row[0]) and
         (row[0].subject_type != 'student' or can_publish(session, row[0].profile_id, at=period_start(row[0])) and can_publish(session, row[0].profile_id, at=row[0].created_at)) and
         team_result_safe(row)]
@@ -168,7 +175,8 @@ def filter_hall_result_rows(session, rows):
     rejected only because it predates the new age-screen publication boundary may
     reappear in the Hall once the account currently declares 13+ or adult.
     Unscreened, unknown, under-13 and consent-linked accounts remain excluded.
-    Team and instrument rows receive no compatibility exception.
+    Team rows follow the public Team identity policy; instruments retain their
+    conservative activity privacy filter. Neither uses this student exception.
     """
     strict = filter_result_rows(session, rows)
     visible_ids = {row[0].id for row in strict}

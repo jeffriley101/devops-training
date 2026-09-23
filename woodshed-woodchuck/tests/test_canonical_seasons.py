@@ -301,7 +301,7 @@ def test_current_membership_helpers_ignore_expired_and_future_teams(roster_db):
             teams[season.id] = team
         session.commit()
         assert _active_team_id_for_event(session, profile_id, NOW) == teams[target.id].id
-        champion = {"_normalized_name": "shared identity", "_owner_profile_id": None}
+        champion = {"_family_id": teams[target.id].family_id}
         assert _current_team_member_ids(session, champion, now=NOW) == {profile_id}
         assert dashboard_metrics(session, verifier_id=1, today=NOW.date())["students"][0]["team"]["name"] == "Band Camp"
         assert verifier_dashboard_snapshot(session, verifier_id=2, today=NOW.date())["student"]["team"]["name"] == "Band Camp"

@@ -98,7 +98,7 @@ def test_duplicate_normalized_name_and_emblem_are_rejected(session: Session) -> 
     active = season(session); first = profile(session, 1); second = profile(session, 2); third = profile(session, 3)
     session.commit()
     create_and_join_team(session, profile=first, season=active, name="Brass Cats", emblem_key="emoji:cat", now=NOW)
-    with pytest.raises(ValueError, match="already in use"):
+    with pytest.raises(ValueError, match="That Team name is already taken"):
         create_and_join_team(session, profile=second, season=active, name=" BRASS   CATS ", emblem_key="emoji:dog", now=NOW)
     with pytest.raises(ValueError, match="already in use"):
         create_and_join_team(session, profile=third, season=active, name="Dog Tones", emblem_key="emoji:cat", now=NOW)

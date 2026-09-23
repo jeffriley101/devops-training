@@ -21,7 +21,7 @@ from .content import GENERAL_BONUS_CHALLENGE, QUEST_POOL
 from .db import SessionLocal
 from .hall_public import public_hall_payload
 from .age_privacy import (
-    profile_public, can_publish, chart_public, team_public, filter_result_rows,
+    profile_public, can_publish, chart_public, team_public, public_team_identity_allowed, filter_result_rows,
     filter_hall_result_rows, hall_history_allowed,
 )
 from .instruments import INSTRUMENTS_BY_LABEL, canonical_instrument_key
@@ -477,19 +477,17 @@ def public_team_name(team: Team | None, fallback: str = "Team") -> str:
 
 
 def public_team_emblem(team: Team | None) -> str:
+    from .teams import APPROVED_EMBLEMS
     if team is not None and team.moderation_status == "hidden":
         return "shield:silver"
-    return team.emblem_key if team is not None else "shield:silver"
+    return team.emblem_key if team is not None and team.emblem_key in APPROVED_EMBLEMS else "shield:silver"
 
 
 def lifetime_team_identity(result: ContestResult, team: Team | None) -> str:
-    """Identify the same season-scoped team safely across its later seasons."""
-    if team is not None and team.moderation_status != "hidden":
-        if team.creator_profile_id is not None:
-            return f"owner:{team.creator_profile_id}:name:{team.normalized_name}"
-        return f"name:{team.normalized_name}"
-    # Keep a moderated or deleted historical team separate rather than
-    # collapsing unrelated private identities into one public Hall row.
+    """Use durable family identity; never infer continuity from a name/owner."""
+    if team is not None and team.family_id is not None:
+        return f"family:{team.family_id}"
+    # Missing historical Teams cannot safely be connected by their labels.
     return f"historical:{result.team_id or result.subject_key}"
 
 
@@ -1189,7 +1187,7 @@ def _lifetime_team_practice_scores(
     source_cutoff: datetime | None = None,
     public_only: bool = False,
 ) -> dict[int, float]:
-    """Return uncapped qualifying team practice through the scoring week."""
+    """Aggregate qualifying public Team practice once per persistent family."""
     _practice_scoring_mode(through_week)
     filters = [
         PracticeChart.practice_date < through_week.week_end,
@@ -1200,11 +1198,24 @@ def _lifetime_team_practice_scores(
     if source_cutoff is not None:
         filters.append(PracticeChart.created_at <= aware_utc(source_cutoff))
     scores: dict[int, int] = {}
-    for chart in session.scalars(select(PracticeChart).where(*filters)).all():
+    for chart, team in session.execute(select(PracticeChart, Team).join(
+        Team, Team.id == PracticeChart.team_id
+    ).where(*filters, Team.visibility == "public")).all():
         if public_only and not chart_public(session, chart):
             continue
-        scores[chart.team_id] = scores.get(chart.team_id, 0) + _scoring_seconds(chart, through_week)
-    return {key: seconds / 60 for key, seconds in scores.items()}
+        scores[team.family_id] = scores.get(team.family_id, 0) + _scoring_seconds(chart, through_week)
+    # A current-season incarnation takes precedence even if it is unavailable;
+    # do not bypass its moderation/privacy state by showing an older incarnation.
+    representatives = {}
+    for team in session.scalars(select(Team).join(Season).where(
+        Team.family_id.in_(scores), Season.starts_on <= through_week.week_start
+    ).order_by((Team.season_id == through_week.season_id).desc(), Season.starts_on.desc(), Team.id.desc())):
+        if team.family_id in representatives:
+            continue
+        if team.season_id == through_week.season_id or public_team_identity_allowed(team):
+            representatives[team.family_id] = team
+    return {team.id: scores[family_id] / 60 for family_id, team in representatives.items()
+            if public_team_identity_allowed(team)}
 
 
 # Legacy semantics are intentionally isolated from team_leaderboards(). Stored
@@ -1312,9 +1323,12 @@ def team_leaderboards(
         # Live BOARD team rows expose only team identity + aggregate scores.
         # Private/under-13 member activity is filtered at the contribution level;
         # it must not hide the whole team's current-week row.
-        visible = set(lifetime_practice) | set(weekly_activity_points) | {
+        candidates = set(lifetime_practice) | set(weekly_activity_points) | {
             tid for division in weekly.values() for tid in division["totals"]
         }
+        visible = set(session.scalars(select(Team.id).where(
+            Team.id.in_(candidates), Team.visibility == "public"
+        )))
         for division in weekly.values():
             for metric in division:
                 division[metric] = {tid: value for tid, value in division[metric].items() if tid in visible}
@@ -2112,7 +2126,7 @@ def contest_results_payload(
                 public_team_emblem(teams.get(result.team_id))
                 if result.subject_type == "team" else None
             ),
-            "active_member_count": result.active_member_count,
+            "active_member_count": result.active_member_count if _include_private else None,
             "score": result.effective_score,
         } for result, contest in rows],
     }
@@ -2191,9 +2205,8 @@ def _current_team_member_ids(
     session: Session, champion: dict[str, object], *, now: datetime
 ) -> set[int]:
     """Return current active members for one lifetime team identity."""
-    normalized_name = champion.get("_normalized_name")
-    owner_profile_id = champion.get("_owner_profile_id")
-    if not isinstance(normalized_name, str) or not normalized_name:
+    family_id = champion.get("_family_id")
+    if not isinstance(family_id, int):
         return set()
     now_utc = aware_utc(now)
     # Match the existing team-membership authority: a temporary display
@@ -2204,13 +2217,10 @@ def _current_team_member_ids(
         return set()
     team_query = select(Team.id).where(
         Team.season_id == active_season.id,
-        Team.normalized_name == normalized_name,
+        Team.family_id == family_id,
+        Team.visibility == "public",
         Team.moderation_status != "hidden",
     )
-    if isinstance(owner_profile_id, int):
-        team_query = team_query.where(Team.creator_profile_id == owner_profile_id)
-    else:
-        team_query = team_query.where(Team.creator_profile_id.is_(None))
     current_team_id = session.scalar(team_query)
     if current_team_id is None:
         return set()
@@ -2382,6 +2392,7 @@ def hall_of_champions_payload(
                     "_owner_profile_id": (
                         team.creator_profile_id if team is not None else None
                     ),
+                    "_family_id": team.family_id if team is not None else None,
                     "medals": _empty_medal_counts(),
                     "by_division": {
                         "open": _empty_medal_counts(),
@@ -3554,8 +3565,8 @@ def contest_week_results(week_start: date, request: Request) -> dict[str, object
         if contest_week is None:
             raise HTTPException(status_code=404, detail="Contest week not found.")
         # This endpoint powers the Medal Board of Past Winners. Restore only
-        # eligible 13+ legacy individual snapshots; team/instrument history
-        # remains under the ordinary conservative filter.
+        # eligible 13+ legacy individual snapshots. Public Team medals use safe
+        # Team identity; instrument history retains its conservative filter.
         return contest_results_payload(
             session,
             contest_week,
