@@ -1,5 +1,5 @@
 """Standalone child Free practice; captured email and disposable PostgreSQL only."""
-import re,json,hmac,hashlib
+import re,json,hmac,hashlib,html as html_lib
 from datetime import datetime,timedelta,timezone,date
 from types import SimpleNamespace
 from fastapi.testclient import TestClient
@@ -311,6 +311,47 @@ def test_pending_parent_request_sends_no_child_invitation_before_confirmation(ag
     assert 'Synthetic A' not in mail[0].get_body(preferencelist=('plain',)).get_content()
     assert c.post('/trusted-verifiers/invitations',data={'email':'director-c@example.test','role':'band_director'}).status_code==403
     assert c.get('/account/state').status_code==403
+
+
+def test_parent_permission_email_plain_text_retains_notice_and_links(age_db,captured):
+    mail,_=captured
+    with age_db() as s:
+        service.request_consent(s,parent_email='parent-email@example.test')
+        s.commit()
+    message=mail[0]
+    plain=message.get_body(preferencelist=('plain',)).get_content()
+    approve=re.search(r'https://testserver/family/approve/[^\s]+',plain).group()
+    withdraw=re.search(r'https://testserver/family/withdraw/[^\s]+',plain).group()
+    body=message.get_body(preferencelist=('html',)).get_content()
+    assert service.NOTICE in plain
+    assert 'Read and choose permissions: '+approve in plain
+    assert 'Withdraw this request: '+withdraw in plain
+    assert plain.rstrip('\n')==(service.NOTICE+'\nNo director sharing is requested. Free private practice does not require it.'
+        +'\nRead and choose permissions: '+approve+'\nWithdraw this request: '+withdraw)
+    assert 'No director sharing is requested. Free private practice does not require it.' in body
+
+
+def test_parent_permission_email_html_is_readable_linked_complete_and_escaped(age_db,captured,monkeypatch):
+    mail,_=captured
+    director_name='Director <Admin> & "Lead"'
+    monkeypatch.setattr(service,'notice_policy',lambda environment=None:
+        (service.PRODUCTION_NOTICE_VERSION,service.PRODUCTION_NOTICE,service.PRODUCTION_NOTICE_SHA256))
+    with age_db() as s:
+        service.request_consent(s,parent_email='parent-html@example.test',
+            director_email='director@example.test',director_name=director_name)
+        s.commit()
+    message=mail[0]
+    plain=message.get_body(preferencelist=('plain',)).get_content()
+    body=message.get_body(preferencelist=('html',)).get_content()
+    approve=re.search(r'https://testserver/family/approve/[^\s]+',plain).group()
+    withdraw=re.search(r'https://testserver/family/withdraw/[^\s]+',plain).group()
+    assert '<pre' not in body.lower()
+    assert all(html_lib.escape(paragraph) in body for paragraph in service.PRODUCTION_NOTICE.splitlines())
+    assert 'href="'+approve+'"' in body and 'Review and choose permissions</a>' in body
+    assert 'href="'+withdraw+'"' in body and 'Withdraw this request</a>' in body
+    director='Suggested director (optional): '+director_name+' <director@example.test>. Sharing and chart review require separate parent selection.'
+    assert html_lib.escape(director) in body
+    assert '<Admin>' not in body
 
 
 def test_sensitive_family_links_are_not_logged(age_db,captured,caplog):
