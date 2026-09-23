@@ -541,10 +541,12 @@ def plunge_burrow(request: Request):
 
 @app.get("/arcade")
 def arcade(request: Request):
+    from .arcade_access import CLASSROOM
     return _render(
         request,
         "arcade.html",
         analytics_event="arcade_entered",
+        classroom_games=CLASSROOM,
         title="Arcade",
         active_nav="store",
         page_class="main-app-page arcade-screen",

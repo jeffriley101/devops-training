@@ -1,7 +1,8 @@
 """Balance attacks and earning regressions, only isolated SQLite/local PostgreSQL."""
+from uuid import uuid4
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
-from datetime import datetime
+from datetime import datetime, timezone
 from threading import Event
 import json
 
@@ -38,6 +39,9 @@ def economy_db(request, tmp_path, monkeypatch):
                 display_name=f'Student {index}', pin_hash=hash_pin('2468'),
                 instrument='Flute', level='Beginner', goal='Practice'))
         session.flush()
+        from app.age_privacy import declare_age
+        for profile_id in (1, 2):
+            declare_age(session, profile_id, "adult", at=datetime(2000, 1, 1, tzinfo=timezone.utc))
         session.add_all([WoodchuckState(profile_id=i, revision=3, state_json={
             'account': {'serverRevision': 3}, 'progress': {'credits': 100, 'streak': 2},
             'inventory': {'ownedItems': ['legacy-hat']}, 'profile': {},
@@ -85,7 +89,7 @@ def test_sync_cannot_increase_decrease_replace_or_drop_balance(economy_db, progr
 
 def test_signup_and_missing_state_cannot_import_funds(economy_db):
     with TestClient(main.app) as client:
-        result = client.post('/account/create', data=dict(display_name='New student', pin='2468',
+        result = client.post('/account/create', data=dict(age_band='adult', display_name='New student', pin='2468',
             instrument='Flute', level='Beginner', goal='Practice', initial_state=json.dumps({
                 'progress': {'credits': 999999, 'streak': 999},
                 'inventory': {'ownedItems': ['ufo']}, 'account': {'admin': True}})))
@@ -210,7 +214,7 @@ def test_stale_sync_cannot_erase_or_refund_intervening_economy(economy_db, opera
     elif operation == 'purchase':
         result = client.post('/store/purchases', json={'item_key':'ladybug'})
     else:
-        result = client.post('/arcade/plays', json={'game_key':'blue'})
+        result = client.post('/arcade/plays', json={'request_id': uuid4().hex, 'game_key':'thirds'})
     assert result.status_code in (200, 201), result.text
     earned = balance(client)
     assert earned != old['progress']['credits']

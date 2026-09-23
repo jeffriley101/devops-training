@@ -24,6 +24,7 @@ from .arcade_rewards import (
 )
 from .db import SessionLocal
 from .history_attempts import HistoryAttemptError, history_snapshot
+from .history_mystery import history_mystery_central_date
 from .models import WoodchuckState
 
 
@@ -57,6 +58,7 @@ class ArcadePlayStart(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     game_key: str = Field(min_length=1, max_length=30)
+    request_id: str = Field(min_length=20, max_length=64, pattern=r'^[A-Za-z0-9_-]+$')
 
 
 class ArcadePlayCompletion(BaseModel):
@@ -97,10 +99,13 @@ def create_arcade_play(submitted: ArcadePlayStart, request: Request):
             raise HTTPException(status_code=401, detail="Student sign-in is required.")
         try:
             result = start_arcade_play(
-                session, profile_id=profile.id, game_key=submitted.game_key
+                session, profile_id=profile.id, game_key=submitted.game_key, request_id=submitted.request_id
             )
             session.commit()
+            expired = (result.play.game_key == 'history-mystery' and
+                       result.play.daily_play_date != history_mystery_central_date())
             return {
+                **arcade_play_status(session, profile_id=profile.id, game_key=result.play.game_key),
                 "play_token": result.play.play_token,
                 "game_key": result.play.game_key,
                 "entry_cost": result.play.entry_cost,
@@ -110,10 +115,13 @@ def create_arcade_play(submitted: ArcadePlayStart, request: Request):
                 "daily_reward_limit": DAILY_REWARDED_PLAY_LIMIT,
                 "state_revision": result.state_revision,
                 "resumed": result.resumed,
+                "charged_now": 0 if result.resumed else result.play.entry_cost,
+                "already_completed": result.play.completed_at is not None,
+                "attempt_closed": result.play.completed_at is not None or expired,
                 **({"history": history_snapshot(session.get(WoodchuckState, profile.id), result.play)}
-                   if result.play.game_key == "history-mystery" else {}),
+                   if result.play.game_key == "history-mystery" and result.play.completed_at is None and not expired else {}),
             }
-        except (ArcadeDailyLimitError, InsufficientArcadeBalanceError) as error:
+        except (ArcadeDailyLimitError, InsufficientArcadeBalanceError, ArcadePlayConflictError) as error:
             session.rollback()
             raise HTTPException(status_code=409, detail=str(error)) from error
         except ValueError as error:

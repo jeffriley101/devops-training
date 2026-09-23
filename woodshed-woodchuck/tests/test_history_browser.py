@@ -57,7 +57,13 @@ process.stdin.on('end', async () => {
     };
     const until = async expression => {
       for (let i = 0; i < 200; i++) {
-        if (await evaluate(expression)) return;
+        try {
+          if (await evaluate(expression)) return;
+        } catch (error) {
+          // Navigation can destroy the old execution context before the next
+          // document is ready. Only retry this CDP navigation race.
+          if (error.code !== -32000 || !/navigated|context/i.test(error.message)) throw error;
+        }
         await new Promise(resolve => setTimeout(resolve, 50));
       }
       throw new Error('Timed out: ' + expression);
@@ -100,7 +106,14 @@ process.stdin.on('end', async () => {
       score:document.getElementById('history-mystery-score').textContent,
       best:document.getElementById('history-mystery-best').textContent,
       message:document.getElementById('history-mystery-message').textContent}))`);
-    process.stdout.write(JSON.stringify({initial, buttonHeight, ...final}));
+    await send('Page.navigate', {url: config.origin + '/arcade'}, sessionId);
+    await until('document.readyState === "complete" && document.querySelector("[data-arcade-attempts=history-mystery]")?.textContent.includes("2 purchased")');
+    const room = await evaluate(`({free:document.querySelector('[data-arcade-price=blue]').textContent,
+      normal:document.querySelector('[data-arcade-price=thirds]').textContent,
+      reserved:document.querySelectorAll('.arcade-classroom li').length,
+      classroomLinks:document.querySelectorAll('.arcade-classroom a').length,
+      overflow:document.documentElement.scrollWidth > window.innerWidth})`);
+    process.stdout.write(JSON.stringify({initial, buttonHeight, ...final, room}));
   } catch (error) {process.stderr.write(JSON.stringify(error, Object.getOwnPropertyNames(error))); process.exitCode=1;}
   finally {clearTimeout(timer); chrome.kill();}
 });
@@ -112,7 +125,11 @@ def test_history_browser_loss_refresh_and_completion(tmp_path, width, score):
     chrome = shutil.which('google-chrome')
     if not chrome or not shutil.which('node'):
         pytest.skip('Chromium and Node required for real browser validation')
-    (tmp_path / 'browser_app.py').write_text(SERVER)
+    # The lobby requires the same completed setup state as a real account.
+    seed = SERVER.replace('"credits":20', '"credits":120').replace(
+        'state_json={"progress"',
+        'state_json={"profile":{"instrument":"Flute","level":"Beginner","goal":"Practice"},"progress"')
+    (tmp_path / 'browser_app.py').write_text(seed)
     with socket.socket() as sock:
         sock.bind(('127.0.0.1', 0))
         port = sock.getsockname()[1]
@@ -146,9 +163,11 @@ def test_history_browser_loss_refresh_and_completion(tmp_path, width, score):
             payload = json.loads(result.stdout)
             assert payload['answers'] == 5
             assert payload['score'] == payload['best'] == str(score)
-            assert payload['credits'] == payload['initial'] - 1 + (5 if score == 5 else 0)
+            assert payload['credits'] == payload['initial'] - 100 + (5 if score == 5 else 0)
             assert payload['buttonHeight'] >= 48
             assert f'Final score: {score} / 5' in payload['message']
+            assert payload['room'] == {'free': 'Always free', 'normal': '100 Dandelions · 3 attempts',
+                                       'reserved': 5, 'classroomLinks': 0, 'overflow': False}
         finally:
             process.terminate()
             try:

@@ -1,4 +1,5 @@
 from __future__ import annotations
+from uuid import uuid4
 
 from datetime import datetime, timezone
 from pathlib import Path
@@ -59,6 +60,8 @@ def economy_database(monkeypatch: pytest.MonkeyPatch):
     )
     factory = sessionmaker(bind=engine, expire_on_commit=False, autoflush=False)
     Base.metadata.create_all(engine)
+    from app import session_revocations
+    monkeypatch.setattr(session_revocations, "SessionLocal", factory)
     monkeypatch.setattr(account_routes, "SessionLocal", factory)
     monkeypatch.setattr(arcade_routes, "SessionLocal", factory)
     monkeypatch.setattr(main, "SessionLocal", factory)
@@ -67,7 +70,7 @@ def economy_database(monkeypatch: pytest.MonkeyPatch):
     engine.dispose()
 
 
-def add_player(factory, suffix: str, *, credits: int = 20):
+def add_player(factory, suffix: str, *, credits: int = 120):
     with factory() as session:
         profile = WoodchuckProfile(
             woodchuck_id=f"WC-ECO-{suffix}",
@@ -80,6 +83,10 @@ def add_player(factory, suffix: str, *, credits: int = 20):
         )
         session.add(profile)
         session.flush()
+        from app.age_privacy import declare_age
+        from datetime import datetime, timezone
+        if profile.status == "active":
+            declare_age(session, profile.id, "adult", at=datetime(2000, 1, 1, tzinfo=timezone.utc))
         session.add(WoodchuckState(
             profile_id=profile.id,
             state_json={"progress": {"credits": credits}},
@@ -89,7 +96,7 @@ def add_player(factory, suffix: str, *, credits: int = 20):
         return profile
 
 
-def signed_client(factory, suffix: str, *, credits: int = 20):
+def signed_client(factory, suffix: str, *, credits: int = 120):
     profile = add_player(factory, suffix, credits=credits)
     client = TestClient(app)
     assert client.post(
@@ -111,7 +118,7 @@ def balance(factory, profile_id: int) -> int:
 
 
 def test_page_views_are_free_and_start_deducts_exactly_once(economy_database) -> None:
-    client, profile = signed_client(economy_database, "START", credits=4)
+    client, profile = signed_client(economy_database, "START", credits=103)
 
     for path in (
         "/plunge-burrow",
@@ -125,11 +132,11 @@ def test_page_views_are_free_and_start_deducts_exactly_once(economy_database) ->
         "/arcade/history-mystery",
     ):
         assert client.get(path).status_code == 200
-    assert client.get("/arcade/plays/status/scale-keyboard").json()["balance"] == 4
+    assert client.get("/arcade/plays/status/scale-keyboard").json()["balance"] == 103
 
-    response = client.post("/arcade/plays", json={"game_key": "scale-keyboard"})
+    response = client.post("/arcade/plays", json={'request_id': uuid4().hex, 'game_key': "scale-keyboard"})
     assert response.status_code == 200
-    assert response.json()["entry_cost"] == 1
+    assert response.json()["entry_cost"] == 100
     assert response.json()["balance"] == 3
     assert balance(economy_database, profile.id) == 3
     with economy_database() as session:
@@ -143,9 +150,9 @@ def test_insufficient_balance_rejects_start_without_negative_balance(
     economy_database,
 ) -> None:
     client, profile = signed_client(economy_database, "EMPTY", credits=0)
-    response = client.post("/arcade/plays", json={"game_key": "blue"})
+    response = client.post("/arcade/plays", json={'request_id': uuid4().hex, 'game_key': "thirds"})
     assert response.status_code == 409
-    assert "1 dandelion" in response.json()["detail"]
+    assert "100 Dandelions" in response.json()["detail"]
     assert balance(economy_database, profile.id) == 0
     with economy_database() as session:
         assert session.scalar(select(ArcadePlaySession.id)) is None
@@ -154,18 +161,18 @@ def test_insufficient_balance_rejects_start_without_negative_balance(
 def test_client_cannot_choose_entry_cost_or_payout(economy_database) -> None:
     client, profile = signed_client(economy_database, "AUTHORITY", credits=3)
     rejected_start = client.post(
-        "/arcade/plays", json={"game_key": "blue", "entry_cost": 0}
+        "/arcade/plays", json={'request_id': uuid4().hex, 'game_key': "blue", "entry_cost": 0}
     )
     assert rejected_start.status_code == 422
     assert balance(economy_database, profile.id) == 3
 
-    play = client.post("/arcade/plays", json={"game_key": "blue"}).json()
+    play = client.post("/arcade/plays", json={'request_id': uuid4().hex, 'game_key': "blue"}).json()
     rejected_result = client.post(
         f"/arcade/plays/{play['play_token']}/complete",
         json={"score": 250, "payout": 999},
     )
     assert rejected_result.status_code == 422
-    assert balance(economy_database, profile.id) == 2
+    assert balance(economy_database, profile.id) == 3
     accepted = client.post(
         f"/arcade/plays/{play['play_token']}/complete", json={"score": 250}
     )
@@ -185,7 +192,7 @@ def test_all_games_use_their_centralized_payout_tiers(game_key: str) -> None:
 
 def test_completion_pays_once_and_retry_is_idempotent(economy_database) -> None:
     client, profile = signed_client(economy_database, "RETRY", credits=5)
-    play = client.post("/arcade/plays", json={"game_key": "blue"}).json()
+    play = client.post("/arcade/plays", json={'request_id': uuid4().hex, 'game_key': "blue"}).json()
 
     first = client.post(
         f"/arcade/plays/{play['play_token']}/complete", json={"score": 150}
@@ -196,11 +203,11 @@ def test_completion_pays_once_and_retry_is_idempotent(economy_database) -> None:
 
     assert first.status_code == 200
     assert first.json()["payout"] == 3
-    assert first.json()["balance"] == 7
+    assert first.json()["balance"] == 8
     assert retry.status_code == 200
     assert retry.json()["already_completed"] is True
     assert retry.json()["payout"] == 3
-    assert balance(economy_database, profile.id) == 7
+    assert balance(economy_database, profile.id) == 8
     with economy_database() as session:
         row = session.scalar(select(ArcadePlaySession))
         assert row.submitted_score == 150
@@ -214,10 +221,10 @@ def test_completion_pays_once_and_retry_is_idempotent(economy_database) -> None:
 def test_retrying_an_unfinished_shared_game_reuses_its_paid_play(
     economy_database, game_key: str
 ) -> None:
-    client, profile = signed_client(economy_database, "RESUME", credits=4)
+    client, profile = signed_client(economy_database, "RESUME", credits=103)
 
-    first = client.post("/arcade/plays", json={"game_key": game_key})
-    retry = client.post("/arcade/plays", json={"game_key": game_key})
+    first = client.post("/arcade/plays", json={'request_id': uuid4().hex, 'game_key': game_key})
+    retry = client.post("/arcade/plays", json={'request_id': uuid4().hex, 'game_key': game_key})
 
     assert first.status_code == retry.status_code == 200
     assert retry.json()["play_token"] == first.json()["play_token"]
@@ -235,10 +242,10 @@ def test_retrying_an_unfinished_shared_game_reuses_its_paid_play(
 def test_repeated_shared_game_completion_keeps_one_score_and_one_payout(
     economy_database, game_key: str
 ) -> None:
-    client, profile = signed_client(economy_database, "STRESS", credits=20)
+    client, profile = signed_client(economy_database, "STRESS", credits=220)
     scores = (0, 3, 6, 9, 12)
     for score in scores:
-        play = client.post("/arcade/plays", json={"game_key": game_key}).json()
+        play = client.post("/arcade/plays", json={'request_id': uuid4().hex, 'game_key': game_key}).json()
         completed = client.post(
             f"/arcade/plays/{play['play_token']}/complete", json={"score": score}
         )
@@ -264,9 +271,9 @@ def test_repeated_shared_game_completion_keeps_one_score_and_one_payout(
 
 
 def test_conflicting_replay_and_another_profile_are_rejected(economy_database) -> None:
-    owner, _profile = signed_client(economy_database, "OWNER", credits=4)
-    stranger, _ = signed_client(economy_database, "OTHER", credits=4)
-    play = owner.post("/arcade/plays", json={"game_key": "radio-tuner"}).json()
+    owner, _profile = signed_client(economy_database, "OWNER", credits=103)
+    stranger, _ = signed_client(economy_database, "OTHER", credits=103)
+    play = owner.post("/arcade/plays", json={'request_id': uuid4().hex, 'game_key': "radio-tuner"}).json()
 
     assert stranger.post(
         f"/arcade/plays/{play['play_token']}/complete", json={"score": 300}
@@ -296,7 +303,7 @@ def test_result_requires_a_valid_authenticated_play(economy_database) -> None:
 
 def test_play_token_cannot_be_submitted_for_another_game(economy_database) -> None:
     client, _ = signed_client(economy_database, "WRONGGAME")
-    play = client.post("/arcade/plays", json={"game_key": "blue"}).json()
+    play = client.post("/arcade/plays", json={'request_id': uuid4().hex, 'game_key': "blue"}).json()
     response = client.post(
         "/arcade/scores/radio-tuner",
         json={"score": 100, "play_token": play["play_token"]},
@@ -315,14 +322,14 @@ def test_lower_score_completes_and_pays_without_replacing_best(economy_database)
             profile_id=profile.id, game_key="blue", best_score=250
         ))
         session.commit()
-    play = client.post("/arcade/plays", json={"game_key": "blue"}).json()
+    play = client.post("/arcade/plays", json={'request_id': uuid4().hex, 'game_key': "blue"}).json()
     result = client.post(
         f"/arcade/plays/{play['play_token']}/complete", json={"score": 80}
     ).json()
     assert result["updated"] is False
     assert result["best_score"] == 250
     assert result["payout"] == 2
-    assert result["balance"] == 4
+    assert result["balance"] == 5
 
 
 def test_daily_cap_is_per_game_and_still_allows_paid_play(economy_database) -> None:
@@ -348,14 +355,14 @@ def test_daily_cap_is_per_game_and_still_allows_paid_play(economy_database) -> N
     assert status["completed_reward_plays"] == 10
     assert client.get("/arcade/plays/status/radio-tuner").json()["reward_eligible"] is True
 
-    play = client.post("/arcade/plays", json={"game_key": "blue"}).json()
-    assert play["balance"] == 19
+    play = client.post("/arcade/plays", json={'request_id': uuid4().hex, 'game_key': "blue"}).json()
+    assert play["balance"] == 20
     assert play["reward_eligible"] is False
     completed = client.post(
         f"/arcade/plays/{play['play_token']}/complete", json={"score": 250}
     ).json()
     assert completed["payout"] == 0
-    assert completed["balance"] == 19
+    assert completed["balance"] == 20
 
 
 def test_chicago_calendar_boundary_resets_reward_count(economy_database) -> None:
@@ -411,7 +418,7 @@ def test_service_start_and_complete_are_one_play_one_score(economy_database) -> 
         session.commit()
     assert result["payout"] == 2
     assert result["best_score"] == 25
-    assert result["balance"] == 3
+    assert result["balance"] == 4
 
 
 def test_all_nine_clients_use_shared_start_and_completion_contract() -> None:
@@ -431,7 +438,7 @@ def test_all_nine_clients_use_shared_start_and_completion_contract() -> None:
     assert "completePlay(token, game.score)" in INTERVAL_JS
     assert "startPlay(GAME_KEY)" in HISTORY_JS
     assert "completePlay(token, game.score)" in HISTORY_JS
-    assert 'body: JSON.stringify({ game_key: gameKey })' in ECONOMY_JS
+    assert 'body: JSON.stringify({ game_key: gameKey, request_id: requestId })' in ECONOMY_JS
     assert "encodeURIComponent(playToken)" in ECONOMY_JS
     assert "root.WWState.saveState(state, { sync: false })" in ECONOMY_JS
 

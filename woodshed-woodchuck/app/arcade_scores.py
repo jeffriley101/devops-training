@@ -3,7 +3,22 @@ from __future__ import annotations
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from .models import ArcadeHighScore, WoodchuckProfile
+from .models import ArcadeHighScore, ArcadePlaySession, WoodchuckProfile
+
+
+def publishable_attempt_bests(session, game_key):
+    """Public best can be lower than a lifetime best earned while private."""
+    from .age_privacy import can_publish
+    from .age_models import AccountPrivacy
+    rows = session.execute(select(ArcadePlaySession.profile_id, func.max(ArcadePlaySession.submitted_score))
+        .join(AccountPrivacy, AccountPrivacy.profile_id == ArcadePlaySession.profile_id)
+        .where(ArcadePlaySession.game_key == game_key, ArcadePlaySession.submitted_score > 0,
+               AccountPrivacy.age_band.in_(['13to17', 'adult']),
+               ArcadePlaySession.started_at >= AccountPrivacy.public_from,
+               ArcadePlaySession.completed_at >= AccountPrivacy.public_from)
+        .group_by(ArcadePlaySession.profile_id))
+    # Reuse the shared current-consent gate as well as both historical boundaries.
+    return {pid: score for pid, score in rows if can_publish(session, pid)}
 
 
 ARCADE_GAME_KEYS = frozenset({
@@ -108,13 +123,19 @@ def arcade_score_payload(
         )
     ).all()
 
-    from .age_privacy import can_publish
-    rows=[(score,profile) for score,profile in rows if profile.id==profile_id or can_publish(session,profile.id,at=score.updated_at)]
+    public_bests = publishable_attempt_bests(session, key)
+    visible = []
+    for score, profile in rows:
+        # Aggregate timestamps do not establish when the scoring attempt began.
+        value = (score.best_score if profile.id == profile_id
+                 else public_bests.get(profile.id, 0))
+        if value > 0:
+            visible.append((value, profile))
+    rows = sorted(visible, key=lambda row: (-row[0], row[1].display_name.lower(), row[1].display_name, row[1].id))
     leaderboard: list[dict[str, object]] = []
     prior_score: int | None = None
     rank = 0
-    for position, (score_row, profile) in enumerate(rows, start=1):
-        score_value = int(score_row.best_score)
+    for position, (score_value, profile) in enumerate(rows, start=1):
         if score_value != prior_score:
             rank = position
             prior_score = score_value

@@ -1,4 +1,5 @@
 """Negative score/answer tests using disposable state; no real gameplay claims."""
+from uuid import uuid4
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
 from datetime import timedelta
@@ -20,7 +21,7 @@ from tests.test_team_families import disposable_url
 
 
 def start(client):
-    result = client.post('/arcade/plays', json={'game_key': 'history-mystery'})
+    result = client.post('/arcade/plays', json={'request_id': uuid4().hex, 'game_key': 'history-mystery'})
     assert result.status_code == 200
     return result.json()
 
@@ -44,7 +45,7 @@ def saved(client):
 
 @pytest.mark.parametrize('score', range(6))
 def test_server_scores_real_choices_and_pays_existing_tiers(history_database, score):
-    client, profile = signed_client(history_database, f'TIER{score}', credits=20)
+    client, profile = signed_client(history_database, f'TIER{score}', credits=119)
     play = start(client)
     token = play['play_token']
     assert 'answer' not in play['history']['question']
@@ -68,11 +69,11 @@ def test_server_scores_real_choices_and_pays_existing_tiers(history_database, sc
 
 
 def start_completed(client):
-    return client.post('/arcade/plays', json={'game_key': 'history-mystery'}).status_code
+    return client.post('/arcade/plays', json={'request_id': uuid4().hex, 'game_key': 'history-mystery'}).status_code
 
 
 def test_forged_score_alternate_endpoint_and_state_cannot_mint_reward(history_database):
-    client, profile = signed_client(history_database, 'FORGE', credits=20)
+    client, profile = signed_client(history_database, 'FORGE', credits=119)
     play = start(client)
     token = play['play_token']
     for endpoint, body in [(f'/arcade/plays/{token}/complete', {'score': 5}),
@@ -91,7 +92,7 @@ def test_forged_score_alternate_endpoint_and_state_cannot_mint_reward(history_da
 
 
 def test_answer_order_retries_refresh_and_stale_sync(history_database):
-    client, profile = signed_client(history_database, 'RETRY', credits=20)
+    client, profile = signed_client(history_database, 'RETRY', credits=119)
     play = start(client)
     token = play['play_token']
     q = questions(history_database, token)
@@ -121,7 +122,7 @@ def test_identity_game_binding_and_unknown_tokens(history_database):
         expected = 404 if client is b else 401
         assert answer(client, token, 0, 'guess').status_code == expected
         assert client.post(f'/arcade/plays/{token}/complete', json={'score': 5}).status_code == expected
-    blue = a.post('/arcade/plays', json={'game_key': 'blue'}).json()['play_token']
+    blue = a.post('/arcade/plays', json={'request_id': uuid4().hex, 'game_key': 'blue'}).json()['play_token']
     assert answer(a, blue, 0, 'guess').status_code == 404
     assert answer(a, 'synthetic-unknown-token', 0, 'guess').status_code == 404
     assert a.post('/arcade/scores/blue', json={'score': 5, 'play_token': token}).status_code == 409
@@ -178,7 +179,7 @@ def test_expiry_and_legacy_unfinished_refresh(history_database):
     assert answer(client, token, 0, 'guess').status_code == 409
     assert client.post(f'/arcade/plays/{token}/complete', json={'score': 5}).status_code == 409
     fresh = start(client)
-    assert fresh['play_token'] != token and fresh['balance'] == 18
+    assert fresh['play_token'] != token and fresh['balance'] == 19
 
 
 @pytest.fixture
@@ -186,7 +187,7 @@ def postgres_history(tmp_path):
     engine = create_engine(disposable_url(tmp_path, 'postgresql'))
     Base.metadata.create_all(engine)
     factory = sessionmaker(engine, expire_on_commit=False)
-    profile = add_profile(factory, 'PG', credits=20)
+    profile = add_profile(factory, 'PG', credits=119)
     yield factory, profile
     engine.dispose()
 

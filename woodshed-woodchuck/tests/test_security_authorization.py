@@ -1,4 +1,5 @@
 from datetime import date, datetime, timedelta, timezone
+from uuid import uuid4
 
 import pytest
 from sqlalchemy import select
@@ -92,14 +93,14 @@ def test_open_arcade_score_forgery_consequences_are_characterized(economy_databa
     """OPEN finding: this asserts observed consequences, not successful remediation."""
     from app.arcade_scores import MAX_ARCADE_SCORE
     first, profile = arcade_client(economy_database, 'FORGER', credits=20)
-    start = first.post('/arcade/plays', json={'game_key':'blue'})
+    start = first.post('/arcade/plays', json={'game_key':'blue','request_id':uuid4().hex})
     assert start.status_code == 200
     path = '/arcade/plays/'+start.json()['play_token']+'/complete'
     result = first.post(path, json={'score':MAX_ARCADE_SCORE})
     assert result.status_code == 200
     assert result.json()['payout'] == 5
-    assert result.json()['balance'] == 24  # Forged score yields four net credits.
-    assert first.post(path, json={'score':MAX_ARCADE_SCORE}).json()['balance'] == 24
+    assert result.json()['balance'] == 25  # Blue is free; existing client-score trust is unchanged.
+    assert first.post(path, json={'score':MAX_ARCADE_SCORE}).json()['balance'] == 25
     second, _ = arcade_client(economy_database, 'OTHER', credits=20)
     assert second.post(path, json={'score':MAX_ARCADE_SCORE}).status_code == 404
     board = second.get('/arcade/scores/blue')
@@ -116,7 +117,7 @@ def test_database_failures_do_not_log_sql_tokens_or_arbitrary_headers(economy_da
     def fail(*args, **kwargs):
         raise SQLAlchemyError('private-play-token secret-db-password private-session-cookie')
     monkeypatch.setattr(arcade_routes, 'start_arcade_play', fail)
-    response = first.post('/arcade/plays', json={'game_key':'blue'},
+    response = first.post('/arcade/plays', json={'game_key':'blue','request_id':uuid4().hex},
                           headers={'X-Woodshed-Arcade-Game':'injected-private-pin'})
     assert response.status_code == 503
     assert 'arcade_request_failed operation=start game_key=unknown' in caplog.text

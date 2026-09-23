@@ -68,13 +68,14 @@
     bestOutputs.forEach((output) => gameKeys.add(output.dataset.arcadePersonalBest));
     if (!gameKeys.size || document.querySelector("[data-arcade-game]")) return;
     gameKeys.forEach(async (gameKey) => {
+      window.WoodshedArcadeEconomy.loadStatus(gameKey).catch(function () {});
       const gameLists = lists.filter((list) => list.dataset.arcadeLeaderboard === gameKey);
       try {
         const payload = await loadScores(gameKey);
         gameLists.forEach((list) => renderLeaderboard(list, payload.leaderboard));
         renderPersonalBest(gameKey, payload.best_score);
       } catch (_error) {
-        gameLists.forEach((list) => renderLeaderboard(list, []));
+        gameLists.forEach((list) => { list.textContent = "Standings unavailable. Reload to retry."; });
       }
     });
   }

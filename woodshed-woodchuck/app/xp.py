@@ -82,14 +82,21 @@ def plunge_best_payload(
         )
     ).all()
 
-    from .age_privacy import can_publish
     from .age_models import AccountPrivacy
-    profiles=[profile for profile in profiles if profile.id==profile_id or (can_publish(session,profile.id) and profile.plunge_best_score > session.get(AccountPrivacy,profile.id).private_plunge_best)]
+    from .arcade_scores import publishable_attempt_bests
+    public_bests = publishable_attempt_bests(session, 'plunge-burrow')
+    visible = []
+    for profile in profiles:
+        # Beating a private-best snapshot does not prove public attempt provenance.
+        value = (profile.plunge_best_score if profile.id == profile_id
+                 else public_bests.get(profile.id, 0))
+        if value > 0:
+            visible.append((value, profile))
+    profiles = sorted(visible, key=lambda row: (-row[0], row[1].display_name.lower(), row[1].display_name, row[1].id))
     ranked_rows: list[dict[str, object]] = []
     previous_score: int | None = None
     rank = 0
-    for position, profile in enumerate(profiles, start=1):
-        score = int(profile.plunge_best_score)
+    for position, (score, profile) in enumerate(profiles, start=1):
         if score != previous_score:
             rank = position
             previous_score = score

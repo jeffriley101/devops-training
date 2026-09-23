@@ -1,4 +1,5 @@
 """Focused synthetic age-gate tests; isolated PostgreSQL schemas, no email."""
+from uuid import uuid4
 import json
 import os
 import sys
@@ -118,7 +119,7 @@ def test_existing_login_is_limited_and_keeps_history_balance_and_rewards(age_db,
 WRITES=[('put','/account/state',{'account':{'woodchuckId':'WC-AGE-A','serverRevision':7},'progress':{'credits':99999}}),
     ('post','/practice-charts',{'practice_date':str(date.today()),'minutes':10,'note':'synthetic'}),
     ('post','/practice-charts/pristine',{'detected_playing_seconds':60,'submission_key':'synthetic-age'}),
-    ('post','/arcade/plays',{'game_key':'blue'}),
+    ('post','/arcade/plays',{'game_key':'blue','request_id':uuid4().hex}),
     ('post','/arcade/plays/fake-token/complete',{'score':100}),
     ('post','/teams',{'name':'Synthetic Ages','emblem_key':'emoji:bear'}),
     ('post','/teams/selection',{'team_id':1}),
@@ -369,7 +370,7 @@ def test_legacy_local_import_blocked_but_fresh_game_completion_still_works(age_d
     assert counts(age_db)==before
     r=c.get('/xp/plunge-best');assert r.status_code==200 and r.json()['allow_local_score_import'] is False
     assert r.json()['best_score']==19
-    start=c.post('/arcade/plays',json={'game_key':'plunge-burrow'});assert start.status_code==200,start.text
+    start=c.post('/arcade/plays',json={'request_id': uuid4().hex, 'game_key':'plunge-burrow'});assert start.status_code==200,start.text
     token=start.json()['play_token']
     completion=c.post(f'/arcade/plays/{token}/complete',json={'score':20});assert completion.status_code==200,completion.text
     assert completion.json()['best_score']==20
