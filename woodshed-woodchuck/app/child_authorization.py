@@ -70,14 +70,27 @@ def consent_active(session,rule):
 def protected_child(session,pid):
     rule=session.get(AccountPrivacy,pid,populate_existing=True)
     return bool(rule and (rule.age_band=='under13' or rule.consent_id))
-def send_copy(service,recipient,subject,text):
+def send_copy(service,recipient,subject,text,*,html_body=None):
     if service.config is None:raise ValueError('Email delivery is not configured.')
-    result=service.send(build_message(to_email=recipient,subject=subject,plain_text=text,html_body='<pre>'+html.escape(text)+'</pre>',config=service.config))
+    result=service.send(build_message(to_email=recipient,subject=subject,plain_text=text,
+        html_body=html_body if html_body is not None else '<pre>'+html.escape(text)+'</pre>',config=service.config))
     if not result.sent:raise ValueError('Email could not be delivered; no authorization is implied.')
 def derived_token(row,purpose):
     value=f'{purpose}:{row.id}:{utc(row.created_at).isoformat()}'
     return str(row.id)+'.'+hmac.new(session_secret().encode(),value.encode(),hashlib.sha256).hexdigest()
 def director_copy(row):return f'\nSuggested director (optional): {row.director_name} <{row.director_email}>. Sharing and chart review require separate parent selection.' if row.director_email else '\nNo director sharing is requested. Free private practice does not require it.'
+
+def parent_permission_html(notice,director,approve_url,withdraw_url):
+    paragraphs=notice.splitlines()
+    body=['<div style="font-family:Arial,sans-serif;color:#222;line-height:1.5;max-width:680px">',
+          '<h2 style="font-size:22px;margin:0 0 16px">'+html.escape(paragraphs[0])+'</h2>']
+    body.extend('<p style="margin:0 0 14px">'+html.escape(paragraph)+'</p>' for paragraph in paragraphs[1:])
+    body.extend([
+        '<p style="margin:18px 0;padding:12px;background:#f3f4f6;border-radius:6px">'+html.escape(director)+'</p>',
+        '<p style="margin:22px 0"><a href="'+html.escape(approve_url,quote=True)+'" style="display:inline-block;background:#2457a7;color:#fff;text-decoration:none;font-weight:bold;padding:12px 18px;border-radius:6px">Review and choose permissions</a></p>',
+        '<p style="margin:0"><a href="'+html.escape(withdraw_url,quote=True)+'" style="color:#555;text-decoration:underline">Withdraw this request</a></p>',
+        '</div>'])
+    return ''.join(body)
 
 def request_consent(session,*,parent_email,director_email='',director_name='',profile=None,
                     cohort_key=None):
@@ -111,7 +124,12 @@ def request_consent(session,*,parent_email,director_email='',director_name='',pr
     token=generate_invitation_token()
     row=PendingConsent(profile_id=profile.id if profile else None,parent_email=email,director_email=director,director_name=name,review_allowed=False,approve_hash=hash_invitation_token(token),created_at=now,expires_at=now+PENDING_TTL,notice_version=version,cohort_key=cohort_key,cohort_claimed_at=cohort_claimed_at)
     session.add(row);session.flush()
-    send_copy(EmailService(),email,'Woodshed: parent permission request',notice+director_copy(row)+'\nRead and choose permissions: '+public_link('/family/approve/'+token)+'\nWithdraw this request: '+public_link('/family/withdraw/'+derived_token(row,'withdraw')))
+    director_text=director_copy(row)
+    approve_url=public_link('/family/approve/'+token)
+    withdraw_url=public_link('/family/withdraw/'+derived_token(row,'withdraw'))
+    plain=notice+director_text+'\nRead and choose permissions: '+approve_url+'\nWithdraw this request: '+withdraw_url
+    send_copy(EmailService(),email,'Woodshed: parent permission request',plain,
+        html_body=parent_permission_html(notice,director_text.lstrip('\n'),approve_url,withdraw_url))
     return row
 
 def pending_from_token(session,token,*,purpose='approve',lock=False):
