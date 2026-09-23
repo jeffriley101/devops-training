@@ -130,7 +130,7 @@
     document.querySelectorAll("[data-arcade-price]").forEach(function (output) {
       if (output.dataset.arcadePrice && output.dataset.arcadePrice !== payload.game_key) return;
       if (payload.free_reason !== undefined) output.textContent = payload.free_reason === "always_free"
-        ? "Always free" : payload.free_reason === "full_access" ? "Free with Full Access"
+        ? "Always free" : payload.free_reason === "full_access" ? "Free"
         : "100 Dandelions · 3 attempts";
     });
     document.querySelectorAll("[data-arcade-attempts]").forEach(function (output) {

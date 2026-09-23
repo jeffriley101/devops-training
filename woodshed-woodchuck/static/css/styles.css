@@ -5294,7 +5294,7 @@ select {
 .practice-room-emoji-control:disabled { opacity: 0.58; cursor: not-allowed; }
 
 .practice-tool-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: stretch;
   gap: 0.7rem;
 }
@@ -5635,18 +5635,67 @@ select {
 }
 .arcade-cabinet-control-panel {
   display: flex;
-  width: min(100%, 8rem);
-  min-height: 1.45rem;
+  width: min(100%, 12rem);
+  min-height: 3.2rem;
   align-items: center;
   justify-content: center;
-  gap: 0.45rem;
-  padding: 0.2rem 0.5rem;
+  gap: .5rem;
+  padding: .45rem;
   border: 2px solid #090910;
-  border-radius: 0.3rem 0.3rem 0.7rem 0.7rem;
-  background: #3b4350;
+  border-bottom-width: 5px;
+  border-radius: .3rem .3rem .7rem .7rem;
+  background: linear-gradient(#657181, #303744);
+  pointer-events: none;
 }
-.arcade-cabinet-control-panel i { display: block; width: 0.55rem; height: 0.55rem; border-radius: 50%; background: #f4d35e; box-shadow: 0 1px 0 #4f3012; }
-.arcade-cabinet-control-panel i:first-child { width: 0.75rem; height: 0.75rem; border: 2px solid #111; background: #49c7d4; }
+.arcade-joystick {
+  position: relative;
+  width: 1.8rem;
+  height: 1.8rem;
+  flex-shrink: 0;
+  border-bottom: .4rem solid #111;
+  border-radius: 30%;
+  background: linear-gradient(90deg, transparent 40%, #ccc 40% 60%, transparent 60%);
+}
+.arcade-joystick::before {
+  content: "";
+  position: absolute;
+  top: -.2rem;
+  left: .3rem;
+  width: 1.2rem;
+  height: 1.2rem;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ffaaa1, #d53030 55%, #761717);
+  box-shadow: 0 2px 0 #17171c;
+}
+.arcade-action-button {
+  flex: 0 0 .9rem;
+  height: .9rem;
+  border: 2px solid #191923;
+  border-radius: 50%;
+  background: #f4d35e;
+  box-shadow: 0 3px 0 #14141d, inset 0 2px 0 #fff7;
+}
+.arcade-action-button + .arcade-action-button { background: #49c7d4; }
+.arcade-token-slot {
+  display: grid;
+  justify-items: center;
+  padding: .2rem;
+  border: 1px solid #abb4bf;
+  border-radius: .2rem;
+  color: #ffe48b;
+  background: #252b33;
+  font-size: .55rem;
+  line-height: 1.2;
+}
+.arcade-token-slot span { font-size: 1rem; }
+.arcade-token-slot::after {
+  content: "";
+  width: 1.1rem;
+  height: .2rem;
+  margin-top: .15rem;
+  background: #050609;
+  box-shadow: 0 1px 0 #8994a1;
+}
 .arcade-cabinet-best { font-size: 0.82rem; font-weight: 900; color: #f4d35e; }
 .arcade-cabinet-best output { color: #fff; font: inherit; }
 .arcade-cabinet-plunge .arcade-cabinet-screen { background: radial-gradient(circle at 50% 72%, #442815 0 20%, transparent 21%), linear-gradient(#7c4b28, #301d15); }
@@ -7738,4 +7787,13 @@ select {
 .family-kws-explainer p {
   margin: .35rem 0 0;
   line-height: 1.5;
+}
+
+/* Reserve standings space without adding fake rows or including it in the link. */
+.arcade-cabinet-grid { align-items: stretch; }
+.arcade-cabinet { display: grid; grid-template-rows: auto 1fr; }
+.arcade-cabinet-history { grid-template-rows: 1fr; }
+.arcade-cabinet .arcade-leaderboard { margin: 0 0 .8rem; min-height: 12rem; }
+@media (max-width: 480px) {
+  .practice-tool-grid { grid-template-columns: 1fr; }
 }
