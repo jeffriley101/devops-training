@@ -1961,6 +1961,13 @@ def test_hall_aggregates_students_instruments_divisions_and_prior_seasons(
             session, student.id, "adult",
             at=datetime(2025, 1, 1, tzinfo=timezone.utc),
         )
+    # Instrument history needs matching public source charts for each week.
+    for source_week, instrument in ((prior_week, "Flute"), (current_week, "Flute"),
+                                    (current_week, "Saxophone")):
+        add_chart(session, profile=students[0], practice_date=source_week.week_start,
+                  minutes=10, instrument=instrument,
+                  verification_status="approved" if source_week is current_week and instrument == "Flute" else None,
+                  created_at=source_week.finalized_at - timedelta(days=7))
 
     def result(
         *, week: ContestWeek, contest: Contest, division: str, medal: str,
@@ -2115,6 +2122,8 @@ def test_hall_uses_persisted_instrument_snapshot_not_current_profile_instrument(
         if contest.key == "weekly-practice-by-instrument"
     )
     student = add_student(session, woodchuck_id="WC-HALL-INSTRUMENT", instrument="Tuba")
+    add_chart(session, profile=student, practice_date=week.week_start,
+              minutes=30, instrument="Clarinet", created_at=NOW)
     week.status = "finalized"
     week.finalized_at = FINAL_NOW
     session.add(ContestResult(
