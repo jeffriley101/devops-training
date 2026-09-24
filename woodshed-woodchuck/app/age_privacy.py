@@ -136,17 +136,22 @@ def team_public(session, team_id, *, at=None, identity_only=False, week=None):
 def filter_result_rows(session, rows):
     from datetime import datetime, time, timezone
     from zoneinfo import ZoneInfo
-    from .models import PracticeChart, ContestWeek
+    from .models import ContestWeek
     def instrument_safe(result):
         if result.subject_type != 'instrument': return True
-        from .contests import normalize_instrument
+        from .contests import normalize_instrument, _charts_and_approved_ids
+        if result.division not in ('open', 'verified'): return False
         week = session.get(ContestWeek, result.contest_week_id)
         if week is None: return False
         instrument_key, _ = normalize_instrument(result.instrument or result.display_name_snapshot or '')
         if not instrument_key: return False
-        charts = session.scalars(select(PracticeChart).where(PracticeChart.practice_date >= week.week_start,
-            PracticeChart.practice_date < week.week_end, PracticeChart.include_contests.is_(True)))
-        matching = [c for c in charts if normalize_instrument(c.instrument)[0] == instrument_key]
+        charts, approved_ids, _ = _charts_and_approved_ids(
+            session, week,
+            submitted_before=week.finalized_at if week.status == 'finalized' else None,
+        )
+        matching = [c for c in charts
+                    if normalize_instrument(c.instrument)[0] == instrument_key
+                    and (result.division == 'open' or c.id in approved_ids)]
         # Require evidence for this instrument and never expose private contributions.
         return bool(matching) and all(chart_public(session, c) for c in matching)
     def period_start(result):

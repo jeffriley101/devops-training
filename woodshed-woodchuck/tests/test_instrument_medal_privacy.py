@@ -6,7 +6,7 @@ from sqlalchemy import select
 
 from app import contests
 from app.age_privacy import declare_age, filter_result_rows, filter_hall_result_rows
-from app.models import Contest, ContestResult
+from app.models import Contest, ContestResult, PracticeChartVerification
 from tests.test_team_contests import add_chart, add_profile
 from tests.test_teams import profile
 from tests.test_teams_medal_hotfix import s, season, week, NOW  # noqa: F401
@@ -91,3 +91,84 @@ def test_ineligible_and_outside_week_charts_do_not_control_visibility(s, matchin
     row[0].instrument = None
     s.commit()
     assert filter_result_rows(s, [row]) == ([row] if matching_public else [])
+
+
+@pytest.mark.parametrize('division,private_approval,visible', [
+    ('verified', None, True),
+    ('verified', 'pending', True),
+    ('verified', 'rejected', True),
+    ('verified', 'late', True),
+    ('verified', 'missing-time', True),
+    ('verified', 'approved', False),
+    ('open', None, False),
+    ('pristine', None, False),
+])
+def test_historical_division_uses_scoring_approval_deadline(s, division, private_approval, visible):
+    finalized = week(s, season(s), status='finalized')
+    public = add_profile(s, 1)
+    private = profile(s, 2)
+    for person, approval in ((public, 'approved'), (private, private_approval)):
+        chart = add_chart(s, person, None, 30, approved=False,
+                          practice_date=NOW.date(), created_at=NOW)
+        chart.instrument = 'Trumpet'
+        if approval is not None:
+            responded = finalized.verification_deadline_at
+            if approval == 'late': responded += timedelta(microseconds=1)
+            if approval == 'missing-time': responded = None
+            s.add(PracticeChartVerification(practice_chart_id=chart.id,
+                status=approval if approval in ('pending', 'rejected') else 'approved',
+                responded_at=responded))
+    row = stored_result(s, finalized, 'Trumpet', 1)
+    row[0].division = division
+    s.commit()
+    before = list(s.execute(select(ContestResult.__table__)))
+    assert filter_result_rows(s, [row]) == ([row] if visible else [])
+    assert filter_hall_result_rows(s, [row]) == ([row] if visible else [])
+    assert bool(contests.contest_results_payload(s, finalized)['results']) == visible
+    assert list(s.execute(select(ContestResult.__table__))) == before
+
+
+@pytest.mark.parametrize('division', ['open', 'verified'])
+@pytest.mark.parametrize('original_source', [False, True])
+def test_post_finalization_charts_cannot_change_historical_visibility(s, division, original_source):
+    finalized = week(s, season(s), status='finalized')
+    public = add_profile(s, 1)
+    private = profile(s, 2)
+    def source(person, submitted):
+        chart = add_chart(s, person, None, 30, approved=False,
+                          practice_date=NOW.date(), created_at=submitted)
+        chart.instrument = 'Trumpet'
+        s.add(PracticeChartVerification(practice_chart_id=chart.id, status='approved',
+              responded_at=finalized.verification_deadline_at))
+    if original_source:
+        source(public, finalized.finalized_at)  # Inclusive scoring cutoff.
+    row = stored_result(s, finalized, 'Trumpet', 1)
+    row[0].division = division
+    s.commit()
+    expected = [row] if original_source else []
+    assert filter_result_rows(s, [row]) == expected
+    before = list(s.execute(select(ContestResult.__table__)))
+    # Neither a private late chart nor a public late chart establishes or
+    # changes original provenance, even with backdated practice/approval dates.
+    for person in (private, public):
+        source(person, finalized.finalized_at + timedelta(microseconds=1))
+        s.commit()
+        assert filter_result_rows(s, [row]) == expected
+        assert filter_hall_result_rows(s, [row]) == expected
+    assert list(s.execute(select(ContestResult.__table__))) == before
+
+
+def test_verified_requires_at_least_one_approved_matching_source(s):
+    finalized = week(s, season(s), status='finalized')
+    public = add_profile(s, 1)
+    for instrument, approved in [('Trumpet', False), ('Clarinet', True)]:
+        chart = add_chart(s, public, None, 30, approved=False,
+                          practice_date=NOW.date(), created_at=NOW)
+        chart.instrument = instrument
+        if approved:
+            s.add(PracticeChartVerification(practice_chart_id=chart.id, status='approved',
+                  responded_at=finalized.verification_deadline_at))
+    row = stored_result(s, finalized, 'Trumpet', 1)
+    row[0].division = 'verified'
+    s.commit()
+    assert filter_result_rows(s, [row]) == []

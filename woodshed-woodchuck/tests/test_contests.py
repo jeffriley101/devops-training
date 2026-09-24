@@ -1965,7 +1965,9 @@ def test_hall_aggregates_students_instruments_divisions_and_prior_seasons(
     for source_week, instrument in ((prior_week, "Flute"), (current_week, "Flute"),
                                     (current_week, "Saxophone")):
         add_chart(session, profile=students[0], practice_date=source_week.week_start,
-                  minutes=10, instrument=instrument, created_at=source_week.finalized_at)
+                  minutes=10, instrument=instrument,
+                  verification_status="approved" if source_week is current_week and instrument == "Flute" else None,
+                  created_at=source_week.finalized_at - timedelta(days=7))
 
     def result(
         *, week: ContestWeek, contest: Contest, division: str, medal: str,
