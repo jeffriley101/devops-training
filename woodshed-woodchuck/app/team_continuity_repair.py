@@ -25,7 +25,7 @@ from sqlalchemy.pool import NullPool
 
 from . import team_continuity_inventory as inventory
 
-REVISION = "t0p1q2r3s4t5"  # Descendants require explicit code/schema review.
+REVISION = "d16team001"  # Descendants require explicit code/schema review.
 CONFIRMATION = "APPLY TEAM CONTINUITY"
 ACKS = ("backup_taken", "writers_paused", "finalization_paused", "maintenance_mode")
 FIELDS = dict(inventory.FIELDS)
@@ -34,7 +34,8 @@ FIELDS["camp_point_awards"] += " activity_type points_awarded"
 FIELDS["practice_charts"] += " include_contests minutes source detected_playing_seconds"
 FIELDS["contest_results"] += " score precise_score rank division subject_key"
 FIELDS["team_families"] += " created_at"
-HISTORY = ("team_families", "practice_charts", "camp_point_awards", "contest_results",
+FIELDS["team_name_claims"] = "normalized_name family_id"
+HISTORY = ("team_families", "team_name_claims", "practice_charts", "camp_point_awards", "contest_results",
            "team_week_membership_snapshots", "reward_grants", "crown_awards",
            "team_join_requests", "team_reports", "director_team_contests",
            "director_team_contest_entries", "director_team_contest_results")
@@ -71,9 +72,9 @@ def schema_guard(connection):
         raise RepairError("h1a_schema_required: use H2A inventory before migration")
     versions = list(connection.scalars(text("SELECT version_num FROM alembic_version")))
     if versions != [REVISION]:
-        # The combined ORM selects both precision columns even for planning.
+        # Planning requires precision columns and permanent public name claims.
         raise RepairError(
-            "revision_not_approved: require t0p1q2r3s4t5; upgrade older schemas "
+            f"revision_not_approved: require {REVISION}; upgrade older schemas "
             "before running this code; use H2A for older-schema inventory"
         )
     columns = {c["name"]: c for c in inspector.get_columns("teams")}
@@ -89,6 +90,16 @@ def schema_guard(connection):
         and any(u["name"] == "uq_team_season_family" and u["column_names"] == ["season_id", "family_id"] for u in uniques))
     if not valid:
         raise RepairError("team_family_constraints_missing")
+    if "team_name_claims" not in tables:
+        raise RepairError("required_schema_incomplete: team_name_claims")
+    claim_pk = inspector.get_pk_constraint("team_name_claims")
+    claim_fks = inspector.get_foreign_keys("team_name_claims")
+    if (claim_pk["constrained_columns"] != ["normalized_name"] or not any(
+        fk["constrained_columns"] == ["family_id"] and fk["referred_table"] == "team_families"
+        and fk["referred_columns"] == ["id"]
+        and fk.get("options", {}).get("ondelete", "").upper() == "RESTRICT" for fk in claim_fks
+    )):
+        raise RepairError("team_name_claim_constraints_missing")
     for name in set(HISTORY) | {"seasons", "team_memberships", "contest_weeks",
                                "woodchuck_profiles", "profile_capabilities"}:
         if name not in tables or set(FIELDS[name].split()) - {c["name"] for c in inspector.get_columns(name)}:
@@ -106,7 +117,7 @@ class Snapshot:
         if name == "teams":
             # Private code never leaves this module in cleartext.
             columns.append(table.c.join_code)
-        statement = select(*columns).order_by(table.c.id)
+        statement = select(*columns).order_by(table.c.normalized_name if name == "team_name_claims" else table.c.id)
         if condition is not None:
             statement = statement.where(condition(table))
         rows = [dict(r) for r in self.connection.execute(statement).mappings()]

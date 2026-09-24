@@ -1983,7 +1983,7 @@ def test_hall_aggregates_students_instruments_divisions_and_prior_seasons(
         normalized_name="lifetime leaders", emblem_key="shield:gold",
         creator_profile_id=students[0].id,
     )
-    current_team = make_team(session,
+    current_team = Team(family_id=old_team.family_id,
         season_id=current_season.id, display_name="Lifetime Leaders",
         normalized_name="lifetime leaders", emblem_key="shield:gold",
         creator_profile_id=students[0].id,

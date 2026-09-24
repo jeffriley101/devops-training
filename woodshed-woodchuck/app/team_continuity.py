@@ -11,8 +11,9 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import or_, select, text
 
 from .models import (ContestResult, ContestWeek, DirectorTeamContest, Season,
-                     Team, TeamFamily, TeamMembership, TeamWeekMembershipSnapshot,
+                     Team, TeamFamily, TeamNameClaim, TeamMembership, TeamWeekMembershipSnapshot,
                      WoodchuckProfile)
+from .team_name_claims import claim_public_team_name
 
 
 def lock_team_seasons(session, *season_ids):
@@ -167,6 +168,10 @@ def _plan(session, source_id, destination_id, now, *, allow_future=False):
             review.append("source_not_active")
         if session.get(TeamFamily, team.family_id) is None:
             conflicts.append("missing_family")
+        if team.visibility == "public":
+            claim = session.get(TeamNameClaim, team.normalized_name, populate_existing=True)
+            if claim is not None and claim.family_id != team.family_id:
+                conflicts.append("public_name_claim_conflict")
         owner = session.get(WoodchuckProfile, team.creator_profile_id, populate_existing=True) if team.creator_profile_id else None
         if team.visibility == "private":
             if (not team.director_led or owner is None or owner.status != "active"
@@ -276,8 +281,10 @@ def apply_team_continuity(session, *, source_season_id, destination_season_id, n
             applied.append(action)
             continue
         successor = session.get(Team, action.successor_team_id) if action.successor_team_id else None
+        source = session.get(Team, action.source_team_id)
+        if source.visibility == "public":
+            claim_public_team_name(session, normalized_name=source.normalized_name, family_id=source.family_id)
         if successor is None:
-            source = session.get(Team, action.source_team_id)
             try:
                 code = _new_join_code(session) if source.director_led else None
             except RuntimeError:

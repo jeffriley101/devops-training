@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from .account_routes import current_profile
 from .contests import CENTRAL, central_week_boundaries, ensure_current_contest_data
 from .db import SessionLocal
-from .age_privacy import team_public, sharing_allowed
+from .age_privacy import public_team_identity_allowed, sharing_allowed
 from .models import (
     ProfileCapability,
     Season,
@@ -26,6 +26,7 @@ from .models import (
 )
 from .team_names import InvalidTeamName, normalized_team_name
 from .team_continuity import lock_team_seasons
+from .team_name_claims import claim_public_team_name, TEAM_NAME_TAKEN
 
 
 EMOJI_EMBLEMS = {
@@ -40,7 +41,6 @@ SHIELD_EMBLEMS = {f"shield:{color}": color.title() for color in (
     "blue", "red", "green", "gold", "purple", "orange", "black", "silver"
 )}
 APPROVED_EMBLEMS = {**EMOJI_EMBLEMS, **LETTER_EMBLEMS, **SHIELD_EMBLEMS}
-MAX_PUBLIC_TEAMS = 200
 
 router = APIRouter(prefix="/teams", tags=["teams"])
 
@@ -87,7 +87,7 @@ def emblem_payload(key: str) -> dict[str, str]:
 def public_team_identity(team: Team) -> tuple[str, dict[str, str]]:
     if team.moderation_status == "hidden":
         return "Hidden Team", emblem_payload("shield:silver")
-    return team.display_name, emblem_payload(team.emblem_key)
+    return team.display_name, emblem_payload(team.emblem_key if team.emblem_key in APPROVED_EMBLEMS else "shield:silver")
 
 
 def team_payload(team: Team) -> dict[str, object]:
@@ -134,7 +134,7 @@ def select_team(session: Session, *, profile: WoodchuckProfile, season: Season,
     if team.moderation_status == "hidden":
         raise ValueError("That team is not available.")
     if team.visibility == "private" and not private_authorized:
-        raise ValueError("That private team requires director approval.")
+        raise ValueError("That Class requires director approval.")
     week_start, _, _, _ = central_week_boundaries(now)
     current = active_membership(session, profile_id=profile.id, season_id=season.id)
     if current and current.team_id == team.id:
@@ -170,9 +170,21 @@ def _create_team_with_new_family(session: Session, **team_fields: object) -> Tea
     ))
     session.add(family)
     session.flush()
+    if team_fields.get("visibility", "public") == "public":
+        claim_public_team_name(session, normalized_name=team_fields["normalized_name"], family_id=family.id)
     team = Team(family_id=family.id, **team_fields)
     session.add(team)
     return team
+
+
+def _creation_conflict_message(error: IntegrityError, *, classroom: bool = False) -> str:
+    constraint = getattr(getattr(error.orig, "diag", None), "constraint_name", "") or ""
+    detail = str(error.orig)
+    if constraint == "uq_team_season_name" or "teams.season_id, teams.normalized_name" in detail:
+        return "That Class name is already taken." if classroom else TEAM_NAME_TAKEN
+    if constraint == "uq_team_season_emblem" or "teams.season_id, teams.emblem_key" in detail:
+        return "That emblem is already in use this season."
+    return "That Class could not be created. Please try again." if classroom else "That Team could not be created. Please try again."
 
 
 def create_and_join_team(session: Session, *, profile: WoodchuckProfile,
@@ -201,7 +213,7 @@ def create_and_join_team(session: Session, *, profile: WoodchuckProfile,
         session.commit(); session.refresh(team); session.refresh(membership)
     except IntegrityError as error:
         session.rollback()
-        raise ValueError("That team name or emblem is already in use.") from error
+        raise ValueError(_creation_conflict_message(error)) from error
     except Exception:
         session.rollback()
         raise
@@ -247,7 +259,7 @@ def create_director_team(
         session.refresh(team)
     except IntegrityError as error:
         session.rollback()
-        raise ValueError("That team name or emblem is already in use.") from error
+        raise ValueError(_creation_conflict_message(error, classroom=True)) from error
     except Exception:
         session.rollback()
         raise
@@ -263,7 +275,7 @@ def selection_payload(session: Session, *, profile: WoodchuckProfile, now: datet
         Team.visibility == "public",
     ).order_by(
         Team.display_name, Team.id
-    ).limit(MAX_PUBLIC_TEAMS)).all()
+    )).all()
     current_team = session.get(Team, membership.team_id) if membership else None
     week_membership_count = session.scalar(select(func.count(TeamMembership.id)).where(
         TeamMembership.profile_id == profile.id,
@@ -277,7 +289,10 @@ def selection_payload(session: Session, *, profile: WoodchuckProfile, now: datet
     next_at = datetime.combine(week.week_end, time.min, CENTRAL).astimezone(timezone.utc)
     return {
         "season": {"key": season.key, "name": season.name},
-        "teams": [team_payload(team) for team in teams if team_public(session, team.id)],
+        "teams": [
+            {key: value for key, value in team_payload(team).items() if key in {"id", "name", "emblem"}}
+            for team in teams if public_team_identity_allowed(team)
+        ],
         "membership": {
             "team": team_payload(current_team) if current_team else None,
             "selected_week_start": membership.selected_week_start.isoformat() if membership else None,

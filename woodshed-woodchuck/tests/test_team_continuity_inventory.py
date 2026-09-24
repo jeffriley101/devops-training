@@ -99,6 +99,8 @@ def make_database(url, mode):
     with engine.begin() as c:
         c.execute(text("CREATE TABLE alembic_version (version_num VARCHAR(32) NOT NULL)"))
         if mode == "pre":
+            # Model the pre-family schema, before public name claims existed.
+            models.TeamNameClaim.__table__.drop(c)
             from importlib import import_module
             migration = import_module("migrations.versions.s9n0o1p2q3r4_add_team_families")
             with Operations.context(MigrationContext.configure(c)):

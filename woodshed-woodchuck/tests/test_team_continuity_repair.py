@@ -49,6 +49,7 @@ def seed_database(url):
             s.flush()
             s.add(m.Team(id=tid, family_id=tid, season_id=1, display_name=name,
                          normalized_name=name.casefold(), emblem_key=emblem, creator_profile_id=creator, created_at=OLD))
+            s.add(m.TeamNameClaim(normalized_name=name.casefold(), family_id=tid))
         s.flush()
         for tid, roster in ROSTERS.items():
             for mid, pid in roster:
@@ -460,3 +461,16 @@ def test_final_evidence_failure_reports_committed(db, tmp_path, monkeypatch, cap
     assert json.loads(output.read_text())["transaction_state"] == "prepared_not_committed"
     assert destination_counts(db[1]) == (4, 11)
     assert repair.verify_repair(db[0], approved, approved["plan_sha256"], now=NOW)["verification"]["passed"]
+
+
+def test_permanent_claims_are_fingerprinted_and_never_repaired(db):
+    approved = plan(db)
+    assert approved['content']['state']['history']['team_name_claims']['count'] == 4
+    with db[1].begin() as c:
+        c.execute(m.TeamNameClaim.__table__.insert().values(normalized_name='retired union', family_id=6))
+    before = full_snapshot(db[1])
+    with pytest.raises(repair.RepairError, match='stale_plan'):
+        apply(db, approved)
+    assert full_snapshot(db[1]) == before
+    assert apply(db, plan(db))['verification']['passed']
+    assert full_snapshot(db[1])['team_name_claims'] == before['team_name_claims']

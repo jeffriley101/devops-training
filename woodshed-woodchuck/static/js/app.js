@@ -3543,6 +3543,8 @@
 
     function renderResults(payload) {
       const results = payload && Array.isArray(payload.results) ? payload.results : [];
+      const weekEmpty = document.getElementById("past-winners-week-empty");
+      if (weekEmpty) weekEmpty.classList.toggle("hidden", results.length !== 0);
       ["open", "verified"].forEach((division) => {
         renderContest(division, "weekly-points-leaders", results);
         renderContest(division, "weekly-practice-by-instrument", results);
