@@ -139,11 +139,16 @@ def filter_result_rows(session, rows):
     from .models import PracticeChart, ContestWeek
     def instrument_safe(result):
         if result.subject_type != 'instrument': return True
+        from .contests import normalize_instrument
         week = session.get(ContestWeek, result.contest_week_id)
+        if week is None: return False
+        instrument_key, _ = normalize_instrument(result.instrument or result.display_name_snapshot or '')
+        if not instrument_key: return False
         charts = session.scalars(select(PracticeChart).where(PracticeChart.practice_date >= week.week_start,
             PracticeChart.practice_date < week.week_end, PracticeChart.include_contests.is_(True)))
-        # Conservative historical projection: never expose a small aggregate containing private data.
-        return all(chart_public(session, c) for c in charts)
+        matching = [c for c in charts if normalize_instrument(c.instrument)[0] == instrument_key]
+        # Require evidence for this instrument and never expose private contributions.
+        return bool(matching) and all(chart_public(session, c) for c in matching)
     def period_start(result):
         week=session.get(ContestWeek,result.contest_week_id)
         return datetime.combine(week.week_start,time.min,ZoneInfo('America/Chicago')).astimezone(timezone.utc)
