@@ -387,7 +387,9 @@
     }
 
     if (instrumentObjectEl) {
-      if (window.WWInstruments) {
+      if (instrumentObjectEl.dataset.sceneCell) {
+        instrumentObjectEl.textContent = "";
+      } else if (window.WWInstruments) {
         window.WWInstruments.renderInstrument(instrumentObjectEl, instrument);
       } else {
         instrumentObjectEl.textContent = "♪";
@@ -396,9 +398,9 @@
       }
       instrumentObjectEl.setAttribute(
         "aria-label",
-        `Change instrument. Current instrument: ${instrument}`
+        `Your Woodchuck. Current instrument: ${instrument}. Customize instrument, hoodie and hat.`
       );
-      instrumentObjectEl.title = "Change instrument";
+      instrumentObjectEl.title = "Your Woodchuck";
     }
 
     if (levelEl) {
@@ -474,7 +476,7 @@
           : String(payload.sources?.[key] ?? 0);
       });
       statusEl.textContent = "";
-      control.setAttribute("aria-label", `XP Level ${payload.level}. Open XP details.`);
+      control.setAttribute("aria-label", `XP Level ${payload.level}. Open XP and Daily Login Streak.`);
       control.title = `XP Level ${payload.level}`;
     }
 
@@ -489,7 +491,7 @@
         render(await response.json());
       } catch (_error) {
         statusEl.textContent = "XP is unavailable right now.";
-        control.setAttribute("aria-label", "XP Level unavailable. Open XP details.");
+        control.setAttribute("aria-label", "XP Level unavailable. Open XP and Daily Login Streak.");
       } finally {
         loading = false;
         control.removeAttribute("aria-busy");
@@ -501,7 +503,10 @@
       panel.hidden = !opening;
       panel.classList.toggle("hidden", !opening);
       control.setAttribute("aria-expanded", String(opening));
-      if (opening) refresh();
+      if (opening) {
+        refresh();
+        document.dispatchEvent(new Event("woodshed:xp-opened"));
+      }
     });
     closeButton.addEventListener("click", close);
     document.addEventListener("keydown", function (event) {
@@ -767,11 +772,14 @@
 
     function openDecorateMode() {
       decorateMode = true;
+      document.body.classList.add("stickerbook-open");
       panel.hidden = false;
       panel.classList.remove("hidden");
       control.setAttribute("aria-expanded", "true");
       setFeedback("");
       renderAll();
+      closeButton.focus({ preventScroll: true });
+      panel.scrollIntoView({ block: "start", behavior: "instant" });
       void refreshInventory();
     }
 
@@ -780,9 +788,11 @@
       dragState = null;
       panel.hidden = true;
       panel.classList.add("hidden");
+      document.body.classList.remove("stickerbook-open");
       control.setAttribute("aria-expanded", "false");
       renderAll();
-      control.focus();
+      window.scrollTo({ top: 0, behavior: "instant" });
+      control.focus({ preventScroll: true });
     }
 
     control.addEventListener("click", function () {
@@ -790,6 +800,10 @@
       else openDecorateMode();
     });
     closeButton.addEventListener("click", closeDecorateMode);
+    document.getElementById("shed-decoration-view-room")?.addEventListener("click", function () {
+      scene.scrollIntoView({ block: "start", behavior: "instant" });
+      (layer.querySelector("button") || control).focus({ preventScroll: true });
+    });
     panel.addEventListener("click", function (event) {
       const button = event.target.closest("[data-decoration-size]");
       if (!button) return;
@@ -928,6 +942,7 @@
         stateApi.saveState(next, { sync: false });
         hydrateHome(next);
         feedback.textContent = payload.redeemed ? "+20 dandelions" : "Already found today. Come back tomorrow!";
+        window.WWSurfaces?.markSaved(panel);
         if (payload.redeemed) {
           celebrateSuccess(form);
           playSound("secretReward");
@@ -1020,6 +1035,9 @@
       panel.hidden = !opening; panel.classList.toggle("hidden", !opening);
       trigger.setAttribute("aria-expanded", String(opening));
       if (opening) load();
+    });
+    document.getElementById("shed-team-close")?.addEventListener("click", () => {
+      window.WWNavigation.dismissCurrent();
     });
     document.getElementById("shed-team-create")?.addEventListener("click", async function () {
       const response = await fetch("/teams", {method: "POST", credentials: "same-origin", headers: {"Content-Type": "application/json"}, body: JSON.stringify({
@@ -1124,21 +1142,27 @@
     }
 
     const requestAccount = stateApi.accountRequest();
-    fetch("/account/login-streak", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { Accept: "application/json" },
-    })
-      .then(async (response) => {
-        if (!response.ok) throw new Error("Login streak unavailable");
-        return response.json();
+    let loading = false;
+    function refresh() {
+      if (loading) return;
+      loading = true;
+      fetch("/account/login-streak", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { Accept: "application/json" },
       })
-      .then(render)
-      .catch(() => {
-        if (statusEl) {
-          statusEl.textContent = "Your streak will update when you’re back online.";
-        }
-      });
+        .then(async (response) => {
+          if (!response.ok) throw new Error("Login streak unavailable");
+          return response.json();
+        })
+        .then(render)
+        .catch(() => {
+          if (statusEl) statusEl.textContent = "Your streak will update when you’re back online.";
+        })
+        .finally(() => { loading = false; });
+    }
+    document.addEventListener("woodshed:xp-opened", refresh);
+    refresh();
   }
 
   function updateStreak(progress, today) {
@@ -1685,9 +1709,9 @@
     document.addEventListener("keydown", function (event) {
       if (event.key === "Escape" && !panel.hidden) stopTuner(true);
     });
-    window.addEventListener("pagehide", function () {
-      if (!panel.hidden || mediaStream || audioContext) stopTuner(false);
-    });
+    const releaseTuner = () => stopTuner(false);
+    if (window.WWLifecycle) window.WWLifecycle.onBackground(releaseTuner);
+    else window.addEventListener("pagehide", releaseTuner);
   }
 
 
@@ -1937,6 +1961,7 @@
     let audioContext = null;
     let schedulerTimer = null;
     let playbackGeneration = 0;
+    const scheduledClicks = new Set();
     let nextBeatTime = 0;
     let isRunning = false;
     let tapTimes = [];
@@ -2066,6 +2091,10 @@
 
       oscillator.connect(gain);
       gain.connect(audioContext.destination);
+      scheduledClicks.add(oscillator);
+      oscillator.onended = () => {
+        scheduledClicks.delete(oscillator); oscillator.disconnect(); gain.disconnect();
+      };
 
       oscillator.start(scheduledTime);
       oscillator.stop(scheduledTime + 0.06);
@@ -2108,7 +2137,10 @@
         resumePromise = Promise.resolve(audioContext.resume());
       }
       await resumePromise;
-      if (startingGeneration !== playbackGeneration) return;
+      if (startingGeneration !== playbackGeneration || document.hidden) {
+        if (audioContext?.state === "running") void audioContext.suspend();
+        return;
+      }
 
       if (schedulerTimer !== null) {
         window.clearInterval(schedulerTimer);
@@ -2139,6 +2171,9 @@
         schedulerTimer = null;
       }
 
+      scheduledClicks.forEach(oscillator => { try { oscillator.stop(); } catch (_) {} });
+      scheduledClicks.clear();
+      if (audioContext?.state === "running") void audioContext.suspend();
       clearVisualTimers();
 
       if (pulse) {
@@ -2270,10 +2305,11 @@
       setBpm(numberInput.value);
     });
 
-    document.addEventListener("visibilitychange", function () {
-      if (document.hidden && isRunning) stopMetronome();
-    });
-    window.addEventListener("pagehide", stopMetronome);
+    if (window.WWLifecycle) window.WWLifecycle.onBackground(stopMetronome);
+    else {
+      document.addEventListener("visibilitychange", function () { if (document.hidden) stopMetronome(); });
+      window.addEventListener("pagehide", stopMetronome);
+    }
     window.addEventListener("ww:session-changed", stopMetronome);
     window.addEventListener("ww:guest-discarded", function () {
       stopMetronome();
@@ -4078,7 +4114,7 @@
     }
 
     control.addEventListener("click", revealBalance);
-    control.addEventListener("keydown", function (event) {
+    if (control.tagName !== "BUTTON") control.addEventListener("keydown", function (event) {
       if (event.key !== "Enter" && event.key !== " ") return;
       event.preventDefault();
       revealBalance();

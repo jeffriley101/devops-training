@@ -83,14 +83,14 @@ def test_exact_hooks_destinations_and_static_versions(client):
     assert 'href="/setup"' in welcome and 'href="/login"' in welcome
     assert 'rel="preload" as="image" href="/static/img/woodshed-painting.png"' in welcome
     scripts = re.search(r'<template id="account-scripts">(.*?)</template>', welcome, re.S)[1]
-    assert '/static/js/world-entry.js?v=3' in scripts
+    assert '/static/js/world-entry.js?v=5' in scripts
     assert 'data-page-generation="' in welcome and 'class="app-shell" hidden' in welcome
     assert 'href="/guest"' in welcome
     store = client.get('/store').text
     assert store.count('data-world-entry="arcade"') == 1
     assert re.search(r'<a [^>]*href="/arcade"[^>]*data-world-entry="arcade"', store)
     assert 'rel="preload" as="image" href="/static/img/arcade/arcade-entry-splash.png"' in store
-    for url in ['/static/css/world-entry.css?v=2', '/static/js/world-entry.js?v=3']:
+    for url in ['/static/css/world-entry.css?v=2', '/static/js/world-entry.js?v=5']:
         assert url in welcome
         assert client.get(url).status_code == 200
     assert 'data-world-entry="arcade"' not in client.get('/arcade').text
@@ -99,8 +99,8 @@ def test_exact_hooks_destinations_and_static_versions(client):
 def test_approved_asset_exact_bytes_and_no_alternate_runtime_name(client):
     response = client.get('/static/img/arcade/arcade-entry-splash.png')
     assert response.headers['content-type'] == 'image/png'
-    assert len(response.content) == 3013191
-    assert hashlib.sha256(response.content).hexdigest() == '4261c91f78e16c28dc36891b7f794adb4486633961edcc5d9a339f27f19f40bd'
+    assert len(response.content) == 942111
+    assert hashlib.sha256(response.content).hexdigest() == '201938c91c2d81c843dd30733979de5dc0cd5487fc724c9fda93802cec09b196'
     source = (ROOT / 'static/js/world-entry.js').read_text()
     assert re.findall(r'/static/img/arcade/[^"\s]+', source) == ['/static/img/arcade/arcade-entry-splash.png']
 

@@ -31,8 +31,11 @@
     if (!layer || !art) return false;
 
     layer.classList.add("ww-motion-ready");
-    layer.setAttribute("role", "button");
-    layer.setAttribute("tabindex", "0");
+    const presentationOnly = layer.hasAttribute("data-presentation-only");
+    if (!presentationOnly) {
+      layer.setAttribute("role", "button");
+      layer.setAttribute("tabindex", "0");
+    }
     layer.setAttribute("aria-label", "Woodchuck");
 
     art.addEventListener("animationend", function (event) {
@@ -55,8 +58,8 @@
       restartAnimation(art, "is-achievement-hop");
     }
 
-    layer.addEventListener("click", wiggle);
-    layer.addEventListener("keydown", function (event) {
+    if (!presentationOnly) layer.addEventListener("click", wiggle);
+    if (!presentationOnly) layer.addEventListener("keydown", function (event) {
       if (event.key !== "Enter" && event.key !== " ") return;
       event.preventDefault();
       wiggle();

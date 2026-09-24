@@ -143,6 +143,7 @@
   });
   async function startAccountPage() {
     if (!scripts) return true; // Local Guest pages make no preflight request.
+    window.WWRecovery?.begin(() => window.location.reload());
     try {
       if (!accountId || !navigator.locks?.request) throw new Error("Session verification unavailable");
       // Share the transition lock: no login/logout can overtake this check or
@@ -153,19 +154,20 @@
           credentials: "same-origin", cache: "no-store",
           headers: {"X-Woodshed-Account": accountId},
         });
-        const payload = response.ok ? await response.json() : null;
+        if (!response.ok) throw Object.assign(new Error("Session verification failed"), {status: response.status});
+        const payload = await response.json();
         if (readEpoch() !== epoch || stopped || !payload?.authenticated ||
             payload.profile?.woodchuck_id !== accountId ||
             !document.body.dataset.pageGeneration ||
             payload.page_generation !== document.body.dataset.pageGeneration) {
-          throw new Error("Rendered account session is no longer current");
+          throw Object.assign(new Error("Rendered account session is no longer current"), {status: 401});
         }
         verifying = false;
         const shell = document.querySelector(".app-shell");
         if (shell) shell.hidden = false;
         // Load real consumers in their original order only after verification.
-        // Keep the shell hidden until every script is ready; JSON bootstrap is
-        // outside the inert template but no state consumer ran before this gate.
+        // JSON bootstrap is outside the inert template, but no state consumer
+        // ran before this gate. Opening the shell lets layout consumers measure it.
         const loads = [];
         for (const original of scripts.content.querySelectorAll("script")) {
           check();
@@ -180,9 +182,20 @@
         }
         await Promise.all(loads);
         check();
+        window.WWRecovery?.clear();
         return true;
       });
-    } catch (_error) { stop(); return false; }
+    } catch (error) {
+      if (!window.WWRecovery) { stop(); return false; }
+      // Never unlock consumers after a failed preflight or script load. Network
+      // failures do not revoke the session or claim that the user logged out.
+      if (readEpoch() !== epoch || stopped) { stop(); return false; }
+      verifying = true;
+      const shell = document.querySelector(".app-shell");
+      if (shell) shell.hidden = true;
+      window.WWRecovery.failure(error, () => window.location.reload());
+      return false;
+    }
   }
   const ready = startAccountPage();
   window.WWSessionBoundary = Object.freeze({

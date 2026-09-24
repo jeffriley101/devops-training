@@ -13,13 +13,11 @@ SHOP_WIRING = APP[APP.index("function wireShopPolish"):APP.index("function wireP
 
 
 def test_backpack_and_buddy_open_the_two_catalog_shelves() -> None:
-    backpack = STORE[STORE.index("🎒") - 220:STORE.index("🎒") + 180]
-    buddy = STORE[STORE.index("🐛") - 220:STORE.index("🐛") + 190]
-    assert "data-shop-panel=\"gear\"" in backpack
-    assert "Open Gear Shelf" in backpack
-    assert "data-shop-panel=\"little-buddy\"" in buddy
-    assert "Open Little Buddy Shelf" in buddy
-    assert "coming soon" not in (backpack + buddy).casefold()
+    from test_r4a_artwork import cells
+    controls = {a['data-scene-cell']: a for _, a in cells(STORE)}
+    for cell, shelf, label in [('R1', 'gear', 'Open Gear Shelf'), ('R2', 'little-buddy', 'Open Little Buddy Shelf')]:
+        assert controls[cell]['data-shop-panel'] == shelf
+        assert controls[cell]['aria-label'] == label
 
 
 def test_shelves_render_every_server_catalog_item_including_ufo() -> None:
@@ -52,7 +50,7 @@ def test_both_shelves_explain_the_two_daily_finds_without_cluttering_scene() -> 
     assert buddies.count("2 daily finds") == 1
     assert gear.count("New finds tomorrow") == 1
     assert buddies.count("New finds tomorrow") == 1
-    scene = STORE[STORE.index('class="shop-scene"'):STORE.index('id="shop-feature-dialog"')]
+    scene = STORE[STORE.index('class="shop-scene artwork-scene'):STORE.index('id="shop-feature-dialog"')]
     assert "daily finds" not in scene.casefold()
 
 

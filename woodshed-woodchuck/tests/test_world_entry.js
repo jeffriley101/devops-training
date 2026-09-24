@@ -7,7 +7,7 @@ process.env.TZ = 'America/Chicago';
 
 function boot({motion = false, authenticated = true, account = 'opaque-account-a', storage = new Map(),
   clock = new Date(2026, 8, 14, 12).getTime(), width = 1200, height = 800,
-  broken = false, storageBlocked = false, dialogBroken = false} = {}) {
+  broken = false, storageBlocked = false, dialogBroken = false, arrival = false} = {}) {
   const nodes = [], events = {}, documentEvents = {}, timers = new Map(), navigations = [];
   let now = 0, next = 0;
   class Node {
@@ -52,12 +52,12 @@ function boot({motion = false, authenticated = true, account = 'opaque-account-a
   const window = {innerWidth: width, innerHeight: height,
     matchMedia: () => ({matches: motion}),
     getComputedStyle: () => ({objectPosition: '48% 14%'}),
-    location: {pathname: '/store', assign: href => navigations.push(href)},
+    location: {pathname: arrival ? '/home' : '/store', assign: href => navigations.push(href)},
     addEventListener: (k, fn) => { events[k] = fn; },
     setTimeout: (fn, ms) => { timers.set(++next, {fn, at: now + ms}); return next; },
     clearTimeout: id => timers.delete(id),
     localStorage: dailyStorage,
-    sessionStorage: {getItem: () => null, setItem() {}, removeItem() {}},
+    sessionStorage: {getItem: key => arrival && key === 'woodshed:world-entry-arrival:v1' ? JSON.stringify({account,path:'/home',expires:clock+8000}) : null, setItem() {}, removeItem() {}},
   };
   class LocalDate extends Date {
     constructor(...args) { super(...(args.length ? args : [clock + now])); }
@@ -79,7 +79,7 @@ function boot({motion = false, authenticated = true, account = 'opaque-account-a
     const e = {target: link, button: 0, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; }, ...override};
     documentEvents.click(e); return {link, e};
   }
-  return {body, shell, nodes, events, advance, click, navigations, storage, original, document, timers,
+  return {window, body, shell, nodes, events, advance, click, navigations, storage, original, document, timers,
     overlay: () => nodes.findLast(n => n.tagName === 'DIALOG' && !n.removed)};
 }
 
@@ -223,4 +223,13 @@ for (const [width,height] of [[1440,900],[390,844]]) test(`flight ${width}px use
     const x = x0+(x1-x0)*p, y = y0+(y1-y0)*p;
     assert.ok(Math.abs((x-x0)/(x1-x0)-(y-y0)/(y1-y0))<1e-10);
   }
+});
+
+for (const motion of [false,true]) test(`arrival completion waits for the visible flow; reduced motion=${motion}`, async()=>{
+  const ui=boot({arrival:true,motion});let ready=false;
+  ui.window.WWWorldEntry.arrivalReady.then(()=>{ready=true;});
+  await Promise.resolve();assert.equal(ready,false);
+  if(!motion){ui.advance(219);await Promise.resolve();assert.equal(ready,false);}
+  ui.advance(motion?0:1);await Promise.resolve();
+  assert.equal(ready,true);assert.equal(ui.body.classList.contains('world-entry-arrival'),false);
 });

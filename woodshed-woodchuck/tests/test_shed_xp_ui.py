@@ -17,30 +17,14 @@ def xp_javascript() -> str:
 
 
 def test_shed_controls_use_requested_left_and_right_columns() -> None:
-    left_column = HOME.index("woodshed-object-column-left")
-    center_column = HOME.index("woodshed-object-column-center", left_column)
-    name = HOME.index("id=\"woodchuck-name-value\"", left_column)
-    instrument = HOME.index("id=\"instrument-object\"", name)
-    xp_control = HOME.index("id=\"xp-level-control\"", instrument)
-    stickerbook = HOME.index("id=\"shed-decorate-button\"", xp_control)
-    mum = HOME.index("id=\"mum-open-button\"", stickerbook)
-    right_column = HOME.index("woodshed-object-column-right", center_column)
-    team = HOME.index("id=\"shed-team-button\"", right_column)
-    profile_level = HOME.index("id=\"level-value\"", team)
-    metronome = HOME.index("id=\"metronome-open-button\"", xp_control)
-    tuner = HOME.index("id=\"tuner-open-button\"", metronome)
-    audio = HOME.index("id=\"sound-effects-button\"", tuner)
-
-    assert left_column < name < instrument < xp_control < stickerbook < mum < center_column
-    assert center_column < right_column < team < profile_level < metronome < tuner < audio
-    assert "aria-controls=\"xp-panel\"" in HOME[xp_control:metronome]
-    assert HOME.count("id=\"xp-level-control\"") == 1
-    assert HOME.count("id=\"level-value\"") == 1
-    xp_markup = HOME[xp_control:stickerbook]
-    assert '<span class="xp-level-symbol" aria-hidden="true">⭐</span>' in xp_markup
-    assert 'id="xp-level-number" class="sr-only"' in xp_markup
-    level_markup = HOME[profile_level:metronome]
-    assert '<span class="room-object-icon" aria-hidden="true">🏅</span>' in level_markup
+    from test_r4a_artwork import cells, SHED
+    controls = cells(HOME)
+    assert {a['data-scene-cell']: a['id'] for _, a in controls} == SHED
+    assert HOME.count('id="xp-level-control"') == 1
+    assert HOME.count('id="level-value"') == 1
+    assert 'id="xp-level-number" hidden' in HOME
+    assert '⭐' not in HOME[:HOME.index('id="sound-effects-panel"')]
+    assert '🏅' not in HOME
 
 
 def test_xp_panel_lists_every_lifetime_source() -> None:
@@ -102,33 +86,28 @@ def test_profile_skill_level_editor_remains_separate() -> None:
 
 
 def test_mobile_shed_controls_use_static_five_row_columns() -> None:
-    start = CSS.index("/* Production mobile SHED 5×2 control grid. */")
-    layout = CSS[start:]
-
-    assert "grid-template-rows: repeat(5, minmax(0, 1fr))" in layout
-    assert "width: 3.5rem" in layout
-    assert "left: 0.65rem !important" in layout
-    assert "right: 0.65rem !important" in layout
-    assert "position: static !important" in layout
-    assert "pointer-events: auto" in layout
-    assert "stageShedGrid" not in APP
-    assert "forceShedPositions" not in APP
-    assert "ww-shed-grid" not in APP + CSS + HOME
-
-def test_xp_level_uses_an_emoji_token_without_the_old_coin_treatment() -> None:
-    badge = CSS[CSS.index(".xp-level-control {"):CSS.index(".xp-panel {")]
-    assert "background: transparent" in badge
-    assert "border: 0" in badge
-    assert "drop-shadow" in badge
-    assert ".xp-level-symbol" in badge
-    assert "radial-gradient" not in badge
+    layout = (ROOT / 'static/css/scene-hotspots.css').read_text()
+    assert 'grid-template-rows: repeat(5, 20%)' in layout
+    assert 'grid-template-columns: repeat(2, 50%)' in layout
+    assert 'gap: 0' in layout
+    assert 'stageShedGrid' not in APP
+    assert 'forceShedPositions' not in APP
 
 
-def test_profile_level_uses_the_gold_medal_emoji_separately_from_xp() -> None:
+def test_xp_cell_uses_artwork_with_an_accessible_label() -> None:
+    start = HOME.index('id="xp-level-control"')
+    button = HOME[start:HOME.index('</button>', start)]
+    assert 'data-scene-cell="L3"' in button
+    assert 'aria-label="Open XP and Daily Login Streak"' in button
+    assert '⭐' not in button
+
+
+def test_profile_level_cell_remains_separate_from_xp() -> None:
     control_start = HOME.index('id="level-value"')
     control = HOME[control_start:HOME.index("</button>", control_start)]
     assert 'aria-controls="change-level-panel"' in control
-    assert "🏅" in control
+    assert 'data-scene-cell="R2"' in control
+    assert "🏅" not in control
 
 
 def test_shed_team_control_uses_the_configured_emblem_with_the_safe_fallback() -> None:

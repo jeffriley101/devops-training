@@ -2,19 +2,24 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-HOME = (ROOT / "templates" / "home.html").read_text()
+STREAK = (ROOT / "templates" / "_room_streak.html").read_text()
 BASE = (ROOT / "templates" / "base.html").read_text()
 APP = (ROOT / "static" / "js" / "app.js").read_text()
 CSS = (ROOT / "static" / "css" / "styles.css").read_text()
 STORE_INVENTORY = (ROOT / "app" / "store_inventory.py").read_text()
 
 
-def test_shed_has_compact_login_streak_and_weekly_crown_progress() -> None:
-    assert 'id="login-streak-card"' in HOME
-    assert 'id="login-streak-days"' in HOME
-    assert 'id="login-streak-progress" max="7"' in HOME
-    assert 'id="login-streak-progress-text"' in HOME
-    assert "weekly streak crown" in HOME.casefold()
+def test_xp_panel_contains_the_single_login_streak_component() -> None:
+    home = (ROOT / "templates/home.html").read_text()
+    xp = home[home.index('id="xp-panel"'):home.index('id="shed-team-panel"')]
+    assert '{% include "_room_streak.html" %}' in xp
+    assert '_room_streak.html' not in BASE
+    assert '_room_streak.html' not in (ROOT / 'templates/store.html').read_text()
+    assert 'id="login-streak-card"' in STREAK
+    assert 'id="login-streak-days"' in STREAK
+    assert 'id="login-streak-progress" max="7"' in STREAK
+    assert 'id="login-streak-progress-text"' in STREAK
+    assert "weekly streak crown" in STREAK.casefold()
     assert ".login-streak-card" in CSS
     assert "grid-template-columns: minmax(0, 1fr);" in CSS
 

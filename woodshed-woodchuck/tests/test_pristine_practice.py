@@ -98,7 +98,7 @@ def test_pristine_route_ui_and_microphone_privacy(pristine_database) -> None:
     assert "PristinePracticeDetector.createDetector" in script
     assert "/static/js/pristine-timer.js?v=2" in template
     assert "/static/js/pristine-detector.js?v=1" in template
-    assert "/static/js/pristine-practice.js?v=3" in template
+    assert "/static/js/pristine-practice.js?v=4" in template
     assert "START_CONFIRMATION_MS = 180" in detector
     assert "strongTransientThreshold" in detector
     assert "adaptIdleFloor" in detector

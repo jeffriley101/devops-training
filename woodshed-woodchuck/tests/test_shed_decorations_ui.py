@@ -9,7 +9,7 @@ DECORATIONS = APP[APP.index("function wireShedDecorations"):APP.index("function 
 
 
 def test_decorate_mode_has_a_dedicated_scene_layer_and_inventory_panel() -> None:
-    scene_start = HOME.index("class=\"woodshed-scene\"")
+    scene_start = HOME.index('class="woodshed-scene artwork-scene')
     scene_end = HOME.index("id=\"shed-decorate-panel\"", scene_start)
     scene = HOME[scene_start:scene_end]
     assert "id=\"shed-decoration-layer\"" in scene
@@ -17,20 +17,20 @@ def test_decorate_mode_has_a_dedicated_scene_layer_and_inventory_panel() -> None
     assert "aria-controls=\"shed-decorate-panel\"" in scene
     assert "id=\"shed-decoration-inventory\"" in HOME
     assert "id=\"shed-decoration-placed-list\"" not in HOME
-    left_start = scene.index("woodshed-object-column-left")
-    left_column = scene[left_start:scene.index("woodshed-object-column-center", left_start)]
+    left_column = scene
     xp = left_column.index('id="xp-level-control"')
     decorate = left_column.index('id="shed-decorate-button"')
     chair = left_column.index('id="mum-open-button"')
     decorate_end = left_column.index("</button>", decorate)
     decorate_button = left_column[decorate:decorate_end]
     assert xp < decorate < chair
-    assert 'class="room-object shed-decorate-button"' in decorate_button
+    assert 'class="scene-hotspot"' in decorate_button
     assert 'aria-label="Open Stickerbook"' in decorate_button
-    assert '<span class="room-object-icon" aria-hidden="true">🎨</span>' in decorate_button
+    assert 'data-scene-cell="L4"' in decorate_button
+    assert "🎨" not in decorate_button
     assert "<span>Decorate</span>" not in decorate_button
     assert "Return to Inventory" not in DECORATIONS
-    panel = HOME[HOME.index('id="shed-decorate-panel"'):HOME.index('id="xp-panel"')]
+    panel = HOME[HOME.index('id="shed-decorate-panel"'):]
     assert 'id="shed-stickerbook-title">Stickerbook</h2>' in panel
     assert "Tap an inventory item" not in panel
     assert panel.count("<h3>") == 0
@@ -192,15 +192,12 @@ def test_decoration_sizes_use_medium_large_and_extra_large_shed_width_scale() ->
     assert 0.19 < 0.33 < 0.47
 
 
-def test_mobile_artwork_zoom_and_decoration_layer_share_scene_geometry() -> None:
-    mobile = CSS[
-        CSS.index("@media (max-width: 640px)", CSS.index(".shed-decoration-size-xlarge")):
-    ]
-    assert "background-size: cover" in mobile
-    assert "background-position: center" in mobile
-    assert ".shed-decoration-layer" in mobile
-    assert "inset: 7% 0" in mobile
-    assert "window.addEventListener(\"resize\", renderPlacedDecorations)" in DECORATIONS
+def test_mobile_artwork_and_decoration_layer_share_scene_geometry() -> None:
+    layout = (ROOT / 'static/css/scene-hotspots.css').read_text()
+    assert '.artwork-scene > .shed-decoration-layer { inset: 0; z-index: 2; }' in layout
+    assert '.artwork-scene.is-decorating > .shed-decoration-layer { z-index: 6; }' in layout
+    assert 'object-fit: contain' in layout
+    assert 'window.addEventListener("resize", renderPlacedDecorations)' in DECORATIONS
 
 
 def test_decoration_size_and_phone_layout_are_safe() -> None:
@@ -252,14 +249,19 @@ def test_decorate_panel_overrides_the_wide_mentor_card_layout() -> None:
     assert "text-align: left" in panel
 
 
-def test_decorate_close_is_viewport_fixed_above_the_panel() -> None:
-    start = CSS.index(".shed-decorate-close {")
-    close_rule = CSS[start:CSS.index(".shed-decoration-inventory {", start)]
-    assert "position: fixed" in close_rule
-    assert "top: max(0.75rem, env(safe-area-inset-top))" in close_rule
-    assert "right: max(0.75rem, env(safe-area-inset-right))" in close_rule
-    assert "z-index: 1200" in close_rule
-    assert "flex:" not in close_rule
+def test_stickerbook_is_a_scrolling_workspace_outside_the_overlay_system() -> None:
+    layout = (ROOT / "static/css/scene-hotspots.css").read_text()
+    surfaces = (ROOT / "static/js/shared-ui.js").read_text()
+    assert "'shed-decorate-panel': 'shed-decorate-close'" not in surfaces
+    assert 'id="shed-decorate-panel"' in HOME.split('{% block room_workspace %}')[1]
+    assert 'body.artwork-room-page.stickerbook-open' in layout
+    workspace = layout.split('.artwork-room-page #shed-decorate-panel {')[1].split('}')[0]
+    assert 'position: static' in workspace and 'max-height: none' in workspace
+    assert '.artwork-room-page .shed-decorate-close { position: static; }' in layout
+    assert 'document.body.classList.add("stickerbook-open")' in DECORATIONS
+    assert 'document.body.classList.remove("stickerbook-open")' in DECORATIONS
+    assert 'panel.scrollIntoView({ block: "start", behavior: "instant" })' in DECORATIONS
+    assert 'control.focus({ preventScroll: true })' in DECORATIONS
 
 
 def test_decoration_initialization_is_single_and_profile_controls_remain() -> None:

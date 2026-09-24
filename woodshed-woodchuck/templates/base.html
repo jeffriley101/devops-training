@@ -2,14 +2,15 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>{{ title }} · Woodshed Woodchuck</title>
-  <link rel="stylesheet" href="/static/css/styles.css?v=122" />
+  <link rel="stylesheet" href="/static/css/styles.css?v=123" />
   <link rel="stylesheet" href="/static/css/woodchuck-motion.css?v=6" />
   <link rel="stylesheet" href="/static/css/world-entry.css?v=2" />
   {% if authenticated_profile and active_nav == "store" %}
   <link rel="preload" as="image" href="/static/img/arcade/arcade-entry-splash.png" />
   {% endif %}
+  {% if "artwork-room-page" in (page_class or "") %}<link rel="stylesheet" href="/static/css/scene-hotspots.css?v=4" />{% endif %}
   {% block dashboard_styles %}{% endblock %}
 
   <!-- Woodshed app icons -->
@@ -50,6 +51,8 @@
       {% block content %}{% endblock %}
     </main>
 
+    {% block room_workspace %}{% endblock %}
+
     {% if nav_items and active_nav %}
     {% if active_nav not in ("home", "store") %}
     <div class="sound-effects-controls">
@@ -75,27 +78,32 @@
     {% endif %}
   </div>
 
+  <script src="/static/js/shared-ui.js?v=4"></script>
+  <script src="/static/js/recovery.js?v=1"></script>
   <script id="quest-pool-data" type="application/json">{{ quest_pool | default({}) | tojson }}</script>
   <script id="sax-viking-messages-data" type="application/json">{{ sax_viking_messages | default({}) | tojson }}</script>
   <script id="instrument-definitions-data" type="application/json">{{ instrument_definitions | default([]) | tojson }}</script>
+  {% if woodchuck_appearance %}<script id="woodchuck-appearance-data" type="application/json">{{ woodchuck_appearance | tojson }}</script>{% endif %}
   <script id="account-state-bootstrap" type="application/json">{{ account_state_bootstrap | default(none) | tojson }}</script>
   <script id="authenticated-player-name" type="application/json">{{ (authenticated_profile.display_name if authenticated_profile else none) | tojson }}</script>
   {% if authenticated_profile %}<template id="account-scripts">{% else %}
-  <script src="/static/js/session-boundary.js?v=4"></script>{% endif %}
+  <script src="/static/js/session-boundary.js?v=5"></script>{% endif %}
   <script src="/static/js/state.js?v=9"></script>
   <script src="/static/js/instruments.js?v=3"></script>
   <script src="/static/vendor/tone/Tone.js?v=15.1.22"></script>
-  <script src="/static/js/audio.js?v=15"></script>
-  <script src="/static/js/tuner.js?v=2"></script>
+  <script src="/static/js/audio.js?v=17"></script>
+  {% if active_nav == "home" %}<script src="/static/js/tuner.js?v=2"></script>{% endif %}
   <script src="/static/js/character-reaction.js?v=3"></script>
-  <script src="/static/js/woodchuck-motion.js?v=3"></script>
+  <script src="/static/js/woodchuck-motion.js?v=4"></script>
   <script src="/static/js/practice-duration.js?v=1"></script>
-  <script src="/static/js/app.js?v=age13-86"></script>
-  <script src="/static/js/account.js?v=age13-16"></script>
-  <script src="/static/js/world-entry.js?v=3"></script>
+  <script src="/static/js/app.js?v=r4a-91"></script>
+  <script src="/static/js/account.js?v=r4-17"></script>
+  <script src="/static/js/world-entry.js?v=5"></script>
+  {% if woodchuck_appearance %}<script src="/static/js/woodchuck-appearance.js?v=3"></script>{% endif %}
+  {% if authenticated_profile and active_nav == "home" %}<script src="/static/js/shed-entry-streak.js?v=1"></script>{% endif %}
   {% block page_scripts %}{% endblock %}
   {% if authenticated_profile %}</template>
-  <script src="/static/js/session-boundary.js?v=4"></script>{% endif %}
-<p class="body-copy"><a href="/family/practice">Private practice and director</a> · <a href="/family/parent-access">Parent access</a></p>
+  <script src="/static/js/session-boundary.js?v=5"></script>{% endif %}
+{% if "artwork-room-page" not in (page_class or "") %}<p class="body-copy"><a href="/family/practice">Private practice and director</a> · <a href="/family/parent-access">Parent access</a></p>{% endif %}
 </body>
 </html>

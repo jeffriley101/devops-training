@@ -1,0 +1,222 @@
+/* One uncropped artwork rectangle, shared exactly by ten equal hit targets. */
+.artwork-room-page {
+  --art-width: 1024;
+  --art-height: 1536;
+  --room-nav-height: calc(4.5rem + env(safe-area-inset-bottom));
+}
+.artwork-room-page.shed-screen { --art-width: 941; --art-height: 1672; }
+.artwork-room-page .main-nav {
+  height: var(--room-nav-height);
+  padding: .5rem max(.5rem, env(safe-area-inset-right))
+    calc(.5rem + env(safe-area-inset-bottom)) max(.5rem, env(safe-area-inset-left));
+  align-items: center;
+  z-index: 20;
+}
+.artwork-room-page .nav-pill { min-height: 44px; display: grid; place-items: center; }
+.artwork-room-page .card.woodshed-page { padding: 0; border: 0; background: none; overflow: visible; box-shadow: none; }
+.artwork-scene.shed-artwork-scene { --art-width: 941; --art-height: 1672; }
+.artwork-scene.shop-artwork-scene { --art-width: 1024; --art-height: 1536; }
+.artwork-room-page .artwork-scene {
+  position: relative;
+  isolation: isolate;
+  width: min(100%, calc(var(--room-scene-height) * var(--art-width) / var(--art-height)));
+  aspect-ratio: var(--art-width) / var(--art-height);
+  height: auto;
+  min-height: 0;
+  margin: 0 auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  overflow: hidden;
+  background: none;
+  box-shadow: 0 3px 18px #0005;
+}
+.artwork-scene > .room-scene-art {
+  display: block;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+.scene-hotspots {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(2, 50%);
+  grid-template-rows: repeat(5, 20%);
+  gap: 0;
+  z-index: 5;
+}
+#woodshed-hotspots > .scene-hotspot,
+#shop-hotspots > .scene-hotspot {
+  position: static;
+  inset: auto !important;
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: transparent;
+  font-size: 0;
+  box-shadow: none;
+  filter: none;
+  transform: none !important;
+  scale: none;
+  transition: none;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.scene-hotspot > * { display: none; }
+#woodshed-hotspots > .scene-hotspot:focus-visible,
+#shop-hotspots > .scene-hotspot:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: -5px;
+  box-shadow: inset 0 0 0 7px #175eab;
+  background: rgb(24 96 180 / .15);
+}
+.artwork-scene > [data-presentation-only] {
+  display: block;
+  position: absolute;
+  left: 50%;
+  bottom: 4%;
+  width: 36%;
+  height: 46%;
+  max-width: none;
+  transform: translateX(-50%);
+  z-index: 1;
+  pointer-events: none;
+}
+.artwork-scene > [data-presentation-only] img {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  object-fit: contain;
+  pointer-events: none;
+}
+.artwork-scene > .shed-decoration-layer { inset: 0; z-index: 2; }
+/* Stickerbook deliberately takes over dragging while its specialized UI is open. */
+.artwork-scene.is-decorating > .shed-decoration-layer { z-index: 6; }
+/* The hidden passcode dot is separate from the ten-cell artwork surface. */
+.artwork-room-page .shed-secret-button {
+  display: block;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #d7263d;
+  font-size: 1.4rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+.artwork-room-page .shed-secret-button:focus-visible { outline: 3px solid #fff; }
+/* Room shell: scene and primary navigation. */
+body.artwork-room-page {
+  --room-scene-height: calc(100dvh - var(--room-nav-height) - env(safe-area-inset-top));
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+.artwork-room-page .app-shell {
+  width: 100%;
+  max-width: none;
+  height: 100dvh;
+  min-height: 0;
+  margin: 0;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+    var(--room-nav-height) env(safe-area-inset-left);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.artwork-room-page .app-shell[hidden] { display: none; }
+.artwork-room-page .content-wrap {
+  flex: 1;
+  min-height: 0;
+  display: block;
+}
+.artwork-room-page .woodshed-page,
+.artwork-room-page .shop-page {
+  height: 100%;
+  min-height: 0;
+  margin: 0;
+  display: grid;
+  place-items: center;
+}
+/* The same server-backed streak component lives inside XP, never in the shell. */
+.artwork-room-page #xp-panel #login-streak-card {
+  width: 100%;
+  min-width: 0;
+  margin: .75rem 0;
+  padding: .75rem;
+  color: #24351b;
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+  align-items: stretch;
+}
+.artwork-room-page #login-streak-title { margin: 0; }
+.artwork-room-page .login-streak-summary { gap: .5rem; }
+.artwork-room-page .login-streak-crown-progress { display: flex; flex-direction: row; align-items: center; width: 100%; gap: .5rem; }
+.artwork-room-page #xp-panel .login-streak-crown-progress progress {
+  width: auto;
+  min-width: 0;
+  flex: 1 1 0;
+  margin: 0;
+  height: .75rem;
+}
+.artwork-room-page .shed-secret-button {
+  position: fixed;
+  left: env(safe-area-inset-left);
+  bottom: var(--room-nav-height);
+  width: 1.5rem;
+  z-index: 21;
+}
+[data-student-woodchuck]:not([data-appearance-ready]) { visibility: hidden; }
+
+/* Existing feature designs retain their contents; only their viewport placement changes. */
+body.artwork-room-page [data-room-panel] {
+  position: fixed;
+  inset: max(.75rem, env(safe-area-inset-top)) auto auto 50%;
+  transform: translateX(-50%);
+  width: min(52rem, calc(100% - 1.5rem - env(safe-area-inset-left) - env(safe-area-inset-right)));
+  max-height: calc(100dvh - var(--room-nav-height) - env(safe-area-inset-top) - 1.5rem);
+  min-height: 0;
+  margin: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  z-index: 100;
+  box-shadow: 0 0 0 100vmax rgb(0 0 0 / .6);
+}
+body.artwork-room-page dialog {
+  max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 2rem);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+body.artwork-room-page #sound-effects-panel[data-room-panel] { width: min(30rem, calc(100% - 1.5rem)); }
+/* Stickerbook is a document workspace, never an overlay or modal surface. */
+body.artwork-room-page.stickerbook-open {
+  height: auto;
+  min-height: 100dvh;
+  overflow-y: auto;
+}
+.artwork-room-page.stickerbook-open .app-shell { height: auto; min-height: 100dvh; }
+.artwork-room-page.stickerbook-open .content-wrap { flex: none; height: var(--room-scene-height); }
+.artwork-room-page #shed-decorate-panel {
+  color: #24351b;
+  position: static;
+  width: min(100%, 60rem);
+  max-height: none;
+  margin: .75rem auto 0;
+  overflow: visible;
+  flex: none;
+}
+.artwork-room-page .shed-decorate-close { position: static; }

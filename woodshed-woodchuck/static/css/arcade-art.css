@@ -26,3 +26,52 @@
 .arcade-cabinet-screen.arcade-art-active::after { content: none; }
 
 .arcade-art-active > .arcade-art-image { visibility: visible; }
+
+/* Each gradient spans the full lobby; only its color stops repeat, never a tile. */
+.arcade-lobby {
+  background-color: #070b18;
+  background-image:
+    radial-gradient(ellipse at 18% 28%, #fffbd7 0 1px, #f5ff4cbb 2px, #f6ff4525 18px, transparent 65px),
+    radial-gradient(ellipse at 78% 64%, #fff 0 1px, #fc35ebbb 3px, #fc35eb22 24px, transparent 85px),
+    repeating-linear-gradient(128deg, transparent 0 130px, #ff19cf22 136px, #ff19cf99 142px, #ff4dde 145px, #fff3fd 147px 148px, #ff19cf 150px, #ff19cf55 154px, transparent 164px 320px),
+    repeating-linear-gradient(42deg, transparent 0 176px, #00eaff22 181px, #00eaff99 187px, #35edff 190px, #eaffff 192px 193px, #00eaff 195px, #00eaff44 200px, transparent 209px 410px),
+    repeating-linear-gradient(158deg, transparent 0 236px, #9741ff22 242px, #9741ffbb 247px, #b895ff 250px 253px, #9741ff66 257px, transparent 267px 510px),
+    repeating-linear-gradient(73deg, transparent 0 300px, #edff3b33 305px, #eaff00cc 309px, #ffffdb 311px 312px, #baff0055 316px, transparent 322px 590px),
+    repeating-linear-gradient(112deg, transparent 0 360px, #baff0033 363px, #baff00dd 368px 370px, #e7ffb5 371px, #baff0044 375px, transparent 381px 730px);
+  background-size: auto;
+  background-repeat: no-repeat;
+}
+.arcade-lobby .bg-orbs { display: none; }
+.arcade-lobby .arcade-room { background: rgb(5 9 22 / .12); }
+.arcade-lobby .arcade-room > p {
+  padding: .6rem .8rem;
+  background: #0b1426;
+  border-radius: .5rem;
+}
+.rhythm-baseball-feature {
+  width: min(100%, 26rem);
+  margin: 2.5rem auto 0;
+  text-align: center;
+}
+.rhythm-baseball-feature h2 { font-size: clamp(1.25rem, 4vw, 1.8rem); color: #fff5bb; }
+.rhythm-baseball-standings {
+  padding: .75rem 1rem;
+  margin-bottom: 1rem;
+  background: #0b1426;
+  border: 1px solid #7855bd;
+  border-radius: .75rem;
+}
+.rhythm-baseball-standings h3 { margin-top: 0; }
+.rhythm-baseball-feature figure { margin: 0; }
+.rhythm-baseball-cabinet {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 2 / 3;
+  object-fit: contain;
+  border-radius: .75rem;
+}
+.rhythm-baseball-feature figcaption { padding: .75rem; background: #0b1426; }
+
+.arcade-lobby .arcade-cabinet { background-color: #0b1426; }
+.arcade-lobby .rhythm-baseball-feature h2 { background: #0b1426; padding: .5rem; }

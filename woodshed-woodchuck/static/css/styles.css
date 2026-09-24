@@ -7797,3 +7797,16 @@ select {
 @media (max-width: 480px) {
   .practice-tool-grid { grid-template-columns: 1fr; }
 }
+
+/* R4 shared behavior foundation; artwork hotspot geometry is deliberately deferred. */
+.woodchuck-editor { width: min(92vw, 30rem); max-height: 85dvh; overflow: auto; border-radius: 1rem; }
+.woodchuck-editor form { display: grid; gap: .65rem; }
+.woodchuck-editor select, .woodchuck-editor button, .shared-recovery button, .shared-recovery a { min-height: 44px; font-size: 1rem; }
+.woodchuck-editor::backdrop { background: rgb(0 0 0 / .55); }
+.shared-recovery { position: fixed; z-index: 10000; inset: auto 1rem calc(1rem + env(safe-area-inset-bottom)); padding: 1rem; background: #fff8e7; color: #302315; border: 2px solid #715137; border-radius: .75rem; box-shadow: 0 3px 20px #0005; }
+.shared-recovery p { margin: 0 0 .5rem; }
+.shared-recovery a { display: inline-flex; align-items: center; }
+.woodchuck-editor :focus-visible, .shared-recovery :focus-visible { outline: 3px solid #2371c2; outline-offset: 3px; }
+.shop-student-character-layer { position: absolute; z-index: 2; left: 50%; bottom: 12%; width: 38%; height: 52%; transform: translateX(-50%); pointer-events: none; }
+.shop-student-character { width: 100%; height: 100%; object-fit: contain; }
+.practice-room-door[aria-disabled="true"] { opacity: .7; cursor: default; }

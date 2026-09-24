@@ -142,6 +142,7 @@ NAV_ITEMS = [
 def _render(request: Request, template_name: str, *, analytics_event: str | None = None, **context: object):
     account_state_bootstrap = None
     authenticated_profile = None
+    woodchuck_appearance = None
     with SessionLocal() as session:
         profile = current_profile(request, session)
         if profile is not None:
@@ -160,6 +161,9 @@ def _render(request: Request, template_name: str, *, analytics_event: str | None
                 ),
             }
             saved_state = session.get(WoodchuckState, profile.id)
+            if template_name in {"home.html", "store.html"}:
+                from .appearance import appearance_payload
+                woodchuck_appearance = appearance_payload(session, profile, saved_state)
             account_state_bootstrap = {
                 "state": saved_state.state_json if saved_state else None,
                 "revision": saved_state.revision if saved_state else 0,
@@ -177,6 +181,7 @@ def _render(request: Request, template_name: str, *, analytics_event: str | None
             "instrument_definitions": instrument_definition_payloads(),
             "account_state_bootstrap": account_state_bootstrap,
             "authenticated_profile": authenticated_profile,
+            "woodchuck_appearance": woodchuck_appearance,
             **context,
         },
     )
@@ -203,7 +208,7 @@ def qr_data_uri(value: str) -> str:
 
 
 def art_submission_mailto() -> str:
-    return f"mailto:{quote(ART_SUBMISSION_EMAIL, safe='@.+-_')}?subject=Woodshed%20Woodchuck%20Artwork"
+    return f"mailto:{quote(ART_SUBMISSION_EMAIL, safe='@.+-_')}"
 
 
 @app.get("/")
@@ -471,7 +476,7 @@ def home(request: Request):
         "home.html",
         title="shed",
         active_nav="home",
-        page_class="main-app-page shed-screen",
+        page_class="main-app-page shed-screen artwork-room-page",
         instruments=INSTRUMENT_OPTIONS,
         levels=LEVEL_OPTIONS,
         member_since=member_since,
@@ -547,7 +552,7 @@ def arcade(request: Request):
         analytics_event="arcade_entered",
         title="Arcade",
         active_nav="store",
-        page_class="main-app-page arcade-screen",
+        page_class="main-app-page arcade-screen arcade-lobby",
     )
 
 
@@ -686,7 +691,7 @@ def store(request: Request):
     site_url = public_site_url(request)
     return _render(
         request, "store.html", title="shop", active_nav="store",
-        page_class="main-app-page",
+        page_class="main-app-page artwork-room-page",
         public_site_url=site_url, public_site_qr=qr_data_uri(site_url),
         practice_definition=PRACTICE_DEFINITION,
         art_submission_mailto=art_submission_mailto(),

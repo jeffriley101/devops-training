@@ -174,6 +174,7 @@ def test_motion_script_runs_without_replacing_character_source():
           return selector === ".woodshed-character-art" ? art : null;
         },
         setAttribute(name, value) { attributes[name] = value; },
+        hasAttribute(name) { return name in attributes; },
       });
       const windowListeners = {};
       global.window = {

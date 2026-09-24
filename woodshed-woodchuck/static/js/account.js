@@ -351,100 +351,6 @@
     });
   }
 
-  function wireInstrumentChange() {
-    const openButton = document.getElementById(
-      "instrument-object"
-    );
-    const panel = document.getElementById("change-instrument-panel");
-    const form = document.getElementById("change-instrument-form");
-    const select = document.getElementById("change-instrument-select");
-    const cancelButton = document.getElementById(
-      "change-instrument-cancel-button"
-    );
-    const feedback = document.getElementById("change-instrument-feedback");
-    if (!openButton || !panel || !form || !select || !feedback) return;
-
-    function setPanelOpen(open) {
-      panel.hidden = !open;
-      panel.classList.toggle("hidden", !open);
-      openButton.setAttribute("aria-expanded", String(open));
-      if (open) {
-        const state = stateApi.getState();
-        select.value = state.profile.instrument || "";
-        feedback.textContent = "";
-        feedback.classList.remove("error-text");
-        select.focus();
-      } else {
-        openButton.focus();
-      }
-    }
-
-    openButton.addEventListener("click", function () {
-      setPanelOpen(true);
-    });
-    if (cancelButton) {
-      cancelButton.addEventListener("click", function () {
-        setPanelOpen(false);
-      });
-    }
-
-    form.addEventListener("submit", async function (event) {
-      event.preventDefault();
-      const instrument = select.value;
-      const submitButton = form.querySelector("button[type='submit']");
-      feedback.textContent = "Saving instrument…";
-      feedback.classList.remove("error-text");
-      submitButton.disabled = true;
-
-      try {
-        const response = await fetch("/account/profile/instrument", {
-          method: "PATCH",
-          credentials: "same-origin",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ instrument }),
-        });
-        if (!response.ok) {
-          throw new Error(
-            await responseMessage(
-              response,
-              "The instrument could not be changed."
-            )
-          );
-        }
-        const payload = await response.json();
-        const next = stateApi.getState();
-        next.profile.instrument = payload.instrument;
-        stateApi.saveState(next);
-
-        const instrumentObject = document.getElementById("instrument-object");
-        if (window.WWInstruments) {
-          window.WWInstruments.renderInstrument(
-            instrumentObject,
-            payload.instrument
-          );
-          instrumentObject.setAttribute(
-            "aria-label",
-            `Change instrument. Current instrument: ${payload.instrument}`
-          );
-          instrumentObject.title = "Change instrument";
-        }
-        if (payload.shed_character_url) {
-          const character = document.querySelector(".woodshed-character-art");
-          if (character) character.src = payload.shed_character_url;
-        }
-        feedback.textContent = `Instrument changed to ${payload.instrument}.`;
-        submitButton.classList.add("is-confirmed-success");
-      } catch (error) {
-        feedback.classList.add("error-text");
-        feedback.textContent = error instanceof TypeError
-          ? "The instrument could not be changed. Check your connection and try again."
-          : error.message || "The instrument could not be changed. Please try again.";
-      } finally {
-        submitButton.disabled = false;
-      }
-    });
-  }
-
   function wireProfileChange({ kind, endpoint, stateKey, payloadKey, triggerId }) {
     const openButton = document.getElementById(triggerId);
     const panel = document.getElementById(`change-${kind}-panel`);
@@ -495,6 +401,7 @@
         next.profile[stateKey] = payload[payloadKey];
         stateApi.saveState(next);
         feedback.textContent = `${kind === "name" ? "Name" : "Level"} changed successfully.`;
+        window.WWSurfaces?.markSaved(panel);
         button.classList.add("is-confirmed-success");
         openButton.textContent = kind === "level"
           ? payload[payloadKey].charAt(0).toUpperCase()
@@ -519,7 +426,7 @@
 
   wireCreateAccount();
   wireLogin();
-  wireInstrumentChange();
+
   wireProfileChange({ kind: "name", endpoint: "/account/profile/name", stateKey: "woodchuckName", payloadKey: "display_name", triggerId: "woodchuck-name-value" });
   wireProfileChange({ kind: "level", endpoint: "/account/profile/level", stateKey: "level", payloadKey: "level", triggerId: "level-value" });
 })();

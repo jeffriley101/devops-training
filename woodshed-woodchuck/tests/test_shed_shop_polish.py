@@ -66,7 +66,7 @@ def test_shed_profile_displays_are_semantic_keyboard_controls() -> None:
     for element_id, panel in (
         ("woodchuck-name-value", "change-name-panel"),
         ("level-value", "change-level-panel"),
-        ("instrument-object", "change-instrument-panel"),
+        ("instrument-object", "your-woodchuck"),
     ):
         start = home.index(f'id="{element_id}"')
         opening = home.rfind("<button", 0, start)
@@ -95,7 +95,7 @@ def test_shed_uses_server_member_date_board_clipboard_and_compact_level() -> Non
     assert ">📋<" not in home
     assert ">📔<" not in home
     assert "profileLevel.charAt(0).toUpperCase()" not in app_js
-    assert 'id="level-value"' in home and "🏅" in home
+    assert 'id="level-value"' in home and 'data-scene-cell="R2"' in home
     assert 'Level: ${profileLevel}. Change level.' in app_js
     assert 'kind === "level"' in account_js
 
@@ -114,17 +114,16 @@ def test_profile_payload_preserves_authoritative_creation_timestamp() -> None:
 def test_practice_room_is_local_expandable_and_has_tool_slots() -> None:
     store = (ROOT / "templates/store.html").read_text(encoding="utf-8")
     assert "Practice Room" in store
-    assert "🚪" in store
+    assert 'data-scene-cell="L5"' in store
     assert 'data-shop-panel="practice-room"' in store
     assert 'data-shop-panel-content="practice-room"' in store
-    assert "Open Spectrogram" in store
+    assert 'aria-disabled="true" aria-label="Room D. Spectrogram. Temporarily unavailable"' in store
     assert 'href="/practice/pristine" aria-label="Open Pristine Practice"' in store
     assert 'href="/arcade" aria-label="Open Arcade Room"' in store
     assert store.count('class="practice-room-emoji-control practice-room-door"') == 4
     assert "Pristine P-Chart — Coming Soon" not in store
     practice_section = store[store.index('data-shop-panel-content="practice-room"'):store.index('data-shop-panel-content="artist"')]
-    assert 'href="https://brassspectrogram.netlify.app/"' in practice_section
-    assert 'rel="noopener noreferrer"' in practice_section
+    assert 'brassspectrogram.netlify.app' not in practice_section
 
 
 def test_donate_moved_once_to_shop_and_qr_is_accessible() -> None:
@@ -132,7 +131,7 @@ def test_donate_moved_once_to_shop_and_qr_is_accessible() -> None:
     store = (ROOT / "templates/store.html").read_text(encoding="utf-8")
     assert "venmo.com/u/jeffriley101" not in home
     assert 'href="/membership?as_account=student"' in store
-    assert 'aria-label="Unlock Full Access"' in store
+    assert 'aria-label="Premium"' in store
     assert 'alt="QR code for the public Woodshed Woodchuck website at {{ public_site_url }}"' in store
     assert "Open the Woodshed website" not in store
     assert 'data-public-site-url="{{ public_site_url }}"' in store
