@@ -41,6 +41,10 @@ def preserve_server_values(submitted, saved=None):
     result.pop("_history_mystery", None)
     if "_history_mystery" in saved:
         result["_history_mystery"] = deepcopy(saved["_history_mystery"])
+    # Appearance is validated only by the dedicated Premium-aware endpoint.
+    result.pop("appearance", None)
+    if "appearance" in saved:
+        result["appearance"] = deepcopy(saved["appearance"])
     prior_progress = saved.get("progress")
     prior_progress = prior_progress if isinstance(prior_progress, dict) else {}
     progress = result.get("progress")

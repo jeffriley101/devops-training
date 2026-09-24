@@ -436,6 +436,59 @@ def redeem_daily_secret(request: Request, submitted: DailySecretSubmission):
         return {"redeemed": True, "amount": SECRET_REWARD_AMOUNT, "credits": progress["credits"], "revision": state.revision}
 
 
+class AppearanceUpdate(BaseModel):
+    instrument: str
+    hoodie: str
+    hat: str
+
+
+@router.get("/appearance")
+def load_appearance(request: Request):
+    from .appearance import appearance_payload
+    with SessionLocal() as session:
+        profile = current_profile(request, session)
+        if profile is None:
+            raise HTTPException(401, "Student sign-in is required.")
+        return JSONResponse(appearance_payload(session, profile, session.get(WoodchuckState, profile.id)),
+                            headers={"Cache-Control": "no-store"})
+
+
+@router.patch("/appearance")
+def save_appearance(request: Request, submitted: AppearanceUpdate):
+    from .appearance import appearance_payload, validate_choices
+    from .instruments import normalize_supported_instrument
+    with SessionLocal() as session:
+        profile = current_profile(request, session)
+        if profile is None:
+            raise HTTPException(401, "Student sign-in is required.")
+        state = lock_state(session, profile.id)
+        session.refresh(profile)
+        if current_profile(request, session) is None:
+            raise HTTPException(401, "Student sign-in is required.")
+        before = appearance_payload(session, profile, state)
+        try:
+            instrument = (profile.instrument if submitted.instrument == profile.instrument
+                          else normalize_supported_instrument(submitted.instrument))
+            choices = validate_choices({"hoodie": submitted.hoodie, "hat": submitted.hat},
+                                       before["saved"], before["premium"])
+        except PermissionError as error:
+            raise HTTPException(403, str(error)) from error
+        except ValueError as error:
+            raise HTTPException(400, str(error)) from error
+        profile.instrument = instrument
+        data = deepcopy(state.state_json or {})
+        data["appearance"] = choices
+        if isinstance(data.get("profile"), dict):
+            data["profile"]["instrument"] = instrument
+        state.state_json = data
+        state.revision += 1
+        session.commit()
+        from .economy import economy_payload
+        return JSONResponse({**appearance_payload(session, profile, state),
+                             **economy_payload(state), "revision": state.revision},
+                            headers={"Cache-Control": "no-store"})
+
+
 @router.patch("/profile/instrument")
 def change_profile_instrument(
     request: Request,

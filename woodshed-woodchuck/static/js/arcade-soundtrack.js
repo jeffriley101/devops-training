@@ -50,6 +50,7 @@
   let restartTimer = null;
   let resumeTimer = null;
   let stopped = false;
+  let backgroundStopped = false;
   let runActive = false;
   let playbackActivated = false;
   let soundtrackEnabled = true;
@@ -94,7 +95,7 @@
   }
 
   function playSoundtrack() {
-    if (stopped || runActive || !applyPreferences()) {
+    if (stopped || backgroundStopped || document.hidden || runActive || !applyPreferences()) {
       updateSoundtrackToggle();
       return Promise.resolve(false);
     }
@@ -102,6 +103,7 @@
       const attempt = audio.play();
       if (attempt && typeof attempt.then === "function") {
         return attempt.then(function () {
+          if (stopped || backgroundStopped || document.hidden || runActive) { audio.pause(); return false; }
           playbackActivated = true;
           updateSoundtrackToggle();
           return true;
@@ -148,6 +150,8 @@
   }
 
   function activateFromGesture(event) {
+    if (document.hidden) return;
+    backgroundStopped = false;
     const target = event && event.target;
     if (target && typeof target.closest === "function" && target.closest("a[href]")) {
       stopSoundtrack();
@@ -181,6 +185,10 @@
   document.addEventListener("pointerdown", activateFromGesture, true);
   document.addEventListener("keydown", activateFromGesture, true);
   document.addEventListener("woodshed:arcade-soundtrack-run-state", handleRunState);
+  if (window.WWLifecycle) window.WWLifecycle.onBackground(() => {
+    backgroundStopped = true; clearRestart(); clearResume(); audio.pause(); playbackActivated = false;
+    updateSoundtrackToggle();
+  });
   window.addEventListener("pagehide", stopSoundtrack, { once: true });
   window.addEventListener("beforeunload", stopSoundtrack, { once: true });
 

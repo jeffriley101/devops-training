@@ -18,26 +18,24 @@ def shop_markup() -> str:
 
 def test_shop_is_one_viking_scene_with_balanced_control_columns() -> None:
     markup = shop_markup()
-    assert 'class="shop-scene"' in markup
+    assert 'class="shop-scene artwork-scene shop-artwork-scene"' in markup
     assert '/static/img/shop-viking-valley-fair.png' in markup
     assert '/static/img/shop3.png' not in markup
-    assert (ROOT / "static/img/shop3.png").is_file()
-    assert markup.count("shop-object-column-left") == 1
-    assert markup.count("shop-object-column-right") == 1
-    assert markup.index("shop-object-column-left") < markup.index("shop-object-column-right")
-    assert markup.index("shop-feature-dialog") > markup.index("</div>\n\n  <dialog")
-    assert "Share the Woodshed" not in markup
-    assert "Open the Woodshed website" not in markup
-    assert "Your Permanent Crown" not in markup
-    assert "shop-share-card" not in markup
-    assert "shop-donate-button" not in markup
+    assert markup.count('data-scene-cell=') == 10
+    assert markup.index('id="shop-hotspots"') < markup.index('<dialog')
+    assert 'data-presentation-only' in markup
+    assert 'data-student-woodchuck' in markup
+    assert '_your_woodchuck.html' not in markup
+    assert 'shop-object-column' not in markup
+    assert 'shop-donate-button' not in markup
 
 
 def test_left_controls_preserve_rewards_and_community_actions() -> None:
     markup = shop_markup()
-    left = markup[markup.index("shop-object-column-left"):markup.index("shop-object-column-right")]
-    controls = ["🌼", "👑", "🐐", "📬", "🚪"]
-    assert [left.index(item) for item in controls] == sorted(left.index(item) for item in controls)
+    from test_r4a_artwork import cells
+    left = [a for _, a in cells(markup) if a['data-scene-cell'].startswith('L')]
+    assert [a.get('data-shop-panel', a.get('id')) for a in left] == [
+        'dandelion-object', 'crown', 'goat', 'artist', 'practice-room']
     assert 'id="credits-value"' in markup
     assert 'data-shop-panel="crown"' in markup
     assert 'data-shop-panel="goat"' in markup
@@ -51,17 +49,17 @@ def test_left_controls_preserve_rewards_and_community_actions() -> None:
 
 def test_right_controls_and_full_access_link_are_unique() -> None:
     markup = shop_markup()
-    right_start = markup.index("shop-object-column-right")
-    right = markup[right_start:markup.index("</div>\n  </div>", right_start)]
-    controls = ["🎒", "🐛", "🔗", "🔑", "🗿"]
-    assert [right.index(item) for item in controls] == sorted(right.index(item) for item in controls)
-    assert "Open Spectrogram" in markup
+    from test_r4a_artwork import cells
+    right = [a for _, a in cells(markup) if a['data-scene-cell'].startswith('R')]
+    assert [a.get('data-shop-panel', a.get('href')) for a in right] == [
+        'gear', 'little-buddy', 'share', '/membership?as_account=student', 'practice-definition']
+    assert "Spectrogram. Temporarily unavailable" in markup
     assert 'href="/practice/pristine" aria-label="Open Pristine Practice"' in markup
     assert "Clothing Shelf, coming soon" not in markup
     assert "Gear Shelf, coming soon" not in markup
     assert "direct file upload" not in markup
     assert 'href="/membership?as_account=student"' in markup
-    assert markup.count('aria-label="Unlock Full Access"') == 1
+    assert markup.count('aria-label="Premium"') == 1
 
 
 def test_shop_dialogs_and_keyboard_focus_behavior_are_wired() -> None:
@@ -73,7 +71,7 @@ def test_shop_dialogs_and_keyboard_focus_behavior_are_wired() -> None:
     for label in (
         "Open Crown Progress", "Open The GOAT Tracker", "Open Practice Definition",
         "Share Woodshed", "Open Gear Shelf", "Open Little Buddy Shelf",
-        "Open Practice Room", "Open Artist instructions", "Unlock Full Access",
+        "Open Practice Room", "Open Artist instructions", "Premium",
     ):
         assert f'aria-label="{label}' in markup
     assert "dialog.showModal()" in javascript
@@ -111,10 +109,12 @@ def test_share_uses_one_canonical_url_and_accessible_qr(monkeypatch) -> None:
 def test_artist_email_is_fixed_public_project_address(monkeypatch) -> None:
     monkeypatch.setenv("ART_SUBMISSION_EMAIL", "private@example.org?bcc=other@example.org")
     configured = TestClient(main.app).get("/store").text
-    assert "mailto:woodshedwoodchuck@gmail.com?subject=Woodshed%20Woodchuck%20Artwork" in configured
+    assert 'href="mailto:support@woodshedwoodchuck.com">Email Woodshed Support</a>' in configured
+    assert "Email artwork instructions" not in configured
+    assert "mailto:woodshedwoodchuck@gmail.com" not in configured
     assert "Artwork email coming soon." not in configured
     assert "private@example.org" not in configured and "bcc=" not in configured
-    assert "The Viking Sax would love to see your artwork of a woodchuck, the Viking Sax, or anything fun (please ask an adult before emailing your artwork). And feel free to email questions, concerns, and comments about this app, too." in configured
+    assert "We’d love to see your artwork of a woodchuck, the Viking Sax, or anything fun! Please ask an adult before emailing your artwork. You can also email us with questions, concerns, comments, or support requests." in configured
 
 
 def test_mobile_css_avoids_fixed_width_overflow() -> None:
@@ -126,40 +126,15 @@ def test_mobile_css_avoids_fixed_width_overflow() -> None:
 
 
 def test_mobile_shop_keeps_both_vertical_columns_over_the_scene() -> None:
-    css = CSS.read_text(encoding="utf-8")
-    markup = shop_markup()
-    mobile_start = css.index("@media (max-width: 430px)", css.index("/* SHOP */"))
-    mobile = css[mobile_start:css.index("@media (max-width: 640px)", mobile_start)]
-
-    assert "display: block" in mobile
-    assert ".shop-object-column {" in mobile
-    assert "position: absolute" in mobile
-    assert "display: flex" in mobile
-    assert "flex-direction: column" in mobile
-    assert "top: .65rem" in mobile
-    assert "bottom: .65rem" in mobile
-    assert "justify-content: space-between" in mobile
-    assert "translateY(-50%)" not in mobile
-    assert ".shop-object-column-left { left: .35rem; }" in mobile
-    assert ".shop-object-column-right { right: .35rem; }" in mobile
-    assert "flex-direction: row" not in mobile
-    assert "display: none" not in mobile
-    assert "width: 100%" not in mobile
-    assert "overflow-x" not in mobile
-    assert "min-height: 44px" in mobile
-
-    left = markup[markup.index("shop-object-column-left"):markup.index("shop-object-column-right")]
-    right_start = markup.index("shop-object-column-right")
-    right = markup[
-        right_start:markup.index("</div>\n  </div>", right_start)
-    ]
-    for control in ("🌼", "👑", "🐐", "📬", "🚪"):
-        assert control in left
-    for control in ("🎒", "🐛", "🔗", "🔑", "🗿"):
-        assert control in right
-    assert 'class="shop-dandelion-count"' in left
-    assert 'aria-label="Shop rewards and community"' in markup
-    assert 'aria-label="Shop shelves, sharing, and rooms"' in markup
+    css = (ROOT / 'static/css/scene-hotspots.css').read_text()
+    assert 'grid-template-columns: repeat(2, 50%)' in css
+    assert 'grid-template-rows: repeat(5, 20%)' in css
+    assert 'gap: 0' in css
+    assert 'object-fit: contain' in css
+    assert '100dvh - var(--room-nav-height)' in css
+    assert 'safe-area-inset-bottom' in css
+    assert 'data-scene-cell="L5"' in shop_markup()
+    assert 'data-scene-cell="R5"' in shop_markup()
 
 
 def test_shop_dandelion_balance_reveal_is_maintained_application_behavior() -> None:
@@ -172,7 +147,7 @@ def test_shop_dandelion_balance_reveal_is_maintained_application_behavior() -> N
     ]
 
     assert 'id="dandelion-object"' in markup
-    assert 'id="credits-value" class="shop-dandelion-count"' in markup
+    assert 'id="credits-value" hidden' in markup
     count_rule = css[css.index(".shop-dandelion-count {"):css.index(
         "#dandelion-object {"
     )]

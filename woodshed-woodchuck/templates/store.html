@@ -3,55 +3,20 @@
 {% block content %}
 <section class="shop-page" aria-labelledby="shop-scene-title">
   <h1 id="shop-scene-title" class="sr-only">Shop</h1>
-  <div class="shop-scene" aria-label="Interactive Shop with Sax Viking">
-    <img
-      class="shop-viking-art"
-      src="/static/img/shop-viking-valley-fair.png"
-      alt="Sax Viking welcoming you to the Shop"
-    />
-
-    <div class="shop-object-column shop-object-column-left" aria-label="Shop rewards and community">
-      <div id="dandelion-object" class="shop-scene-control shop-dandelion-control" aria-label="0 dandelions">
-        <span class="shop-control-emoji" aria-hidden="true">🌼</span>
-        <span class="sr-only">Dandelions</span>
-        <strong id="credits-value" class="shop-dandelion-count">0</strong>
-      </div>
-      <button class="shop-scene-control" type="button" data-shop-panel="crown" aria-label="Open Crown Progress">
-        <span class="shop-control-emoji" aria-hidden="true">👑</span><span class="sr-only">Crown Progress</span>
-      </button>
-      <button class="shop-scene-control" type="button" data-shop-panel="goat" aria-label="Open The GOAT Tracker">
-        <span class="shop-control-emoji" aria-hidden="true">🐐</span><span class="sr-only">The GOAT Tracker</span>
-      </button>
-      <button class="shop-scene-control" type="button" data-shop-panel="artist" aria-label="Open Artist instructions">
-        <span class="shop-control-emoji" aria-hidden="true">📬</span><span class="sr-only">Artist</span>
-      </button>
-      <button class="shop-scene-control" type="button" data-shop-panel="practice-room" aria-label="Open Practice Rooms">
-        <span class="shop-control-emoji" aria-hidden="true">🚪</span><span class="sr-only">Practice Rooms</span>
-      </button>
-    </div>
-
-    <div class="shop-object-column shop-object-column-right" aria-label="Shop shelves, sharing, and rooms">
-      <button class="shop-scene-control shop-shelf-control" type="button" data-shop-panel="gear" aria-label="Open Gear Shelf">
-        <span class="shop-control-emoji" aria-hidden="true">🎒</span><span class="sr-only">Gear Shelf</span>
-      </button>
-      <button class="shop-scene-control shop-shelf-control" type="button" data-shop-panel="little-buddy" aria-label="Open Little Buddy Shelf">
-        <span class="shop-control-emoji" aria-hidden="true">🐛</span><span class="sr-only">Little Buddy Shelf</span>
-      </button>
-      <button
-        class="shop-scene-control"
-        type="button"
-        data-shop-panel="share"
-        data-public-site-url="{{ public_site_url }}"
-        aria-label="Share Woodshed"
-      >
-        <span class="shop-control-emoji shop-share-arrow" aria-hidden="true">🔗</span><span class="sr-only">Share Woodshed</span>
-      </button>
-      <a class="shop-scene-control" href="/membership?as_account=student" aria-label="Unlock Full Access" title="Unlock Full Access">
-        <span class="shop-control-emoji" aria-hidden="true">🔑</span><span class="sr-only">Unlock Full Access</span>
-      </a>
-      <button class="shop-scene-control" type="button" data-shop-panel="practice-definition" aria-label="Open Practice Definition">
-        <span class="shop-control-emoji" aria-hidden="true">🗿</span><span class="sr-only">Practice Definition</span>
-      </button>
+  <div class="shop-scene artwork-scene shop-artwork-scene" aria-label="Interactive Shop">
+    <img class="room-scene-art shop-viking-art" src="/static/img/shop-viking-valley-fair.png" width="1024" height="1536" alt="Woodshed Shop" />
+    {% if woodchuck_appearance %}<div class="shop-student-character-layer" data-presentation-only><img data-student-woodchuck class="shop-student-character" src="{{ woodchuck_appearance.source }}" alt="Your Woodchuck" /></div>{% endif %}
+    <div id="shop-hotspots" class="scene-hotspots" aria-label="Shop room controls">
+      <button id="dandelion-object" class="scene-hotspot" data-scene-cell="L1" type="button" aria-label="Dandelions. Show balance."><span id="credits-value" hidden>0</span></button>
+      <button class="scene-hotspot" data-scene-cell="R1" type="button" data-shop-panel="gear" aria-label="Open Gear Shelf"></button>
+      <button class="scene-hotspot" data-scene-cell="L2" type="button" data-shop-panel="crown" aria-label="Open Crown Progress"></button>
+      <button class="scene-hotspot" data-scene-cell="R2" type="button" data-shop-panel="little-buddy" aria-label="Open Little Buddy Shelf"></button>
+      <button class="scene-hotspot" data-scene-cell="L3" type="button" data-shop-panel="goat" aria-label="Open The GOAT Tracker"></button>
+      <button class="scene-hotspot" data-scene-cell="R3" type="button" data-shop-panel="share" data-public-site-url="{{ public_site_url }}" aria-label="Share Woodshed"></button>
+      <button class="scene-hotspot" data-scene-cell="L4" type="button" data-shop-panel="artist" aria-label="Open Artist instructions"></button>
+      <a class="scene-hotspot" data-scene-cell="R4" href="/membership?as_account=student" aria-label="Premium"></a>
+      <button class="scene-hotspot" data-scene-cell="L5" type="button" data-shop-panel="practice-room" aria-label="Open Practice Rooms"></button>
+      <button class="scene-hotspot" data-scene-cell="R5" type="button" data-shop-panel="practice-definition" aria-label="Open Practice Definition"></button>
     </div>
   </div>
 
@@ -116,12 +81,12 @@
           <a class="practice-room-emoji-control practice-room-door" href="/practice/skill-building" aria-label="Open Skill Building Exercises" title="Skill Building Exercises"><span class="practice-room-door-tag">A</span><span class="practice-room-door-window" aria-hidden="true">♫</span><strong>Skill Building Exercises</strong></a>
           <a class="practice-room-emoji-control practice-room-door" href="/practice/pristine" aria-label="Open Pristine Practice" title="Pristine Practice"><span class="practice-room-door-tag">B</span><span class="practice-room-door-window" aria-hidden="true">🎙️</span><strong>Pristine P-Chart</strong></a>
           <a class="practice-room-emoji-control practice-room-door" href="/arcade" aria-label="Open Arcade Room" title="Arcade Room" data-world-entry="arcade"><span class="practice-room-door-tag">C</span><span class="practice-room-door-window" aria-hidden="true">🕹️</span><strong>Arcade Room</strong></a>
-          <a class="practice-room-emoji-control practice-room-door" href="https://brassspectrogram.netlify.app/" target="_blank" rel="noopener noreferrer" aria-label="Open Spectrogram" title="Brass Practice Tool"><span class="practice-room-door-tag">D</span><span class="practice-room-door-window" aria-hidden="true">🪊</span><strong>Spectrogram</strong></a>
+          <div class="practice-room-emoji-control practice-room-door" role="link" aria-disabled="true" aria-label="Room D. Spectrogram. Temporarily unavailable"><span class="practice-room-door-tag">D</span><span class="practice-room-door-window" aria-hidden="true">🪊</span><strong>Spectrogram</strong><span>Temporarily unavailable</span></div>
         </div>
       </section>
       <section data-shop-panel-content="artist" hidden>
-        <p>The Viking Sax would love to see your artwork of a woodchuck, the Viking Sax, or anything fun (please ask an adult before emailing your artwork). And feel free to email questions, concerns, and comments about this app, too.</p>
-        <p><a class="btn btn-secondary" href="{{ art_submission_mailto }}">Email artwork instructions</a></p>
+        <p>We’d love to see your artwork of a woodchuck, the Viking Sax, or anything fun! Please ask an adult before emailing your artwork. You can also email us with questions, concerns, comments, or support requests.</p>
+        <p><a class="btn btn-secondary" href="{{ art_submission_mailto }}">Email Woodshed Support</a></p>
       </section>
     </div>
   </dialog>

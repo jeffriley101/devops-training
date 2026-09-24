@@ -28,11 +28,7 @@ def test_shared_sound_controls_render_on_main_pages_except_shop() -> None:
     assert '<body class="main-app-page' in shop.text
     assert 'class="sound-effects-controls"' not in shop.text
 
-    assert (
-        '<body{% if page_class %} class="{{ page_class }}"{% endif %} '
-        'data-authenticated="{{ \'true\' if authenticated_profile else \'false\' }}">'
-        in BASE
-    )
+    assert 'data-authenticated="{{ \'true\' if authenticated_profile else \'false\' }}"' in BASE
     assert '{% if active_nav not in ("home", "store") %}' in BASE
     assert CSS.count(".main-app-page .sound-effects-controls") == 1
     assert ".woodshed-object-column-right > .shed-sound-effects-controls" in CSS
@@ -80,11 +76,11 @@ def test_shared_placement_keeps_page_content_and_accessibility_intact() -> None:
     assert 'id="total-p-charts-value"' not in templates["SHED"]
     assert 'id="p-book"' not in templates["SHED"]
     assert 'aria-label="Open Bulletin Board"' not in templates["SHED"]
-    assert 'class="sound-effects-controls shed-sound-effects-controls"' in templates["SHED"]
-    right = templates["SHED"][templates["SHED"].index("woodshed-object-column-right"):templates["SHED"].index("id=\"shed-decorate-panel\"")]
+    assert 'data-scene-cell="R5"' in templates["SHED"]
+    right = templates["SHED"]
     assert right.index('id="shed-team-button"') < right.index('id="sound-effects-button"')
     assert 'aria-label="Audio settings. Sound Effects On."' in templates["SHED"]
-    assert 'title="Audio settings. Sound Effects On."' in templates["SHED"]
+    assert 'id="sound-effects-close"' in templates["SHED"]
     assert "practice-timer" in templates["BOOK"] and "Submit" in templates["BOOK"]
     assert "Bonus Challenge" in templates["BOARD"] and "plunge-burrow-button" in templates["BOARD"]
     assert 'data-shop-panel-content="gear"' in templates["SHOP"]
@@ -95,47 +91,31 @@ def test_shared_placement_keeps_page_content_and_accessibility_intact() -> None:
 
 
 def test_mobile_shed_columns_center_controls_without_changing_their_vertical_flow() -> None:
-    mobile_start = CSS.index("/* Production mobile SHED 5×2 control grid. */")
-    mobile = CSS[mobile_start:]
-    assert "grid-template-rows: repeat(5, minmax(0, 1fr))" in mobile
-    assert "align-items: center" in mobile
-    assert "justify-items: center" in mobile
-    assert "align-self: center" in mobile
-    assert "justify-self: center" in mobile
+    layout = (ROOT / 'static/css/scene-hotspots.css').read_text()
+    assert 'grid-template-rows: repeat(5, 20%)' in layout
+    assert 'grid-template-columns: repeat(2, 50%)' in layout
+    assert 'gap: 0' in layout
+    assert 'width: 100%' in layout and 'height: 100%' in layout
 
 
 def test_production_mobile_shed_controls_use_shared_centered_lanes() -> None:
-    start = CSS.index("/* Production mobile SHED 5×2 control grid. */")
-    layout = CSS[start:]
-    app = (ROOT / "static/js/app.js").read_text(encoding="utf-8")
-    assert ".woodshed-foreground > .woodshed-object-column-left" in layout
-    assert ".woodshed-foreground > .woodshed-object-column-right" in layout
-    assert "top: 4% !important" in layout
-    assert "bottom: 4% !important" in layout
-    assert "width: 3.5rem" in layout
-    assert "grid-template-columns: minmax(0, 1fr)" in layout
-    assert "grid-template-rows: repeat(5, minmax(0, 1fr))" in layout
-    assert "stageShedGrid" not in app
-    assert "forceShedPositions" not in app
-    assert "function imp(" not in app
-    assert "el.style.setProperty" not in app
-
-    audio_panel_start = layout.index(".sound-effects-panel {")
-    audio_panel = layout[audio_panel_start:]
-    assert "right: calc(100% + 0.5rem)" in audio_panel
-    assert "bottom: 0" in audio_panel
-    assert "z-index: 7" in audio_panel
-    trigger = layout[layout.index("#sound-effects-button {"):audio_panel_start]
-    assert "z-index: 8" in trigger
+    layout = (ROOT / 'static/css/scene-hotspots.css').read_text()
+    app = (ROOT / 'static/js/app.js').read_text()
+    assert '100dvh - var(--room-nav-height)' in layout
+    assert 'safe-area-inset-bottom' in layout
+    assert 'stageShedGrid' not in app and 'forceShedPositions' not in app
+    panel = layout.split('body.artwork-room-page [data-room-panel] {')[1].split('}')[0]
+    assert 'position: fixed' in panel and 'overflow: auto' in panel
+    assert 'width: min(30rem, calc(100% - 1.5rem))' in layout
 
 
-def test_shed_audio_control_uses_headphones_while_preserving_settings_behavior() -> None:
+def test_shed_audio_cell_preserves_settings_behavior_without_emoji() -> None:
     home = (ROOT / "templates/home.html").read_text(encoding="utf-8")
     audio = (ROOT / "static/js/audio.js").read_text(encoding="utf-8")
 
     assert 'id="sound-effects-button"' in home
-    assert ">🎧</button>" in home
-    assert 'button.textContent = "🎧"' in audio
+    assert '🎧' not in home
+    assert 'if (button.dataset.sceneCell) button.textContent = ""' in audio
     assert 'Sound Effects ${enabled ? "On" : "Off"}' in audio
     assert "const opening = panel.hidden" in audio
     assert "panel.hidden = !opening" in audio
@@ -143,23 +123,14 @@ def test_shed_audio_control_uses_headphones_while_preserving_settings_behavior()
     assert 'event.key === "Escape" && !panel.hidden' in audio
 
 
-def test_shed_and_shop_interactive_emojis_share_layout_safe_pop_feedback() -> None:
-    pop = CSS[CSS.index(".room-object,"):CSS.index(".room-object:focus-visible")]
-
-    for selector in (
-        ".room-object",
-        ".shed-icon-object",
-        ".xp-level-control",
-        ".shed-readout-level",
-        ".shed-sound-effects-controls .sound-effects-button",
-        ".shop-scene-control",
-    ):
-        assert selector in pop
-    assert "transition:" in pop and "scale 150ms ease" in pop
-    assert "scale: 1.1" in pop
-    assert "scale: 1.16" in pop
-    assert "):active:not(:disabled)" in pop
-    assert ".shed-decoration" not in pop
+def test_artwork_cells_do_not_move_or_reveal_emoji_controls() -> None:
+    layout = (ROOT / 'static/css/scene-hotspots.css').read_text()
+    cell = layout.split('#shop-hotspots > .scene-hotspot {')[1].split('}')[0]
+    assert 'background: transparent' in cell
+    assert 'scale: none' in cell and 'transform: none !important' in cell
+    assert 'border: 0' in cell and 'margin: 0' in cell and 'padding: 0' in cell
+    assert 'font-size: 0' in cell
+    assert '.scene-hotspot:focus-visible' in layout
 
 
 def test_utility_pages_do_not_receive_main_page_positioning() -> None:

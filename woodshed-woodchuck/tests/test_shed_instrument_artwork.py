@@ -1,19 +1,9 @@
-from base64 import b64encode
 import hashlib
-import json
 from pathlib import Path
 import re
 
-from fastapi.testclient import TestClient
-from itsdangerous import TimestampSigner
 import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 
-from app import main as main_module
-from app.account_routes import SESSION_PROFILE_ID
-from app.db import Base
 from app.instruments import (
     INSTRUMENT_OPTIONS,
     SHED_ARTWORK_BY_INSTRUMENT_KEY,
@@ -22,7 +12,7 @@ from app.instruments import (
     shed_artwork_url,
     shed_character_url,
 )
-from app.models import WoodchuckProfile
+from test_world_entry import client, login
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -46,7 +36,7 @@ CHARACTER_ART = {
     "Vocals": "/static/img/woodchuck-vocals.png",
 }
 CHARACTER_FREE_CABIN_SHA256 = (
-    "4a238ad9914ad0b103c1a08501bfb372ca05fbccc03b737f05e5e75873465721"
+    "2c5f1fb36ede596e79db7a81e92cf4ab66170cf264ee6441de6f937e7e861603"
 )
 INSTRUMENT_ART = {
     "Flute": "/static/img/shed/instruments/flute.png",
@@ -111,51 +101,25 @@ def test_character_fallback_never_uses_flattened_scene_artwork():
 
 @pytest.mark.parametrize(("instrument", "character"), CHARACTER_ART.items())
 def test_home_renders_character_separately_from_fixed_cabin(
-    monkeypatch, instrument, character,
+    client, instrument, character,
 ):
-    engine = create_engine(
-        "sqlite://",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    Base.metadata.create_all(engine)
-    sessions = sessionmaker(bind=engine, expire_on_commit=False)
-    with sessions() as session:
-        profile = WoodchuckProfile(
-            woodchuck_id=f"WC-SHED-{instrument.upper()}",
-            display_name="SHED Character Test",
-            pin_hash="private",
-            instrument=instrument,
-            level="Beginner",
-            goal="Practice",
-        )
-        session.add(profile)
-        session.commit()
-        profile_id = profile.id
-
-    monkeypatch.setattr(main_module, "SessionLocal", sessions)
-    session_data = b64encode(json.dumps({SESSION_PROFILE_ID: profile_id}).encode())
-    session_cookie = TimestampSigner(str(main_module.SESSION_SECRET)).sign(
-        session_data
-    ).decode()
-    client = TestClient(main_module.app)
-    client.cookies.set("session", session_cookie)
-    response = client.get("/home")
+    login(client)
+    result = client.patch('/account/appearance', json={
+        'instrument': instrument, 'hoodie': 'blue', 'hat': 'green'})
+    assert result.status_code == 200
+    response = client.get('/home')
 
     assert response.status_code == 200
     character_src = re.search(
-        r'class="character-art woodshed-character-art"\s+src="([^"]+)"',
+        r'class="character-art woodshed-character-art" data-student-woodchuck\s+src="([^"]+)"',
         response.text,
     )
     assert character_src is not None
     assert character_src.group(1) == character
     assert character_src.group(1) not in INSTRUMENT_ART.values()
     assert character_src.group(1) != "/static/img/shed-cabin-new.png"
-    assert (
-        'class="woodshed-scene" aria-label="Interactive Woodshed room" '
-        'style="background-image: url(\'/static/img/shed-cabin-new.png\');"'
-        in response.text
-    )
+    assert 'class="room-scene-art" src="/static/img/shed-cabin-new.png"' in response.text
+
 
 
 def test_selected_artwork_is_wired_only_to_the_shed():
@@ -169,23 +133,16 @@ def test_selected_artwork_is_wired_only_to_the_shed():
     assert "shed_character_url(profile.instrument)" in main
     assert "shed_cabin_background_url=shed_artwork_url(None)" in main
     assert "shed_character_url=character_url" in main
-    assert (
-        'style="background-image: url(\'{{ shed_cabin_background_url }}\');"'
-        in home
-    )
+    assert 'src="{{ shed_cabin_background_url }}"' in home
     assert 'src="{{ shed_character_url }}"' in home
     assert 'src="{{ shed_artwork_url }}"' not in home
-    assert "background-position: center" in css
-    assert "background-size: cover" in css
-    instrument_switch = account_js[
-        account_js.index("function wireInstrumentChange"):
-        account_js.index("function wireProfileChange")
-    ]
-    assert "payload.shed_character_url" in instrument_switch
-    assert 'document.querySelector(".woodshed-character-art")' in instrument_switch
-    assert "character.src = payload.shed_character_url" in instrument_switch
-    assert "woodshed-scene" not in instrument_switch
-    assert "backgroundImage" not in instrument_switch
+    scene_css = (ROOT / 'static/css/scene-hotspots.css').read_text()
+    assert 'object-fit: contain' in scene_css
+    assert 'aspect-ratio: var(--art-width) / var(--art-height)' in scene_css
+    shared = (ROOT / "static/js/woodchuck-appearance.js").read_text()
+    assert "[data-student-woodchuck]" in shared
+    assert "data-student-woodchuck" in store
+    assert "backgroundImage" not in shared
     assert "/static/img/shed-cabin-new.png" in css
     assert "/static/img/woodchuck-home.png" not in css
     assert "/static/img/shed-cabin-new.png" not in store

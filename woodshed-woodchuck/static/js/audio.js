@@ -183,6 +183,7 @@
   }
 
   function playGoat() {
+    if (document.hidden || requiresGesture) return false;
     const readyPlayers = goatPlayers.filter(function (player) {
       return player && player.loaded === true;
     });
@@ -236,6 +237,7 @@
     try {
       if (context.state !== "running" && typeof context.resume === "function") {
         Promise.resolve(context.resume()).then(function () {
+          if (document.hidden || requiresGesture) { suspendAudio(); return; }
           if (!audioContextIsRunning()) return;
           unlocked = true;
           buildGraph();
@@ -270,7 +272,11 @@
     return true;
   }
 
+  let audioGeneration = 0;
+  let requiresGesture = false;
   function unlock() {
+    if (document.hidden || requiresGesture) return Promise.resolve(false);
+    const generation = audioGeneration;
     if (unlocked && audioContextIsRunning()) return Promise.resolve(true);
     if (!window.Tone || typeof window.Tone.start !== "function") {
       unlocked = false;
@@ -289,6 +295,7 @@
     unlockPending = Promise.resolve(startResult)
       .catch(function () { return false; })
       .then(async function () {
+        if (document.hidden || generation !== audioGeneration) { suspendAudio(); return false; }
         const context = toneAudioContext();
         if (
           context && context.state !== "running" &&
@@ -296,6 +303,7 @@
         ) {
           try { await context.resume(); } catch (_error) { return false; }
         }
+        if (document.hidden || generation !== audioGeneration) { suspendAudio(); return false; }
         return markAudioReady();
       })
       .finally(function () { unlockPending = null; });
@@ -323,6 +331,7 @@
   }
 
   function play(name) {
+    if (document.hidden) return false;
     if (!enabled || !EFFECT_NAMES.includes(name)) return false;
     if (!unlocked || !audioContextIsRunning() || !graph) {
       unlock().then(function (ready) {
@@ -455,7 +464,8 @@
     const slider = document.getElementById("sound-effects-volume");
     const value = document.getElementById("sound-effects-volume-value");
     if (button) {
-      button.textContent = "🎧";
+      if (button.dataset.sceneCell) button.textContent = "";
+      else button.textContent = "🎧";
       button.setAttribute("aria-label", `Audio settings. Sound Effects ${enabled ? "On" : "Off"}.`);
       button.title = `Audio settings. Sound Effects ${enabled ? "On" : "Off"}.`;
     }
@@ -483,6 +493,11 @@
       button.setAttribute("aria-expanded", String(opening));
       if (opening) toggle.focus();
     });
+    document.getElementById("sound-effects-close")?.addEventListener("click", function () {
+      panel.hidden = true;
+      button.setAttribute("aria-expanded", "false");
+      button.focus();
+    });
     toggle.addEventListener("change", function () { setEnabled(toggle.checked); });
     slider.addEventListener("input", function () { setVolume(Number(slider.value) / 100); });
     document.addEventListener("keydown", function (event) {
@@ -505,6 +520,8 @@
   }
 
   function gestureUnlock(event) {
+    if (document.hidden) return;
+    requiresGesture = false;
     if (event.type === "keydown" && event.isComposing) return;
     if (isDedicatedMediaGesture(event)) return;
     unlock().catch(function () {});
@@ -515,13 +532,14 @@
   }
 
   function playPianoPitch(frequency, duration) {
+    if (document.hidden) return false;
     const pitch = Number(frequency);
     const noteDuration = Number.isFinite(Number(duration)) && Number(duration) > 0
       ? Number(duration) : 0.42;
     if (!enabled || !Number.isFinite(pitch) || pitch <= 0) return false;
     function trigger() {
       const current = buildGraph();
-      if (!current) return false;
+      if (!current || document.hidden || requiresGesture) return false;
       current.piano.triggerAttackRelease(pitch, noteDuration);
       return true;
     }
@@ -534,7 +552,16 @@
   document.addEventListener("touchend", gestureUnlock, true);
   document.addEventListener("click", gestureUnlock, true);
   document.addEventListener("keydown", gestureUnlock, true);
-  document.addEventListener("visibilitychange", refreshAudioState);
+  function suspendAudio() {
+    audioGeneration++; requiresGesture = true;
+    unlocked = false;
+    goatPlayPending = false;
+    goatPlayers.forEach(player => { try { player.stop(); } catch (_) {} });
+    const context = toneAudioContext();
+    if (context && context.state === "running" && typeof context.suspend === "function") void context.suspend();
+  }
+  if (window.WWLifecycle) window.WWLifecycle.onBackground(suspendAudio);
+  else document.addEventListener("visibilitychange", () => { if (document.hidden) suspendAudio(); });
   window.addEventListener("pageshow", refreshAudioState);
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", wireControls, { once: true });
   else wireControls();

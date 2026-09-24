@@ -23,16 +23,25 @@
 
   // Discard the superseded per-login display state; daily state survives logout.
   remove("woodshed:arcade-entry:v1");
+  let finishArrival;
+  const arrivalReady = new Promise(resolve => { finishArrival = resolve; });
+  window.WWWorldEntry = Object.freeze({arrivalReady});
+  let arriving = false;
   // The destination fades in only after our navigation, never on ordinary visits.
   try {
     const arrival = JSON.parse(read(arrivalKey));
     remove(arrivalKey);
     if (authenticated && arrival && arrival.account === account &&
         arrival.path === window.location.pathname && arrival.expires > Date.now()) {
+      arriving = true;
       document.body.classList.add("world-entry-arrival");
-      window.setTimeout(() => document.body.classList.remove("world-entry-arrival"), 220);
+      window.setTimeout(() => {
+        document.body.classList.remove("world-entry-arrival");
+        finishArrival();
+      }, reduced() ? 0 : 220);
     }
   } catch (_) { remove(arrivalKey); }
+  if (!arriving) finishArrival();
 
   if (authenticated && document.querySelector('[data-world-entry="arcade"]')) {
     const preload = new Image();
@@ -57,6 +66,14 @@
   window.addEventListener("ww:session-changed", () => { retired = true; reset(); });
 
   function start(link, kind, day) {
+    // Warm only public assets while the approved flight plays. Fetching the
+    // authenticated destination would duplicate GET side effects and must not
+    // cache private HTML. The actual document remains a normal navigation.
+    if (kind === "woodshed") {
+      ["/static/img/shed-cabin-new.png"].forEach(src => { const image = new Image(); image.src = src; });
+      const warm = document.createElement("link"); warm.rel = "preload"; warm.as = "script";
+      warm.href = "/static/js/tuner.js?v=2"; document.head?.appendChild(warm);
+    }
     const overlay = document.createElement("dialog");
     overlay.className = `world-entry-overlay world-entry-${kind}`;
     overlay.setAttribute("aria-label", kind === "arcade"

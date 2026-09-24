@@ -34,23 +34,16 @@ def test_secret_period_is_plain_red_with_transparent_hit_target_and_unchanged_fl
     assert 'feedback.textContent = payload.redeemed ? "+20 dandelions"' in javascript
 
 
-def test_secret_period_is_a_scene_anchored_safe_area_bottom_control() -> None:
-    css = source("static/css/styles.css")
+def test_secret_period_is_separate_from_the_ten_artwork_cells() -> None:
+    from test_r4a_artwork import cells
     home = source("templates/home.html")
-    scene = home[
-        home.index('<div class="woodshed-scene"'):
-        home.index('<div class="woodshed-foreground"')
-    ]
-    assert 'id="shed-secret-button"' in scene
-    assert ".woodshed-scene > .shed-secret-button {" in css
-    rule_start = css.index(".woodshed-scene > .shed-secret-button {")
-    secret_rule = css[rule_start:css.index("}", rule_start)]
-    assert "position: absolute" in secret_rule
-    assert "bottom: max(0.45rem, env(safe-area-inset-bottom))" in secret_rule
-    assert "left: max(0.45rem, env(safe-area-inset-left))" in secret_rule
-    assert "color: #d7263d" in secret_rule
-    assert "position: fixed" not in secret_rule
-
+    css = source("static/css/scene-hotspots.css")
+    assert all(a.get('id') != 'shed-secret-button' for _, a in cells(home))
+    assert home.index('id="shed-secret-button"') > home.index('id="sound-effects-button"')
+    rule = css.split('.artwork-room-page .shed-secret-button {')[1].split('}')[0]
+    assert 'display: block' in rule
+    assert 'position: fixed' not in rule and 'position: absolute' not in rule
+    assert 'color: #d7263d' in rule
 
 
 def test_level_control_is_centered_with_full_accessible_dynamic_label() -> None:
@@ -62,8 +55,9 @@ def test_level_control_is_centered_with_full_accessible_dynamic_label() -> None:
     assert 'aria-controls="change-level-panel"' in home
     control_start = home.index('id="level-value"')
     control = home[control_start:home.index("</button>", control_start)]
-    assert "🏅" in control
-    assert 'class="room-object shed-profile-field"' in control
+    assert 'data-scene-cell="R2"' in control
+    assert "🏅" not in control
+    assert 'class="scene-hotspot"' in control
     assert "`Level: ${profileLevel}. Change level.`" in javascript
     hydrate = javascript[javascript.index("function hydrateHome"):javascript.index("function wireXpPanel")]
     assert "levelEl.textContent" not in hydrate
@@ -73,7 +67,7 @@ def test_shop_dandelion_count_is_hidden_unboxed_and_uses_shared_hydration() -> N
     store = source("templates/store.html")
     css = source("static/css/styles.css")
     javascript = source("static/js/app.js")
-    assert '<strong id="credits-value" class="shop-dandelion-count">0</strong>' in store
+    assert '<span id="credits-value" hidden>0</span>' in store
     assert 'id="dandelion-object"' in store
     control = css[css.index(".shop-dandelion-control"):css.index(".shop-dandelion-count")]
     count = css[css.index(".shop-dandelion-count"):css.index("#dandelion-object")]
@@ -125,9 +119,9 @@ def test_bonus_progress_action_is_an_accessible_gold_stereo_dial() -> None:
 
 
 def test_fixed_artist_mailto_has_no_private_fields() -> None:
-    assert ART_SUBMISSION_EMAIL == "woodshedwoodchuck@gmail.com"
+    assert ART_SUBMISSION_EMAIL == "support@woodshedwoodchuck.com"
     assert main.art_submission_mailto() == (
-        "mailto:woodshedwoodchuck@gmail.com?subject=Woodshed%20Woodchuck%20Artwork"
+        "mailto:support@woodshedwoodchuck.com"
     )
     rendered = TestClient(main.app).get("/store").text
     assert main.art_submission_mailto() in rendered

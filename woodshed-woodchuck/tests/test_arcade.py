@@ -112,8 +112,10 @@ def test_practice_room_destinations_are_preserved_as_four_doors() -> None:
         STORE.index('data-shop-panel-content="artist"')
     ]
     assert practice.count('class="practice-room-emoji-control practice-room-door"') == 4
-    assert 'href="https://brassspectrogram.netlify.app/"' in practice
-    assert 'target="_blank" rel="noopener noreferrer"' in practice
+    assert "brassspectrogram.netlify.app" not in practice
+    assert 'aria-disabled="true"' in practice
+    assert "Temporarily unavailable" in practice
+    assert 'target="_blank"' not in practice
     assert 'href="/practice/pristine" aria-label="Open Pristine Practice"' in practice
     assert "<small>Coming Soon</small>" not in practice
     assert 'href="/arcade" aria-label="Open Arcade Room"' in practice
@@ -180,7 +182,7 @@ def test_arcade_room_renders_nine_touch_friendly_cabinets() -> None:
 def test_arcade_pages_route_game_specific_soundtracks() -> None:
     assert '/static/js/arcade-soundtrack.js' not in ARCADE
     for template in (GAME, PLUNGE, SCALE, HISTORY, WHEEL, THIRDS, NINES, INTERVAL):
-        assert '/static/js/arcade-soundtrack.js?v=8' in template
+        assert '/static/js/arcade-soundtrack.js?v=9' in template
     assert 'data-arcade-soundtrack="{{ arcade_game.key }}"' in GAME
     assert 'data-arcade-soundtrack="plunge-burrow"' in PLUNGE
     assert 'data-arcade-soundtrack="scale-keyboard"' in SCALE

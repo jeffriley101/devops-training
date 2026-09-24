@@ -1,0 +1,16 @@
+{% if woodchuck_appearance %}
+<dialog id="your-woodchuck" class="woodchuck-editor" aria-labelledby="woodchuck-editor-title">
+  <form id="woodchuck-editor-form">
+    <h2 id="woodchuck-editor-title">Your Woodchuck</h2>
+    <label for="woodchuck-instrument">Instrument</label>
+    <select id="woodchuck-instrument" name="instrument">{% for item in instruments %}<option value="{{ item }}">{{ item }}</option>{% endfor %}</select>
+    <p id="woodchuck-legacy-instrument" hidden></p>
+    <p>Changing instruments will not erase your practice history or rewards.</p>
+    <label for="woodchuck-hoodie">Hoodie Color</label><select id="woodchuck-hoodie" name="hoodie"></select>
+    <label for="woodchuck-hat">Hat Color</label><select id="woodchuck-hat" name="hat"></select>
+    <p>More colors are available with Premium. Instrument choice is always available.</p>
+    <p id="woodchuck-editor-status" role="status" aria-live="polite"></p>
+    <div class="button-row"><button type="submit">Save</button><button type="button" data-surface-close>Close</button></div>
+  </form>
+</dialog>
+{% endif %}

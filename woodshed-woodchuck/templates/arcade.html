@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block dashboard_styles %}<link rel="stylesheet" href="/static/css/arcade-art.css?v=3">{% endblock %}
+{% block dashboard_styles %}<link rel="stylesheet" href="/static/css/arcade-art.css?v=6">{% endblock %}
 
 {% block content %}
 <section class="arcade-room" aria-label="Arcade">
@@ -8,7 +8,7 @@
     <a class="btn btn-secondary" href="/store">Back to SHOP</a>
   </header>
 
-  <p>Balance: <output data-arcade-balance>—</output> Dandelions. Full Access includes free normal Arcade play. Purchased attempts do not expire.</p>
+  <p>Balance: <output data-arcade-balance>—</output> Dandelions. Premium includes free normal Arcade play. Purchased attempts do not expire.</p>
   <p>History Mystery: one quiz per Central day; unused purchased attempts carry over.</p>
   <div class="arcade-cabinet-grid">
     <article class="arcade-cabinet arcade-cabinet-plunge">
@@ -152,6 +152,17 @@
     </article>
   </div>
 
+  <section class="rhythm-baseball-feature" aria-labelledby="rhythm-baseball-title">
+    <h2 id="rhythm-baseball-title">RHYTHM BASEBALL</h2>
+    <section class="rhythm-baseball-standings" aria-labelledby="rhythm-baseball-top-five">
+      <h3 id="rhythm-baseball-top-five">TOP 5</h3>
+      <p>Coming soon. Standings will appear when Rhythm Baseball launches.</p>
+    </section>
+    <figure>
+      <img class="rhythm-baseball-cabinet" src="/static/img/rhythm-baseball-cabinet.png" width="1024" height="1536" loading="lazy" alt="Rhythm Baseball arcade cabinet — coming soon" />
+      <figcaption>Featured upcoming game. Gameplay is not available yet.</figcaption>
+    </figure>
+  </section>
 </section>
 {% endblock %}
 

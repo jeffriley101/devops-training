@@ -106,15 +106,18 @@
     frameId = window.requestAnimationFrame(monitor);
   }
 
+  let captureGeneration = 0;
   async function stopMicrophone() {
+    captureGeneration++;
     if (frameId !== null) window.cancelAnimationFrame(frameId);
     frameId = null;
     if (stream) stream.getTracks().forEach(function (track) { track.stop(); });
     stream = null;
     analyser = null;
     samples = null;
-    if (audioContext) await audioContext.close().catch(function () {});
+    const closingContext = audioContext;
     audioContext = null;
+    if (closingContext) await closingContext.close().catch(function () {});
   }
 
   function resetSession() {
@@ -136,10 +139,12 @@
   }
 
   async function startSession() {
+    if (document.hidden || startButton.disabled || submitting) return;
     if (root.dataset.authenticated !== "true") {
       feedback.textContent = "Sign in before starting Pristine Practice.";
       return;
     }
+    const generation = captureGeneration;
     startButton.disabled = true;
     retryButton.hidden = true;
     feedback.textContent = "";
@@ -147,7 +152,7 @@
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         throw new Error("This browser cannot use a microphone for Pristine Practice.");
       }
-      stream = await navigator.mediaDevices.getUserMedia({
+      const acquired = await navigator.mediaDevices.getUserMedia({
         audio: {
           autoGainControl: false,
           echoCancellation: false,
@@ -155,10 +160,16 @@
         },
         video: false,
       });
+      if (generation !== captureGeneration || document.hidden) {
+        acquired.getTracks().forEach(track => track.stop());
+        return;
+      }
+      stream = acquired;
       const AudioContextClass = window.AudioContext || window.webkitAudioContext;
       if (!AudioContextClass) throw new Error("Web Audio is unavailable in this browser.");
       audioContext = new AudioContextClass();
       await audioContext.resume();
+      if (generation !== captureGeneration || document.hidden) return;
       const source = audioContext.createMediaStreamSource(stream);
       analyser = audioContext.createAnalyser();
       analyser.fftSize = 1024;
@@ -175,6 +186,7 @@
       render(timer.snapshot());
       frameId = window.requestAnimationFrame(monitor);
     } catch (error) {
+      if (generation !== captureGeneration) return;
       await stopMicrophone();
       sessionStarted = false;
       microphoneOutput.textContent = "Microphone unavailable";
@@ -236,6 +248,7 @@
     await startSession();
   });
   pauseButton.addEventListener("click", function () {
+    if (!stream) { feedback.textContent = "Microphone stopped. Finish this session before starting another."; return; }
     const now = performance.now();
     const state = timer.snapshot().paused ? timer.resume(now) : timer.pause(now);
     render(state);
@@ -262,6 +275,17 @@
     }
     await startSession();
   });
-  window.addEventListener("pagehide", function () { void stopMicrophone(); });
+  function backgroundPractice() {
+    const wasActive = stream || startButton.disabled;
+    if (sessionStarted && !timer.snapshot().done) render(timer.pause(performance.now()));
+    void stopMicrophone();
+    if (!wasActive || submitting || saved) return;
+    if (!hasUnsavedPractice()) resetSession();
+    microphoneOutput.textContent = "Microphone stopped. Return to the tool to start a new session.";
+    feedback.textContent = "Capture stopped in the background. Your practice has not been saved automatically.";
+    // Existing captured work remains available to finish/save explicitly.
+  }
+  if (window.WWLifecycle) window.WWLifecycle.onBackground(backgroundPractice);
+  else window.addEventListener("pagehide", backgroundPractice);
   resetSession();
 }());

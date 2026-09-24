@@ -2,166 +2,33 @@
 
 {% block content %}
 <section class="card woodshed-page">
-  <div class="woodshed-scene" aria-label="Interactive Woodshed room" style="background-image: url('{{ shed_cabin_background_url }}');">
-    <button id="shed-secret-button" class="shed-secret-button" type="button" aria-controls="shed-secret-panel" aria-expanded="false" aria-label="Open secret passcode">.</button>
-    <div class="woodshed-character-layer" aria-label="Woodchuck holding selected instrument">
-      <img
-        class="character-art woodshed-character-art"
-        src="{{ shed_character_url }}"
-        alt="Woodchuck"
-      />
+  <div class="woodshed-scene artwork-scene shed-artwork-scene" aria-label="Interactive Woodshed room">
+    <img class="room-scene-art" src="{{ shed_cabin_background_url }}" width="941" height="1672" alt="The Woodshed room" />
+    <div class="woodshed-character-layer" data-presentation-only aria-label="Your Woodchuck">
+      <img class="character-art woodshed-character-art" data-student-woodchuck src="{{ shed_character_url }}" alt="Your Woodchuck" />
     </div>
-
     <div id="shed-decoration-layer" class="shed-decoration-layer" aria-label="Placed SHED decorations"></div>
-
-    <div class="woodshed-foreground" aria-label="Clickable Woodshed objects">
-      <div class="woodshed-object-column woodshed-object-column-left">
-        <button
-          id="woodchuck-name-value"
-          class="shed-readout shed-readout-name shed-profile-field"
-          type="button"
-          aria-controls="change-name-panel"
-          aria-expanded="false"
-          aria-label="Change Woodchuck name"
-          title="Change Woodchuck name"
-        >
-          Name your Woodchuck
-        </button>
-
-        <button
-          id="instrument-object"
-          class="shed-icon-object shed-profile-field"
-          type="button"
-          aria-controls="change-instrument-panel"
-          aria-expanded="false"
-          aria-label="Change instrument"
-          title="Change instrument"
-        >
-          ♪
-        </button>
-
-        <button
-          id="xp-level-control"
-          class="xp-level-control"
-          type="button"
-          aria-controls="xp-panel"
-          aria-expanded="false"
-          aria-label="XP Level. Loading."
-          title="XP Level"
-        >
-          <span class="xp-level-symbol" aria-hidden="true">⭐</span>
-          <span id="xp-level-number" class="sr-only">1</span>
-        </button>
-
-        <button
-          id="shed-decorate-button"
-          class="room-object shed-decorate-button"
-          type="button"
-          aria-controls="shed-decorate-panel"
-          aria-expanded="false"
-          aria-label="Open Stickerbook"
-          title="Stickerbook"
-        >
-          <span class="room-object-icon" aria-hidden="true">🎨</span>
-        </button>
-
-        <button
-          id="mum-open-button"
-          class="room-object chair-object"
-          type="button"
-          aria-label="Visit Mum's chair"
-          aria-controls="mum-panel"
-          aria-expanded="false"
-          title="Mum's Chair"
-        >
-          <span class="room-object-icon" aria-hidden="true">🪑</span>
-        </button>
-      </div>
-
-      <div
-        class="woodshed-object-column woodshed-object-column-center"
-        aria-hidden="true"
-      ></div>
-
-      <div class="woodshed-object-column woodshed-object-column-right">
-        <button id="shed-team-button" class="room-object dandelion-object" type="button" aria-controls="shed-team-panel" aria-expanded="false" aria-label="Choose a team" title="Choose a team">
-          <span id="shed-team-emblem" class="room-object-icon" aria-hidden="true">⬡</span>
-        </button>
-
-        <button
-          id="level-value"
-          class="room-object shed-profile-field"
-          type="button"
-          aria-controls="change-level-panel"
-          aria-expanded="false"
-          aria-label="Change student level"
-          title="Change student level"
-        >
-          <span class="room-object-icon" aria-hidden="true">🏅</span>
-        </button>
-
-        <button
-          id="metronome-open-button"
-          class="room-object metronome-object"
-          type="button"
-          aria-label="Open metronome"
-          aria-controls="metronome-panel"
-          aria-expanded="false"
-          title="Metronome"
-        >
-          <span class="room-object-icon" aria-hidden="true">🕰️</span>
-        </button>
-
-        <button
-          id="tuner-open-button"
-          class="room-object tuner-object"
-          type="button"
-          aria-label="Open tuner"
-          aria-controls="tuner-panel"
-          aria-expanded="false"
-          title="Tuner"
-        >
-          <span class="room-object-icon" aria-hidden="true">🔱</span>
-        </button>
-
-        <div class="sound-effects-controls shed-sound-effects-controls">
-          <button id="sound-effects-button" class="sound-effects-button" type="button" aria-label="Audio settings. Sound Effects On." title="Audio settings. Sound Effects On." aria-controls="sound-effects-panel" aria-expanded="false">🎧</button>
-          <div id="sound-effects-panel" class="sound-effects-panel" hidden>
-            <label class="sound-effects-toggle" for="sound-effects-enabled">
-              <span>Sound Effects</span>
-              <input id="sound-effects-enabled" type="checkbox" checked />
-            </label>
-            <label for="sound-effects-volume">Volume <output id="sound-effects-volume-value" for="sound-effects-volume">35%</output></label>
-            <input id="sound-effects-volume" type="range" min="0" max="100" step="1" value="35" aria-label="Sound Effects volume" aria-valuetext="35 percent" />
-          </div>
-        </div>
-      </div>
+    <div id="woodshed-hotspots" class="scene-hotspots" aria-label="Woodshed room controls">
+      <button id="woodchuck-name-value" class="scene-hotspot" data-scene-cell="L1" type="button" aria-controls="change-name-panel" aria-expanded="false" aria-label="Change Woodchuck name"></button>
+      <button id="shed-team-button" class="scene-hotspot" data-scene-cell="R1" type="button" aria-controls="shed-team-panel" aria-expanded="false" aria-label="Choose a team"><span id="shed-team-emblem" hidden></span></button>
+      <button id="instrument-object" class="scene-hotspot" data-scene-cell="L2" type="button" aria-controls="your-woodchuck" aria-expanded="false" aria-label="Your Woodchuck: instrument, hoodie and hat colors"></button>
+      <button id="level-value" class="scene-hotspot" data-scene-cell="R2" type="button" aria-controls="change-level-panel" aria-expanded="false" aria-label="Change student level"></button>
+      <button id="xp-level-control" class="scene-hotspot" data-scene-cell="L3" type="button" aria-controls="xp-panel" aria-expanded="false" aria-label="Open XP and Daily Login Streak"><span id="xp-level-number" hidden>1</span></button>
+      <button id="metronome-open-button" class="scene-hotspot" data-scene-cell="R3" type="button" aria-controls="metronome-panel" aria-expanded="false" aria-label="Open metronome"></button>
+      <button id="shed-decorate-button" class="scene-hotspot" data-scene-cell="L4" type="button" aria-controls="shed-decorate-panel" aria-expanded="false" aria-label="Open Stickerbook"></button>
+      <button id="tuner-open-button" class="scene-hotspot" data-scene-cell="R4" type="button" aria-controls="tuner-panel" aria-expanded="false" aria-label="Open tuner"></button>
+      <button id="mum-open-button" class="scene-hotspot" data-scene-cell="L5" type="button" aria-controls="mum-panel" aria-expanded="false" aria-label="Visit Mum"></button>
+      <button id="sound-effects-button" class="scene-hotspot" data-scene-cell="R5" type="button" aria-controls="sound-effects-panel" aria-expanded="false" aria-label="Audio settings. Sound Effects On."></button>
     </div>
-
   </div>
 
-  <section id="login-streak-card" class="login-streak-card" aria-labelledby="login-streak-title">
-    <div class="login-streak-summary">
-      <span class="login-streak-icon" aria-hidden="true">🔥</span>
-      <div>
-        <h2 id="login-streak-title">Day <span id="login-streak-days">—</span> Login Streak</h2>
-        <p id="login-streak-status" role="status" aria-live="polite">Checking today’s streak…</p>
-      </div>
-    </div>
-    <div class="login-streak-crown-progress">
-      <span aria-hidden="true">👑</span>
-      <progress id="login-streak-progress" max="7" value="0" aria-label="Progress toward the next weekly streak crown">0 of 7 days</progress>
-      <span id="login-streak-progress-text">0 / 7</span>
-    </div>
-  </section>
+    <button id="shed-secret-button" class="shed-secret-button" type="button" aria-controls="shed-secret-panel" aria-expanded="false" aria-label="Open secret passcode">.</button>
 
-  <section id="shed-decorate-panel" class="mentor-card shed-decorate-panel hidden" hidden aria-labelledby="shed-stickerbook-title">
-    <div class="shed-decorate-panel-head">
-      <h2 id="shed-stickerbook-title">Stickerbook</h2>
-      <button id="shed-decorate-close" class="shed-decorate-close" type="button" aria-label="Close Decorate mode">×</button>
-    </div>
-    <div id="shed-decoration-inventory" class="shed-decoration-inventory" aria-live="polite"></div>
-    <p id="shed-decoration-feedback" class="sr-only" role="status" aria-live="polite"></p>
+  <section id="sound-effects-panel" class="sound-effects-panel" hidden aria-label="Audio settings">
+    <button id="sound-effects-close" class="btn btn-secondary" type="button">Close audio settings</button>
+    <label class="sound-effects-toggle" for="sound-effects-enabled"><span>Sound Effects</span><input id="sound-effects-enabled" type="checkbox" checked /></label>
+    <label for="sound-effects-volume">Volume <output id="sound-effects-volume-value" for="sound-effects-volume">35%</output></label>
+    <input id="sound-effects-volume" type="range" min="0" max="100" step="1" value="35" aria-label="Sound Effects volume" aria-valuetext="35 percent" />
   </section>
 
   <section id="xp-panel" class="mentor-card xp-panel hidden" hidden aria-labelledby="xp-panel-title">
@@ -170,11 +37,12 @@
         <p class="chip">Lifetime XP</p>
         <h2 id="xp-panel-title">Level <span id="xp-panel-level">1</span></h2>
       </div>
-      <button id="xp-panel-close" class="xp-panel-close" type="button" aria-label="Close XP panel">×</button>
+      <button id="xp-panel-close" class="xp-panel-close" type="button" aria-label="Close XP and Daily Login Streak">×</button>
     </div>
     <progress id="xp-progress" max="100" value="0" aria-label="XP progress">0%</progress>
     <p id="xp-progress-text" class="xp-progress-text">Loading XP…</p>
     <p id="xp-max-level-label" class="xp-max-level-label" hidden>Max Level</p>
+    {% include "_room_streak.html" %}
     <dl class="xp-source-list" aria-label="XP Sources">
       <div><dt>Credited Practice Time</dt><dd id="xp-source-practice-minutes">—</dd></div>
       <div><dt>Board Points</dt><dd id="xp-source-board-points">—</dd></div>
@@ -185,7 +53,10 @@
   </section>
 
   <section id="shed-team-panel" class="mentor-card hidden" hidden aria-labelledby="shed-team-title">
-    <h2 id="shed-team-title">Choose Your Team</h2>
+    <div class="xp-panel-head">
+      <h2 id="shed-team-title">Choose Your Team</h2>
+      <button id="shed-team-close" class="xp-panel-close" type="button" aria-label="Close Team panel">×</button>
+    </div>
     <div id="shed-team-current" class="shed-team-current" aria-live="polite">Loading teams…</div>
     <details id="shed-team-report-panel" class="shed-team-report" hidden>
       <summary>Report this team</summary>
@@ -238,46 +109,6 @@
         <button class="btn btn-primary" type="submit">Submit</button>
         <button id="shed-secret-cancel" class="btn btn-secondary" type="button">Cancel</button>
         <button id="shed-secret-close" class="btn btn-secondary" type="button">Close</button>
-      </div>
-    </form>
-  </section>
-
-  <section
-    id="change-instrument-panel"
-    class="mentor-card change-instrument-panel hidden"
-    aria-labelledby="change-instrument-title"
-    hidden
-  >
-    <div class="section-head">
-      <p class="chip">Edit Profile</p>
-      <h2 id="change-instrument-title">Change Instrument</h2>
-    </div>
-    <p>
-      Changing instruments will not erase your practice history, dandelions,
-      streaks, contest results, verifier connections, medals, or crowns.
-    </p>
-    <form id="change-instrument-form" class="stack-form">
-      <label for="change-instrument-select">Current instrument</label>
-      <select id="change-instrument-select" name="instrument" required>
-        {% for item in instruments %}
-        <option value="{{ item }}">{{ item }}</option>
-        {% endfor %}
-      </select>
-      <p
-        id="change-instrument-feedback"
-        class="body-copy"
-        role="status"
-        aria-live="polite"
-      ></p>
-      <div class="button-row">
-        <button class="btn btn-primary" type="submit">Save Instrument</button>
-        <button
-          id="change-instrument-cancel-button"
-          class="btn btn-secondary"
-          type="button"
-        >
-          Cancel
-        </button>
       </div>
     </form>
   </section>
@@ -513,4 +344,18 @@
   </section>
 
 </section>
+{% include "_your_woodchuck.html" %}
+{% endblock %}
+
+{% block room_workspace %}
+  <section id="shed-decorate-panel" class="mentor-card shed-decorate-panel hidden" hidden aria-labelledby="shed-stickerbook-title">
+    <div class="shed-decorate-panel-head">
+      <h2 id="shed-stickerbook-title">Stickerbook</h2>
+      <button id="shed-decorate-close" class="shed-decorate-close" type="button" aria-label="Close Decorate mode">×</button>
+    </div>
+    <button id="shed-decoration-view-room" class="btn btn-secondary" type="button">View room</button>
+    <div id="shed-decoration-inventory" class="shed-decoration-inventory" aria-live="polite"></div>
+    <p id="shed-decoration-feedback" class="sr-only" role="status" aria-live="polite"></p>
+  </section>
+
 {% endblock %}

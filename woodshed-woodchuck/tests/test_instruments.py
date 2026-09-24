@@ -245,12 +245,16 @@ def test_shed_uses_dynamic_instrument_renderer_and_safe_profile_form() -> None:
     home = (root / "templates" / "home.html").read_text(encoding="utf-8")
     renderer = (root / "static/js/instruments.js").read_text(encoding="utf-8")
     account_js = (root / "static/js/account.js").read_text(encoding="utf-8")
+    editor = (root / "templates/_your_woodchuck.html").read_text(encoding="utf-8")
+    appearance_js = (root / "static/js/woodchuck-appearance.js").read_text(encoding="utf-8")
 
     assert ">\n          🎷\n" not in home
-    assert 'id="change-instrument-form"' in home
-    assert "Changing instruments will not erase your practice history" in home
+    assert '{% include "_your_woodchuck.html" %}' in home
+    assert 'id="woodchuck-editor-form"' in editor
+    assert "Changing instruments will not erase your practice history" in editor
     assert "renderInstrument" in renderer
-    assert 'fetch("/account/profile/instrument"' in account_js
+    assert "fetch('/account/appearance'" in appearance_js
+    assert 'wireInstrumentChange' not in account_js
     assert 'credentials: "same-origin"' in account_js
     for private_field in ("pin_hash", "verifier_email", "verifier_name"):
         assert private_field not in home.casefold()

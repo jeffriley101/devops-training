@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Guest exploration · Woodshed Woodchuck</title>
-  <link rel="stylesheet" href="/static/css/styles.css?v=120" />
+  <link rel="stylesheet" href="/static/css/styles.css?v=123" />
 </head>
 <body data-guest="{{ 'local' if not blocked and not signing_in else 'transition' }}" data-account-id="{{ account_id }}" data-page-generation="{{ request.session.get('woodchuck_page_generation', '') if account_id else '' }}" data-authenticated="{{ 'true' if account_id else 'false' }}">
 <div class="app-shell"{% if account_id %} hidden{% endif %}><main class="content-wrap">
@@ -185,17 +185,19 @@
   {% endif %}
 </section>
 </main></div>
+<script src="/static/js/shared-ui.js?v=4"></script>
+<script src="/static/js/recovery.js?v=1"></script>
 {% if account_id %}<template id="account-scripts">{% else %}
-<script src="/static/js/session-boundary.js?v=2"></script>{% endif %}
+<script src="/static/js/session-boundary.js?v=5"></script>{% endif %}
 {% if signing_in %}
 <script src="/static/js/state.js?v=9"></script>
-<script src="/static/js/account.js?v=16"></script>
+<script src="/static/js/account.js?v=r4-17"></script>
 {% elif not blocked %}
 <script src="/static/js/tuner.js?v=2"></script>
-<script src="/static/js/app.js?v=86"></script>
+<script src="/static/js/app.js?v=r4a-91"></script>
 {% endif %}
 <script src="/static/js/guest.js?v=1"></script>
 {% if account_id %}</template>
-<script src="/static/js/session-boundary.js?v=2"></script>{% endif %}
+<script src="/static/js/session-boundary.js?v=5"></script>{% endif %}
 </body>
 </html>
