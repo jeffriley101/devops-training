@@ -80,6 +80,7 @@ from app import login_limits
 from app.db import Base, engine, SessionLocal
 from app.models import WoodchuckProfile, WoodchuckState
 from app.security import hash_pin
+from app.age_privacy import declare_age
 assert engine.url.get_backend_name() == "sqlite"
 Base.metadata.create_all(engine)
 def forbidden_backend(*args):
@@ -93,6 +94,7 @@ with SessionLocal() as session:
         pin_hash=hash_pin("2468"), instrument="Flute", level="Beginner", goal="Practice")
     session.add(profile)
     session.flush()
+    declare_age(session, profile.id, 'adult')
     session.add(WoodchuckState(profile_id=profile.id, state_json={}, revision=0))
     session.commit()
 with TestClient(app, base_url="https://woodshed.example.test") as client:
