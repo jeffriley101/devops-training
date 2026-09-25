@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">Woodshed</string>
+    <string name="loading">Opening Woodshed…</string>
+    <string name="retry">Retry</string>
+    <string name="offline">You appear to be offline. Check your connection, then try again.</string>
+    <string name="connection_error">Woodshed could not connect. Check your connection, then try again.</string>
+    <string name="server_error">Woodshed is having trouble loading this page. Please try again shortly.</string>
+    <string name="page_error">This Woodshed page could not be opened. Please try again.</string>
+    <string name="secure_error">A secure connection to Woodshed could not be established. Please try again later.</string>
+    <string name="blocked_link">Woodshed cannot open this type of link.</string>
+    <string name="no_link_app">No app is available to open this link.</string>
+    <string name="renderer_error">Woodshed needs to reopen this page. Please try again.</string>
+</resources>

@@ -1,0 +1,13 @@
+<resources>
+    <color name="woodshed_background">#2D1E12</color>
+    <color name="woodshed_text">#FFF5E4</color>
+    <style name="AppTheme" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">#EAC584</item>
+        <item name="android:windowBackground">@color/woodshed_background</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:statusBarColor">@color/woodshed_background</item>
+        <item name="android:navigationBarColor">@color/woodshed_background</item>
+        <item name="android:windowActionModeOverlay">true</item>
+    </style>
+</resources>
