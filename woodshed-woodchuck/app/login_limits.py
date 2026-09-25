@@ -72,6 +72,11 @@ def _backend(mode, url):
     return RedisBackend(url) if mode == "redis" else MemoryBackend()
 
 
+def _is_render():
+    # This platform marker also enables production policy in session_config.
+    return os.getenv("RENDER", "").strip().lower() == "true"
+
+
 def _settings():
     mode = os.getenv("LOGIN_RATE_LIMIT_MODE", "off").strip().lower()
     required_value = os.getenv("LOGIN_RATE_LIMIT_REQUIRED", "false").strip().lower()
@@ -82,10 +87,13 @@ def _settings():
     if mode not in {"off", "memory", "redis"} or (required and mode != "redis"):
         raise ValueError("Invalid limiter mode")
     if is_production() and mode != "off":
-        # Uvicorn must not rewrite scope['client'] before our trust check. The
-        # launch command must also omit any CLI override of this setting.
-        if mode != "redis" or os.environ.get("FORWARDED_ALLOW_IPS") != "":
-            raise ValueError("Production requires Redis and an unmodified peer address")
+        # Render identity comes from its overwritten CF-Connecting-IP header,
+        # independent of Uvicorn's rewritten client. Elsewhere preserve the raw
+        # peer for CIDR trust checks, with no contrary launch-command override.
+        if mode != "redis":
+            raise ValueError("Production requires Redis")
+        if not _is_render() and os.environ.get("FORWARDED_ALLOW_IPS") != "":
+            raise ValueError("Production requires an unmodified peer address outside Render")
     if mode == "redis" and not url:
         raise ValueError("Missing limiter backend")
     if mode != "off":
@@ -102,6 +110,17 @@ def _trusted_proxy_networks():
 
 
 def source_ip(request):
+    if _is_render():
+        # Only for Render public ingress, where Cloudflare overwrites this
+        # header: https://render.com/articles/host-pocketbase-on-render
+        # Never fall back to request.client/XFF: Uvicorn may have rewritten the
+        # peer from caller-supplied XFF. Missing/ambiguous headers fail closed.
+        values = request.headers.getlist("cf-connecting-ip")
+        if len(values) != 1 or "%" in values[0]:
+            raise ValueError("Missing or invalid Render client IP")
+        parsed = ipaddress.ip_address(values[0].strip(" \t"))
+        return str(parsed.ipv4_mapped if isinstance(parsed, ipaddress.IPv6Address) and parsed.ipv4_mapped else parsed)
+
     def address(value):
         parsed = ipaddress.ip_address(value.strip())
         return parsed.ipv4_mapped if isinstance(parsed, ipaddress.IPv6Address) and parsed.ipv4_mapped else parsed

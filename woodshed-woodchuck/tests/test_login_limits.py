@@ -14,7 +14,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 from starlette.datastructures import Headers
 
-from app import account_routes, verifier_routes, membership_routes, main, login_limits as limits
+from app import account_routes, verifier_routes, membership_routes, main, session_revocations, login_limits as limits
 from app.db import Base
 from app.models import WoodchuckProfile, TrustedVerifier
 from app.security import hash_pin
@@ -25,6 +25,7 @@ def limiter(monkeypatch):
     for name in ('RENDER', 'APP_ENV', 'LOGIN_TRUSTED_PROXY_CIDRS', 'LOGIN_RATE_LIMIT_REQUIRED'):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv('LOGIN_RATE_LIMIT_MODE', 'memory')
+    monkeypatch.setenv('SESSION_SECRET', 'synthetic-login-limiter-session-secret-at-least-32')
     now = [100.0]
     backend = limits.MemoryBackend(lambda: now[0])
     monkeypatch.setattr(limits, '_backend', lambda *args: backend)
@@ -36,13 +37,16 @@ def login_db(limiter, monkeypatch):
     engine = create_engine('sqlite://', poolclass=StaticPool, connect_args={'check_same_thread': False})
     Base.metadata.create_all(engine)
     factory = sessionmaker(engine, expire_on_commit=False)
-    for module in (account_routes, verifier_routes, membership_routes, main):
+    for module in (account_routes, verifier_routes, membership_routes, main, session_revocations):
         monkeypatch.setattr(module, 'SessionLocal', factory)
     with factory() as session:
         pin = hash_pin('2468')
         session.add(WoodchuckProfile(woodchuck_id='WC-LIMITED', display_name='Student A', pin_hash=pin,
             instrument='Flute', level='Beginner', goal='Practice'))
         session.add(TrustedVerifier(email='verifier@example.test', display_name='Verifier A', pin_hash=pin))
+        session.flush()
+        from app.age_privacy import declare_age
+        declare_age(session, 1, 'adult')
         session.commit()
     yield factory
     engine.dispose()
@@ -147,7 +151,9 @@ def test_blocked_attempts_do_not_extend_window(limiter):
     limits.enforce_login_limit(request(), 'student', 'WC-ONE')
 
 
-def test_proxy_allowlist_right_to_left_and_spoof_prefix(monkeypatch):
+@pytest.mark.parametrize('unsafe_network', ['0.0.0.0/0', '::/0', 'not-a-network'])
+def test_proxy_allowlist_right_to_left_and_spoof_prefix(monkeypatch, unsafe_network):
+    monkeypatch.delenv('RENDER', raising=False)
     monkeypatch.setenv('LOGIN_TRUSTED_PROXY_CIDRS', '10.0.0.0/24')
     for forged in ('1.1.1.1', '8.8.8.8'):
         assert limits.source_ip(request('10.0.0.2', {'x-forwarded-for':
@@ -155,7 +161,7 @@ def test_proxy_allowlist_right_to_left_and_spoof_prefix(monkeypatch):
         assert limits.source_ip(request('192.0.2.9', {'x-forwarded-for': forged})) == '192.0.2.9'
     assert limits.source_ip(request('10.0.0.2', {'x-forwarded-for':'garbage'})) == '10.0.0.2'
     assert limits.source_ip(request('::ffff:192.0.2.9')) == '192.0.2.9'
-    monkeypatch.setenv('LOGIN_TRUSTED_PROXY_CIDRS', '0.0.0.0/0')
+    monkeypatch.setenv('LOGIN_TRUSTED_PROXY_CIDRS', unsafe_network)
     with pytest.raises(ValueError): limits.source_ip(request())
 
 
@@ -197,13 +203,157 @@ def test_outage_never_falls_back_or_leaks_secrets(limiter, monkeypatch, caplog):
     assert status['configured'] and status['state'] == 'unavailable'
 
 
-def test_production_rejects_memory_and_uvicorn_rewriting(limiter, monkeypatch):
-    monkeypatch.setenv('RENDER', 'true')
-    for mode, forwarded in [('memory',''), ('redis','*'), ('redis','127.0.0.1')]:
+def test_non_render_production_rejects_memory_and_uvicorn_rewriting(limiter, monkeypatch):
+    monkeypatch.setenv('APP_ENV', 'production')
+    for mode, forwarded in [('memory',''), ('redis','*'), ('redis','127.0.0.1'), ('redis',None)]:
         monkeypatch.setenv('LOGIN_RATE_LIMIT_MODE', mode)
-        monkeypatch.setenv('FORWARDED_ALLOW_IPS', forwarded)
+        if forwarded is None:
+            monkeypatch.delenv('FORWARDED_ALLOW_IPS', raising=False)
+        else:
+            monkeypatch.setenv('FORWARDED_ALLOW_IPS', forwarded)
         monkeypatch.setenv('LOGIN_RATE_LIMIT_REDIS_URL', 'redis://unused.test')
         assert client().post('/account/login', data={'woodchuck_id':'WC-X','pin':'1234'}).status_code == 503
+
+
+@pytest.fixture
+def render_limiter(limiter, monkeypatch):
+    # Synthetic Redis settings; limiter supplies an isolated deterministic backend.
+    monkeypatch.setenv('RENDER', 'true')
+    monkeypatch.setenv('LOGIN_RATE_LIMIT_MODE', 'redis')
+    monkeypatch.setenv('LOGIN_RATE_LIMIT_REQUIRED', 'true')
+    monkeypatch.setenv('LOGIN_RATE_LIMIT_REDIS_URL', 'redis://unused.test')
+    monkeypatch.setenv('FORWARDED_ALLOW_IPS', '*')
+    return limiter
+
+
+@pytest.mark.parametrize('header,expected', [
+    ('198.51.100.9', '198.51.100.9'),
+    ('2001:0DB8:0000:0000:0000:0000:0000:0009', '2001:db8::9'),
+    ('::ffff:198.51.100.9', '198.51.100.9'),
+    (' \t198.51.100.9\t ', '198.51.100.9'),
+])
+def test_render_uses_only_single_platform_ip(render_limiter, header, expected):
+    incoming = request('not-a-peer', {'CF-Connecting-IP': header,
+        'X-Forwarded-For': '203.0.113.99, 10.0.0.1', 'Forwarded': 'for=203.0.113.99'})
+    assert limits.source_ip(incoming) == expected
+    incoming.client = None
+    assert limits.source_ip(incoming) == expected
+    assert limits.protection_status(check_backend=False)['state'] == 'configured'
+
+
+@pytest.mark.parametrize('kind,route,data', [
+    ('student', '/account/login', {'woodchuck_id': 'WC-LIMITED', 'pin': '2468'}),
+    ('verifier', '/trusted-verifiers/login', {'email': 'verifier@example.test', 'pin': '2468'}),
+])
+def test_render_normal_settings_allow_valid_login(login_db, render_limiter, kind, route, data):
+    response = client().post(route, data=data, headers={
+        'CF-Connecting-IP': '2001:db8::9', 'X-Forwarded-For': '203.0.113.99'})
+    assert response.status_code == 200 and response.json()['authenticated'] is True
+    key = limits.limiter_keys(kind, '', '2001:db8::9')[0][0]
+    assert render_limiter[0].rows[key][0] == 1
+    assert all('2001:db8::9' not in key and '2468' not in key for key in render_limiter[0].rows)
+
+
+@pytest.mark.parametrize('header', [None, '', ' ', 'unknown', '123', '198.51.100.09',
+    '198.51.100.9, 203.0.113.1', '198.51.100.9:443', '[2001:db8::9]',
+    '2001:db8::9%eth0', '198.51.100.9/32', '\n198.51.100.9', '198.51.100.9\r\n'])
+def test_render_invalid_header_fails_before_consuming_quota(render_limiter, header):
+    headers = {'X-Forwarded-For': '203.0.113.99'}
+    if header is not None:
+        headers['CF-Connecting-IP'] = header
+    with pytest.raises(HTTPException) as error:
+        limits.enforce_login_limit(request(headers=headers), 'student', 'WC-SYNTHETIC')
+    assert error.value.status_code == 503
+    assert not render_limiter[0].rows
+
+
+@pytest.mark.parametrize('route,data', [
+    ('/account/login', {'woodchuck_id': 'WC-LIMITED', 'pin': '2468'}),
+    ('/trusted-verifiers/login', {'email': 'verifier@example.test', 'pin': '2468'}),
+    ('/trusted-verifiers/invitations/synthetic-token/accept', {'display_name': 'Test', 'pin': '2468'}),
+    ('/admin/login', {'token': 'synthetic-admin'}),
+    ('/contests/admin/finalize-current', {}),
+    ('/contests/weeks/2026-09-07/finalize', {}),
+])
+@pytest.mark.parametrize('headers', [[], [('cf-connecting-ip', 'invalid')],
+    [('cf-connecting-ip', '198.51.100.9'), ('cf-connecting-ip', '203.0.113.9')],
+    [('cf-connecting-ip', '198.51.100.9'), ('cf-connecting-ip', '198.51.100.9')]])
+def test_render_bad_platform_header_fails_closed_on_credential_routes(
+        login_db, render_limiter, monkeypatch, route, data, headers):
+    monkeypatch.setenv('CONTEST_ADMIN_TOKEN', 'synthetic-contest')
+    response = client().post(route, data=data, headers=headers + [
+        ('x-forwarded-for', '203.0.113.88'), ('x-contest-admin-token', 'synthetic-contest')])
+    assert response.status_code == 503
+    assert not render_limiter[0].rows
+
+
+def test_render_uvicorn_default_rewriting_cannot_choose_limiter_bucket(render_limiter):
+    from uvicorn import Config
+    from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
+    config = Config(main.app)
+    assert config.proxy_headers is True and config.forwarded_allow_ips == '*'
+    observed_peers = []
+
+    async def observe(scope, receive, send):
+        if scope['type'] == 'http':
+            observed_peers.append(scope['client'][0])
+        await main.app(scope, receive, send)
+
+    wrapped = ProxyHeadersMiddleware(observe, trusted_hosts=config.forwarded_allow_ips)
+    with TestClient(wrapped, client=('10.0.0.2', 5000)) as browser:
+        for index in range(6):
+            forged = f'203.0.113.{index+1}'
+            response = browser.post('/admin/login', data={'token': 'synthetic'}, headers={
+                'CF-Connecting-IP': '198.51.100.9', 'X-Forwarded-For': forged + ', 10.0.0.1'})
+            assert observed_peers[-1] == forged  # Uvicorn actually rewrote the peer.
+            assert response.status_code == (403 if index < 5 else 429)
+        assert response.headers['retry-after'] == '900'
+        assert browser.post('/admin/login', data={'token': 'synthetic'}, headers={
+            'CF-Connecting-IP': '198.51.100.10', 'X-Forwarded-For': forged}).status_code == 403
+    key = limits.limiter_keys('admin', '', '198.51.100.9')[0][0]
+    assert render_limiter[0].rows[key][0] == 6
+    assert len(render_limiter[0].rows) == 2  # Platform clients, not six forged XFF clients.
+
+
+@pytest.mark.parametrize('kind', ['student', 'verifier', 'admin', 'contest_admin'])
+def test_render_redis_errors_still_fail_closed_without_logging(render_limiter, monkeypatch, caplog, kind):
+    def unavailable(*args):
+        raise RuntimeError('synthetic-backend-password synthetic-pin synthetic-connection-url')
+    monkeypatch.setattr(limits, '_backend', unavailable)
+    with pytest.raises(HTTPException) as error:
+        limits.enforce_login_limit(request(headers={'CF-Connecting-IP': '198.51.100.9'}), kind, 'synthetic-id')
+    assert error.value.status_code == 503
+    assert 'synthetic' not in error.value.detail + caplog.text
+    assert not render_limiter[0].rows
+
+
+def test_render_still_requires_redis_and_explicit_required_policy(render_limiter, monkeypatch):
+    for mode, required in [('memory', 'false'), ('off', 'true')]:
+        monkeypatch.setenv('LOGIN_RATE_LIMIT_MODE', mode)
+        monkeypatch.setenv('LOGIN_RATE_LIMIT_REQUIRED', required)
+        assert limits.protection_status()['state'] == 'unavailable'
+    monkeypatch.setenv('LOGIN_RATE_LIMIT_REQUIRED', 'false')
+    assert limits.protection_status()['state'] == 'disabled'
+    # Off mode must not demand a platform header or activate a saved Redis URL.
+    limits.enforce_login_limit(request(), 'student', 'synthetic-id')
+    assert not render_limiter[0].rows
+
+
+@pytest.mark.parametrize('marker', [None, 'false', '1'])
+def test_non_render_production_ignores_cf_header_and_retains_cidr_trust(limiter, monkeypatch, marker):
+    if marker is not None:
+        monkeypatch.setenv('RENDER', marker)
+    monkeypatch.setenv('APP_ENV', 'production')
+    monkeypatch.setenv('LOGIN_RATE_LIMIT_MODE', 'redis')
+    monkeypatch.setenv('LOGIN_RATE_LIMIT_REDIS_URL', 'redis://unused.test')
+    monkeypatch.setenv('FORWARDED_ALLOW_IPS', '')
+    monkeypatch.setenv('LOGIN_TRUSTED_PROXY_CIDRS', '10.0.0.0/24')
+    headers = {'CF-Connecting-IP': '203.0.113.99', 'X-Forwarded-For': '203.0.113.88, 198.51.100.9, 10.0.0.3'}
+    assert limits.source_ip(request('10.0.0.2', headers)) == '198.51.100.9'
+    assert limits.source_ip(request('192.0.2.9', headers)) == '192.0.2.9'
+    limits.enforce_login_limit(request('10.0.0.2', headers), 'student', 'WC-SYNTHETIC')
+    key = limits.limiter_keys('student', 'WC-SYNTHETIC', '198.51.100.9')[0][0]
+    assert limiter[0].rows[key][0] == 1
 
 
 def test_identifiers_hashed_normalized_and_credentials_not_logged(login_db, limiter, caplog):
@@ -339,7 +489,7 @@ def test_contest_valid_session_header_only_route_and_site_boundary(login_db, lim
     monkeypatch.setattr(contest_admin, 'admin_status', lambda *args, **kwargs: {})
     monkeypatch.setattr(contest_admin.templates, 'TemplateResponse', lambda **kwargs: JSONResponse({'ok':True}))
     monkeypatch.setattr(contests, 'finalize_contest_week', lambda *args, **kwargs: object())
-    monkeypatch.setattr(contests, 'contest_results_payload', lambda *args: {'finalized':True})
+    monkeypatch.setattr(contests, 'contest_results_payload', lambda *args, **kwargs: {'finalized':True})
     browser = client()
     assert browser.get('/contests/admin', headers={'X-Contest-Admin-Token':'wrong'}).status_code == 403
     assert browser.get('/contests/admin', headers={'X-Contest-Admin-Token':'test-site-only-secret'}).status_code == 403
