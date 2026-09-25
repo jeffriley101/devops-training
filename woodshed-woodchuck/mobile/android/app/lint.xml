@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<lint>
+    <!-- R4B deliberately uses the highest installed platform supported by cached
+         AGP 8.13.2 (maximum 36.1). Review API 37 with the pre-store toolchain upgrade. -->
+    <issue id="OldTargetApi">
+        <ignore path="build.gradle.kts" />
+    </issue>
+</lint>
