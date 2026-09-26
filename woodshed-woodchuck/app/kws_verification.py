@@ -1,5 +1,6 @@
 """Signed KWS results converge here; permissions come from prior parent choices."""
 from datetime import timedelta
+from enum import Enum
 import hashlib
 import hmac
 import json
@@ -23,19 +24,39 @@ MAX_EMAILS_PER_HOUR = 3  # Conservative subset of KWS's ten/hour; rolling, acros
 TERMINAL = {'verified', 'activated', 'failed', 'cancelled'}
 
 
+class RejectionStage(str, Enum):
+    MALFORMED_SIGNATURE_HEADER = 'malformed_signature_header'
+    OVERSIZED_BODY = 'oversized_body'
+    INVALID_TIMESTAMP = 'invalid_timestamp'
+    SIGNATURE_MISMATCH = 'signature_mismatch'
+    INVALID_JSON = 'invalid_json'
+    WRONG_EVENT_NAME = 'wrong_event_name'
+    ORG_MISMATCH = 'org_mismatch'
+    PRODUCT_MISMATCH = 'product_mismatch'
+    INVALID_PAYLOAD_SHAPE = 'invalid_payload_shape'
+    UNBOUND_PAYLOAD = 'unbound_payload'
+    PARENT_EMAIL_MISMATCH = 'parent_email_mismatch'
+    BINDING_REJECTED = 'binding_rejected'
+    COMPLETION_REJECTED = 'completion_rejected'
+
+
 class InvalidResult(ValueError):
-    pass
+    def __init__(self, stage: RejectionStage):
+        if not isinstance(stage, RejectionStage):
+            raise TypeError('Invalid KWS rejection stage.')
+        self.stage = stage
+        super().__init__('Invalid, expired or unbound KWS result.')
 
 
-def fail():
-    raise InvalidResult('Invalid, expired or unbound KWS result.')
+def fail(stage: RejectionStage):
+    raise InvalidResult(stage)
 
 
 def unique_object(pairs):
     result = {}
     for key, value in pairs:
         if key in result:
-            fail()
+            fail(RejectionStage.INVALID_JSON)
         result[key] = value
     return result
 
@@ -44,66 +65,80 @@ def parse_json(value):
     try:
         result = json.loads(value, object_pairs_hook=unique_object)
         if not isinstance(result, dict):
-            fail()
+            fail(RejectionStage.INVALID_JSON)
         return result
+    except InvalidResult:
+        raise
     except (ValueError, TypeError, UnicodeError):
-        fail()
+        fail(RejectionStage.INVALID_JSON)
 
 
 def fresh(timestamp):
     if isinstance(timestamp, bool) or not isinstance(timestamp, (int, float)):
-        fail()
+        fail(RejectionStage.INVALID_TIMESTAMP)
     now = consent.clock().timestamp()
     if not now - FRESHNESS.total_seconds() <= timestamp <= now + SKEW.total_seconds():
-        fail()
+        fail(RejectionStage.INVALID_TIMESTAMP)
     return timestamp
 
 
-def signatures_match(message, signatures, secrets_):
+def signatures_match(message, signatures, secrets_, malformed_stage=RejectionStage.SIGNATURE_MISMATCH):
     if not 1 <= len(signatures) <= 10:
-        fail()
+        fail(malformed_stage)
     matched = False
+    has_valid_candidate = False
     for key in secrets_:
         expected = hmac.new(key.encode(), message, hashlib.sha256).hexdigest()
         for signature in signatures:
             valid = isinstance(signature, str) and bool(re.fullmatch('[0-9a-fA-F]{64}', signature))
+            has_valid_candidate |= valid
             # Compare every candidate without an early successful exit.
             matched |= hmac.compare_digest(expected, signature.lower() if valid else '0' * 64) and valid
     if not matched:
-        fail()
+        fail(RejectionStage.SIGNATURE_MISMATCH if has_valid_candidate else malformed_stage)
 
 
 def webhook_result(raw, header, cfg):
-    if len(raw) > 65536 or not isinstance(header, str) or len(header) > 2048:
-        fail()
+    if len(raw) > 65536:
+        fail(RejectionStage.OVERSIZED_BODY)
+    if not isinstance(header, str) or len(header) > 2048:
+        fail(RejectionStage.MALFORMED_SIGNATURE_HEADER)
     parts = [p.strip().split('=', 1) for p in header.split(',')]
     if any(len(p) != 2 for p in parts):
-        fail()
+        fail(RejectionStage.MALFORMED_SIGNATURE_HEADER)
     times = [v for k, v in parts if k == 't']
-    if len(times) != 1 or not re.fullmatch('[0-9]{1,12}', times[0]):
-        fail()
+    if len(times) != 1:
+        fail(RejectionStage.MALFORMED_SIGNATURE_HEADER)
+    if not re.fullmatch('[0-9]{1,12}', times[0]):
+        fail(RejectionStage.INVALID_TIMESTAMP)
     timestamp = fresh(int(times[0]))
     # The original timestamp and EXACT raw bytes are signed, before any JSON parse.
     signatures_match(times[0].encode() + b'.' + raw,
-                     [v for k, v in parts if k == 'v1'], cfg.webhook_secrets)
-    event = parse_json(raw.decode('utf-8', errors='strict'))
-    if event.get('name') != 'parent-verified' or event.get('orgId') != cfg.org_id:
-        fail()
+                     [v for k, v in parts if k == 'v1'], cfg.webhook_secrets,
+                     RejectionStage.MALFORMED_SIGNATURE_HEADER)
+    try:
+        event = parse_json(raw.decode('utf-8', errors='strict'))
+    except UnicodeError:
+        fail(RejectionStage.INVALID_JSON)
+    if event.get('name') != 'parent-verified':
+        fail(RejectionStage.WRONG_EVENT_NAME)
+    if event.get('orgId') != cfg.org_id:
+        fail(RejectionStage.ORG_MISMATCH)
     if event.get('productId') is not None and event.get('productId') != cfg.product_id:
-        fail()
+        fail(RejectionStage.PRODUCT_MISMATCH)
     payload = event.get('payload')
     if not isinstance(payload, dict) or not isinstance(payload.get('parentEmail'), str):
-        fail()
+        fail(RejectionStage.INVALID_PAYLOAD_SHAPE)
     return payload.get('externalPayload'), payload.get('status'), timestamp, payload['parentEmail']
 
 
 def redirect_result(params, cfg):
     if (len(params.getlist('status')) != 1 or len(params.getlist('externalPayload')) != 1
             or set(params) - {'status', 'externalPayload', 'signature'}):
-        fail()
+        fail(RejectionStage.INVALID_PAYLOAD_SHAPE)
     status, payload = params['status'], params['externalPayload']
     if len(status) > 4096 or len(payload) > 250:
-        fail()
+        fail(RejectionStage.INVALID_PAYLOAD_SHAPE)
     # QueryParams has percent-decoded once. Never reserialize the signed strings.
     signatures_match((status + ':' + payload).encode(), params.getlist('signature'),
                      cfg.verification_secrets)
@@ -131,14 +166,14 @@ def current_binding(session, row, v, cfg):
     if (v.environment != cfg.environment or v.org_id != cfg.org_id or v.product_id != cfg.product_id
             or row.notice_version != notice_version or v.notice_sha256 != notice_sha256
             or not v.account_allowed or not hmac.compare_digest(v.binding_sha256, binding(row, v))):
-        fail()
+        fail(RejectionStage.BINDING_REJECTED)
     if row.profile_id:
         profile = session.scalar(select(WoodchuckProfile).where(WoodchuckProfile.id == row.profile_id)
                                  .with_for_update().execution_options(populate_existing=True))
         rule = session.get(AccountPrivacy, row.profile_id, populate_existing=True)
         if (not profile or profile.status != 'active' or profile.session_version != v.profile_session_version
                 or (rule.consent_id if rule else None) != v.prior_consent_id):
-            fail()
+            fail(RejectionStage.BINDING_REJECTED)
 
 
 def reserve_budget(session, email, environment='test'):
@@ -236,31 +271,31 @@ def complete(session, cfg, payload, status, timestamp, parent_email=None):
     """No HTTP/email/login here. One transaction, same lock order as withdrawal/activation."""
     consent.require_under13_review()
     if not isinstance(payload, str) or not re.fullmatch(r'[A-Za-z0-9_-]{43}', payload):
-        fail()
+        fail(RejectionStage.INVALID_PAYLOAD_SHAPE)
     if (not isinstance(status, dict) or type(status.get('verified')) is not bool
             or not isinstance(status.get('transactionId'), str) or not 1 <= len(status['transactionId']) <= 256):
-        fail()
+        fail(RejectionStage.INVALID_PAYLOAD_SHAPE)
     if status['verified'] and status.get('errorCode') not in (None, ''):
-        fail()
+        fail(RejectionStage.INVALID_PAYLOAD_SHAPE)
     pending_id = session.scalar(select(KWSVerification.pending_id)
                                 .where(KWSVerification.payload_hash == hash_invitation_token(payload)))
     if not pending_id:
-        fail()
+        fail(RejectionStage.UNBOUND_PAYLOAD)
     row = session.scalar(select(PendingConsent).where(PendingConsent.id == pending_id)
                          .with_for_update().execution_options(populate_existing=True))
     v = session.scalar(select(KWSVerification).where(KWSVerification.pending_id == pending_id)
                        .with_for_update().execution_options(populate_existing=True))
     if parent_email is not None and not hmac.compare_digest(row.parent_email.lower().encode(), parent_email.lower().encode()):
-        fail()
+        fail(RejectionStage.PARENT_EMAIL_MISMATCH)
     if timestamp < consent.utc(v.created_at).timestamp() - SKEW.total_seconds():
-        fail()
+        fail(RejectionStage.COMPLETION_REJECTED)
     transaction = hashlib.sha256(json.dumps([cfg.environment, cfg.org_id, cfg.product_id,
                                             status['transactionId']], separators=(',', ':')).encode()).hexdigest()
     if v.state in TERMINAL:
         # Already activated/revoked/withdrawn cannot be reconstructed by another delivery.
         if v.state in {'verified', 'activated', 'failed'} and (v.transaction_hash != transaction
                 or (v.state in {'verified', 'activated'}) != status['verified']):
-            fail()
+            fail(RejectionStage.COMPLETION_REJECTED)
         return None
     current_binding(session, row, v, cfg)
     if consent.utc(row.expires_at) <= consent.clock() or consent.utc(v.expires_at) <= consent.clock():
@@ -270,7 +305,7 @@ def complete(session, cfg, payload, status, timestamp, parent_email=None):
     # The DB unique constraint also serializes transaction reuse across different requests.
     if session.scalar(select(KWSVerification.id).where(KWSVerification.transaction_hash == transaction,
                                                       KWSVerification.id != v.id)):
-        fail()
+        fail(RejectionStage.COMPLETION_REJECTED)
     v.transaction_hash = transaction
     v.completed_at = consent.clock()
     if not status['verified']:
