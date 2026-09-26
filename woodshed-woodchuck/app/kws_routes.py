@@ -1,4 +1,5 @@
 """KWS-only callbacks. Signature verification replaces CSRF only on these paths."""
+import logging
 from fastapi import APIRouter, Request, HTTPException
 from sqlalchemy.exc import IntegrityError
 from .db import SessionLocal
@@ -8,6 +9,7 @@ from .kws_client import Config, KWSUnavailable
 from . import kws_verification as kws
 
 router = APIRouter(route_class=PrivateRoute)
+logger = logging.getLogger(__name__)
 
 
 async def handle_webhook(request: Request, environment: str):
@@ -15,12 +17,12 @@ async def handle_webhook(request: Request, environment: str):
         cfg = Config.load(environment)
         headers = request.headers.getlist('x-kws-signature')
         if len(headers) != 1:
-            kws.fail()
+            kws.fail(kws.RejectionStage.MALFORMED_SIGNATURE_HEADER)
         raw = bytearray()
         async for chunk in request.stream():
             raw.extend(chunk)
             if len(raw) > 65536:
-                kws.fail()
+                kws.fail(kws.RejectionStage.OVERSIZED_BODY)
         result = kws.webhook_result(bytes(raw), headers[0], cfg)
         with SessionLocal() as session:
             kws.complete(session, cfg, *result)
@@ -28,7 +30,11 @@ async def handle_webhook(request: Request, environment: str):
         return {'received': True}
     except KWSUnavailable:
         raise HTTPException(503, 'KWS callback is unavailable.') from None
-    except (kws.InvalidResult, UnicodeError):
+    except kws.InvalidResult as error:
+        logger.warning('%s', error.stage.value)
+        raise HTTPException(400, 'Invalid KWS result.') from None
+    except UnicodeError:
+        logger.warning('%s', kws.RejectionStage.INVALID_PAYLOAD_SHAPE.value)
         raise HTTPException(400, 'Invalid KWS result.') from None
     except IntegrityError:
         raise HTTPException(409, 'KWS transaction was already bound to another request.') from None
