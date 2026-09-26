@@ -46,7 +46,7 @@ def test_instrument_sources_are_isolated_and_history_is_unchanged(s, sources, in
     private = profile(s, 2)
     declare_age(s, private.id, 'under13', at=NOW-timedelta(days=30))
     for instrument, is_public in sources:
-        chart = add_chart(s, public if is_public else private, None, 30, approved=False,
+        chart = add_chart(s, public if is_public else private, None, 30, approved=True,
                           practice_date=NOW.date(), created_at=NOW)
         chart.instrument = instrument
     rows = [stored_result(s, finalized, instrument, rank)
@@ -79,11 +79,11 @@ def test_ineligible_and_outside_week_charts_do_not_control_visibility(s, matchin
     private = profile(s, 2)  # Unknown-age charts must also stay private.
     for day, included in [(finalized.week_start-timedelta(days=1), True),
                           (finalized.week_end, True), (NOW.date(), False)]:
-        chart = add_chart(s, private, None, 30, approved=False, practice_date=day, created_at=NOW)
+        chart = add_chart(s, private, None, 30, approved=True, practice_date=day, created_at=NOW)
         chart.instrument = 'Trumpet'
         chart.include_contests = included
     if matching_public:
-        chart = add_chart(s, public, None, 30, approved=False,
+        chart = add_chart(s, public, None, 30, approved=True,
                           practice_date=finalized.week_start, created_at=NOW)
         chart.instrument = 'Trumpet'
     row = stored_result(s, finalized, 'Trumpet', 1)
@@ -100,7 +100,7 @@ def test_ineligible_and_outside_week_charts_do_not_control_visibility(s, matchin
     ('verified', 'late', True),
     ('verified', 'missing-time', True),
     ('verified', 'approved', False),
-    ('open', None, False),
+    ('open', None, False),  # Original private contributions still protect saved medals.
     ('pristine', None, False),
 ])
 def test_historical_division_uses_scoring_approval_deadline(s, division, private_approval, visible):

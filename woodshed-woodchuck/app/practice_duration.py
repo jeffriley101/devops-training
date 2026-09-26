@@ -1,4 +1,4 @@
-"""Credited chart duration. Intentional Pristine + ordinary credit is additive."""
+"""Reported chart duration and independent earning qualification."""
 from sqlalchemy import case
 
 
@@ -31,3 +31,18 @@ def format_seconds(seconds: float) -> str:
 
 def format_minutes(minutes: float) -> str:
     return format_seconds(minutes * 60)
+
+
+def qualified_practice_clause():
+    """Only independently approved BOOK records are earning/contest evidence.
+
+    Reported duration remains available in private logs. A browser's Pristine
+    source flag or microphone duration is never an independent verification.
+    """
+    from sqlalchemy import exists
+    from .models import PracticeChart, PracticeChartVerification
+    return (PracticeChart.source == "p-book") & exists().where(
+        PracticeChartVerification.practice_chart_id == PracticeChart.id,
+        PracticeChartVerification.status == "approved",
+        PracticeChartVerification.responded_at.is_not(None),
+    )

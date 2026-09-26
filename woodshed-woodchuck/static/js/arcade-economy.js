@@ -189,7 +189,8 @@
         message.textContent = payload.resumed ? "Resuming the same attempt. No extra charge."
           : payload.charged_now > 0 ? "100 Dandelions paid · 3 attempts included; this attempt has started."
           : "Attempt started. No charge.";
-        if (payload.reward_eligible === false) message.textContent += " Daily prize plays complete — scores still count.";
+        if (payload.result_authority === "self_reported") message.textContent += " Practice play: no prizes or shared scores.";
+        else if (payload.reward_eligible === false) message.textContent += " Daily prize plays complete — scores still count.";
       });
       return payload;
     });
@@ -214,7 +215,9 @@
       playTokens.delete(playToken);
       renderStatus(payload, requestAccount);
       document.querySelectorAll("[data-arcade-economy-message]").forEach(function (message) {
-        if (payload.reward_eligible === false) {
+        if (payload.result_authority === "self_reported") {
+          message.textContent = "Practice run complete. No prizes or shared scores.";
+        } else if (payload.reward_eligible === false) {
           message.textContent = "Daily prize plays complete — scores still count.";
         } else if (payload.payout > 0) {
           message.textContent = `+${payload.payout} 🌼`;

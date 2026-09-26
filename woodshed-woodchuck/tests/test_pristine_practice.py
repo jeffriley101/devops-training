@@ -51,7 +51,8 @@ def pristine_database(monkeypatch: pytest.MonkeyPatch):
     )
     factory = sessionmaker(bind=engine, expire_on_commit=False)
     Base.metadata.create_all(engine)
-    for module in (account_routes, main, practice_chart_routes):
+    from app import session_revocations
+    for module in (account_routes, main, practice_chart_routes, session_revocations):
         monkeypatch.setattr(module, "SessionLocal", factory)
     yield factory
     Base.metadata.drop_all(engine)
@@ -69,6 +70,8 @@ def add_profile(session: Session, key: str, instrument: str = "Flute") -> Woodch
     )
     session.add(profile)
     session.flush()
+    from app.age_privacy import declare_age
+    declare_age(session, profile.id, "adult", at=datetime(2000, 1, 1, tzinfo=timezone.utc))
     session.add(WoodchuckState(
         profile_id=profile.id,
         state_json={"progress": {"credits": 0}},
@@ -120,7 +123,7 @@ def test_pristine_route_ui_and_microphone_privacy(pristine_database) -> None:
     assert "sign in" in response.text.casefold()
 
 
-def test_pristine_api_persists_exact_time_without_verifier_and_snapshots_team(
+def test_pristine_api_keeps_exact_time_private_without_team_credit(
     pristine_database,
 ) -> None:
     factory = pristine_database
@@ -174,16 +177,16 @@ def test_pristine_api_persists_exact_time_without_verifier_and_snapshots_team(
     assert chart_payload["minutes"] == 12
     assert chart_payload["detected_playing_seconds"] == 754
     assert chart_payload["source"] == "pristine"
-    assert chart_payload["pristine"] is True
+    assert chart_payload["pristine"] is False
     assert chart_payload["verification"] is None
-    assert chart_payload["team_id"] == team_id
+    assert chart_payload["team_id"] is None
 
     with factory() as session:
         charts = session.scalars(select(PracticeChart).where(
             PracticeChart.profile_id == profile_id
         )).all()
         assert len(charts) == 1
-        assert charts[0].team_id == team_id
+        assert charts[0].team_id is None
         assert session.scalar(select(PracticeChartVerification)) is None
 
     unauthenticated = TestClient(app).post(
@@ -243,7 +246,7 @@ def test_pristine_requires_detected_playing_but_accepts_exact_subminute_time(
     assert ordinary_payload["pristine"] is False
     assert ordinary_payload["detected_playing_seconds"] is None
     assert len(pristine_payloads) == 2
-    assert all(row["pristine"] is True for row in pristine_payloads)
+    assert all(row["pristine"] is False for row in pristine_payloads)
     assert sorted(row["detected_playing_seconds"] for row in pristine_payloads) == [1, 59]
 
     with factory() as session:
@@ -257,7 +260,7 @@ def test_pristine_requires_detected_playing_but_accepts_exact_subminute_time(
         }
 
 
-def test_pristine_populates_open_pristine_team_average_and_tpr_only() -> None:
+def test_pristine_claims_are_excluded_from_competitive_divisions() -> None:
     engine = create_engine(
         "sqlite://",
         connect_args={"check_same_thread": False},
@@ -330,24 +333,20 @@ def test_pristine_populates_open_pristine_team_average_and_tpr_only() -> None:
             contest_week=week,
             current_profile_id=first.id,
         )
-        assert students["open"][0]["total_minutes"] == 40
+        assert students["open"][0]["total_minutes"] == 10
         assert students["verified"][0]["total_minutes"] == 10
-        assert students["pristine"][0]["total_minutes"] == 30
+        assert students["pristine"] == []
         assert all(row["display_name"] != second.display_name for row in students["verified"])
 
         boards = team_leaderboards(session, season=season, contest_week=week)
-        assert boards["team-weekly-practice"]["open"][0]["score"] == 44
+        assert boards["team-weekly-practice"]["open"][0]["score"] == 10
         assert boards["team-weekly-practice"]["verified"][0]["score"] == 10
-        assert boards["team-weekly-practice"]["pristine"][0]["score"] == 34
-        assert boards["team-weekly-average-practice"]["pristine"][0]["score"] == 30
-        assert boards["team-weekly-average-practice"]["pristine"][0]["active_member_count"] == 1
-        assert boards["team-practice-rating"]["pristine"][0]["score"] == (
-            calculate_team_practice_rating([30], eligible_roster=2).rating
-        )
+        for key in ("team-weekly-practice", "team-weekly-average-practice", "team-practice-rating"):
+            assert boards[key]["pristine"] == []
     engine.dispose()
 
 
-def test_pristine_finalization_matches_live_open_and_pristine_divisions() -> None:
+def test_pristine_assertions_do_not_create_finalized_results() -> None:
     engine = create_engine(
         "sqlite://",
         connect_args={"check_same_thread": False},
@@ -385,7 +384,7 @@ def test_pristine_finalization_matches_live_open_and_pristine_divisions() -> Non
                 ContestResult.profile_id == profile.id,
             )
         ).all())
-        assert divisions == {"open", "pristine"}
+        assert divisions == set()
     engine.dispose()
 
 

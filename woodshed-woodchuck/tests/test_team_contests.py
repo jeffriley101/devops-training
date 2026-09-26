@@ -84,17 +84,17 @@ def test_team_practice_cap_average_verified_and_season_formulas() -> None:
     boards = team_leaderboards(session, season=season, contest_week=week)
     weekly_open = boards["team-weekly-practice"]["open"][0]
     weekly_verified = boards["team-weekly-practice"]["verified"][0]
-    assert weekly_open["score"] == 454 and weekly_open["active_member_count"] == 2
+    assert weekly_open["score"] == 350 and weekly_open["active_member_count"] == 1
     assert weekly_open["emblem_key"] == "emoji:goat"
     assert weekly_verified["score"] == 350 and weekly_verified["active_member_count"] == 1
-    assert boards["team-weekly-average-practice"]["open"][0]["score"] == 200
+    assert boards["team-weekly-average-practice"]["open"][0]["score"] == 300
     assert boards["team-weekly-average-practice"]["verified"][0]["score"] == 300
-    assert boards["team-lifetime-practice"]["open"][0]["score"] == 1054
+    assert boards["team-lifetime-practice"]["open"][0]["score"] == 350
     assert boards["team-weekly-practice"]["pristine"] == []
     assert boards["team-weekly-average-practice"]["pristine"] == []
     assert boards["team-practice-rating"]["pristine"] == []
     assert boards["team-practice-rating"]["open"][0]["score"] == (
-        calculate_team_practice_rating([350, 100], eligible_roster=3).rating
+        calculate_team_practice_rating([350], eligible_roster=3).rating
     )
     assert boards["team-practice-rating"]["verified"][0]["score"] == (
         calculate_team_practice_rating([350], eligible_roster=3).rating
@@ -110,8 +110,8 @@ def test_team_activity_points_are_weekly_normal_activity_only() -> None:
         emblem_key="letter:W", now=NOW,
     )
     for activity_type, points, occurred_at, duplicate_key in (
-        ("care", 2, NOW, "band-camp:2026-07-28:care"),
-        ("care", 30, datetime(2026, 7, 20, 15, tzinfo=timezone.utc), "old-care"),
+        ("trivia", 2, NOW, "synthetic-trivia"),
+        ("trivia", 30, datetime(2026, 7, 20, 15, tzinfo=timezone.utc), "old-trivia"),
         ("bonus-challenge", 20, NOW, "bonus-challenge:team-should-not-count"),
         ("contest-placement", 40, NOW, f"contest:{week.id}:team-placement"),
     ):
@@ -180,7 +180,7 @@ def test_finalization_keeps_team_rewards_out_of_personal_hall_medals() -> None:
     )
     add_chart(session, captain, team.id, 45, created_at=NOW)
     award, _created = create_camp_point_award(
-        session, profile=captain, activity_type="care",
+        session, profile=captain, activity_type="trivia",
         activity_date=NOW.date(), now=NOW,
     )
     award.created_at = NOW
@@ -247,7 +247,7 @@ def test_revised_olympic_rewards_and_weekly_participation() -> None:
         )
         add_chart(
             session, student, team.id, [60, 60, 40, 20][index],
-            approved=False, created_at=NOW,
+            approved=True, created_at=NOW,
         )
     session.commit(); finalize_contest_week(session, week_start=week.week_start, now=FINAL_NOW); session.commit()
     open_results = session.scalars(select(ContestResult).join(Contest).where(

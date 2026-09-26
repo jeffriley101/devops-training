@@ -212,7 +212,7 @@ def test_invitation_and_pchart_send_after_persistence_and_resend_without_duplica
             assert accepted.status_code == 200
         verifier_id = student.get("/trusted-verifiers/invitations").json()["connections"][0]["verifier"]["id"]
         chart = student.post("/practice-charts", json={
-            "verifier_id": verifier_id, "practice_date": "2026-07-30", "minutes": 25,
+            "verifier_id": verifier_id, "practice_date": datetime.now(practice_chart_routes.CENTRAL).date().isoformat(), "minutes": 25,
             "note": "Long tones", "practice_details": ["Tone"], "submission_key": "smtp-chart-1",
         })
         assert chart.status_code == 201 and chart.json()["email_delivery"]["sent"] is True
@@ -226,7 +226,7 @@ def test_invitation_and_pchart_send_after_persistence_and_resend_without_duplica
         resent_chart = student.post(f"/practice-charts/verifications/{verification_id}/resend-email")
         assert resent_chart.status_code == 200 and resent_chart.json()["email_delivery"]["sent"] is True
         duplicate = student.post("/practice-charts", json={
-            "verifier_id": verifier_id, "practice_date": "2026-07-30", "minutes": 25,
+            "verifier_id": verifier_id, "practice_date": chart.json()["chart"]["practice_date"], "minutes": 25,
             "note": "Long tones", "practice_details": ["Tone"], "submission_key": "smtp-chart-1",
         })
         assert duplicate.status_code == 201 and duplicate.json()["created"] is False and duplicate.json()["email_delivery"] is None
@@ -238,7 +238,7 @@ def test_invitation_and_pchart_send_after_persistence_and_resend_without_duplica
             def __init__(self, *_args, **_kwargs): raise TimeoutError()
         monkeypatch.setattr(email_service.smtplib, "SMTP", FailingSMTP)
         failed_chart = student.post("/practice-charts", json={
-            "verifier_id": verifier_id, "practice_date": "2026-07-31", "minutes": 10,
+            "verifier_id": verifier_id, "practice_date": chart.json()["chart"]["practice_date"], "minutes": 10,
             "note": "Scales", "practice_details": [], "submission_key": "smtp-chart-2",
         })
         assert failed_chart.status_code == 201

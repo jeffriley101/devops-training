@@ -126,12 +126,10 @@ def test_lifetime_family_totals_identity_cutoffs_privacy_and_ties(s):
         (first,child,9999,NOW.date(),NOW), (current,owner,9999,NOW.date(),NOW+timedelta(days=1)),
         (current,owner,9999,w.week_end,NOW),
     ]:
-        chart=add_chart(s,person,t.id,seconds//60,approved=False,practice_date=day,created_at=created)
-        chart.source='pristine'
-        chart.detected_playing_seconds=seconds
+        add_chart(s,person,t.id,seconds//60,approved=True,practice_date=day,created_at=created)
     s.commit()
     scores=contests._lifetime_team_practice_scores(s,w,source_cutoff=NOW,public_only=True)
-    assert scores=={current.id:1810/60,other.id:1810/60,historical.id:10}
+    assert scores=={current.id:30,other.id:30,historical.id:10}
     rows=contests.team_leaderboards(s,season=active,contest_week=w,source_cutoff=NOW)['team-lifetime-practice']['open']
     assert [r['rank'] for r in rows]==[1,1,3]
     assert next(r for r in rows if r['team_id']==current.id)['team_name']=='Union Renewed'
@@ -194,7 +192,7 @@ def test_finalized_empty_week_remains_listed(s):
     assert contests.finalized_weeks_payload(s)['weeks'][0]['week_start']=='2026-09-14'
 
 
-@pytest.mark.parametrize('mode,expected', [('precise_seconds',1810/60),('legacy_minutes',30)])
+@pytest.mark.parametrize('mode,expected', [('precise_seconds',30),('legacy_minutes',30)])
 def test_finalization_creates_one_lifetime_result_per_family(s,mode,expected):
     old=season(s,'old',date(2026,7,27),date(2026,9,13)); active=season(s)
     owner=add_profile(s,1)
@@ -204,8 +202,7 @@ def test_finalization_creates_one_lifetime_result_per_family(s,mode,expected):
     w=week(s,active);w.practice_scoring_mode=mode
     contests.ensure_contest_definitions(s)
     for t,seconds,day in [(first,605,date(2026,8,1)),(current,1205,NOW.date())]:
-        chart=add_chart(s,owner,t.id,seconds//60,approved=False,practice_date=day,created_at=NOW)
-        chart.source='pristine';chart.detected_playing_seconds=seconds
+        add_chart(s,owner,t.id,seconds//60,approved=True,practice_date=day,created_at=NOW)
     s.commit()
     contests.finalize_contest_week(s,week_start=w.week_start,now=NOW+timedelta(days=8));s.commit()
     rows=list(s.scalars(select(ContestResult).join(Contest).where(

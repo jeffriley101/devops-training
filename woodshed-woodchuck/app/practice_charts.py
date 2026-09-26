@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -12,7 +12,6 @@ from .economy import lock_state
 from .models import (
     PracticeChart,
     PracticeChartVerification,
-    QuestCompletion,
     RewardGrant,
     StudentVerifierConnection,
     TrustedVerifier,
@@ -180,8 +179,11 @@ def create_practice_chart_verification_request(
         if connection is None or (connection.role=='band_director' and not (permitted_director(session,profile.id,verifier_id,review=True) or ordinary_director_connection(session,profile.id,verifier_id))):
             raise ValueError('Choose an accepted, authorized chart reviewer.')
 
-    state = lock_state(session, profile.id) if award_dandelions else None
+    # Serialize all practice sources, including private BOOK and Pristine.
+    lock_state(session, profile.id)
 
+    if submission_key is None:
+        raise ValueError("A P-Chart submission key is required.")
     if submission_key is not None:
         if not isinstance(submission_key, str):
             raise ValueError("The P-Chart submission key must be text.")
@@ -197,9 +199,14 @@ def create_practice_chart_verification_request(
             )
         )
         if existing_chart is not None:
-            if existing_chart.source != source:
+            if (existing_chart.source != source
+                or existing_chart.practice_date != practice_date
+                or existing_chart.minutes != minutes
+                or existing_chart.detected_playing_seconds != detected_playing_seconds
+                or (existing_chart.note or "") != normalized_note
+                or existing_chart.practice_details != normalized_details):
                 raise ValueError(
-                    "That submission key belongs to a different P-Chart type."
+                    "That submission key was already used for different practice data."
                 )
             existing_verification = session.scalar(
                 select(PracticeChartVerification).where(
@@ -220,25 +227,26 @@ def create_practice_chart_verification_request(
             "The student must have an instrument before creating a P-Chart."
         )
 
-    if award_dandelions:
-        # Match BOOK's existing formula/cap using persisted records, not its
-        # truncated browser history or the submitted credits_awarded value.
-        earned = session.scalar(select(func.coalesce(func.sum(PracticeChart.credits_awarded), 0)).where(
-            PracticeChart.profile_id == profile.id, PracticeChart.practice_date == practice_date,
-        )) or 0
-        completion = session.scalar(select(QuestCompletion).where(
-            QuestCompletion.profile_id == profile.id, QuestCompletion.activity_date == practice_date,
-        ))
-        # Only the legacy quest endpoint inserts a rewarded BOOK log entry.
-        # The current Board Bonus Challenge has always awarded separately.
-        if completion is not None and session.scalar(select(RewardGrant.id).where(
-            RewardGrant.profile_id == profile.id,
-            RewardGrant.reward_type == "dandelion",
-            RewardGrant.source_key == f"bonus-challenge:{practice_date.isoformat()}:{completion.quest_id}",
-        )) is not None:
-            earned += completion.reward_amount
-        credits_awarded = (min(minutes // 5 + len(normalized_details), max(0, MAX_DAILY_CREDITS - earned))
-                           if source == "p-book" else 0)
+    from .contests import CENTRAL
+    from .practice_duration import chart_seconds_sql
+    now = datetime.now(timezone.utc)
+    today = now.astimezone(CENTRAL).date()
+    if not today - timedelta(days=1) <= practice_date <= today:
+        raise ValueError("Practice logs must be for today or yesterday.")
+    seconds = detected_playing_seconds if source == "pristine" else minutes * 60
+    # This bounds self-reported logs; it is not evidence of playing time.
+    for clause in (PracticeChart.practice_date == practice_date,
+                   PracticeChart.created_at >= now - timedelta(hours=24)):
+        used = session.scalar(select(func.coalesce(func.sum(chart_seconds_sql()), 0)).where(
+            PracticeChart.profile_id == profile.id, clause)) or 0
+        if used + seconds > MAX_DETECTED_PLAYING_SECONDS:
+            raise ValueError("Practice logs exceed the shared daily/24-hour duration limit.")
+    # Submission is a self-report. Only independent review can qualify BOOK
+    # for XP/competition; browser microphone time cannot establish Pristine status.
+    credits_awarded = 0
+    if source == "pristine":
+        include_contests = include_team_contests = False
+        team_id = None
 
     chart = PracticeChart(
         profile_id=profile.id,
@@ -257,31 +265,18 @@ def create_practice_chart_verification_request(
         ordinary_email_preset_id=ordinary_email_preset_id,
     )
 
-    session.add(chart)
-    session.flush()
-
-    if award_dandelions and credits_awarded:
-        payload = deepcopy(state.state_json or {})
-        progress = dict(payload.get("progress") or {})
-        balance = progress.get("credits", 0)
-        balance = balance if type(balance) is int else 0
-        progress["credits"] = balance + credits_awarded
-        payload["progress"] = progress
-        state.state_json = payload
-        state.revision += 1
-        session.add(RewardGrant(profile_id=profile.id, source_key=f"practice-chart:{chart.id}",
-                                reward_type="dandelion", category_key="practice", amount=credits_awarded))
-
     verification = None
-    if verifier_id is not None:
-        verification = PracticeChartVerification(
-            practice_chart_id=chart.id,
-            verifier_id=verifier_id,
-            status="pending",
-        )
-        session.add(verification)
-
     try:
+        session.add(chart)
+        session.flush()
+        if verifier_id is not None:
+            verification = PracticeChartVerification(
+                practice_chart_id=chart.id,
+                verifier_id=verifier_id,
+                status="pending",
+            )
+            session.add(verification)
+
         session.commit()
         session.refresh(chart)
         if verification is not None:
@@ -296,9 +291,14 @@ def create_practice_chart_verification_request(
                 )
             )
             if existing_chart is not None:
-                if existing_chart.source != source:
+                if (existing_chart.source != source
+                    or existing_chart.practice_date != practice_date
+                    or existing_chart.minutes != minutes
+                    or existing_chart.detected_playing_seconds != detected_playing_seconds
+                    or (existing_chart.note or "") != normalized_note
+                    or existing_chart.practice_details != normalized_details):
                     raise ValueError(
-                        "That submission key belongs to a different P-Chart type."
+                        "That submission key was already used for different practice data."
                     )
                 existing_verification = session.scalar(
                     select(PracticeChartVerification).where(
@@ -332,7 +332,7 @@ def create_pristine_practice_chart(
     team_id: int | None = None,
     practice_date: date,
 ) -> CreatedPracticeChartRequest:
-    """Persist one self-verified microphone-activity practice session."""
+    """Persist a private, unverified browser microphone activity log."""
     return create_practice_chart_verification_request(
         session,
         profile=profile,
@@ -391,6 +391,13 @@ def respond_to_practice_chart_verification(
     if verification is None:
         raise LookupError("Verification request was not found.")
 
+    owner_id = session.scalar(select(PracticeChart.profile_id).where(
+        PracticeChart.id == verification.practice_chart_id))
+    if owner_id is None:
+        raise LookupError("The requested P-Chart was not found.")
+    state = lock_state(session, owner_id)
+    session.refresh(verification)
+
     if verification.status != "pending":
         raise ValueError(
             "That P-Chart verification request "
@@ -434,6 +441,35 @@ def respond_to_practice_chart_verification(
     verification.status = normalized_decision
     verification.response_note = normalized_note or None
     verification.responded_at = datetime.now(timezone.utc)
+    if normalized_decision == "approved" and chart.source == "p-book" and not chart.credits_awarded:
+        from .contests import CENTRAL
+        now = verification.responded_at
+        day_start = datetime.combine(
+            now.astimezone(CENTRAL).date(), datetime.min.time(), CENTRAL
+        ).astimezone(timezone.utc)
+        # Preserve the BOOK formula and 75 ceiling, using the actual earning
+        # day (and rolling 24h), never the browser's chosen practice date.
+        earned = max(session.scalar(select(func.coalesce(func.sum(RewardGrant.amount), 0)).where(
+            RewardGrant.profile_id == chart.profile_id,
+            RewardGrant.category_key == "practice",
+            RewardGrant.reward_type == "dandelion",
+            RewardGrant.created_at >= boundary,
+        )) or 0 for boundary in (day_start, now - timedelta(hours=24)))
+        amount = min(chart.minutes // 5 + len(normalize_practice_details(chart.practice_details)),
+                     max(0, MAX_DAILY_CREDITS - earned))
+        if amount:
+            payload = deepcopy(state.state_json or {})
+            progress = dict(payload.get("progress") or {})
+            balance = progress.get("credits", 0)
+            progress["credits"] = (balance if type(balance) is int else 0) + amount
+            payload["progress"] = progress
+            state.state_json = payload
+            state.revision += 1
+            chart.credits_awarded = amount
+            session.add(RewardGrant(profile_id=chart.profile_id,
+                source_key=f"practice-chart:{chart.id}", reward_type="dandelion",
+                category_key="practice", amount=amount, created_at=now))
+
 
     try:
         session.commit()

@@ -69,3 +69,9 @@ def preserve_server_values(submitted, saved=None):
 def economy_payload(state):
     return {"credits": (state.state_json.get("progress") or {}).get("credits", 0),
             "state_revision": state.revision}
+
+
+def qualified_camp_point_clause():
+    """Unverified legacy check-ins must not generate new standings/crowns."""
+    from .models import CampPointAward
+    return CampPointAward.activity_type.in_(("trivia", "contest-placement", "placement"))

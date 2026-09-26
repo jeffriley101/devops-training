@@ -5272,11 +5272,11 @@
         feedbackEl.textContent = verifierId
           ? (
               `A new page was added for ${verifierName}. Verification is pending. ` +
-              `+${dandelionsEarned} dandelions added.`
+              `Rewards and contest credit require reviewer approval.`
             )
           : (
-              `A new Open P-Chart was saved. ` +
-              `+${dandelionsEarned} dandelions added.`
+              `A private practice log was saved. ` +
+              `Rewards and contest credit require reviewer approval.`
             );
         const deliveryMessages = [];
         const verificationStatus = createdPayload.verification_email || createdPayload.email_delivery;

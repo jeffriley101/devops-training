@@ -245,6 +245,8 @@ def test_rollover_preserves_history_state_rewards_crown_and_activity_data(
     session, _ = database
     source, old_week, contests = ready_source(session)
     student = add_student(session)
+    from app.age_privacy import declare_age
+    declare_age(session, student.id, "adult", at=datetime(2025, 1, 1, tzinfo=timezone.utc))
     verifier = TrustedVerifier(
         email="preserved-verifier@example.com",
         display_name="Preserved Verifier",
@@ -367,7 +369,7 @@ def test_new_season_standings_start_empty_and_new_awards_use_current_week(
     assert set(empty["standings"]["weekly-practice-by-instrument"]) == {"open"}
 
     create_camp_point_award(
-        session, profile=student, activity_type="care",
+        session, profile=student, activity_type="trivia",
         activity_date=date(2026, 8, 4),
         now=datetime(2026, 8, 4, 18, tzinfo=timezone.utc),
     )
@@ -406,11 +408,17 @@ def test_status_endpoint_requires_authentication_and_returns_safe_data(
     session, factory = database
     ready_source(session)
     student = add_student(session)
+    from app.age_privacy import declare_age
+    declare_age(session, student.id, "adult", at=datetime(2025, 1, 1, tzinfo=timezone.utc))
     session.commit()
     monkeypatch.setattr(contest_routes, "SessionLocal", factory)
 
     def request(profile_id: int | None = None) -> Request:
-        scope: dict[str, object] = {"type": "http", "method": "GET", "path": "/"}
+        scope: dict[str, object] = {
+            "type": "http", "method": "GET", "path": "/contests/season/status",
+            "scheme": "http", "server": ("testserver", 80),
+            "headers": [], "query_string": b"",
+        }
         scope["session"] = (
             {SESSION_PROFILE_ID: profile_id} if profile_id is not None else {}
         )

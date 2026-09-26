@@ -8,6 +8,9 @@ from .models import ArcadeHighScore, ArcadePlaySession, WoodchuckProfile
 
 def publishable_attempt_bests(session, game_key):
     """Public best can be lower than a lifetime best earned while private."""
+    if game_key != "history-mystery":
+        # No independent evidence exists for these browser-scored games.
+        return {}
     from .age_privacy import can_publish
     from .age_models import AccountPrivacy
     rows = session.execute(select(ArcadePlaySession.profile_id, func.max(ArcadePlaySession.submitted_score))

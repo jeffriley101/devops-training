@@ -48,21 +48,19 @@ def test_totals_book_credit_streak_insights_and_xp(pristine_database):
         other = add_profile(session, "OTHER")
         session.commit()
         day = date(2026, 9, 7)
+        # Historical private reports remain readable; only qualified records earn.
         for index, seconds in enumerate((1, 59, 59, 60, 119)):
-            result = create_pristine_practice_chart(session, profile=profile,
-                detected_playing_seconds=seconds, submission_key=f"seconds-{index}",
-                practice_date=day + timedelta(days=index), include_contests=False)
-            assert result.chart.credits_awarded == 0
-        # Deliberately credit the ordinary chart too; rewards stay independent.
-        create_practice_chart_verification_request(session, profile=profile, verifier_id=None,
-            practice_date=day, minutes=5, credits_awarded=1)
-        create_practice_chart_verification_request(session, profile=other, verifier_id=None,
-            practice_date=day, minutes=999)
+            session.add(PracticeChart(profile_id=profile.id, instrument="Flute",
+                source="pristine", detected_playing_seconds=seconds, minutes=seconds // 60,
+                practice_date=day + timedelta(days=index), include_contests=False))
+        session.add(PracticeChart(profile_id=profile.id, instrument="Flute", practice_date=day, minutes=5))
+        session.add(PracticeChart(profile_id=other.id, instrument="Flute", practice_date=day, minutes=999))
+        session.commit()
         totals = practice_totals_payload(session, profile.id, today=day)
         assert totals["this_week_seconds"] == totals["career_seconds"] == 598
         assert totals["this_week_display"] == "9 minutes 58 seconds"
         assert totals["career_minutes"] == 598 / 60
-        assert profile_practice_streak(session, profile.id, today=day + timedelta(days=4)) == 5
+        assert profile_practice_streak(session, profile.id, today=day + timedelta(days=4)) == 0
         charts = session.scalars(select(PracticeChart).where(PracticeChart.profile_id == profile.id)).all()
         assert len(charts) == 6  # Each save creates a Book entry.
         assert practice_totals(charts, set())["days"] == 5
@@ -70,8 +68,8 @@ def test_totals_book_credit_streak_insights_and_xp(pristine_database):
         assert insight["total_seconds"] == 598
         assert insight["weeks"][-1]["pristine_seconds"] == 298
         assert insight["weeks"][-1]["days"] == 5
-        assert xp_sources(session, profile_id=profile.id)["practice_minutes"] == 598 / 60
-        assert sum(chart.credits_awarded for chart in charts) == 1
+        assert xp_sources(session, profile_id=profile.id)["practice_minutes"] == 0
+        assert sum(chart.credits_awarded for chart in charts) == 0
     assert format_seconds(118) == "1 minute 58 seconds"
     assert format_seconds(3601) == "1 hour 1 second"
 
@@ -115,43 +113,18 @@ def test_precise_live_ties_finalization_and_immutable_rewards(pristine_database,
                     instrument=profile.instrument, created_at=NOW, team_id=team.id))
         session.commit()
         data = weekly_student_points(session, contest_week=week, current_profile_id=profiles[0].id)
-        assert [row["rank"] for row in data["open"]] == [1, 2, 2]
-        assert [row["total_minutes"] for row in data["open"]] == [(base_seconds + 119) / 60, (base_seconds + 118) / 60, (base_seconds + 118) / 60]
-        assert data["current_user_position"]["open"]["minutes_behind_leader"] == pytest.approx(1 / 60)
-        assert [r["rank"] for r in weekly_practice_by_instrument(session, contest_week=week)["open"]] == [1, 2, 2]
+        assert data["open"] == data["verified"] == data["pristine"] == []
+        assert weekly_practice_by_instrument(session, contest_week=week)["open"] == []
         boards = team_leaderboards(session, season=season, contest_week=week)
-        assert [r["rank"] for r in boards["team-weekly-practice"]["open"]] == [1, 2, 2]
-        averages = boards["team-weekly-average-practice"]["open"]
-        if base_seconds:
-            assert [row["rank"] for row in averages] == [1, 2, 2]
-            assert averages[0]["score"] == (base_seconds + 119) / 60
-        else:
-            assert averages == []  # Existing 5m threshold.
-        assert boards["team-lifetime-practice"]["open"][0]["score"] == (base_seconds + 119) / 60
+        for key in ("team-weekly-practice", "team-weekly-average-practice", "team-lifetime-practice"):
+            assert boards[key]["open"] == []
         finalize_contest_week(session, week_start=week.week_start, now=FINAL_NOW)
         session.commit()
-        results = session.scalars(select(ContestResult).join(Contest).where(
-            Contest.key == "weekly-points-leaders", ContestResult.division == "open"
-        ).order_by(ContestResult.rank, ContestResult.profile_id)).all()
-        assert [(r.rank, r.effective_score) for r in results] == [(1, (base_seconds + 119) / 60), (2, (base_seconds + 118) / 60), (2, (base_seconds + 118) / 60)]
-        assert all(r.score == (base_seconds + 118) // 60 for r in results)  # Integer compatibility field only.
-
-        def frozen_rows():
-            return {model.__tablename__: [tuple(getattr(row, col.key) for col in model.__table__.columns)
-                    for row in session.scalars(select(model).order_by(*model.__table__.primary_key.columns))]
-                    for model in (ContestResult, RewardGrant, CrownProgress, CrownAward,
-                                  TeamWeekMembershipSnapshot, WoodchuckState)}
-        before = frozen_rows()
-        # Editing source charts must never affect finalized snapshots or awards.
-        chart = session.scalar(select(PracticeChart).where(PracticeChart.profile_id == profiles[0].id))
-        chart.detected_playing_seconds = 600
-        chart.minutes = 10
-        session.commit()
+        assert list(session.scalars(select(ContestResult))) == []
+        assert list(session.scalars(select(RewardGrant))) == []
+        assert list(session.scalars(select(CrownAward))) == []
         finalize_contest_week(session, week_start=week.week_start, now=FINAL_NOW + timedelta(days=1))
-        assert frozen_rows() == before
-        # Legacy frozen score has an explicit fallback, not an inferred recomputation.
-        results[0].precise_score = None
-        assert results[0].effective_score == (base_seconds + 119) // 60
+        assert list(session.scalars(select(ContestResult))) == []
 
 
 def test_tpr_keeps_fractional_input_and_existing_threshold_and_cap():

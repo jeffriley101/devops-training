@@ -89,8 +89,8 @@ def test_query_selectors_cannot_change_private_student_scope(identities):
     assert first.get('/practice-charts?profile_id=2').json()['charts'] == []
 
 
-def test_open_arcade_score_forgery_consequences_are_characterized(economy_database):
-    """OPEN finding: this asserts observed consequences, not successful remediation."""
+def test_arcade_score_forgery_cannot_earn_or_publish(economy_database):
+    """SEC-003: even in-range assertions are not earning evidence."""
     from app.arcade_scores import MAX_ARCADE_SCORE
     first, profile = arcade_client(economy_database, 'FORGER', credits=20)
     start = first.post('/arcade/plays', json={'game_key':'blue','request_id':uuid4().hex})
@@ -98,13 +98,13 @@ def test_open_arcade_score_forgery_consequences_are_characterized(economy_databa
     path = '/arcade/plays/'+start.json()['play_token']+'/complete'
     result = first.post(path, json={'score':MAX_ARCADE_SCORE})
     assert result.status_code == 200
-    assert result.json()['payout'] == 5
-    assert result.json()['balance'] == 25  # Blue is free; existing client-score trust is unchanged.
-    assert first.post(path, json={'score':MAX_ARCADE_SCORE}).json()['balance'] == 25
+    assert result.json()['payout'] == 0
+    assert result.json()['balance'] == 20
+    assert first.post(path, json={'score':MAX_ARCADE_SCORE}).json()['balance'] == 20
     second, _ = arcade_client(economy_database, 'OTHER', credits=20)
     assert second.post(path, json={'score':MAX_ARCADE_SCORE}).status_code == 404
     board = second.get('/arcade/scores/blue')
-    assert str(MAX_ARCADE_SCORE) in board.text  # Shared score integrity affected.
+    assert str(MAX_ARCADE_SCORE) not in board.text
     assert profile.woodchuck_id not in board.text
 
 

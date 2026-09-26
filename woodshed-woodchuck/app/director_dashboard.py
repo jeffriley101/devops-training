@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from .practice_duration import chart_seconds
+from .practice_duration import chart_seconds, qualified_practice_clause
 from .account_routes import current_profile
 from .contests import CENTRAL, central_week_boundaries, ensure_current_contest_data
 from .db import SessionLocal
@@ -118,6 +118,7 @@ def _period_roster(
 def _dashboard_practice_rows(
     session: Session, *, team_id: int, week_start: date, week_end: date
 ) -> list[PracticeChart]:
+    """Submitted charts in dashboard scope, before scoring qualification."""
     return list(session.scalars(select(PracticeChart).where(
         PracticeChart.team_id == team_id,
         PracticeChart.practice_date >= week_start,
@@ -153,11 +154,19 @@ def dashboard_payload(
     roster = _period_roster(
         session, team_id=selected_id, starts_at=starts_at, ends_at=ends_at
     )
-    charts = _dashboard_practice_rows(
+    submitted_charts = _dashboard_practice_rows(
         session, team_id=selected_id, week_start=week_start, week_end=week_end
     )
     roster = {pid for pid in roster if can_publish(session, pid)}
-    charts = [chart for chart in charts if chart.profile_id in roster and chart_public(session, chart)]
+    submitted_charts = [chart for chart in submitted_charts
+                        if chart.profile_id in roster and chart_public(session, chart)]
+    submitted_ids = [chart.id for chart in submitted_charts]
+    # Review counts include pending submissions. Every scored metric uses the
+    # stricter SEC-003 subset of these same authorized, public, in-window rows.
+    qualified_ids = set(session.scalars(select(PracticeChart.id).where(
+        PracticeChart.id.in_(submitted_ids), qualified_practice_clause(),
+    ))) if submitted_ids else set()
+    charts = [chart for chart in submitted_charts if chart.id in qualified_ids]
     member_seconds: dict[int, int] = defaultdict(int)
     daily_seconds: dict[date, int] = defaultdict(int)
     instrument_seconds: dict[str, int] = defaultdict(int)
@@ -175,11 +184,11 @@ def dashboard_payload(
         [seconds / 60 for seconds in member_seconds.values()], eligible_roster=len(roster)
     )
 
-    chart_ids = [chart.id for chart in charts]
     verification_rows = list(session.scalars(select(PracticeChartVerification).where(
-        PracticeChartVerification.practice_chart_id.in_(chart_ids)
-    )).all()) if chart_ids else []
-    verified_count = sum(row.status == "approved" for row in verification_rows)
+        PracticeChartVerification.practice_chart_id.in_(submitted_ids)
+    )).all()) if submitted_ids else []
+    verified_count = sum(row.status == "approved" and row.responded_at is not None
+                         for row in verification_rows)
     pending_count = sum(row.status == "pending" for row in verification_rows)
 
     today = _utc(now).astimezone(CENTRAL).date()
@@ -217,7 +226,7 @@ def dashboard_payload(
                 "percent": round(len(meaningful) * 100 / len(roster)) if roster else 0,
             },
             "p_charts": {
-                "submitted": len(charts),
+                "submitted": len(submitted_charts),
                 "verified": verified_count,
                 "pending": pending_count,
             },
@@ -355,6 +364,7 @@ def _contest_team_scores(
     charts = session.scalars(select(PracticeChart).where(
         PracticeChart.team_id.in_(team_ids),
         PracticeChart.include_contests.is_(True),
+        qualified_practice_clause(),
         PracticeChart.include_team_contests.is_(True),
         PracticeChart.created_at >= _utc(contest.starts_at),
         PracticeChart.created_at < _utc(contest.ends_at),
@@ -380,7 +390,8 @@ def _contest_team_scores(
             score = calculate_team_practice_rating(
                 [seconds / 60 for seconds in member_values], eligible_roster=roster_count
             ).rating
-        scores[team_id] = (score, active_count, roster_count)
+        if score > 0:
+            scores[team_id] = (score, active_count, roster_count)
     return scores
 
 

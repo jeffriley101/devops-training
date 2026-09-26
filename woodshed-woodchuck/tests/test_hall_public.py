@@ -12,7 +12,7 @@ from app import account_routes, contests, main
 from app.db import Base
 from app.age_privacy import declare_age
 from app.models import (Contest, ContestResult, ContestWeek, DirectorTeamContest,
-                        DirectorTeamContestResult, PracticeChart, Season, Team, WoodchuckProfile)
+                        DirectorTeamContestResult, PracticeChart, PracticeChartVerification, Season, Team, WoodchuckProfile)
 from app.security import hash_pin
 from tests.team_factory import make_team
 
@@ -48,9 +48,11 @@ def hall_db(monkeypatch):
                          normalized_name="team alpha", emblem_key="shield:gold",
                          creator_profile_id=people[0].id)
         session.add_all([week, team]); session.flush()
-        session.add(PracticeChart(profile_id=people[0].id, practice_date=week.week_start,
+        chart = PracticeChart(profile_id=people[0].id, practice_date=week.week_start,
             minutes=42, instrument="Flute", source="p-book", credits_awarded=0,
-            include_contests=True, created_at=NOW-timedelta(days=1)))
+            include_contests=True, created_at=NOW-timedelta(days=1))
+        session.add(chart); session.flush()
+        session.add(PracticeChartVerification(practice_chart_id=chart.id, status="approved", responded_at=NOW))
         for kind, subjects in (("student", people), ("team", [team]), ("instrument", [None])):
             contest = Contest(key=f"dto-{kind}", name=f"Synthetic {kind}",
                               metric_type="practice_minutes", subject_type=kind, active=True)

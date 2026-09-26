@@ -144,12 +144,12 @@ def add_week_activity(
     ))
     session.add(CampPointAward(
         profile_id=profile.id,
-        activity_type="care",
+        activity_type="trivia",
         points_awarded=1,
         occurred_at=datetime.combine(
             week.week_start, datetime.min.time(), timezone.utc
         ) + timedelta(hours=18),
-        duplicate_key=f"job:{week.week_start}:care",
+        duplicate_key=f"job:{week.week_start}:trivia",
         created_at=created_at,
     ))
     session.commit()

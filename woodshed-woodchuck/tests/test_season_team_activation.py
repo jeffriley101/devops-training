@@ -126,6 +126,9 @@ def test_later_normal_source_finalization(db):
         from app.age_privacy import declare_age
         for profile in s.scalars(select(m.WoodchuckProfile)).all():
             declare_age(s, profile.id, "adult", at=base.OLD)
+        for chart in s.scalars(select(m.PracticeChart)).all():
+            s.add(m.PracticeChartVerification(practice_chart_id=chart.id,
+                status="approved", responded_at=DUE))
         finalize_contest_week(s, week_start=date(2026, 9, 21), now=DUE + timedelta(seconds=1))
         s.commit()
         snapshots = list(s.scalars(select(m.TeamWeekMembershipSnapshot).where(m.TeamWeekMembershipSnapshot.contest_week_id == 7)))

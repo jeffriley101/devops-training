@@ -177,7 +177,7 @@ def test_client_cannot_choose_entry_cost_or_payout(economy_database) -> None:
         f"/arcade/plays/{play['play_token']}/complete", json={"score": 250}
     )
     assert accepted.status_code == 200
-    assert accepted.json()["payout"] == 5
+    assert accepted.json()["payout"] == 0
 
 
 @pytest.mark.parametrize("game_key", sorted(ARCADE_PAYOUT_THRESHOLDS))
@@ -202,17 +202,17 @@ def test_completion_pays_once_and_retry_is_idempotent(economy_database) -> None:
     )
 
     assert first.status_code == 200
-    assert first.json()["payout"] == 3
-    assert first.json()["balance"] == 8
+    assert first.json()["payout"] == 0
+    assert first.json()["balance"] == 5
     assert retry.status_code == 200
     assert retry.json()["already_completed"] is True
-    assert retry.json()["payout"] == 3
-    assert balance(economy_database, profile.id) == 8
+    assert retry.json()["payout"] == 0
+    assert balance(economy_database, profile.id) == 5
     with economy_database() as session:
         row = session.scalar(select(ArcadePlaySession))
         assert row.submitted_score == 150
-        assert row.payout == 3
-        assert row.reward_granted_at is not None
+        assert row.payout == 0
+        assert row.reward_granted_at is None
 
 
 @pytest.mark.parametrize(
@@ -250,11 +250,8 @@ def test_repeated_shared_game_completion_keeps_one_score_and_one_payout(
             f"/arcade/plays/{play['play_token']}/complete", json={"score": score}
         )
         assert completed.status_code == 200
-        assert completed.json()["best_score"] == score
-        if score:
-            assert completed.json()["leaderboard"][0]["score"] == score
-        else:
-            assert completed.json()["leaderboard"] == []
+        assert completed.json()["best_score"] == 0
+        assert completed.json()["leaderboard"] == []
 
     with economy_database() as session:
         plays = session.scalars(select(ArcadePlaySession).where(
@@ -266,8 +263,7 @@ def test_repeated_shared_game_completion_keeps_one_score_and_one_payout(
             ArcadeHighScore.game_key == game_key,
         )).all()
     assert len(plays) == len(scores)
-    assert len(high_scores) == 1
-    assert high_scores[0].best_score == 12
+    assert len(high_scores) == 0
 
 
 def test_conflicting_replay_and_another_profile_are_rejected(economy_database) -> None:
@@ -328,8 +324,8 @@ def test_lower_score_completes_and_pays_without_replacing_best(economy_database)
     ).json()
     assert result["updated"] is False
     assert result["best_score"] == 250
-    assert result["payout"] == 2
-    assert result["balance"] == 5
+    assert result["payout"] == 0
+    assert result["balance"] == 3
 
 
 def test_daily_cap_is_per_game_and_still_allows_paid_play(economy_database) -> None:
@@ -353,7 +349,7 @@ def test_daily_cap_is_per_game_and_still_allows_paid_play(economy_database) -> N
     status = client.get("/arcade/plays/status/blue").json()
     assert status["reward_eligible"] is False
     assert status["completed_reward_plays"] == 10
-    assert client.get("/arcade/plays/status/radio-tuner").json()["reward_eligible"] is True
+    assert client.get("/arcade/plays/status/radio-tuner").json()["reward_eligible"] is False
 
     play = client.post("/arcade/plays", json={'request_id': uuid4().hex, 'game_key': "blue"}).json()
     assert play["balance"] == 20
@@ -398,7 +394,7 @@ def test_chicago_calendar_boundary_resets_reward_count(economy_database) -> None
             now=after_midnight,
         )
     assert old_status["reward_eligible"] is False
-    assert new_status["reward_eligible"] is True
+    assert new_status["reward_eligible"] is False
     assert new_status["completed_reward_plays"] == 0
 
 
@@ -416,9 +412,9 @@ def test_service_start_and_complete_are_one_play_one_score(economy_database) -> 
             score=25,
         )
         session.commit()
-    assert result["payout"] == 2
-    assert result["best_score"] == 25
-    assert result["balance"] == 4
+    assert result["payout"] == 0
+    assert result["best_score"] == 0
+    assert result["balance"] == 2
 
 
 def test_all_nine_clients_use_shared_start_and_completion_contract() -> None:

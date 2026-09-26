@@ -136,7 +136,7 @@ def team_public(session, team_id, *, at=None, identity_only=False, week=None):
 def filter_result_rows(session, rows):
     from datetime import datetime, time, timezone
     from zoneinfo import ZoneInfo
-    from .models import ContestWeek
+    from .models import ContestWeek, PracticeChart, PracticeChartVerification
     def instrument_safe(result):
         if result.subject_type != 'instrument': return True
         from .contests import normalize_instrument, _charts_and_approved_ids
@@ -145,10 +145,29 @@ def filter_result_rows(session, rows):
         if week is None: return False
         instrument_key, _ = normalize_instrument(result.instrument or result.display_name_snapshot or '')
         if not instrument_key: return False
-        charts, approved_ids, _ = _charts_and_approved_ids(
-            session, week,
-            submitted_before=week.finalized_at if week.status == 'finalized' else None,
-        )
+        if week.status == 'finalized':
+            if week.finalized_at is None: return False
+            # Publication checks original contributors, not today's earning
+            # eligibility. Dropping unreviewed sources can both hide old medals
+            # and incorrectly omit private contributors from this privacy check.
+            source_query = select(PracticeChart).where(
+                PracticeChart.practice_date >= week.week_start,
+                PracticeChart.practice_date < week.week_end,
+                PracticeChart.include_contests.is_(True),
+                PracticeChart.created_at <= week.finalized_at,
+            )
+            if result.division == 'verified':
+                source_query = source_query.where(PracticeChart.id.in_(
+                    select(PracticeChartVerification.practice_chart_id).where(
+                        PracticeChartVerification.status == 'approved',
+                        PracticeChartVerification.responded_at.is_not(None),
+                        PracticeChartVerification.responded_at <= week.verification_deadline_at,
+                    )
+                ))
+            charts = session.scalars(source_query).all()
+            approved_ids = {chart.id for chart in charts}
+        else:
+            charts, approved_ids, _ = _charts_and_approved_ids(session, week)
         matching = [c for c in charts
                     if normalize_instrument(c.instrument)[0] == instrument_key
                     and (result.division == 'open' or c.id in approved_ids)]
@@ -167,23 +186,28 @@ def filter_result_rows(session, rows):
         team_result_safe(row)]
 
 
-def hall_history_allowed(session, profile_id, *, created_at=None):
+def hall_history_allowed(session, profile_id, *, created_at=None, period_start=None):
+    from .models import WoodchuckProfile
+    profile = session.get(WoodchuckProfile, profile_id)
     rule = session.get(AccountPrivacy, profile_id, populate_existing=True)
     return bool(
-        rule
+        profile and profile.status == 'active'
+        and rule
         and rule.age_band in ('13to17', 'adult')
         and not rule.consent_id
         and rule.public_from is not None
-        and (created_at is None or utc(created_at) < utc(rule.public_from))
+        and (created_at is None or utc(created_at) < utc(rule.public_from)
+             or period_start is not None and utc(period_start) < utc(rule.public_from))
     )
 
 
 def filter_hall_result_rows(session, rows):
-    """Hall-only compatibility for finalized legacy individual results.
+    """Medal Board/Hall compatibility for finalized legacy individual results.
 
     Keep the ordinary historical privacy filter everywhere else. A student result
     rejected only because it predates the new age-screen publication boundary may
-    reappear in the Hall once the account currently declares 13+ or adult.
+    reappear once the active account currently declares 13+ or adult. The
+    contest period may predate screening even when the result was saved later.
     Unscreened, unknown, under-13 and consent-linked accounts remain excluded.
     Team rows follow the public Team identity policy; instruments retain their
     conservative activity privacy filter. Neither uses this student exception.
@@ -198,7 +222,14 @@ def filter_hall_result_rows(session, rows):
             continue
         if result.subject_type != 'student' or result.profile_id is None:
             continue
-        if not hall_history_allowed(session, result.profile_id, created_at=result.created_at):
+        from .models import ContestWeek
+        from zoneinfo import ZoneInfo
+        week = session.get(ContestWeek, result.contest_week_id)
+        if week is None or week.status != 'finalized' or week.finalized_at is None:
+            continue
+        period_start = datetime.combine(week.week_start, time.min, ZoneInfo('America/Chicago'))
+        if not hall_history_allowed(session, result.profile_id,
+                                    created_at=result.created_at, period_start=period_start):
             continue
         output.append(row)
     return output

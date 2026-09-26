@@ -10,7 +10,8 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app import account_routes, director_dashboard, main, teams
+from app import account_routes, director_dashboard, main, session_revocations, teams
+from app.age_privacy import declare_age
 from app.contests import hall_of_champions_payload
 from app.db import Base
 from app.director_dashboard import (
@@ -53,7 +54,7 @@ def dashboard_database(monkeypatch: pytest.MonkeyPatch):
     )
     factory = sessionmaker(bind=engine, expire_on_commit=False)
     Base.metadata.create_all(engine)
-    for module in (account_routes, director_dashboard, main, teams):
+    for module in (account_routes, director_dashboard, main, session_revocations, teams):
         monkeypatch.setattr(module, "SessionLocal", factory)
     monkeypatch.setattr(director_dashboard, "datetime", FixedDashboardDateTime)
     with factory() as session:
@@ -74,6 +75,9 @@ def dashboard_database(monkeypatch: pytest.MonkeyPatch):
                 level="Beginner", goal="Practice",
             ))
         session.flush()
+        # These dashboard/Hall fixtures model already-public adult accounts.
+        for student in session.scalars(select(WoodchuckProfile)):
+            declare_age(session, student.id, "adult", at=NOW - timedelta(days=60))
         for key in ("DIRECTOR", "OTHER"):
             profile = session.scalar(select(WoodchuckProfile).where(
                 WoodchuckProfile.woodchuck_id == f"WC-{key}"
@@ -197,16 +201,18 @@ def test_dashboard_aggregates_metrics_charts_and_pending_state_without_identity_
             include_team_contests=True, created_at=NOW - timedelta(days=1),
         )
         second = PracticeChart(
-            profile_id=student.id, practice_date=date(2026, 8, 25), minutes=3,
+            profile_id=student.id, practice_date=date(2026, 8, 25), minutes=300,
             instrument="Trumpet", team_id=team.id, include_contests=True,
             include_team_contests=True, created_at=NOW,
         )
         session.add_all([first, second]); session.flush()
         session.add_all([
-            PracticeChartVerification(practice_chart_id=first.id, status="approved"),
+            PracticeChartVerification(practice_chart_id=first.id, status="approved",
+                                      responded_at=NOW),
             PracticeChartVerification(practice_chart_id=second.id, status="pending"),
         ])
         session.commit()
+        pending_chart_id = second.id
 
     director = client_for("WC-DIRECTOR")
     payload = director.get(f"/director/dashboard?team_id={team.id}").json()
@@ -215,7 +221,9 @@ def test_dashboard_aggregates_metrics_charts_and_pending_state_without_identity_
         "week_end": "2026-08-31",
     }
     metrics = payload["metrics"]
-    assert metrics["total_practice_minutes"] == 33
+    # Only reviewed practice scores; the submitted/pending counts still describe
+    # the review workflow, including the second chart awaiting approval.
+    assert metrics["total_practice_minutes"] == 30
     assert metrics["average_minutes"] == 30
     assert metrics["participation"] == {"active": 1, "eligible": 2, "percent": 50}
     assert metrics["p_charts"] == {"submitted": 2, "verified": 1, "pending": 1}
@@ -223,10 +231,107 @@ def test_dashboard_aggregates_metrics_charts_and_pending_state_without_identity_
     assert metrics["team_practice_rating"] > 0
     assert payload["charts"]["daily_practice"][0]["minutes"] == 30
     assert {row["instrument"] for row in payload["charts"]["by_instrument"]} == {
-        "Flute", "Trumpet",
+        "Flute",
     }
     assert "Member Person" not in repr(payload["metrics"])
     assert "Student Person" not in repr(payload["charts"])
+    assert sum(row["minutes"] for row in payload["charts"]["daily_practice"]) == 30
+
+    # The same submission joins scoring only after an actual review response.
+    with dashboard_database() as session:
+        review = session.scalar(select(PracticeChartVerification).where(
+            PracticeChartVerification.practice_chart_id == pending_chart_id))
+        review.status = "approved"
+        review.responded_at = NOW
+        session.commit()
+    reviewed = director.get(f"/director/dashboard?team_id={team.id}").json()
+    assert reviewed["metrics"]["p_charts"] == {"submitted": 2, "verified": 2, "pending": 0}
+    assert reviewed["metrics"]["total_practice_minutes"] == 330
+    assert reviewed["metrics"]["average_minutes"] == 165
+    assert reviewed["metrics"]["participation"] == {"active": 2, "eligible": 2, "percent": 100}
+    assert sum(row["minutes"] for row in reviewed["charts"]["daily_practice"]) == 330
+
+
+@pytest.mark.parametrize("excluded_by", [
+    "before_week", "after_week", "contest_opt_out", "team_opt_out",
+    "other_team", "nonmember", "ended_membership", "private_date",
+])
+def test_dashboard_review_counts_preserve_scope_and_privacy(dashboard_database, excluded_by):
+    team = add_owned_team(dashboard_database, "DIRECTOR", "Review Scope", "letter:R")
+    with dashboard_database() as session:
+        member = profile(session, "MEMBER")
+        membership = TeamMembership(
+            season_id=team.season_id, team_id=team.id, profile_id=member.id,
+            selected_week_start=date(2026, 8, 24), started_at=NOW - timedelta(days=5),
+        )
+        session.add(membership)
+        chart = PracticeChart(
+            profile_id=member.id, practice_date=date(2026, 8, 25), minutes=300,
+            instrument="Flute", team_id=team.id, include_contests=True,
+            include_team_contests=True, created_at=NOW,
+        )
+        if excluded_by == "before_week":
+            chart.practice_date = date(2026, 8, 23)
+        elif excluded_by == "after_week":
+            chart.practice_date = date(2026, 8, 31)
+        elif excluded_by == "contest_opt_out":
+            chart.include_contests = False
+        elif excluded_by == "team_opt_out":
+            chart.include_team_contests = False
+        elif excluded_by == "other_team":
+            other_team = create_director_team(
+                session, profile=profile(session, "OTHER"),
+                season=session.get(Season, team.season_id), name="Other Review Scope",
+                emblem_key="letter:O", now=NOW,
+            )
+            chart.team_id = other_team.id
+        elif excluded_by == "nonmember":
+            chart.profile_id = profile(session, "OTHER").id
+        elif excluded_by == "ended_membership":
+            membership.ended_at = datetime(2026, 8, 24, 5, tzinfo=timezone.utc)
+        else:
+            from app.age_models import AccountPrivacy
+            session.get(AccountPrivacy, member.id).public_from = NOW
+        session.add(chart)
+        session.flush()
+        session.add(PracticeChartVerification(practice_chart_id=chart.id, status="pending"))
+        session.commit()
+    response = client_for("WC-DIRECTOR").get(f"/director/dashboard?team_id={team.id}")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["metrics"]["p_charts"] == {"submitted": 0, "verified": 0, "pending": 0}
+    assert payload["metrics"]["total_practice_minutes"] == 0
+    assert payload["charts"]["by_instrument"] == []
+
+
+@pytest.mark.parametrize("status", [None, "rejected", "approved"])
+def test_dashboard_unreviewed_submissions_do_not_score(dashboard_database, status):
+    team = add_owned_team(dashboard_database, "DIRECTOR", "Unreviewed", "letter:U")
+    with dashboard_database() as session:
+        member = profile(session, "MEMBER")
+        session.add(TeamMembership(
+            season_id=team.season_id, team_id=team.id, profile_id=member.id,
+            selected_week_start=date(2026, 8, 24), started_at=NOW - timedelta(days=5),
+        ))
+        chart = PracticeChart(
+            profile_id=member.id, practice_date=date(2026, 8, 25), minutes=300,
+            instrument="Flute", team_id=team.id, include_contests=True,
+            include_team_contests=True, created_at=NOW,
+        )
+        session.add(chart)
+        session.flush()
+        if status is not None:
+            session.add(PracticeChartVerification(
+                practice_chart_id=chart.id, status=status,
+                responded_at=NOW if status == "rejected" else None,
+            ))
+        session.commit()
+    response = client_for("WC-DIRECTOR").get(f"/director/dashboard?team_id={team.id}")
+    assert response.status_code == 200
+    metrics = response.json()["metrics"]
+    assert metrics["p_charts"] == {"submitted": 1, "verified": 0, "pending": 0}
+    assert metrics["total_practice_minutes"] == metrics["average_minutes"] == 0
+    assert metrics["participation"]["active"] == metrics["team_practice_rating"] == 0
 
 
 def test_dashboard_total_is_raw_while_average_and_tpr_use_their_own_caps(
@@ -263,6 +368,7 @@ def test_dashboard_total_is_raw_while_average_and_tpr_use_their_own_caps(
                 created_at=NOW,
             ),
         ])
+        approve_book_fixtures(session, NOW)
         session.commit()
 
     payload = client_for("WC-DIRECTOR").get(
@@ -327,6 +433,7 @@ def _event_setup(factory, metric: str):
                 include_team_contests=True, created_at=end,
             ),
         ])
+        approve_book_fixtures(session, end)
         session.commit()
         return contest.id, owner.id, first.id, second.id, end
 
@@ -424,6 +531,7 @@ def test_director_contest_metric_caps_are_independent(dashboard_database) -> Non
         ])
         session.commit()
 
+        approve_book_fixtures(session, end)
         scores = {}
         for metric, contest in contests.items():
             finalized, created = finalize_director_contest(
@@ -488,7 +596,7 @@ def test_director_dashboard_migration_follows_published_team_foundation() -> Non
 
 
 @pytest.mark.parametrize("metric", ["total_minutes", "average_minutes"])
-def test_seconds_break_live_director_ties_and_freeze_precisely(dashboard_database, metric):
+def test_unverified_seconds_cannot_create_director_results(dashboard_database, metric):
     from app.director_dashboard import _contest_team_scores
     first = add_owned_team(dashboard_database, "DIRECTOR", "Seconds North", "letter:N")
     second = add_owned_team(dashboard_database, "DIRECTOR", "Seconds South", "letter:S")
@@ -514,11 +622,16 @@ def test_seconds_break_live_director_ties_and_freeze_precisely(dashboard_databas
             submitted=DirectorContestCreate(title="Seconds", starts_at=start, ends_at=end,
                 finalizes_at=end, metric=metric, team_ids=[first.id, second.id]))
         scores = _contest_team_scores(session, contest)
-        assert scores[first.id][0] == 358 / 60
-        assert scores[second.id][0] == 359 / 60
+        assert scores == {}
         finalize_director_contest(session, contest=contest, profile=owner, now=end)
         results = session.scalars(select(DirectorTeamContestResult).where(
-            DirectorTeamContestResult.contest_id == contest.id).order_by(DirectorTeamContestResult.rank)).all()
-        assert [(row.team_id, row.rank, row.score) for row in results] == [
-            (second.id, 1, 359 / 60), (first.id, 2, 358 / 60)]
+            DirectorTeamContestResult.contest_id == contest.id)).all()
+        assert results == []
         assert not finalize_director_contest(session, contest=contest, profile=owner, now=end)[1]
+
+
+def approve_book_fixtures(session, at):
+    session.flush()
+    for chart in session.scalars(select(PracticeChart).where(PracticeChart.source == "p-book")):
+        session.add(PracticeChartVerification(practice_chart_id=chart.id, status="approved", responded_at=at))
+    session.flush()

@@ -513,18 +513,15 @@ def test_blue_and_radio_score_posts_persist_and_refresh_leaderboards(
     radio = submit_paid_score(client, "radio-tuner", 85)
 
     assert blue.status_code == radio.status_code == 200
-    assert blue.json()["best_score"] == 70
-    assert radio.json()["best_score"] == 85
-    assert blue.json()["leaderboard"][0]["is_current_user"] is True
-    assert radio.json()["leaderboard"][0]["is_current_user"] is True
+    assert blue.json()["best_score"] == 0
+    assert radio.json()["best_score"] == 0
+    assert blue.json()["leaderboard"] == []
+    assert radio.json()["leaderboard"] == []
     with arcade_database() as session:
         rows = session.scalars(
             select(ArcadeHighScore).where(ArcadeHighScore.profile_id == profile.id)
         ).all()
-    assert {(row.game_key, row.best_score) for row in rows} == {
-        ("blue", 70),
-        ("radio-tuner", 85),
-    }
+    assert rows == []
 
 
 def test_first_score_persists_and_lower_score_cannot_replace_it(
@@ -555,14 +552,14 @@ def test_higher_and_duplicate_submissions_are_safe_across_sessions(
         data={"woodchuck_id": profile.woodchuck_id, "pin": "2468"},
     ).status_code == 200
 
-    assert submit_paid_score(first_device, "radio-tuner", 30).json()["updated"] is True
+    assert submit_paid_score(first_device, "radio-tuner", 30).json()["updated"] is False
     assert submit_paid_score(first_device, "radio-tuner", 30).json()["updated"] is False
     higher = submit_paid_score(second_device, "radio-tuner", 55)
     reloaded = first_device.get("/arcade/scores/radio-tuner")
 
     assert higher.status_code == reloaded.status_code == 200
-    assert higher.json()["updated"] is True
-    assert reloaded.json()["best_score"] == 55
+    assert higher.json()["updated"] is False
+    assert reloaded.json()["best_score"] == 0
 
 
 def test_top_five_uses_olympic_ties_and_public_active_names(
@@ -602,11 +599,7 @@ def test_top_five_uses_olympic_ties_and_public_active_names(
         )
 
     assert [(row["rank"], row["display_name"], row["score"]) for row in payload["leaderboard"]] == [
-        (1, "Leader", 100),
-        (2, "Alpha", 90),
-        (2, "Zulu", 90),
-        (4, "Fourth", 80),
-        (5, "Fifth", 70),
+        (1, "Current", 60),  # Retained owner-only legacy best; no shared unchecked ranking.
     ]
     assert "Deleted Secret" not in str(payload)
     assert "woodchuck_id" not in str(payload)

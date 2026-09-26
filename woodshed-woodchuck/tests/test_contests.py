@@ -101,7 +101,7 @@ def add_chart(
     practice_date: date,
     minutes: int,
     instrument: str | None = None,
-    verification_status: str | None = None,
+    verification_status: str | None = "approved",
     include_contests: bool = True,
     created_at: datetime | None = None,
 ) -> PracticeChart:
@@ -222,7 +222,7 @@ def test_camp_point_activities_persist_once_and_aggregate_separately(
     session.add(WoodchuckState(
         profile_id=student.id, state_json=deepcopy(state_payload), revision=3
     ))
-    for activity in ("hours", "care", "trivia", "marching"):
+    for activity in ("trivia",):
         award, created = create_camp_point_award(
             session,
             profile=student,
@@ -243,7 +243,7 @@ def test_camp_point_activities_persist_once_and_aggregate_separately(
 
     assert created is False
     assert duplicate.activity_type == "trivia"
-    assert session.scalar(select(func.count()).select_from(CampPointAward)) == 4
+    assert session.scalar(select(func.count()).select_from(CampPointAward)) == 1
     standings = weekly_camp_points(
         session, contest_week=week, current_profile_id=student.id
     )
@@ -251,10 +251,10 @@ def test_camp_point_activities_persist_once_and_aggregate_separately(
         "rank": 1,
         "display_name": "Student WC-CAMP-A",
         "emblem_key": None,
-        "total_points": 4,
+        "total_points": 1,
         "is_current_user": True,
     }]
-    assert standings["current_user_position"]["open"]["total_points"] == 4
+    assert standings["current_user_position"]["open"]["total_points"] == 1
     assert "verified" not in standings
     assert session.get(WoodchuckState, student.id).state_json == state_payload
 
@@ -269,7 +269,7 @@ def test_camp_points_do_not_include_p_charts_or_practice_minutes(
         session, profile=student, practice_date=date(2026, 7, 28), minutes=45
     )
     create_camp_point_award(
-        session, profile=student, activity_type="care",
+        session, profile=student, activity_type="trivia",
         activity_date=date(2026, 7, 28), now=NOW,
     )
     session.commit()
@@ -307,7 +307,7 @@ def test_activity_board_includes_bonus_but_excludes_contest_placement(
         session, contest_week=week, current_profile_id=student.id
     )["open"]
 
-    assert rows[0]["total_points"] == 3
+    assert rows == []
 
     finalize_contest_week(session, week_start=week.week_start, now=FINAL_NOW)
     session.commit()
@@ -315,7 +315,7 @@ def test_activity_board_includes_bonus_but_excludes_contest_placement(
         Contest.key == "weekly-camp-points",
         ContestResult.profile_id == student.id,
     ))
-    assert finalized is not None and finalized.score == 3
+    assert finalized is None
 
 
 def test_student_camp_point_totals_use_persisted_central_week_and_exclude_future(
@@ -332,7 +332,7 @@ def test_student_camp_point_totals_use_persisted_central_week_and_exclude_future
         ("future", NOW + timedelta(minutes=1), 50),
     ):
         session.add(CampPointAward(
-            profile_id=student.id, activity_type="hours", points_awarded=points,
+            profile_id=student.id, activity_type="trivia", points_awarded=points,
             occurred_at=occurred_at, duplicate_key=f"totals-{key}",
         ))
     session.commit()
@@ -433,20 +433,20 @@ def test_board_week_and_season_camp_points_share_authoritative_ledger(
         session, profile_id=student.id, now=current_now,
         season=season, contest_week=current_week,
     )
-    assert totals == {"camp_points_this_week": 17, "camp_points_season": 32}
+    assert totals == {"camp_points_this_week": 3, "camp_points_season": 6}
     assert totals["camp_points_season"] >= totals["camp_points_this_week"]
 
     payload = current_contests_payload(
         session, now=current_now, current_profile_id=student.id
     )
-    assert payload["camp_points_this_week"] == 17
-    assert payload["camp_points_season"] == 32
+    assert payload["camp_points_this_week"] == 3
+    assert payload["camp_points_season"] == 6
     student_position = payload["standings"]["weekly-camp-points"][
         "current_user_position"
     ]["open"]
     # The permanent total keeps placement awards, while the activity
     # leaderboard deliberately excludes the 3-point contest placement.
-    assert student_position["total_points"] == 14
+    assert student_position["has_score"] is False
     assert session.scalar(select(func.count()).select_from(CampPointAward).where(
         CampPointAward.profile_id == student.id,
         CampPointAward.duplicate_key.like(
@@ -455,7 +455,7 @@ def test_board_week_and_season_camp_points_share_authoritative_ledger(
     )) == 1
     assert current_contests_payload(
         session, now=current_now, current_profile_id=student.id
-    )["camp_points_season"] == 32
+    )["camp_points_season"] == 6
 
     finalize_contest_week(
         session, week_start=prior_week.week_start, now=current_now
@@ -491,21 +491,13 @@ def test_camp_point_award_endpoint_is_authenticated_idempotent_and_private(
     with pytest.raises(HTTPException) as unauthorized:
         contest_module.award_camp_points(request_with_session(), submitted)
     assert unauthorized.value.status_code == 401
-    first = contest_module.award_camp_points(request_with_session(student.id), submitted)
-    repeated = contest_module.award_camp_points(request_with_session(student.id), submitted)
-    persisted = contest_module.daily_camp_point_awards(
-        submitted.activity_date, request_with_session(student.id)
-    )
-
-    assert first["created"] is True
-    assert repeated["created"] is False
-    assert first["award"]["points_awarded"] == 1
-    assert persisted["activity_date"] == submitted.activity_date.isoformat()
-    assert persisted["awards"] == [first["award"]]
-    assert session.scalar(select(func.count()).select_from(CampPointAward)) == 1
-    serialized = repr(first).casefold()
-    for private in ("profile_id", "woodchuck_id", "wc-camp-private", "pin", "email", "verifier"):
-        assert private not in serialized
+    for _ in range(2):
+        with pytest.raises(HTTPException) as rejected:
+            contest_module.award_camp_points(request_with_session(student.id), submitted)
+        assert rejected.value.status_code == 400
+    persisted = contest_module.daily_camp_point_awards(submitted.activity_date, request_with_session(student.id))
+    assert persisted["awards"] == []
+    assert session.scalar(select(func.count()).select_from(CampPointAward)) == 0
 
     with pytest.raises(HTTPException) as unauthorized_read:
         contest_module.daily_camp_point_awards(
@@ -581,7 +573,6 @@ def test_weekly_practice_divisions_and_boundaries(
 
     assert standings["open"] == [
         {"rank": 1, "instrument": "Saxophone", "total_minutes": 100},
-        {"rank": 2, "instrument": "Trumpet", "total_minutes": 50},
     ]
     assert set(standings) == {"open"}
 
@@ -773,12 +764,12 @@ def test_student_points_rankings_and_current_user_position(
         "rank": 6,
         "display_name": "Foxtrot Chuck",
         "emblem_key": None,
-        "total_minutes": 20,
+        "total_minutes": 10,
         "is_current_user": True,
     }
     assert standings["current_user_position"]["open"] == {
         "rank": 6,
-        "total_minutes": 20,
+        "total_minutes": 10,
         "minutes_behind_leader": 50,
         "tied": False,
         "in_top_five": False,
@@ -827,7 +818,7 @@ def test_student_standings_include_live_week_team_emblems_and_no_team_null(
     pristine_chart.detected_playing_seconds = 1200
     for profile in (teammate, unteamed):
         session.add(CampPointAward(
-            profile_id=profile.id, activity_type="care", points_awarded=1,
+            profile_id=profile.id, activity_type="trivia", points_awarded=1,
             occurred_at=NOW, duplicate_key=f"emblem-live:{profile.id}",
         ))
     session.commit()
@@ -841,10 +832,9 @@ def test_student_standings_include_live_week_team_emblems_and_no_team_null(
 
     assert {row["display_name"]: row["emblem_key"] for row in practice["open"]} == {
         teammate.display_name: "emoji:lion",
-        unteamed.display_name: None,
     }
     assert practice["verified"][0]["emblem_key"] == "emoji:lion"
-    assert practice["pristine"][0]["emblem_key"] is None
+    assert practice["pristine"] == []
     assert {row["display_name"]: row["emblem_key"] for row in activity_rows} == {
         teammate.display_name: "emoji:lion",
         unteamed.display_name: None,
@@ -893,7 +883,7 @@ def test_student_standings_use_finalized_week_membership_snapshot(
         session, profile=student, practice_date=date(2026, 7, 29), minutes=25
     )
     session.add(CampPointAward(
-        profile_id=student.id, activity_type="care", points_awarded=1,
+        profile_id=student.id, activity_type="trivia", points_awarded=1,
         occurred_at=NOW, duplicate_key="emblem-snapshot",
     ))
     session.commit()
@@ -943,15 +933,14 @@ def test_student_points_use_olympic_ties_and_separate_divisions(
 
     assert [(row["rank"], row["display_name"], row["total_minutes"]) for row in standings["open"]] == [
         (1, "Alpha", 30),
-        (1, "Beta", 30),
-        (3, "Gamma", 15),
+        (2, "Beta", 15),
     ]
     assert [(row["display_name"], row["total_minutes"]) for row in standings["verified"]] == [
         ("Alpha", 30),
         ("Beta", 15),
     ]
-    assert standings["current_user_position"]["open"]["tied"] is True
-    assert standings["current_user_position"]["open"]["minutes_behind_leader"] == 0
+    assert standings["current_user_position"]["open"]["tied"] is False
+    assert standings["current_user_position"]["open"]["minutes_behind_leader"] == 15
     assert standings["current_user_position"]["verified"]["minutes_behind_leader"] == 15
 
 
@@ -1122,7 +1111,7 @@ def test_successful_finalization_medals_rewards_crown_and_idempotence(
     assert [(r.rank, r.medal) for r in point_results] == [
         (1, "gold"), (2, "silver"), (3, "bronze")
     ]
-    assert [result.score for result in point_results] == [20, 15, 10]
+    assert [result.score for result in point_results] == [20, 10, 5]
     assert not any(
         grant.profile_id in {beta.id, gamma.id}
         and grant.source_key.endswith("gold")
@@ -1362,10 +1351,10 @@ def test_camp_points_finalize_once_with_medals_reward_and_crown(
         (silver, ("hours", "care")),
         (bronze, ("hours",)),
     ):
-        for activity in activities:
+        for offset, activity in enumerate(activities):
             award, _created = create_camp_point_award(
-                session, profile=profile, activity_type=activity,
-                activity_date=date(2026, 7, 28), now=NOW,
+                session, profile=profile, activity_type="trivia",
+                activity_date=date(2026, 7, 28)+timedelta(days=offset), now=NOW+timedelta(days=offset),
             )
             award.created_at = NOW
     session.commit()
@@ -1451,7 +1440,7 @@ def test_tenth_win_creates_permanent_crown_and_resets_next_progress(
     session.add(CrownProgress(
         profile_id=student.id,
         category_key=contest.crown_category or contest.key,
-        qualifying_wins=9,
+        qualifying_wins=8,
     ))
     add_chart(
         session,
@@ -1656,6 +1645,7 @@ def test_results_are_immutable_private_and_preserve_historical_data(
     finalize_contest_week(session, week_start=week.week_start, now=FINAL_NOW)
     session.commit()
     before = contest_results_payload(session, week)
+    saved_results = list(session.execute(select(ContestResult.id, ContestResult.score, ContestResult.medal)))
     counts = {model: session.scalar(select(func.count()).select_from(model)) for model in (
         WoodchuckProfile, PracticeChart, PracticeChartVerification, Season, ContestWeek
     )}
@@ -1670,7 +1660,11 @@ def test_results_are_immutable_private_and_preserve_historical_data(
     session.commit()
     after = contest_results_payload(session, week)
 
-    assert after == before
+    assert list(session.execute(select(ContestResult.id, ContestResult.score, ContestResult.medal))) == saved_results
+    # Later review changes cannot erase the finalized instrument medal either.
+    assert any(row["contest"]["key"] == "weekly-practice-by-instrument"
+               for row in before["results"])
+    assert after["results"] == before["results"]
     serialized = repr(after).casefold()
     assert "original public name" in serialized
     for private in ("profile_id", "account_id", "woodchuck_id", "wc-secret-hist", "email", "pin", "verifier"):
@@ -1966,7 +1960,7 @@ def test_hall_aggregates_students_instruments_divisions_and_prior_seasons(
                                     (current_week, "Saxophone")):
         add_chart(session, profile=students[0], practice_date=source_week.week_start,
                   minutes=10, instrument=instrument,
-                  verification_status="approved" if source_week is current_week and instrument == "Flute" else None,
+                  verification_status="approved",
                   created_at=source_week.finalized_at - timedelta(days=7))
 
     def result(
@@ -2566,6 +2560,7 @@ def test_open_p_chart_submission_is_idempotent_listed_and_updates_standings(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     session, factory = database
+    test_now = datetime.now(timezone.utc)
     profile = add_student(
         session, woodchuck_id="WC-PERSIST-OPEN", instrument="Tuba"
     )
@@ -2574,7 +2569,7 @@ def test_open_p_chart_submission_is_idempotent_listed_and_updates_standings(
     request = request_with_session(profile.id)
     submitted = PracticeChartCreate(
         verifier_id=None,
-        practice_date=date(2026, 7, 29),
+        practice_date=test_now.astimezone(contest_module.CENTRAL).date(),
         minutes=35,
         note="Completed chart",
         practice_details=["Long tones"],
@@ -2600,26 +2595,24 @@ def test_open_p_chart_submission_is_idempotent_listed_and_updates_standings(
     assert history["charts"][0]["verification"] is None
 
     payload = current_contests_payload(
-        session, now=NOW, current_profile_id=profile.id
+        session, now=test_now, current_profile_id=profile.id
     )
     points = payload["standings"]["weekly-points-leaders"]
     instruments = payload["standings"]["weekly-practice-by-instrument"]
-    assert points["open"][0]["total_minutes"] == 35
+    assert points["open"] == []
     assert points["verified"] == []
-    assert instruments["open"] == [
-        {"rank": 1, "instrument": "Tuba", "total_minutes": 35}
-    ]
+    assert instruments["open"] == []
     assert set(instruments) == {"open"}
 
     profile.instrument = "Flute"
     session.add(PracticeChartVerification(
         practice_chart_id=first["chart"]["id"], verifier_id=None,
         status="approved",
-        responded_at=datetime(2026, 8, 1, 12, tzinfo=timezone.utc),
+        responded_at=test_now,
     ))
     session.commit()
     approved_payload = current_contests_payload(
-        session, now=NOW, current_profile_id=profile.id
+        session, now=test_now, current_profile_id=profile.id
     )
     approved_points = approved_payload["standings"]["weekly-points-leaders"]
     approved_instruments = approved_payload[
@@ -2715,5 +2708,5 @@ def test_historical_hours_awards_still_feed_band_camp_hours_crown(
     )
     assert hours["name"] == "Band Camp Hours Crown"
     assert hours["progress"] == 0
-    assert hours["earned"] is True
-    assert hours["earned_count"] == 1
+    assert hours["earned"] is False
+    assert hours["earned_count"] == 0

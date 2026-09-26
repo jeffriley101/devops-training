@@ -326,3 +326,140 @@ Next Action: Begin a separate minimal server-authority repair pass, containing u
 Exit Criterion: F01–F06 cannot manufacture persistent earning or competitive results through any alias, fresh key or replay; validated qualification and atomicity tested locally including disposable PostgreSQL races; regression suite failures reconciled; report re-audited as SEC-003 VERIFIED before full intended beta.
 Last Updated: 2026-09-25
 ```
+
+# SEC-003 Repair — 2026-09-25 (AFTER; original audit retained above)
+
+This section records the prospective repair on branch `security/sec-003-server-authority-repair-20260925`, starting HEAD `7f1d0f19edddb997a48f69cf3b4b5f4f55927e88`, in `/home/geph/Training_scripts-sec003-repair/woodshed-woodchuck`. Everything above this section is the original **BEFORE** audit, including its executive result and historical test results. No staging, commits, pushes, merges, deployments, other worktree edits, production requests, or production data changes were performed. **No migration was created or required.**
+
+## Authority decisions and containment by chunk
+
+The audit's fail-closed recommendation is applied. This is containment, not a claim that browser scores or microphone durations have become independently verifiable. Entry prices, payout tables, the BOOK formula, and established daily reward amounts remain in source; unqualified assertions cannot trigger them. Server-owned answer/event sessions for the eight games and server-timed practice participation remain deferred. There is no browser secret, signature scheme, microphone upload, new framework, or parallel economy.
+
+| Original finding / repaired route | BEFORE | AFTER and persistent effects |
+|---|---|---|
+| F03: `POST /practice-charts` BOOK | PARTIAL TRUST; submitted time immediately earned currency, XP and Open/team credit | SERVER VALIDATED qualification: self-reported history only at submission; connected authorized review must approve a BOOK chart before XP or competition use. Approval grants the existing `minutes // 5 + distinct details` formula, within 75 dandelions per server earning day AND rolling 24h, atomically with review status and the existing unique RewardGrant source. |
+| F03: `POST /family/practice` | PARTIAL TRUST; private logs earned immediately | Same shared service and approval boundary; always excluded from contests/team contests. Private log/reviewer permissions and child authorization remain intact. |
+| F04: `POST /practice-charts/pristine` | CLIENT ASSERTED; microphone time automatically earned XP/Open/Pristine/team credit | NO PERSISTENT REWARD from assertions. Exact reported seconds remain in private history, explicitly self-reported; competition/team flags forced off. No independent microphone qualification exists, so Pristine assertions never qualify, even if an anomalous review row exists. |
+| F05: `POST /contests/camp-points/awards`, `hours`, `care`, `marching` | PARTIAL TRUST; check-in minted point, dandelion, crown progress | NOT REACHABLE for unverified earning: rejected before award or economy mutation. Trivia's server-checked answer and fixed reward remain. Legacy unverified activity rows are excluded from new XP, standings and crown calculations. |
+| F01: Plunge Burrow result, both completion aliases | CLIENT ASSERTED | NO PERSISTENT REWARD / NO SHARED PUBLICATION; private play acknowledgment only. |
+| F01: Blue result, both completion aliases | CLIENT ASSERTED | Same shared containment. |
+| F01: Radio Tuner result, both completion aliases | CLIENT ASSERTED | Same shared containment. |
+| F01: Wheel of Woodchuck result, both completion aliases | CLIENT ASSERTED | Same shared containment. |
+| F01: Scale Keyboard result, both completion aliases | CLIENT ASSERTED | Same shared containment. |
+| F01: Thirds result, both completion aliases | CLIENT ASSERTED | Same shared containment. |
+| F01: Dressed to the Nines result, both completion aliases | CLIENT ASSERTED | Same shared containment. |
+| F01: Interval Basic Training result, both completion aliases | CLIENT ASSERTED | Same shared containment. |
+| F02: `POST /xp/plunge-points` | PARTIAL TRUST; invented event could mint 10 XP/day without play | NOT REACHABLE for new earning: valid-looking event claims return 409, invalid events remain rejected. No new event ledger row, XP or balance mutation, with or without a play token. Browser no longer emits pickup XP requests; local game scoring remains. |
+| F06: `POST /contests/bonus-challenge/progress` | PARTIAL TRUST; server filled target time and rewarded request | NOT REACHABLE for unverified completion/earning: shared date/assignment check followed by 409 because challenge-specific qualifying evidence does not exist. No QuestCompletion, RewardGrant, CampPointAward, streak or balance mutation. |
+| F06: `POST /contests/quest/completions` | PARTIAL TRUST; caller's logged minutes qualified | Same shared acceptance boundary; legacy alias cannot bypass it. Generic approved practice is deliberately not treated as proof of an assigned Bonus task. |
+| Downstream weekly/director/team/instrument standings and new contest/crown awards | PARTIAL TRUST in unchecked source rows | SERVER VALIDATED practice input or server-owned trivia/placement input. Unreviewed BOOK, all browser Pristine claims, and unverified BOARD/Bonus ledger categories are filtered before aggregation. Previously finalized outcomes are a separate historical-data limitation below. |
+
+Chunk 1 also makes BOOK minutes and submitted credit fields strict integers; requires nonempty bounded submission keys; accepts practice dates only today/yesterday in Central time; serializes all three practice sources under the existing profile/state lock; and limits their combined reported duration to 86,400 seconds per practice date and rolling 24h. There is no earning from a duration cap alone. Normal BOOK minutes remain whole positive minutes; Pristine retains exact positive seconds, including subminute private logs. Human review remains the independent evidence boundary. A repeated key returns the prior row, while changed duration/date/source/note/details fail. Currency provenance remains `practice-chart:{chart.id}`. Submission never accepts the client's requested reward amount. Practice streak used by the account response also requires qualified charts; private history totals remain labeled/logged practice data.
+
+Chunk 2 retains the account-bound play token, packs, access rules, daily History assignment, request-ID uniqueness, row locks, and completion conflict checks. Both `POST /arcade/plays/{token}/complete` and `POST /arcade/scores/{game_key}` use the same completion function. Unchecked scores can be acknowledged once as private attempt data, including extreme in-range integers, but cannot produce a payout, new account best, or shared leaderboard entry. Floats, negatives and out-of-schema-range values still fail validation. Exact replay has no further mutation; changed scores conflict; wrong-account tokens fail. Public attempt selection now permits only History Mystery, preventing older unchecked attempts from becoming new shared scores. Existing owner-only legacy best displays are retained without promotion to shared rankings. History's ordered answer validation and rewards pass their existing tests. Blue and Plunge remain free; paid attempts retain their existing entry policy. No local-only Top 5 was converted into reporting.
+
+Chunk 3 closes the separate pickup/event stream as well as the completion stream. The old Plunge ledger's capped historical XP remains readable; this repair neither rewrites old account balances nor removes historical rows. A new or replayed arbitrary event cannot append to that ledger.
+
+Chunk 4 removes the two duplicated Bonus reward implementations. Current assignment/progress no longer trusts editable browser `daily` state. Neither completion route has challenge-specific evidence, so both fail closed. The current models require positive reward/point amounts; the repair does not insert fake zero-reward completions or add a schema to do so. Activity/challenge text remains available for practice, with an explicit notice that unverified claims earn no completion credit. A future cosmetic check-in feature or qualified Bonus workflow is separate work.
+
+Chunk 5 applies qualification to weekly Open/Verified/Pristine, instrument, team averages/rating/lifetime totals, director dashboard/contest inputs, membership qualification, activity standings, XP and activity-crown reconciliation. Tests seed legacy unverified charts and ten BOARD claims, then finalize a synthetic week: no new ContestResult or CrownAward is created. Existing privacy/publication gates still apply after qualification. Authentication continues through `current_profile`, session revocation/version checks, active status, age/privacy gates and existing entry/reviewer capabilities. Guest requests cannot persist these sources. No SEC-002 gate was weakened.
+
+## Files changed
+
+Application: `app/arcade_rewards.py`, `app/arcade_scores.py`, `app/contests.py`, `app/director_dashboard.py`, `app/economy.py`, `app/practice_chart_routes.py`, `app/practice_charts.py`, `app/practice_duration.py`, `app/xp.py`.
+
+Browser/copy: `static/js/app.js`, `static/js/arcade-economy.js`, `static/js/plunge-burrow.js`, `templates/p_book.html`, `templates/plunge_burrow.html`, `templates/pristine_practice.html`, `templates/quest.html`.
+
+Tests: new `tests/test_sec003_authority.py`; updated `tests/test_arcade.py`, `tests/test_arcade_economy.py`, `tests/test_batch_b_contests_and_crowns.py`, `tests/test_contests.py`, `tests/test_director_dashboard.py`, `tests/test_plunge_burrow.py`, `tests/test_plunge_burrow_second_pass.py`, `tests/test_practice_scoring_repairs.py`, `tests/test_practice_time_precision.py`, `tests/test_pristine_practice.py`, `tests/test_release3_arcade.py`, `tests/test_security_authorization.py`, `tests/test_server_economy.py`, `tests/test_xp.py`.
+
+Documentation: this report. Exact final status and any additional test fixture changes are recorded in the final validation addendum below.
+
+## Test evidence added
+
+`tests/test_sec003_authority.py` exercises all eight games at both a small forged score and 2,147,483,647 through both result aliases; exact retries, changed scores, account token isolation, malformed scores/request IDs, disabled/unknown games, and no shared result. It covers arbitrary BOOK/Pristine time, shared date/24h budgets, source forgery, duplicate private FAMILY logs, changed payloads, no automatic XP/currency, connected-review qualification, duplicate approval, approval-day reward caps across practice dates, and transaction rollback on a failing reward insert. It exercises Plunge with and without an owned completed play; repeated/fresh/conflicting event keys; arbitrary amounts; both Bonus paths; browser-state assignment/completion forgery; and unverified legacy source rows through finalization/crown reconciliation. Each repaired route family is tested unauthenticated, in Guest mode, with a stale session version and with an inactive account. New PostgreSQL-only tests cover simultaneous duplicate practice submissions and simultaneous approval of the same chart; existing PostgreSQL Arcade replay tests now assert zero payout/high-score promotion for unchecked games.
+
+All tests use synthetic/local accounts and cleared environment variables, `DATABASE_URL=sqlite://`, a synthetic session secret, bytecode disabled, and pytest cache disabled. No external PostgreSQL URL or production configuration was used. The existing temporary audit virtual environment was reused.
+
+Initial chunk gates (overlapping runs; do not sum them):
+
+- Chunk 1: 21 new tests passed; combined impacted gate **40 passed, 31 skipped, 6 deselected**.
+- Chunk 2: new security and unchanged History/security checks passed; old tests expecting insecure payouts/publication were updated. Final affected Arcade gate **49 passed, 20 skipped**; preceding expanded run's remaining two assertion mismatches were fixed and rerun.
+- Chunk 3: new security plus affected XP suite **81 passed**.
+- Chunk 4: combined gate **76 passed, 33 skipped**, with two new test-fixture mistakes (out-of-bounds setup and missing account dict) corrected; focused Bonus rerun **3 passed**.
+- Combined security/economy/Arcade/History/session gate: **227 passed, 56 skipped**.
+- Expanded dedicated SEC-003 suite: **102 passed, 4 skipped**. The four skips are SQLite branches that cannot prove PostgreSQL locks and PostgreSQL branches without an explicit disposable database.
+- `node --check` passed for the three changed JavaScript files. `git diff --check` passed.
+
+## Remaining limits and release review
+
+No timer or score assertion is represented as independently verified. Unchecked Arcade payouts/shared ranking, standalone Plunge XP, Pristine earning/competition, BOARD non-trivia earning and Bonus authoritative completion are intentionally unavailable. Restoring those benefits needs qualifying evidence and a separate implementation; merely lifting these guards would reopen the original P1 findings. Existing human review cannot prevent colluding authorized reviewers, as already noted in the original audit.
+
+Unreviewed historical practice and legacy non-trivia BOARD/Bonus rows no longer enter new authoritative aggregate calculations. Private logs and old rows are retained. Existing balances, purchased items, legacy Plunge XP, already-finalized contest results/medals/Hall/crowns and existing crown-progress rows were **not remediated**. Their possible historical contamination requires a separate data inventory and a human decision; no inference of clean production history is made. A saved old finalized result can still appear in historical output. This is separate from accepting a newly forged request after this repair.
+
+PostgreSQL/manual validation remains required: execute new practice/review and existing Arcade/History concurrent tests on the approved disposable schema; verify approval/earning caps across Central midnight and 24h boundaries; exercise authorized private-child/director review and revocation; verify BOOK/Pristine reload/retry, game over/start/paid-pack UX and the unavailable earning notices on mobile; and review old saved outcomes before enabling full competition. PostgreSQL locks and production schema state are not certified by SQLite tests.
+
+Full intended October beta is **not cleared by this source pass alone**. Human review must accept the contained feature set, reconcile the broad regression results below, validate PostgreSQL concurrency, and decide historical-data handling. This repair does not claim restoration of the full set of formerly unverified earning features.
+
+## Final validation addendum
+
+Additional projection testing found that director contest finalization could rank a team with zero qualified practice. `_contest_team_scores` now requires a positive qualifying score before creating a result. Three new security cases cover total minutes, average minutes and team practice rating. The BOARD ledger qualification uses a positive allowlist (`trivia`, `contest-placement`, legacy `placement`), with an additional unknown-source regression case. Private history and authorized reviewer reports may still display reported durations; these reports do not grant rewards or finalize competitive results.
+
+The final affected run used these 17 modules (the command prefix is the same cleared-environment invocation as above, with `SESSION_SECRET=sec003-local-repair-only` and `--tb=short`):
+
+```text
+tests/test_sec003_authority.py tests/test_xp.py
+tests/test_arcade_economy.py tests/test_release3_arcade.py
+tests/test_history_score_integrity.py tests/test_security_authorization.py
+tests/test_server_economy.py tests/test_session_revocation.py
+tests/test_contests.py tests/test_pristine_practice.py
+tests/test_director_dashboard.py tests/test_batch_b_contests_and_crowns.py
+tests/test_arcade.py tests/test_practice_time_precision.py
+tests/test_practice_scoring_repairs.py tests/test_plunge_burrow.py
+tests/test_plunge_burrow_second_pass.py
+```
+
+Result: **408 passed, 8 failed, 60 skipped** in 167.38 seconds. All **106 new SEC-003 cases passed**; the four additional SEC-003 concurrency variants were skipped because an explicit disposable PostgreSQL database was unavailable (SQLite is not treated as lock validation). Other skips are existing database-dependent variants. The eight failures below also occur at the starting HEAD; no eligibility/privacy/session check was relaxed to conceal them:
+
+| Existing failure | Classification |
+|---|---|
+| `test_contests.py::test_age_verified_historical_student_results_restore_to_medal_board_and_hall` | Baseline historical visibility/roster fixture expectation |
+| `test_director_dashboard.py::test_dashboard_route_authorization_six_cards_and_multi_team_selector` | Baseline director roster/authorization fixture |
+| `test_director_dashboard.py::test_dashboard_aggregates_metrics_charts_and_pending_state_without_identity_leak` | Baseline empty authorized roster |
+| `test_director_dashboard.py::test_dashboard_total_is_raw_while_average_and_tpr_use_their_own_caps` | Baseline empty authorized roster |
+| `test_director_dashboard.py::test_contest_authorization_and_hall_are_private_roster_safe` | Baseline historical visibility fixture |
+| `test_practice_time_precision.py::test_director_report_export_and_rendered_seconds` | Baseline empty authorized roster |
+| `test_practice_scoring_repairs.py::test_season_tools_guard_rejects_incomplete_precision_schema` | Baseline migration-revision expectation drift (`revision_not_approved`, expected constraint error) |
+| `test_plunge_burrow.py::test_plunge_uses_the_shared_arcade_soundtrack` | Baseline asset assertion expects v8; template uses v9 |
+
+Baseline comparisons used an immutable `git archive` export of starting HEAD under `/tmp/sec003-baseline.VA8KGs`, with the same synthetic environment. This is not another edited worktree. The five projection modules produced **105 passed / 8 failed** at baseline versus **108 passed / 5 baseline failures** after repair. The two precision modules produced **33 passed / 5 failed** at baseline versus **36 passed / 2 baseline failures** after repair. Updated tests now explicitly create approved BOOK evidence when testing legitimate competition, and assert exclusion when testing self-reported time. No failure was converted to an unconditional skip or xfail.
+
+Temporary diagnostic logs: `/tmp/sec003-final-affected.log`, `/tmp/sec003-affected-baseline.log`, `/tmp/sec003-precision-baseline.log`, `/tmp/sec003-plunge-client-final.log`. These are local review evidence, not deployment artifacts.
+
+The final dedicated security rerun adds explicit malformed Plunge event IDs, Pristine refresh/retry/conflicting payloads and malformed IDs, and invalid Bonus assignments/dates/durations through both aliases: **110 passed, 4 skipped**, 44.05 seconds (`/tmp/sec003-security-final.log`). This supersedes the earlier 102/106-case security counts; application source did not change for these additional cases.
+
+### Full-suite comparison
+
+Both full-suite runs completed, using the same isolated environment and `pytest -q -p no:cacheprovider` without a test-file filter:
+
+| Run | Passed | Failed | Skipped | Time |
+|---|---:|---:|---:|---:|
+| Starting HEAD archive | 1,590 | 277 | 395 | 2,626.82 s |
+| Initial repair snapshot | 1,608 | 344 | 392 | 2,699.22 s |
+
+**The full suite is not clean.** The repair full-suite run began before the later projection/precision fixture corrections, director zero-score correction, and final expanded security cases. It is not represented as a run of the final files. The exact failure-name comparison found **265 shared failures, 79 initial-repair-only failures, and 12 baseline-only failures**. Of the 79 repair-only failures, 51 are superseded by the final 17-module affected run above. The other 28 were investigated in the follow-up below. Counts differ in collection as security tests and replacement expectations were added; the comparison uses node IDs, not just subtraction of pass totals.
+
+Baseline failures span legacy account/session/age and authorized-roster fixtures; outdated browser/asset assertions; migration/schema revision expectations; and existing contest/team/store/verifier tests. No application authorization or privacy gate was weakened to make those tests pass. PostgreSQL-dependent variants and unavailable browser/database tools account for environment-dependent skips; they are not evidence that concurrent behavior passed. Full logs: `/tmp/sec003-broad-baseline.log`, `/tmp/sec003-broad-repair.log`; exact failure-name differences: `/tmp/sec003-broad-comparison.txt`.
+
+The additional 28 repair-only failures were fixture/contract drift: unreviewed practice and unverified BOARD rows were still expected to score; legacy BOOK probes lacked required keys or used old dates/unknown fields; and two Bonus tests required the removed unconditional completion/reward implementation as source strings. Valid competition fixtures now contain approved BOOK evidence or trusted trivia ledger entries. Unreviewed-source tests assert exclusion. Instrument-medal privacy tests still exercise public/private contributing sources with independent approval, and explicitly exclude unreviewed records from the contributing set. The two obsolete Bonus implementation-string tests and an unused reward-count helper were removed; HTTP behavior and absence of persistent effects are covered by the expanded SEC-003 tests, not replaced with skips or xfails.
+
+Additional test files changed for this reconciliation: `tests/test_contest_jobs.py`, `tests/test_email_delivery.py`, `tests/test_guest_boundary.py`, `tests/test_hall_public.py`, `tests/test_instrument_medal_privacy.py`, `tests/test_phase8_i_played_it.py`, `tests/test_phase9_contest_integrity.py`, `tests/test_post_phase5_cleanup.py`, `tests/test_practice_insights.py`, `tests/test_season_rollover.py`, `tests/test_season_team_activation.py`, `tests/test_team_contests.py`, `tests/test_teams_medal_hotfix.py`. The Guest fixture correction also fixes two pre-existing missing-Arcade-request-ID failures. These changes alter test setup/expectations, not the application containment or public identity/privacy policy.
+
+The follow-up ran all 13 modules in that list with the same isolated pytest command: **154 passed, 5 failed, 33 skipped**, 164.40 seconds (`/tmp/sec003-followup-regressions.log`). Four failures reproduce on the starting HEAD: `test_phase9_contest_integrity.py::test_deleted_student_leaves_live_individual_boards_but_not_team_totals`, `test_phase9_contest_integrity.py::test_open_and_verified_wins_share_one_crown_progress_row`, `test_season_rollover.py::test_rollover_preserves_history_state_rewards_crown_and_activity_data`, and `test_season_rollover.py::test_status_endpoint_requires_authentication_and_returns_safe_data`. The fifth was the email-delivery test's remaining hardcoded historical dates in its retry/failure setup. Those were corrected to reuse the initial chart date, and its isolated final rerun **passed** in 26.34 seconds (`/tmp/sec003-email-final2.log`). Persistence, deduplication and mocked delivery-failure handling remain tested.
+
+Thus every initial-repair-only full-suite failure is accounted for by a passing corrected test or by the two obsolete Bonus source-string tests replaced with HTTP security coverage. No new application regression remains demonstrated by these runs. Across the final per-case results of the 30 affected modules and the four last security additions, coverage is **567 passed / 12 confirmed baseline failures / 93 skipped**. This is a deduplicated accounting across reruns, **not a single full-suite execution**. The full-suite initial-snapshot results above remain recorded unchanged. Final JavaScript syntax and `git diff --check` checks passed; the index remained empty.
+
+## Repair disposition
+
+**SEC-003 status: READY TO STAGE** — source containment is ready for human review; no staging was performed. All six original P1 groups are prospectively contained. No known remaining prospective P0/P1 or newly identified P2 is demonstrated in the repaired paths. F07 remains a P3 validation limitation for unexecuted PostgreSQL concurrency/manual checks and the broader baseline test debt. Historical data integrity remains unassessed; this status does not certify old balances or saved awards.
+
+The full intended October beta remains **blocked on SEC-003 release verification**, not on a required migration. It may clear this gate after human review accepts the contained feature set, PostgreSQL/manual validation succeeds, baseline failures are dispositioned, and historical-data handling is decided. If beta requires restoring the disabled unverified rewards/Pristine competition/Bonus completions, that additional qualifying-evidence implementation is still required. No production changes, migration, staging, commit, push, merge or deployment were performed.

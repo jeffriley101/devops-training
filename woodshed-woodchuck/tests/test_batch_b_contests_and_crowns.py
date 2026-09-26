@@ -96,7 +96,7 @@ def test_batch_b_markup_and_privacy_hooks() -> None:
     assert "Actual practice time comes from submitted P-Charts" in board
     assert "Weekly Gold, Silver, and Bronze winners" in board
     assert "Medals will appear after a contest week is finalized." in board
-    assert "This Week’s Credited Practice" in book and "Career Credited Practice" in book
+    assert "This Week’s Reported Practice" in book and "Career Reported Practice" in book
     for category in (
         "Practice Crown", "Band Camp Crown", "Trivia Crown",
         "Instrument Care Crown", "Marching Crown", "Band Camp Hours Crown",

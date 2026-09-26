@@ -32,6 +32,8 @@ def xp_database(monkeypatch: pytest.MonkeyPatch):
     )
     factory = sessionmaker(bind=engine, expire_on_commit=False)
     Base.metadata.create_all(engine)
+    from app import session_revocations
+    monkeypatch.setattr(session_revocations, "SessionLocal", factory)
     monkeypatch.setattr(account_routes, "SessionLocal", factory)
     monkeypatch.setattr(xp_routes, "SessionLocal", factory)
     yield factory
@@ -50,6 +52,8 @@ def add_profile(session, *, woodchuck_id: str = "WC-XP-TEST") -> WoodchuckProfil
     )
     session.add(profile)
     session.flush()
+    from app.age_privacy import declare_age
+    declare_age(session, profile.id, "adult", at=datetime(2000, 1, 1, tzinfo=timezone.utc))
     return profile
 
 
@@ -116,8 +120,8 @@ def test_historical_minutes_and_valid_submitted_p_charts_use_canonical_rows(
 
         sources = xp_sources(session, profile_id=profile.id)
 
-    assert sources["practice_minutes"] == 150
-    assert sources["p_charts"] == 2
+    assert sources["practice_minutes"] == 0
+    assert sources["p_charts"] == 0
 
 
 def test_rejected_verification_does_not_remove_p_chart_xp(xp_database) -> None:
@@ -139,8 +143,8 @@ def test_rejected_verification_does_not_remove_p_chart_xp(xp_database) -> None:
         after = xp_payload(session, profile_id=profile.id)
 
     assert before == after
-    assert after["sources"]["p_charts"] == 1
-    assert after["sources"]["practice_minutes"] == 20
+    assert after["sources"]["p_charts"] == 0
+    assert after["sources"]["practice_minutes"] == 0
 
 
 def test_board_points_are_lifetime_ledger_points(xp_database) -> None:
@@ -166,7 +170,7 @@ def test_board_points_are_lifetime_ledger_points(xp_database) -> None:
 
         sources = xp_sources(session, profile_id=profile.id)
 
-    assert sources["board_points"] == 9
+    assert sources["board_points"] == 7
 
 
 def test_plunge_points_are_capped_at_ten_per_central_day(xp_database) -> None:
@@ -296,12 +300,12 @@ def test_xp_endpoint_requires_authentication_and_returns_calculated_payload(
         "level": 1,
         "current_level_xp": 0,
         "next_level_xp": 250,
-        "progress_percent": 10.0,
-        "xp_total": 25,
+        "progress_percent": 0.0,
+        "xp_total": 0,
         "sources": {
-            "practice_minutes": 24,
+            "practice_minutes": 0,
             "board_points": 0,
-            "p_charts": 1,
+            "p_charts": 0,
             "plunge_points": 0,
         },
     }
@@ -333,31 +337,11 @@ def test_authenticated_plunge_event_persists_with_server_owned_utc_timestamp(
         session.commit()
     client = TestClient(app)
     sign_in_xp_student(client)
-    before = datetime.now(timezone.utc)
-
     response = client.post("/xp/plunge-points", json={
-        "event_key": "server-time-event",
-        "event_type": "carrot",
-        "points_scored": 3,
-    })
-    after = datetime.now(timezone.utc)
-
-    assert response.status_code == 200
-    assert response.json() == {
-        "created": True,
-        "event_key": "server-time-event",
-        "event_type": "carrot",
-        "points_scored": 3,
-    }
+        "event_key": "server-time-event", "event_type": "carrot", "points_scored": 3})
+    assert response.status_code == 409
     with xp_database() as session:
-        award = session.scalar(select(PlungePointAward).where(
-            PlungePointAward.profile_id == profile_id
-        ))
-        assert award is not None
-        occurred_at = award.occurred_at
-        if occurred_at.tzinfo is None:
-            occurred_at = occurred_at.replace(tzinfo=timezone.utc)
-        assert before <= occurred_at <= after
+        assert session.scalar(select(func.count()).select_from(PlungePointAward)) == 0
 
 
 def test_plunge_duplicate_retry_is_idempotent(xp_database) -> None:
@@ -375,10 +359,10 @@ def test_plunge_duplicate_retry_is_idempotent(xp_database) -> None:
     first = client.post("/xp/plunge-points", json=payload)
     second = client.post("/xp/plunge-points", json=payload)
 
-    assert first.status_code == 200 and first.json()["created"] is True
-    assert second.status_code == 200 and second.json()["created"] is False
+    assert first.status_code == 409
+    assert second.status_code == 409
     with xp_database() as session:
-        assert session.scalar(select(func.count()).select_from(PlungePointAward)) == 1
+        assert session.scalar(select(func.count()).select_from(PlungePointAward)) == 0
 
 
 def test_plunge_duplicate_key_with_conflicting_payload_is_rejected(xp_database) -> None:
@@ -398,12 +382,11 @@ def test_plunge_duplicate_key_with_conflicting_payload_is_rejected(xp_database) 
         "points_scored": 3,
     })
 
-    assert first.status_code == 200
+    assert first.status_code == 409
     assert conflict.status_code == 409
     with xp_database() as session:
         award = session.scalar(select(PlungePointAward))
-        assert award.event_type == "dandelion"
-        assert award.points_scored == 1
+        assert award is None
 
 
 @pytest.mark.parametrize(

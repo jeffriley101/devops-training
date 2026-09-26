@@ -172,7 +172,7 @@ console.log(JSON.stringify({best:game.best,dandelionEmpty:!occupied.has(`${game.
     assert 'playEffect("incorrectTrivia")' in GAME_JS
     reporter = GAME_JS[GAME_JS.index("function reportScoringEvent"):GAME_JS.index("function renderLeaderboard")]
     assert "await" not in reporter
-    assert "supplemental and must never interrupt the game" in reporter
+    assert "root.fetch" not in reporter
     assert 'playEffect("' not in GAME_JS[: GAME_JS.index("const game = new PlungeBurrowGame")]
 
 
@@ -261,10 +261,10 @@ def test_lifecycle_inputs_and_single_animation_loop_are_present() -> None:
 
 def test_plunge_persists_only_score_events_without_account_reward_side_effects() -> None:
     combined = TEMPLATE + GAME_JS
-    assert 'root.fetch("/xp/plunge-points"' in GAME_JS
-    assert 'event_key: eventKey' in GAME_JS
-    assert 'event_type: eventType' in GAME_JS
-    assert 'points_scored: pointsScored' in GAME_JS
+    assert 'root.fetch("/xp/plunge-points"' not in GAME_JS
+    assert 'event_key: eventKey' not in GAME_JS
+    assert 'event_type: eventType' not in GAME_JS
+    assert 'points_scored: pointsScored' not in GAME_JS
     assert "occurred_at" not in GAME_JS
     assert "activity_date" not in GAME_JS
     assert "XMLHttpRequest" not in combined

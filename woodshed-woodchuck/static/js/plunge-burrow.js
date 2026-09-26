@@ -461,30 +461,8 @@
   function safeStorageGet(key, fallback) {
     try { const value = root.localStorage.getItem(key); return value === null ? fallback : value; } catch (_error) { return fallback; }
   }
-  const plungeSessionKey = root.crypto && typeof root.crypto.randomUUID === "function"
-    ? root.crypto.randomUUID()
-    : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
-  let plungeEventSequence = 0;
-
-  function reportScoringEvent(eventType, pointsScored) {
-    if (typeof root.fetch !== "function") return;
-    plungeEventSequence += 1;
-    const eventKey = `${plungeSessionKey}:${plungeEventSequence}:${eventType}`;
-    try {
-      const request = root.fetch("/xp/plunge-points", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          event_key: eventKey,
-          event_type: eventType,
-          points_scored: pointsScored,
-        }),
-      });
-      if (request && typeof request.catch === "function") request.catch(function () {});
-    } catch (_error) {
-      // XP reporting is supplemental and must never interrupt the game.
-    }
+  function reportScoringEvent(_eventType, _pointsScored) {
+    // Pickups affect this local run only; they are not authoritative XP events.
   }
 
   function renderLeaderboard(rows) {

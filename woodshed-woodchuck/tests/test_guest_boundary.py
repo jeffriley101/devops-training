@@ -99,9 +99,9 @@ def test_guest_confirmation_copy_describes_browser_session_with_or_without_stude
 
 
 SUBMISSIONS = [
-    ('post', '/practice-charts', {'practice_date':str(date.today()), 'minutes':10, 'note':'synthetic'}),
+    ('post', '/practice-charts', {'practice_date':str(date.today()), 'minutes':10, 'note':'synthetic', 'submission_key':'guest-practice'}),
     ('post', '/practice-charts/pristine', {'detected_playing_seconds':60, 'submission_key':'synthetic-guest'}),
-    ('post', '/arcade/plays', {'game_key':'blue'}),
+    ('post', '/arcade/plays', {'game_key':'blue', 'request_id':'guest-start-request-0001'}),
     ('post', '/arcade/plays/fake-token/complete', {'score':100}),
     ('post', '/teams', {'name':'Synthetic Guests', 'emblem_key':'emoji:bear'}),
     ('post', '/teams/selection', {'team_id':1}),

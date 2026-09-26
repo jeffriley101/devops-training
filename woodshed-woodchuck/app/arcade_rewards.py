@@ -18,7 +18,7 @@ from .history_attempts import (
 )
 from .models import ArcadePlaySession, ArcadeAttemptPack, ArcadeStartRequest, WoodchuckProfile, WoodchuckState
 from .arcade_access import access_policy, CLASSROOM, PACK_COST, PACK_ATTEMPTS
-from .xp import plunge_best_payload, record_plunge_best_score
+from .xp import plunge_best_payload
 
 
 ARCADE_TIMEZONE = ZoneInfo("America/Chicago")
@@ -202,7 +202,8 @@ def arcade_play_status(
         "attempts_remaining": remaining_attempts(session, profile_id, key),
         "completed_reward_plays": completed,
         "daily_reward_limit": DAILY_REWARDED_PLAY_LIMIT,
-        "reward_eligible": completed < DAILY_REWARDED_PLAY_LIMIT,
+        "result_authority": "server_scored" if key == "history-mystery" else "self_reported",
+        "reward_eligible": key == "history-mystery" and completed < DAILY_REWARDED_PLAY_LIMIT,
         "daily_play_available": daily_play_available,
         "daily_play_resumable": daily_play_resumable,
     }
@@ -291,7 +292,7 @@ def start_arcade_play(
             return ArcadePlayStartResult(
                 play=unfinished_play,
                 balance=_balance(state),
-                reward_eligible=completed < DAILY_REWARDED_PLAY_LIMIT,
+                reward_eligible=key == "history-mystery" and completed < DAILY_REWARDED_PLAY_LIMIT,
                 completed_reward_plays=completed,
                 state_revision=state.revision,
                 resumed=True,
@@ -345,7 +346,7 @@ def start_arcade_play(
     return ArcadePlayStartResult(
         play=play,
         balance=new_balance,
-        reward_eligible=completed < DAILY_REWARDED_PLAY_LIMIT,
+        reward_eligible=key == "history-mystery" and completed < DAILY_REWARDED_PLAY_LIMIT,
         completed_reward_plays=completed,
         state_revision=state.revision,
     )
@@ -399,7 +400,9 @@ def complete_arcade_play(
             "game_key": play.game_key,
             "play_token": play.play_token,
             "score": int(play.submitted_score),
-            "payout": int(play.payout or 0),
+            "payout": int(play.payout or 0) if play.game_key == "history-mystery" else 0,
+            "result_authority": "server_scored" if play.game_key == "history-mystery" else "self_reported",
+            "reward_eligible": play.game_key == "history-mystery",
             "balance": _balance(state) if state is not None else 0,
             "state_revision": state.revision if state is not None else 0,
             "already_completed": True,
@@ -420,24 +423,19 @@ def complete_arcade_play(
         now=timestamp,
         exclude_play_id=play.id,
     )
-    reward_eligible = completed_before < DAILY_REWARDED_PLAY_LIMIT
+    reward_eligible = play.game_key == "history-mystery" and completed_before < DAILY_REWARDED_PLAY_LIMIT
     payout = payout_for_score(play.game_key, score) if reward_eligible else 0
     state = _state_for_update(session, profile_id)
     new_balance = _balance(state) + payout
     if payout:
         _set_balance(state, new_balance)
 
-    if play.game_key == "plunge-burrow":
-        _best, updated = record_plunge_best_score(
-            session, profile_id=profile_id, score=score
-        )
-    else:
+    updated = False
+    if play.game_key == "history-mystery":
         _best, updated = record_arcade_high_score(
-            session,
-            profile_id=profile_id,
-            game_key=play.game_key,
-            score=score,
-        )
+            session, profile_id=profile_id, game_key=play.game_key, score=score)
+    # Other scores are private acknowledgments only. Retain attempt accounting
+    # and replay comparison, without promoting the claim to a best or payout.
     play.completed_at = timestamp
     play.submitted_score = score
     play.payout = payout
@@ -451,6 +449,7 @@ def complete_arcade_play(
         "payout": payout,
         "balance": new_balance,
         "state_revision": state.revision,
+        "result_authority": "server_scored" if play.game_key == "history-mystery" else "self_reported",
         "reward_eligible": reward_eligible,
         "daily_reward_limit": DAILY_REWARDED_PLAY_LIMIT,
         "already_completed": False,

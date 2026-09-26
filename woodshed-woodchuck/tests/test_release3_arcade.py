@@ -118,11 +118,11 @@ def test_always_free_and_daily_rewards_still_capped(db, game):
         run = start(db, game)
         assert run.play.entry_cost == 0
         result = complete(db, run.play, 250)
-        assert result['payout'] == (5 if n < 10 else 0)
+        assert result['payout'] == 0
         assert complete(db, run.play, 250)['already_completed']
     with db() as s:
         assert count(s, ArcadeAttemptPack) == 0
-        assert s.get(WoodchuckState, 1).state_json['progress']['credits'] == 50
+        assert s.get(WoodchuckState, 1).state_json['progress']['credits'] == 0
 
 
 @pytest.mark.parametrize('kind', ['PILOT-D1', 'C001', 'membership'])
@@ -174,7 +174,9 @@ def test_http_mismatched_game_direct_score_and_replayed_completion(db):
     duplicate = c.post(f'/arcade/plays/{token}/complete', json={'score': 10}).json()
     assert first['balance'] == duplicate['balance'] and duplicate['already_completed']
     assert c.post(f'/arcade/plays/{token}/complete', json={'score': 11}).status_code == 409
-    with db() as s: assert count(s, ArcadeHighScore) == count(s, ArcadePlaySession) == 1
+    with db() as s:
+        assert count(s, ArcadeHighScore) == 0
+        assert count(s, ArcadePlaySession) == 1
 
 
 def test_history_pack_carries_days_without_changing_daily_limit(db):
@@ -205,19 +207,10 @@ def test_shared_top5_ties_private_self_and_lower_new_public_best(db, game):
     complete(db, start(db, game, pid=1, now=NOW+timedelta(days=2)).play, 95, now=NOW+timedelta(days=2))
     with db() as s:
         shared = scores(s, 8)['leaderboard']
-        assert len(shared) == 5
-        assert [(r['rank'], r['score']) for r in shared] == [(1,95),(2,90),(2,90),(4,80),(5,70)]
-        assert 'Player 7' not in str(shared) and 'profile_id' not in str(shared)
-        assert scores(s, 1)['best_score'] == 1000
-        assert scores(s, 7)['best_score'] == 999
-        assert scores(s, 2)['leaderboard'][:5] == [dict(r, is_current_user=r['display_name']=='Player 2') for r in shared]
-        lower_self = scores(s, 6)
-        assert lower_self['best_score'] == 60
-        assert lower_self['leaderboard'][:5] == shared
-        if game == 'plunge-burrow':
-            assert lower_self['leaderboard'][5:] == [dict(rank=6, display_name='Player 6', score=60, is_current_user=True)]
-        else:
-            assert len(lower_self['leaderboard']) == 5
+        assert shared == []
+        for pid in (1, 2, 6, 7):
+            assert scores(s, pid)['best_score'] == 0
+            assert scores(s, pid)['leaderboard'] == []
 
 
 @pytest.mark.parametrize('game', ['blue', 'plunge-burrow'])
@@ -244,10 +237,10 @@ def test_private_start_completed_after_public_transition_stays_private(db, game)
     complete(db, private, 1000, now=NOW)
     complete(db, start(db, game, pid=2, now=NOW).play, 90, now=NOW)
     with db() as s:
-        assert [(r['display_name'], r['score']) for r in scores(s, 8)['leaderboard']] == [('Player 2', 90)]
+        assert scores(s, 8)['leaderboard'] == []
         own = scores(s, 1)
-        assert own['best_score'] == 1000
-        assert own['leaderboard'][0] == dict(rank=1, display_name='Player 1', score=1000, is_current_user=True)
+        assert own['best_score'] == 0
+        assert own['leaderboard'] == []
 
     # A lower public result must be selected even though the aggregate stays 1000.
     for score in (95, 80):
@@ -255,10 +248,9 @@ def test_private_start_completed_after_public_transition_stays_private(db, game)
                  now=NOW+timedelta(hours=1))
     with db() as s:
         shared = scores(s, 8)['leaderboard']
-        assert [(r['rank'], r['display_name'], r['score']) for r in shared] == [(1, 'Player 1', 95), (2, 'Player 2', 90)]
-        assert scores(s, 1)['best_score'] == 1000
-        assert scores(s, 1)['leaderboard'][0]['score'] == 1000
-        assert scores(s, 8)['leaderboard'] == shared
+        assert shared == []
+        assert scores(s, 1)['best_score'] == 0
+        assert scores(s, 1)['leaderboard'] == []
 
 
 @pytest.mark.parametrize('game', ['blue', 'plunge-burrow'])
@@ -297,6 +289,7 @@ def test_concurrent_tabs_and_duplicate_completions(db):
     assert sum(not r['already_completed'] for r in results) == 1
     for key in keys: assert start(db, key=key).play.id == runs[0].play.id
     with db() as s:
-        assert count(s, ArcadeAttemptPack) == count(s, ArcadePlaySession) == count(s, ArcadeHighScore) == 1
-        assert s.get(WoodchuckState, 1).state_json['progress']['credits'] == 5
+        assert count(s, ArcadeAttemptPack) == count(s, ArcadePlaySession) == 1
+        assert count(s, ArcadeHighScore) == 0
+        assert s.get(WoodchuckState, 1).state_json['progress']['credits'] == 0
         assert arcade.remaining_attempts(s, 1, 'thirds') == 2

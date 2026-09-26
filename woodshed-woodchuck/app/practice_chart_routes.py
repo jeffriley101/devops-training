@@ -6,7 +6,7 @@ from datetime import timezone
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel, Field, StrictBool, StrictInt
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt
 from sqlalchemy import distinct, func, select
 
 from .account_routes import current_profile
@@ -21,7 +21,7 @@ from .models import (
     TrustedVerifier,
     TeamMembership,
 )
-from .practice_duration import chart_seconds, chart_seconds_sql, format_minutes, format_seconds
+from .practice_duration import qualified_practice_clause, chart_seconds, chart_seconds_sql, format_minutes, format_seconds
 from .seasons import season_covering_date
 from .verifiers import validate_email
 from .practice_charts import (
@@ -91,6 +91,7 @@ def profile_practice_streak(session, profile_id: int, today: date | None = None)
         select(distinct(PracticeChart.practice_date)).where(
             PracticeChart.profile_id == profile_id,
             chart_seconds_sql() > 0,
+            qualified_practice_clause(),
         )
     ))
     return practice_streak(dates, today or datetime.now(CENTRAL).date())
@@ -126,19 +127,23 @@ def practice_totals_payload(session, profile_id: int, today: date | None = None,
 
 
 class PracticeChartCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     verifier_id: int | None = Field(default=None, gt=0)
     practice_date: date
-    minutes: int
+    minutes: StrictInt
     note: str = ""
     practice_details: list[str] = Field(default_factory=list)
     source: str = "p-book"
-    credits_awarded: int = 0
-    submission_key: str | None = Field(default=None, min_length=1, max_length=64)
+    credits_awarded: StrictInt = 0
+    submission_key: str = Field(min_length=1, max_length=64)
     include_contests: StrictBool = True
     include_team_contests: StrictBool = True
 
 
 class PristinePracticeChartCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     detected_playing_seconds: StrictInt = Field(ge=1, le=86400)
     submission_key: str = Field(min_length=1, max_length=64)
     include_contests: StrictBool = True
@@ -195,7 +200,8 @@ def chart_payload(
         "note": chart.note or "",
         "practice_details": chart.practice_details,
         "source": chart.source,
-        "pristine": chart.source == "pristine",
+        "pristine": False,
+        "authority": "reviewed" if verification and verification.status == "approved" else "self_reported",
         "detected_playing_seconds": chart.detected_playing_seconds,
         "credits_awarded": chart.credits_awarded,
         "include_contests": chart.include_contests,

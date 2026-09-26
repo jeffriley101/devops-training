@@ -147,29 +147,19 @@ def test_identity_and_other_account_stay_server_owned(economy_db):
         assert anonymous.put('/account/state', json=forged).status_code == 401
 
 
-def test_real_practice_earnings_cap_dedup_and_purchase(economy_db):
+def test_practice_logs_do_not_grant_before_review(economy_db):
     client = signed_client(economy_db)
     before = balance(client)
     today = datetime.now(contests.CENTRAL).date().isoformat()
-    chart = dict(practice_date=today, minutes=20, practice_details=['Scales', 'Scales', 'Long tones'],
+    chart = dict(practice_date=today, minutes=20, practice_details=['Scales', 'Long tones'],
                  credits_awarded=75, submission_key='practice-once')
     first = client.post('/practice-charts', json=chart)
     assert first.status_code == 201
-    assert first.json()['chart']['credits_awarded'] == 6
-    assert balance(client) == before + 6
+    assert first.json()['chart']['credits_awarded'] == 0
     assert client.post('/practice-charts', json=chart).json()['created'] is False
-    assert balance(client) == before + 6
     capped = client.post('/practice-charts', json={**chart, 'minutes':1440, 'submission_key':'cap'})
-    assert capped.json()['chart']['credits_awarded'] == 69
-    no_reward = client.post('/practice-charts', json={**chart, 'submission_key':'cap-again'})
-    assert no_reward.json()['chart']['credits_awarded'] == 0
-    assert balance(client) == before + 75
-    from app.store_catalog import ALL_ITEMS
-    item = ALL_ITEMS['ladybug']
-    purchase = client.post('/store/purchases', json={'item_key': item.item_key})
-    assert purchase.status_code == 201
-    assert balance(client) == before + 75 - item.price
-    assert any(row['item_key'] == item.item_key for row in client.get('/store/inventory').json()['items'])
+    assert capped.status_code == 400
+    assert balance(client) == before
 
 
 def test_board_earnings_once_and_trivia_requires_correct_answer(economy_db):
@@ -178,16 +168,16 @@ def test_board_earnings_once_and_trivia_requires_correct_answer(economy_db):
     today = datetime.now(contests.CENTRAL).date()
     for activity in ('hours', 'care', 'marching'):
         body = {'activity_date': today.isoformat(), 'activity_type': activity}
-        assert client.post('/contests/camp-points/awards', json=body).json()['created'] is True
-        assert client.post('/contests/camp-points/awards', json=body).json()['created'] is False
-    assert balance(client) == before + 3
+        assert client.post('/contests/camp-points/awards', json=body).status_code == 400
+        assert client.post('/contests/camp-points/awards', json=body).status_code == 400
+    assert balance(client) == before
     assert client.post('/contests/camp-points/awards', json={
         'activity_date':today.isoformat(), 'activity_type':'trivia'}).status_code == 400
     question = contests.trivia_question_for(today)
     answer = {'activity_date': today.isoformat(), 'selected_answer_id': question['correct_answer_id']}
     assert client.post('/contests/trivia/answer', json=answer).json()['award_created'] is True
     assert client.post('/contests/trivia/answer', json=answer).json()['award_created'] is False
-    assert balance(client) == before + 4
+    assert balance(client) == before + 1
     other = signed_client(economy_db, 2)
     other_before = balance(other)
     wrong = next(c['id'] for c in question['choices'] if c['id'] != question['correct_answer_id'])
@@ -196,7 +186,7 @@ def test_board_earnings_once_and_trivia_requires_correct_answer(economy_db):
     assert balance(other) == other_before
 
 
-@pytest.mark.parametrize('operation', ['secret', 'practice', 'board', 'quest', 'purchase', 'arcade'])
+@pytest.mark.parametrize('operation', ['secret', 'purchase', 'arcade'])
 def test_stale_sync_cannot_erase_or_refund_intervening_economy(economy_db, operation):
     client = signed_client(economy_db)
     old = state(client)
@@ -307,8 +297,8 @@ def test_postgres_parallel_practice_cannot_exceed_daily_cap(economy_db):
     with ThreadPoolExecutor(max_workers=2) as pool:
         results = list(pool.map(save, (0, 1)))
     assert all(result.status_code == 201 for result in results)
-    assert sorted(result.json()['chart']['credits_awarded'] for result in results) == [25, 50]
-    assert balance(clients[0]) == before + 75
+    assert sorted(result.json()['chart']['credits_awarded'] for result in results) == [0, 0]
+    assert balance(clients[0]) == before
 
 
 def test_postgres_duplicate_reward_and_purchase_do_not_lose_updates(economy_db):
@@ -354,11 +344,10 @@ def test_practice_cap_preserves_current_and_legacy_quest_rules(economy_db, legac
     else:
         result = client.post('/contests/bonus-challenge/progress', json={
             'activity_date': today, 'challenge_instance': challenge['instance_key']})
-    assert result.status_code == 200
-    assert balance(client) == before + 5
+    assert result.status_code == 409
+    assert balance(client) == before
     result = client.post('/practice-charts', json={'practice_date': today,
         'minutes': 500, 'submission_key': 'after-quest', 'credits_awarded': 0})
     assert result.status_code == 201
-    expected = 70 if legacy else 75
-    assert result.json()['chart']['credits_awarded'] == expected
-    assert balance(client) == before + 5 + expected
+    assert result.json()['chart']['credits_awarded'] == 0
+    assert balance(client) == before

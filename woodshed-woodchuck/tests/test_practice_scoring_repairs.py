@@ -12,7 +12,7 @@ from app.contests import (
 )
 from app.models import (
     CampPointAward, Contest, ContestResult, ContestWeek, CrownAward, CrownProgress,
-    PracticeChart, RewardGrant, TeamWeekMembershipSnapshot, WoodchuckState,
+    PracticeChart, PracticeChartVerification, RewardGrant, TeamWeekMembershipSnapshot, WoodchuckState,
 )
 from app.teams import create_and_join_team, select_team
 from test_pristine_practice import pristine_database, add_profile, NOW, FINAL_NOW
@@ -36,9 +36,11 @@ def seed(session, *, base=0):
         team, _ = create_and_join_team(session, profile=person, season=season,
             name=f"Precision {name}", emblem_key=f"letter:{name}", now=NOW)
         chart = PracticeChart(profile_id=person.id, practice_date=week.week_start,
-            minutes=seconds // 60, instrument="Flute", source="pristine",
-            detected_playing_seconds=seconds, team_id=team.id, created_at=NOW)
+            minutes=base // 60 + (2 if name == "A" else 1), instrument="Flute",
+            source="p-book", team_id=team.id, created_at=NOW)
         session.add(chart)
+        session.flush()
+        session.add(PracticeChartVerification(practice_chart_id=chart.id, status="approved", responded_at=NOW))
         people.append(person)
         teams.append(team)
         charts.append(chart)
@@ -64,20 +66,20 @@ def test_missing_result_repair_retains_mode_and_cannot_issue_wrong_rewards(
             week.practice_scoring_mode = mode
             session.commit()
         else:
-            assert [_scoring_seconds(chart, week) for chart in charts] == [base + 119, base + 61]
+            assert [_scoring_seconds(chart, week) for chart in charts] == [base + 120, base + 60]
         finalize_contest_week(session, week_start=week.week_start, now=FINAL_NOW,
                               repair_finalized=mode == LEGACY_PRACTICE_SCORING)
         session.commit()
         session.expire_all()  # Must work from persisted data, not transient state.
         assert week.practice_scoring_mode == mode
         assert [_scoring_seconds(chart, week) for chart in charts] == (
-            [base + 60, base + 60] if mode == LEGACY_PRACTICE_SCORING else [base + 119, base + 61])
+            [base + 120, base + 60])
         contest = session.scalar(select(Contest).where(Contest.key == contest_key))
         subject = str(people[1].id if contest_key == "weekly-points-leaders" else teams[1].id)
         missing = session.scalar(select(ContestResult).where(
             ContestResult.contest_week_id == week.id, ContestResult.contest_id == contest.id,
             ContestResult.subject_key == subject, ContestResult.division == "open"))
-        expected = (1, (base + 60) / 60) if mode == LEGACY_PRACTICE_SCORING else (2, (base + 61) / 60)
+        expected = (2, (base + 60) / 60)
         assert (missing.rank, missing.effective_score) == expected
         # Leave the original grants in place: a mistakenly rounded rank would
         # create a new rank-specific payout and possibly an undeserved crown win.
@@ -107,13 +109,14 @@ def test_missing_result_repair_retains_mode_and_cannot_issue_wrong_rewards(
 def test_average_rounding_depends_on_original_mode(pristine_database, mode, expected):
     with pristine_database() as session:
         season, week, _, teams, charts = seed(session, base=240)
-        charts[0].detected_playing_seconds = 300
         charts[0].minutes = 5
         third = add_profile(session, "C")
         session.commit()
         select_team(session, profile=third, season=season, team=teams[0], now=NOW)
-        session.add(PracticeChart(profile_id=third.id, practice_date=week.week_start,
-            minutes=6, instrument="Flute", team_id=teams[0].id, created_at=NOW))
+        third_chart = PracticeChart(profile_id=third.id, practice_date=week.week_start,
+            minutes=6, instrument="Flute", team_id=teams[0].id, created_at=NOW)
+        session.add(third_chart); session.flush()
+        session.add(PracticeChartVerification(practice_chart_id=third_chart.id, status="approved", responded_at=NOW))
         week.status = "finalized"
         week.finalized_at = FINAL_NOW
         week.practice_scoring_mode = mode

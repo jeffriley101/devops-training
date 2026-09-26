@@ -6,10 +6,10 @@ from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, select, update
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from .practice_duration import chart_seconds_sql
+from .economy import qualified_camp_point_clause
+from .practice_duration import chart_seconds_sql, qualified_practice_clause
 from .models import (
     CampPointAward,
     PlungePointAward,
@@ -156,50 +156,11 @@ def record_plunge_point_award(
     if type(points_scored) is not int or points_scored != expected_points:
         raise ValueError("Plunge points do not match the scoring event.")
 
-    existing = session.scalar(select(PlungePointAward).where(
-        PlungePointAward.profile_id == profile_id,
-        PlungePointAward.event_key == normalized_key,
-    ))
-    if existing is not None:
-        if (
-            existing.event_type != event_type
-            or existing.points_scored != points_scored
-        ):
-            raise PlungeEventConflictError(
-                "That Plunge event key was already used for different scoring data."
-            )
-        return existing, False
-
-    occurred_at = now or datetime.now(timezone.utc)
-    if occurred_at.tzinfo is None or occurred_at.utcoffset() is None:
-        raise ValueError("The server award time must be timezone-aware.")
-    award = PlungePointAward(
-        profile_id=profile_id,
-        event_key=normalized_key,
-        event_type=event_type,
-        points_scored=points_scored,
-        occurred_at=occurred_at.astimezone(timezone.utc),
+    # A caller-chosen pickup/band event is not play evidence. Keep legacy
+    # ledger reads, but fail closed until validated Plunge events exist.
+    raise PlungeEventConflictError(
+        "Plunge practice play does not currently award XP."
     )
-    session.add(award)
-    try:
-        session.flush()
-    except IntegrityError:
-        session.rollback()
-        existing = session.scalar(select(PlungePointAward).where(
-            PlungePointAward.profile_id == profile_id,
-            PlungePointAward.event_key == normalized_key,
-        ))
-        if existing is None:
-            raise
-        if (
-            existing.event_type != event_type
-            or existing.points_scored != points_scored
-        ):
-            raise PlungeEventConflictError(
-                "That Plunge event key was already used for different scoring data."
-            )
-        return existing, False
-    return award, True
 
 
 def plunge_xp(session: Session, *, profile_id: int) -> int:
@@ -220,11 +181,13 @@ def xp_sources(session: Session, *, profile_id: int) -> dict[str, float | int]:
         select(func.coalesce(func.sum(chart_seconds_sql()), 0)).where(
             PracticeChart.profile_id == profile_id,
             chart_seconds_sql() > 0,
+            qualified_practice_clause(),
         )
     ) or 0
     board_points = session.scalar(
         select(func.coalesce(func.sum(CampPointAward.points_awarded), 0)).where(
-            CampPointAward.profile_id == profile_id
+            CampPointAward.profile_id == profile_id,
+            qualified_camp_point_clause(),
         )
     ) or 0
     p_charts = session.scalar(
@@ -232,6 +195,7 @@ def xp_sources(session: Session, *, profile_id: int) -> dict[str, float | int]:
             PracticeChart.profile_id == profile_id,
             PracticeChart.source == "p-book",
             chart_seconds_sql() > 0,
+            qualified_practice_clause(),
         )
     ) or 0
     return {

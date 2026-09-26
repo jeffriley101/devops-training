@@ -137,9 +137,9 @@ def test_adult_funded_seat_has_insights_without_payer_data(insights_db):
 def test_practice_submission_remains_open(insights_db):
     browser = client("student")
     response = browser.post("/practice-charts", json={"minutes": 10,
-        "practice_date": "2026-09-13", "instrument": "Trumpet",
-        "practice_details": ["Scales"], "include_in_contests": False,
-        "include_in_team": False})
+        "practice_date": datetime.now(routes.CENTRAL).date().isoformat(),
+        "submission_key": "insights-private-log", "practice_details": ["Scales"],
+        "include_contests": False, "include_team_contests": False})
     assert response.status_code in (200, 201)
     assert browser.get("/practice-charts/insights").status_code == 403
 

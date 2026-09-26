@@ -2,7 +2,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -12,7 +12,7 @@ from app.accounts import (
     update_profile_level,
 )
 from app.db import Base
-from app.models import PracticeChart, WoodchuckProfile
+from app.models import PracticeChart, PracticeChartVerification, WoodchuckProfile
 from app.practice_chart_routes import practice_streak, profile_practice_streak
 
 
@@ -82,6 +82,11 @@ def test_streak_counts_distinct_persisted_days_and_breaks_on_gap() -> None:
             PracticeChart(profile_id=row.id, practice_date=today, minutes=10, instrument="Clarinet", source="p-book", practice_details=[], credits_awarded=0),
             PracticeChart(profile_id=row.id, practice_date=today, minutes=20, instrument="Clarinet", source="p-book", practice_details=[], credits_awarded=0),
         ])
+        session.commit()
+        assert profile_practice_streak(session, row.id, today) == 0
+        chart = session.scalar(select(PracticeChart))
+        session.add(PracticeChartVerification(practice_chart_id=chart.id,
+            status="approved", responded_at=datetime.now(timezone.utc)))
         session.commit()
         assert profile_practice_streak(session, row.id, today) == 1
 

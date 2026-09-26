@@ -57,7 +57,7 @@ def add_profile(session: Session, number: int) -> WoodchuckProfile:
     return row
 
 
-def add_chart(session: Session, profile: WoodchuckProfile, team: Team) -> PracticeChart:
+def add_chart(session: Session, profile: WoodchuckProfile, team: Team, *, approved=False) -> PracticeChart:
     row = PracticeChart(
         profile_id=profile.id, practice_date=date(2026, 7, 29), minutes=42,
         instrument="Flute", practice_details=[], source="p-book", credits_awarded=0,
@@ -65,6 +65,9 @@ def add_chart(session: Session, profile: WoodchuckProfile, team: Team) -> Practi
         created_at=NOW,
     )
     session.add(row); session.flush()
+    if approved:
+        session.add(PracticeChartVerification(practice_chart_id=row.id, status="approved",
+            responded_at=datetime(2026, 8, 1, 12, tzinfo=timezone.utc)))
     return row
 
 
@@ -72,13 +75,15 @@ def test_deleted_student_leaves_live_individual_boards_but_not_team_totals() -> 
     session = database()
     season, _contests, week = ensure_band_camp_data(session, now=NOW)
     student = add_profile(session, 1); session.commit()
+    from app.age_privacy import declare_age
+    declare_age(session, student.id, "adult", at=datetime(2025, 1, 1, tzinfo=timezone.utc))
     team, _ = create_and_join_team(
         session, profile=student, season=season, name="Durable Totals",
         emblem_key="shield:gold", now=NOW,
     )
-    add_chart(session, student, team)
+    add_chart(session, student, team, approved=True)
     session.add(CampPointAward(
-        profile_id=student.id, activity_type="care", points_awarded=1,
+        profile_id=student.id, activity_type="trivia", points_awarded=1,
         occurred_at=NOW, duplicate_key="integrity-live", team_id=team.id,
     ))
     session.commit()
@@ -110,7 +115,7 @@ def test_hidden_team_medals_are_omitted_without_changing_result_or_score() -> No
         session, profile=student, season=season, name="Private Original",
         emblem_key="emoji:goat", now=NOW,
     )
-    add_chart(session, student, team); session.commit()
+    add_chart(session, student, team, approved=True); session.commit()
     finalize_contest_week(session, week_start=week.week_start, now=FINAL_NOW)
     session.commit()
     original = session.scalar(select(ContestResult).where(
@@ -139,7 +144,7 @@ def test_open_week_finalizes_after_deletion_and_reruns_without_duplicates() -> N
         session, profile=student, season=season, name="Finalizer Survives",
         emblem_key="letter:F", now=NOW,
     )
-    chart = add_chart(session, student, team); session.commit()
+    chart = add_chart(session, student, team, approved=True); session.commit()
     anonymize_woodchuck_account(session, profile=student, now=DELETED_AT)
     session.commit()
 
@@ -172,6 +177,8 @@ def test_open_and_verified_wins_share_one_crown_progress_row() -> None:
     session = database()
     season, _contests, week = ensure_band_camp_data(session, now=NOW)
     student = add_profile(session, 4); session.commit()
+    from app.age_privacy import declare_age
+    declare_age(session, student.id, "adult", at=datetime(2025, 1, 1, tzinfo=timezone.utc))
     team, _ = create_and_join_team(
         session, profile=student, season=season, name="Dual Division",
         emblem_key="letter:D", now=NOW,
