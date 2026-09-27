@@ -107,7 +107,10 @@ async def request_permission(request:Request):
         from .tester_enrollments import clear_registration_context,registration_context
         claim=registration_context(request) if p is None else None
         if data.get('confirm_account')!=(p.woodchuck_id if p else 'new'):raise HTTPException(409,'Account changed; reload the form.')
-        if p and student_consent_status(s,p.id) not in (None,'no_flow','expired','request_closed'):
+        status=student_consent_status(s,p.id) if p else None
+        if status=='status_unknown':
+            raise HTTPException(503,'Parent permission status is temporarily unavailable. Please use Help.')
+        if status not in (None,'no_flow','expired','request_closed','request_superseded'):
             raise HTTPException(409,'A parent permission request already exists. Reload this page for its status.')
         try:service.request_consent(s,parent_email=data.get('parent_email',''),director_email=data.get('director_email',''),director_name=data.get('director_name',''),profile=p,cohort_key=claim if claim else None);s.commit()
         except ValueError as e:raise HTTPException(409,str(e))

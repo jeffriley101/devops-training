@@ -10,12 +10,14 @@ from sqlalchemy.orm import sessionmaker
 from app.main import app
 from app.db import Base
 from app.age_privacy import declare_age
+from app import child_authorization as consent
 from app.child_authorization import NOTICE_VERSION
 from app.child_models import PendingConsent
 from app.consent_status import student_consent_status
 from app.kws_models import KWSVerification
 from app.models import WoodchuckProfile
 from app.security import hash_invitation_token, hash_pin
+from test_age_screening import age_db
 from test_private_practice import captured
 
 
@@ -45,14 +47,14 @@ def login():
     return client
 
 
-def flow(factory, state=None, *, expired=False, created=None):
+def flow(factory, state=None, *, expired=False, created=None, notice_version=NOTICE_VERSION):
     instant = created or datetime.now(timezone.utc)
     with factory() as session:
         pending = PendingConsent(profile_id=1, parent_email='secret-parent@example.test',
             director_email='', director_name='', review_allowed=False,
             approve_hash=hash_invitation_token('synthetic-approval-token-123456789'),
             created_at=instant, expires_at=instant + (timedelta(hours=-1) if expired else timedelta(hours=24)),
-            notice_version=NOTICE_VERSION)
+            notice_version=notice_version)
         session.add(pending)
         session.flush()
         if state:
@@ -70,6 +72,7 @@ def test_no_flow_shows_start_action(status_db):
     client = login()
     page = client.get('/account/age')
     assert 'Parent permission has not been started yet' in page.text
+    assert '<h1>Parent permission</h1>' in page.text
     assert 'Start a parent permission request' in page.text
     assert 'href="/family/request"' in page.text
     assert 'name="parent_email"' in client.get('/family/request').text
@@ -77,9 +80,9 @@ def test_no_flow_shows_start_action(status_db):
 
 @pytest.mark.parametrize('state,expected', [
     (None, 'A parent permission request has already been sent'),
-    ('reserved', 'Parent verification is still in progress'),
-    ('accepted', 'Parent verification is still in progress'),
-    ('delivery_unknown', 'Woodshed could not confirm the KWS verification result'),
+    ('reserved', 'Parent verification is being prepared or is in progress'),
+    ('accepted', 'Parent verification is being prepared or is in progress'),
+    ('delivery_unknown', 'Woodshed could not confirm KWS delivery or completion status'),
     ('verified', 'permission is not active yet'),
     ('failed', 'Parent verification did not complete'),
     ('activated', 'Parent permission is not currently available'),
@@ -97,6 +100,9 @@ def test_active_flow_status_suppresses_duplicate_form_and_private_data(status_db
             assert secret not in page.text
     if state == 'delivery_unknown':
         assert 'do not repeatedly restart or resend' in client.get('/account/age').text
+        assert 'href="/account/help"' in client.get('/family/request').text
+    if state in ('reserved', 'accepted'):
+        assert 'If no message arrived' in client.get('/account/age').text
         assert 'href="/account/help"' in client.get('/family/request').text
     request_page = client.get('/family/request')
     result = client.post('/family/request', data={'csrf': request_page.context['csrf'],
@@ -120,6 +126,79 @@ def test_expired_flow_offers_fresh_request(status_db):
         assert session.scalar(select(func.count(PendingConsent.id))) == 2
 
 
+def test_superseded_unexpired_request_allows_fresh_request_without_changing_old_row(status_db):
+    flow(status_db, notice_version='older-notice-version')
+    with status_db() as session:
+        old = session.scalar(select(PendingConsent))
+        old_id = old.id
+        original = (old.parent_email, old.approve_hash, old.created_at, old.expires_at,
+                    old.notice_version, old.confirmed_at)
+    client = login()
+    age_page = client.get('/account/age')
+    assert 'previous parent permission request can no longer be used' in age_page.text
+    assert 'Start a new parent permission request' in age_page.text
+    request_page = client.get('/family/request')
+    assert 'name="parent_email"' in request_page.text
+    assert 'Start a new request below' in request_page.text
+    response = client.post('/family/request', data={'csrf': request_page.context['csrf'],
+        'confirm_account': 'WC-STATUS', 'parent_email': 'secret-parent@example.test'})
+    assert response.status_code == 200, response.text
+    with status_db() as session:
+        old = session.get(PendingConsent, old_id)
+        assert (old.parent_email, old.approve_hash, old.created_at, old.expires_at,
+                old.notice_version, old.confirmed_at) == original
+        rows = list(session.scalars(select(PendingConsent).order_by(PendingConsent.id)))
+        assert len(rows) == 2
+        assert rows[1].notice_version == consent.notice_policy()[0]
+
+
+def test_superseded_request_recovery_on_postgresql(age_db, captured):
+    now = consent.clock()
+    with age_db() as session:
+        declare_age(session, 1, 'under13')
+        old = PendingConsent(profile_id=1, parent_email='secret-parent@example.test',
+            director_email='', director_name='', review_allowed=False,
+            approve_hash=hash_invitation_token('postgres-old-approval-token-123456'),
+            created_at=now, expires_at=now + timedelta(hours=24),
+            notice_version='older-notice-version')
+        session.add(old)
+        session.commit()
+        old_id = old.id
+    client = TestClient(app)
+    response = client.post('/account/login', data={'woodchuck_id': 'WC-AGE-A', 'pin': '2468'})
+    assert response.status_code == 200, response.text
+    assert 'can no longer be used' in client.get('/account/age').text
+    page = client.get('/family/request')
+    assert 'name="parent_email"' in page.text
+    response = client.post('/family/request', data={'csrf': page.context['csrf'],
+        'confirm_account': 'WC-AGE-A', 'parent_email': 'secret-parent@example.test'})
+    assert response.status_code == 200, response.text
+    with age_db() as session:
+        rows = list(session.scalars(select(PendingConsent).order_by(PendingConsent.id)))
+        assert len(rows) == 2
+        assert rows[0].id == old_id
+        assert rows[0].notice_version == 'older-notice-version'
+        assert rows[0].expires_at == old.expires_at
+        assert rows[1].notice_version == consent.notice_policy()[0]
+
+
+def test_unknown_notice_policy_blocks_new_request_safely(status_db, monkeypatch):
+    flow(status_db, notice_version='older-notice-version')
+    def unavailable():
+        raise ValueError('Synthetic policy unavailable')
+    monkeypatch.setattr(consent, 'notice_policy', unavailable)
+    client = login()
+    assert 'could not confirm the current permission status' in client.get('/account/age').text
+    request_page = client.get('/family/request')
+    assert 'name="parent_email"' not in request_page.text
+    response = client.post('/family/request', data={'csrf': request_page.context['csrf'],
+        'confirm_account': 'WC-STATUS', 'parent_email': 'secret-parent@example.test'})
+    assert response.status_code == 503
+    assert 'status is temporarily unavailable' in response.text
+    with status_db() as session:
+        assert session.scalar(select(func.count(PendingConsent.id))) == 1
+
+
 @pytest.mark.parametrize('state,expected,form_visible', [
     ('activated', 'Parent permission is not currently available', False),
     ('cancelled', 'previous parent permission request ended', True),
@@ -132,7 +211,7 @@ def test_closed_and_activated_requests_are_not_called_expired(status_db, state, 
 
 
 @pytest.mark.parametrize('state,expected', [
-    ('delivery_unknown', 'Verification email status could not be confirmed'),
+    ('delivery_unknown', 'KWS delivery or completion status could not be confirmed'),
     ('accepted', 'Adult verification in progress'),
     ('reserved', 'Adult verification in progress'),
     ('verified', 'Adult verification completed'),
@@ -144,6 +223,9 @@ def test_parent_approval_status(status_db, state, expected):
     assert expected in page.text
     if state == 'delivery_unknown':
         assert '<h3>Adult verification in progress</h3>' not in page.text
+    if state in ('reserved', 'accepted'):
+        assert 'If you receive a KWS adult-verification message' in page.text
+        assert 'If no message arrived' in page.text
 
 
 def test_status_helper_does_not_write(status_db):
