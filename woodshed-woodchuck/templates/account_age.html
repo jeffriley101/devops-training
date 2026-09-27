@@ -9,6 +9,7 @@
 {% elif consent_status == 'verified_not_activated' %}<p>Parent verification is complete, but permission is not active yet. Ask your parent to reopen the Woodshed permission email and finish activation. Your account is saved.</p>
 {% elif consent_status == 'kws_failed' %}<p>Parent verification did not complete. Your account is saved. <a href="/account/help">Get help</a>.</p>
 {% elif consent_status == 'permission_paused' %}<p>Parent permission is not currently available for this account. Your account is saved. <a href="/account/help">Get help</a>.</p>
+{% elif consent_status == 'permission_withdrawn' %}<p>The previous parent permission was withdrawn. Your account is saved. <a href="/family/request">Start a new parent permission request</a>.</p>
 {% elif consent_status == 'request_closed' %}<p>The previous parent permission request ended. <a href="/family/request">Start a new parent permission request</a>.</p>
 {% elif consent_status == 'request_superseded' %}<p>The previous parent permission request can no longer be used. <a href="/family/request">Start a new parent permission request</a>.</p>
 {% elif consent_status == 'status_unknown' %}<p>Woodshed could not confirm the current permission status. Your account is saved. <a href="/account/help">Get help</a>.</p>

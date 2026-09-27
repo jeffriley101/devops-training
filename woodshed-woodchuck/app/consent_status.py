@@ -3,7 +3,7 @@ from sqlalchemy import select
 from . import child_authorization as service
 from .age_models import AccountPrivacy
 from .age_privacy import utc
-from .child_models import PendingConsent
+from .child_models import ConsentEvidence, PendingConsent
 from .kws_models import KWSVerification
 from .models import WoodchuckProfile
 
@@ -23,11 +23,15 @@ def student_consent_status(session, profile_id):
                                  .order_by(PendingConsent.created_at.desc(), PendingConsent.id.desc()).limit(1))
         if pending is None:
             return 'no_flow'
-        if utc(pending.expires_at) > service.clock() and pending.notice_version != notice_version:
-            return 'request_superseded'
         verification = session.scalar(select(KWSVerification).where(KWSVerification.pending_id == pending.id))
         if verification and verification.state == 'activated':
+            if rule.consent_id and verification.activated_consent_id == rule.consent_id:
+                evidence = session.get(ConsentEvidence, rule.consent_id)
+                if evidence and evidence.profile_id == profile_id and evidence.withdrawn_at:
+                    return 'permission_withdrawn'
             return 'permission_paused'
+        if utc(pending.expires_at) > service.clock() and pending.notice_version != notice_version:
+            return 'request_superseded'
         if verification and verification.state == 'cancelled':
             return 'request_closed'
         if utc(pending.expires_at) <= service.clock():

@@ -110,7 +110,7 @@ async def request_permission(request:Request):
         status=student_consent_status(s,p.id) if p else None
         if status=='status_unknown':
             raise HTTPException(503,'Parent permission status is temporarily unavailable. Please use Help.')
-        if status not in (None,'no_flow','expired','request_closed','request_superseded'):
+        if status not in (None,'no_flow','expired','request_closed','request_superseded','permission_withdrawn'):
             raise HTTPException(409,'A parent permission request already exists. Reload this page for its status.')
         try:service.request_consent(s,parent_email=data.get('parent_email',''),director_email=data.get('director_email',''),director_name=data.get('director_name',''),profile=p,cohort_key=claim if claim else None);s.commit()
         except ValueError as e:raise HTTPException(409,str(e))
