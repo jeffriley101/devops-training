@@ -6,6 +6,7 @@ from fastapi.templating import Jinja2Templates
 from .account_routes import current_profile
 from .age_models import AccountPrivacy
 from .age_privacy import declare_age,eligible,correct_age,utc
+from .consent_status import student_consent_status
 from .db import SessionLocal
 from .site_admin import csrf_token,check_csrf,require_site_admin
 router=APIRouter()
@@ -27,8 +28,11 @@ def age_page(request:Request):
         if profile is None:return RedirectResponse('/login',303)
         if eligible(session,profile.id):return RedirectResponse('/home',303)
         rule=session.get(AccountPrivacy,profile.id)
+        blocked_child=bool(rule and rule.age_band=='under13')
         return page(request,csrf=csrf_token(request),confirm_account=profile.woodchuck_id,
-                    blocked_child=bool(rule and rule.age_band=='under13'),help_only=False)
+                    blocked_child=blocked_child,
+                    consent_status=student_consent_status(session,profile.id) if blocked_child else None,
+                    help_only=False)
 
 @router.post('/account/age')
 async def age_submit(request:Request):

@@ -11,6 +11,7 @@ from .membership_routes import PrivateRoute
 from .site_admin import csrf_token,check_csrf
 from .account_routes import current_profile,SESSION_PROFILE_ID,SESSION_PROFILE_VERSION,SESSION_PAGE_GENERATION
 from .age_privacy import require_eligible,eligible
+from .consent_status import student_consent_status
 from . import child_authorization as service,parent_access
 from .child_models import ConsentEvidence,DirectorPermission,PendingConsent
 from .models import WoodchuckProfile,PracticeChart,PracticeChartVerification,StudentVerifierConnection,TrustedVerifier
@@ -93,7 +94,8 @@ def request_page(request:Request):
     with SessionLocal() as s:
         p=current_profile(request,s)
         claim=registration_context(request) if p is None else None
-        return page(request,'request',available=service.under13_available(),confirm_account=p.woodchuck_id if p else 'new',kws_label=kws_label(),c001_registration=bool(claim))
+        status=student_consent_status(s,p.id) if p else None
+        return page(request,'request',available=service.under13_available(),confirm_account=p.woodchuck_id if p else 'new',kws_label=kws_label(),c001_registration=bool(claim),consent_status=status)
 
 @router.post('/family/request')
 async def request_permission(request:Request):
@@ -105,6 +107,8 @@ async def request_permission(request:Request):
         from .tester_enrollments import clear_registration_context,registration_context
         claim=registration_context(request) if p is None else None
         if data.get('confirm_account')!=(p.woodchuck_id if p else 'new'):raise HTTPException(409,'Account changed; reload the form.')
+        if p and student_consent_status(s,p.id) not in (None,'no_flow','expired','request_closed'):
+            raise HTTPException(409,'A parent permission request already exists. Reload this page for its status.')
         try:service.request_consent(s,parent_email=data.get('parent_email',''),director_email=data.get('director_email',''),director_name=data.get('director_name',''),profile=p,cohort_key=claim if claim else None);s.commit()
         except ValueError as e:raise HTTPException(409,str(e))
         if claim:clear_registration_context(request)

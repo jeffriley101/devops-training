@@ -4,7 +4,14 @@
 {% if kind == 'message' %}<p role="status">{{ message }}</p>{% if woodchuck_id %}<p>Your Woodchuck ID: <strong>{{ woodchuck_id }}</strong></p>{% endif %}
 {% elif kind == 'notice' %}<pre class="family-notice">{{ notice }}</pre>
 {% elif kind == 'request' %}
-{% if available %}<p>{{ kws_label|default('KWS') }}. Ask your parent to authorize Free private practice. Director sharing is optional and your parent chooses it separately. No new child name, PIN or practice history is collected here.{% if c001_registration %} This request will preserve the new account's C001 claim until authorization succeeds.{% endif %}</p><form method="post">{{ csrf_field() }}<input type="hidden" name="confirm_account" value="{{ confirm_account }}"><label>Parent email<input name="parent_email" type="email" required maxlength="254"></label><button>Ask my parent</button></form>
+{% if consent_status == 'pending_parent' %}<p>A parent permission request has already been sent. Ask your parent to use the existing Woodshed email.</p>
+{% elif consent_status == 'kws_pending' %}<p>Parent verification is still in progress. Your account is saved. Your parent must finish verification before account activity resumes.</p>
+{% elif consent_status == 'kws_delivery_unknown' %}<p>Woodshed could not confirm the KWS verification result. Your account is saved. Please do not repeatedly restart or resend the request. If your parent received or completed the KWS message, Woodshed is still waiting for valid confirmation. <a href="/account/help">Get help</a>.</p>
+{% elif consent_status == 'verified_not_activated' %}<p>Parent verification is complete, but permission is not active yet. Ask your parent to reopen the Woodshed permission email and finish activation.</p>
+{% elif consent_status == 'kws_failed' %}<p>Parent verification did not complete. <a href="/account/help">Get help</a>.</p>
+{% elif consent_status == 'permission_paused' %}<p>Parent permission is not currently available for this account. Your account is saved. <a href="/account/help">Get help</a>.</p>
+{% elif consent_status == 'status_unknown' %}<p>Woodshed could not confirm the current permission status. Your account is saved. <a href="/account/help">Get help</a>.</p>
+{% elif available %}{% if consent_status == 'expired' %}<p>The previous parent permission request expired. Start a new request below.</p>{% elif consent_status == 'request_closed' %}<p>The previous parent permission request ended. Start a new request below.</p>{% endif %}<p>{{ kws_label|default('KWS') }}. Ask your parent to authorize Free private practice. Director sharing is optional and your parent chooses it separately. No new child name, PIN or practice history is collected here.{% if c001_registration %} This request will preserve the new account's C001 claim until authorization succeeds.{% endif %}</p><form method="post">{{ csrf_field() }}<input type="hidden" name="confirm_account" value="{{ confirm_account }}"><label>Parent email<input name="parent_email" type="email" required maxlength="254"></label><button>Ask my parent</button></form>
 {% else %}<p>Parent authorization is not open yet. Guest tools and help remain available. No parent email is collected here.</p>{% endif %}
 {% elif kind == 'approve' %}
 <section class="family-parent-hero">
@@ -40,6 +47,11 @@
 </details>
 </section>
 {% if activation_token %}<p>Adult verification completed for your selected permissions. Parent access still requires its separate emailed link.</p><p><a href="/family/activate/{{ activation_token }}">Activate Free private practice</a></p>
+{% elif verification_state == 'delivery_unknown' %}
+<section class="family-status">
+<h3>Verification email status could not be confirmed</h3>
+<p>If you received or completed the KWS message, Woodshed is still waiting for valid confirmation. Please do not repeatedly resend the request. <a href="/account/help">Contact support</a>.</p>
+</section>
 {% elif verification_state %}
 <section class="family-status">
 <h3>Adult verification in progress</h3>
