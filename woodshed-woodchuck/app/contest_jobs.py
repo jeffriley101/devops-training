@@ -18,6 +18,8 @@ from .contests import (
     aware_utc,
     contest_season_clause,
     finalize_contest_week,
+    historical_repair_block_reason,
+    locked_contest_week,
 )
 from .db import SessionLocal
 from .contest_seasons import rollover_season
@@ -112,10 +114,7 @@ def audit_or_repair_history(
     Dry-run is the default and rolls back its savepoint. Open weeks are processed
     only after their preserved verification and finalization deadlines.
     """
-    week = session.scalar(select(ContestWeek).join(Season).where(
-        ContestWeek.week_start == week_start,
-        contest_season_clause(),
-    ))
+    week = locked_contest_week(session, week_start=week_start)
     if week is None:
         raise ValueError("Contest week not found.")
     reason = candidate_reason(WeekCandidate(
@@ -133,6 +132,17 @@ def audit_or_repair_history(
             "reason": reason, "before": before, "after": before,
             "created": {key: 0 for key in before if key != "source_charts"},
         }
+    if week.status == "finalized":
+        incompatibility = historical_repair_block_reason(session, week)
+        if incompatibility is not None:
+            return {
+                "week_start": week.week_start.isoformat(), "status": week.status,
+                "mode": "apply" if apply else "dry_run", "action": "manual_review",
+                "reason": incompatibility,
+                "message": "Original finalizer semantics cannot be proven compatible; manual review is required.",
+                "before": before, "after": before,
+                "created": {key: 0 for key in before if key != "source_charts"},
+            }
 
     savepoint = session.begin_nested() if not apply else None
     finalize_contest_week(
@@ -376,7 +386,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 if submitted.apply:
                     session.commit()
             _log(sys.stdout, "contest_history_audit", **report)
-            return 0
+            return 1 if report["action"] == "manual_review" else 0
         except Exception as error:
             _log(
                 sys.stdout, "contest_history_audit_failed",

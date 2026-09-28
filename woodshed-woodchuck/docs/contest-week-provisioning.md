@@ -14,18 +14,20 @@ Run from `woodshed-woodchuck` with the application environment and an explicit
 `DATABASE_URL` for the intended database. Never paste its value into logs.
 Provisioning also accepts `--database-url`; it has no local-database fallback.
 The deployed code must include provisioning (`bc766ff`), practice-time precision,
-and the schema-compatibility update. This combined code requires exactly one
-Alembic head, `t0p1q2r3s4t5`, and its required columns/TeamFamily constraints.
-The previous `s9n0o1p2q3r4` schema is unsupported: even read-only planning selects
-`ContestWeek.practice_scoring_mode`; the combined result ORM also selects
+the schema-compatibility update, and contest-rule provenance. This combined code
+requires exactly one Alembic head, `d17contest001`, and its required
+columns/TeamFamily constraints. Earlier revisions are unsupported: even read-only
+planning selects `ContestWeek.practice_scoring_mode` and
+`ContestWeek.finalizer_rules_version`; the result ORM also selects
 `ContestResult.precise_score`. Older, unknown, multiple, or incomplete schema
 states refuse before writes. Do not stamp a revision to bypass migration.
 
-In production, apply the precision migration **before starting the new code**.
+In production, apply migrations through `d17contest001` **before starting the
+current code**.
 Pause/drain finalization writers and coordinate the web/finalizer upgrade;
 resume only when all entry points use the compatible release. Follow the
 [precision release ordering](practice-time-precision.md#release-ordering-and-maintenance-compatibility).
-This compatibility update adds no further migration.
+The provenance migration follows the earlier precision migration.
 
 Season records must already match `app/seasons.py`: canonical keys, names, dates,
 and `America/Chicago`. Provisioning does not create or enable Seasons. Resolve

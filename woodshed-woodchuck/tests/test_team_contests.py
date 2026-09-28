@@ -285,10 +285,16 @@ def test_repair_preserves_team_and_individual_history_without_duplicates() -> No
     select_team(session, profile=member, season=season, team=team, now=NOW)
     add_chart(session, captain, team.id, 45, created_at=NOW)
     add_chart(session, member, team.id, 20, created_at=NOW)
-    week.status = "finalized"
-    # Pre-precision historical fixtures carry the migration attestation.
-    week.practice_scoring_mode = "legacy_minutes"
-    week.finalized_at = FINAL_NOW
+    finalize_contest_week(session, week_start=week.week_start, now=FINAL_NOW)
+    session.commit()
+    assert week.finalizer_rules_version is not None
+    missing = session.scalar(select(ContestResult).join(Contest).where(
+        ContestResult.contest_week_id == week.id,
+        Contest.key == "team-weekly-practice",
+        ContestResult.division == "open",
+    ))
+    assert missing is not None
+    session.delete(missing)
     session.commit()
     chart_ids = set(session.scalars(select(PracticeChart.id)).all())
 
@@ -300,6 +306,7 @@ def test_repair_preserves_team_and_individual_history_without_duplicates() -> No
         ContestResult.contest_week_id == week.id
     )).all()
     assert first["action"] == "repaired"
+    assert first["created"]["results"] == 1
     assert {row.subject_type for row in results} >= {"student", "instrument", "team"}
     assert {row.division for row in results} == {"open", "verified"}
     first_counts = (
@@ -325,7 +332,7 @@ def test_repair_preserves_team_and_individual_history_without_duplicates() -> No
     assert any(row["display_name"] == captain.display_name for row in hall["students"])
 
 
-def test_repair_does_not_backfill_replacement_metrics_into_legacy_history() -> None:
+def test_unknown_legacy_history_requires_manual_review_without_new_metrics() -> None:
     session = database()
     season, _, week = ensure_band_camp_data(session, now=NOW)
     captain = add_profile(session, 70); session.commit()
@@ -361,11 +368,15 @@ def test_repair_does_not_backfill_replacement_metrics_into_legacy_history() -> N
     session.commit()
     legacy_snapshot = [(row.id, row.score) for row in legacy_results]
 
-    audit_or_repair_history(
+    report = audit_or_repair_history(
         session, week_start=week.week_start, now=FINAL_NOW, apply=True
     )
     session.commit()
 
+    assert report["action"] == "manual_review"
+    assert report["reason"] == "historical_rules_unknown"
+    assert report["after"] == report["before"]
+    assert all(value == 0 for value in report["created"].values())
     assert [(row.id, row.score) for row in legacy_results] == legacy_snapshot
     replacement_results = session.scalars(select(ContestResult).join(Contest).where(
         ContestResult.contest_week_id == week.id,

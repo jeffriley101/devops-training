@@ -3,14 +3,17 @@
 Use the existing explicit jobs after [calendar preparation](contest-week-provisioning.md).
 Run from `woodshed-woodchuck` in the application environment with an explicit
 `DATABASE_URL` (or `--database-url`); there is no local-database fallback.
-The shared schema guard requires exactly one head, `t0p1q2r3s4t5`, including
-both precision columns and the existing TeamFamily constraints. Previous
-`s9n0o1p2q3r4` is incompatible with the combined ORM, including read-only
-preflight; older, unknown, multiple, and incomplete states refuse before writes.
-Apply the precision migration **before starting the new production code** and
+The shared schema guard requires exactly one head, `d17contest001`, including
+contest-rule provenance, both precision columns, and the existing TeamFamily
+constraints. Earlier revisions, including `t0p1q2r3s4t5`, are incompatible
+with the current ORM, including read-only preflight; older, unknown, multiple,
+and incomplete states refuse before writes.
+Apply migrations through `d17contest001` **before starting the current
+production code** and
 coordinate the web/finalizer upgrade with finalization writers paused/drained.
 Follow [precision release ordering](practice-time-precision.md#release-ordering-and-maintenance-compatibility);
-this compatibility update adds no further migration. Never stamp past a refusal.
+the provenance migration is an additional required revision. Never stamp past a
+refusal.
 These CLI jobs install no scheduler or startup hook. Existing authenticated
 admin finalization remains separate from seasonal activation.
 

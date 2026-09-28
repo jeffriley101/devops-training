@@ -21,7 +21,7 @@ from tests.test_team_families import disposable_url
 from tests.team_factory import make_team
 
 OLD = "c15arcade001"
-NEW = "d16team001"
+NEW = "d17contest001"
 
 
 def snapshot(engine):
@@ -58,7 +58,8 @@ def assert_refused_without_writes(url, engine, reason):
 
 
 @pytest.mark.parametrize("state", ["old", "unknown", "unsupported", "empty", "multiple",
-                                  "precise_score", "practice_scoring_mode", "family_index", "name_claims"])
+                                  "precise_score", "practice_scoring_mode", "finalizer_rules_version",
+                                  "family_index", "name_claims"])
 def test_schema_refusals_before_writes(db, state):
     with db[1].begin() as connection:
         if state in {"old", "unknown", "unsupported"}:
@@ -75,7 +76,8 @@ def test_schema_refusals_before_writes(db, state):
         else:
             table = "contest_results" if state == "precise_score" else "contest_weeks"
             connection.execute(text(f"ALTER TABLE {table} DROP COLUMN {state}"))
-    reason = ("required_schema_incomplete" if state in {"precise_score", "practice_scoring_mode", "name_claims"}
+    reason = ("required_schema_incomplete" if state in {"precise_score", "practice_scoring_mode",
+                                                     "finalizer_rules_version", "name_claims"}
               else "team_family_constraints_missing" if state == "family_index" else "revision_not_approved")
     assert_refused_without_writes(*db, reason)
 
@@ -106,7 +108,7 @@ def test_real_previous_schema_requires_upgrade_then_plan_apply_repeat(tmp_path, 
         for model in (m.TeamNameClaim,):
             with engine.connect() as connection, pytest.raises(DBAPIError):
                 connection.execute(select(model))
-        assert_refused_without_writes(url, engine, "require d16team001; upgrade older schemas")
+        assert_refused_without_writes(url, engine, "require d17contest001; upgrade older schemas")
         end, deadline, finalize = contest_week_schedule(date(2026, 9, 14))
         with engine.begin() as connection:
             source_id = connection.scalar(select(m.Season.id).where(m.Season.key == lifecycle.SOURCE))
@@ -120,10 +122,13 @@ def test_real_previous_schema_requires_upgrade_then_plan_apply_repeat(tmp_path, 
         migrated = snapshot(engine)
         for table, rows in before.items():
             if table != "alembic_version":
-                assert migrated[table] == rows
+                assert len(migrated[table]) == len(rows)
+                for prior, current in zip(rows, migrated[table]):
+                    assert tuple(current._mapping[key] for key in prior._mapping) == tuple(prior)
         with Session(engine) as session:
             week = session.scalar(select(m.ContestWeek))
             assert week.practice_scoring_mode == "legacy_minutes"
+            assert week.finalizer_rules_version is None
             assert week.verification_deadline_at == before["contest_weeks"][0]._mapping["verification_deadline_at"]
         assert provisioning.provision(url, **PAIR)["missing"] == 2
         assert snapshot(engine) == migrated
@@ -142,18 +147,20 @@ def test_real_previous_schema_requires_upgrade_then_plan_apply_repeat(tmp_path, 
         engine.dispose()
 
 
-@pytest.mark.parametrize("field", ["precise_score", "practice_scoring_mode"])
+@pytest.mark.parametrize("field", ["precise_score", "practice_scoring_mode", "finalizer_rules_version"])
 def test_precision_history_is_verified_and_invalidates_approved_plan(tmp_path, field):
     url = f"sqlite:///{tmp_path / 'history.db'}"
     engine = history.seed_database(url)
     try:
         history.apply((url, engine), history.plan((url, engine)))
         approved = history.plan((url, engine))
-        table = "contest_weeks" if field == "practice_scoring_mode" else "contest_results"
+        table = "contest_weeks" if field in {"practice_scoring_mode", "finalizer_rules_version"} else "contest_results"
         with engine.begin() as connection:
             assert field in repair.Snapshot(connection).rows(table)[0]
             connection.execute(text(f"UPDATE {table} SET {field}=:value"),
-                               {"value": "precise_seconds" if field == "practice_scoring_mode" else 40.25})
+                               {"value": "precise_seconds" if field == "practice_scoring_mode"
+                                else "contest_finalizer_v1" if field == "finalizer_rules_version"
+                                else 40.25})
         current = history.plan((url, engine))
         with pytest.raises(repair.RepairError, match="verification_history_or_preconditions_changed"):
             repair.verify_content(approved["content"], current["content"])

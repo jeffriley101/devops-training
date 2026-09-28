@@ -530,6 +530,89 @@ def test_recently_closed_week_audit_respects_deadline_then_finalizes(
     assert set(session.scalars(select(PracticeChart.id)).all()) == source_ids
 
 
+def test_unknown_historical_rules_require_manual_review_without_writes(
+    database: tuple[Session, sessionmaker[Session]],
+) -> None:
+    session, _factory = database
+    season, contests, _current = ensure_band_camp_data(
+        session, now=datetime(2026, 7, 28, tzinfo=timezone.utc)
+    )
+    historical = add_week(
+        session, season, week_start=date(2026, 7, 20), status="finalized"
+    )
+    student = add_student(session, "UNKNOWN-RULES")
+    add_week_activity(
+        session, student, historical, created_at=historical.finalized_at - timedelta(days=1)
+    )
+    contest = next(item for item in contests if item.key == "weekly-points-leaders")
+    stored = ContestResult(
+        contest_week_id=historical.id, contest_id=contest.id, division="open",
+        subject_type="student", subject_key=str(student.id), profile_id=student.id,
+        display_name_snapshot="Historical Winner", score=25, rank=1,
+        medal="gold",
+    )
+    session.add(stored)
+    session.commit()
+    assert historical.finalizer_rules_version is None
+    original_result = (stored.id, stored.score, stored.rank, stored.medal,
+                       stored.display_name_snapshot)
+    original_counts = {
+        "results": session.scalar(select(func.count()).select_from(ContestResult)),
+        "grants": session.scalar(select(func.count()).select_from(RewardGrant)),
+        "awards": session.scalar(select(func.count()).select_from(CampPointAward)),
+    }
+
+    for apply in (False, True):
+        report = audit_or_repair_history(
+            session, week_start=historical.week_start, now=NOW, apply=apply
+        )
+        session.commit()
+        assert report["action"] == "manual_review"
+        assert report["reason"] == "historical_rules_unknown"
+        assert report["after"] == report["before"]
+        assert all(value == 0 for value in report["created"].values())
+        assert {
+            "results": session.scalar(select(func.count()).select_from(ContestResult)),
+            "grants": session.scalar(select(func.count()).select_from(RewardGrant)),
+            "awards": session.scalar(select(func.count()).select_from(CampPointAward)),
+        } == original_counts
+        session.refresh(stored)
+        assert (stored.id, stored.score, stored.rank, stored.medal,
+                stored.display_name_snapshot) == original_result
+        assert session.get(ContestWeek, historical.id).finalizer_rules_version is None
+
+
+@pytest.mark.parametrize("apply", [False, True])
+def test_audit_history_command_exits_nonzero_for_unknown_rules(
+    database: tuple[Session, sessionmaker[Session]],
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    apply: bool,
+) -> None:
+    session, factory = database
+    season, _, _current = ensure_band_camp_data(
+        session, now=datetime(2026, 7, 28, tzinfo=timezone.utc)
+    )
+    historical = add_week(
+        session, season, week_start=date(2026, 7, 20), status="finalized"
+    )
+    monkeypatch.setattr(contest_jobs, "SessionLocal", factory)
+
+    args = ["audit_history", "--week", historical.week_start.isoformat()]
+    if apply:
+        args.append("--apply")
+    assert contest_jobs.main(args) == 1
+    report = json.loads(capsys.readouterr().out)
+    assert report["event"] == "contest_history_audit"
+    assert report["mode"] == ("apply" if apply else "dry_run")
+    assert report["action"] == "manual_review"
+    assert report["reason"] == "historical_rules_unknown"
+    assert report["after"] == report["before"]
+    assert all(value == 0 for value in report["created"].values())
+    session.refresh(historical)
+    assert historical.finalizer_rules_version is None
+
+
 def test_incomplete_finalized_week_repairs_once_without_duplicate_rewards(
     database: tuple[Session, sessionmaker[Session]],
 ) -> None:
@@ -538,22 +621,33 @@ def test_incomplete_finalized_week_repairs_once_without_duplicate_rewards(
         session, now=datetime(2026, 7, 28, tzinfo=timezone.utc)
     )
     incomplete = add_week(
-        session, season, week_start=date(2026, 7, 20), status="finalized"
+        session, season, week_start=date(2026, 7, 20)
     )
     student = add_student(session, "REPAIR")
     add_week_activity(session, student, incomplete)
     source_chart = session.scalar(select(PracticeChart).where(
         PracticeChart.profile_id == student.id
     ))
-    source_chart.created_at = incomplete.finalized_at - timedelta(days=1)
+    source_chart.created_at = NOW - timedelta(days=1)
     source_award = session.scalar(select(CampPointAward).where(
         CampPointAward.profile_id == student.id
     ))
-    source_award.created_at = incomplete.finalized_at - timedelta(days=1)
+    source_award.created_at = NOW - timedelta(days=1)
     late_student = add_student(session, "LATE")
     from app.age_privacy import declare_age
     declare_age(session, student.id, "adult", at=datetime(2026, 7, 1, tzinfo=timezone.utc))
     declare_age(session, late_student.id, "adult", at=datetime(2026, 7, 1, tzinfo=timezone.utc))
+    finalize_contest_week(session, week_start=incomplete.week_start, now=NOW)
+    session.commit()
+    assert incomplete.finalizer_rules_version is not None
+    missing = session.scalar(select(ContestResult).join(Contest).where(
+        ContestResult.contest_week_id == incomplete.id,
+        Contest.key == "weekly-practice-by-instrument",
+    ))
+    assert missing is not None
+    session.delete(missing)
+    session.commit()
+
     session.add(PracticeChart(
         profile_id=late_student.id, practice_date=incomplete.week_start,
         minutes=999, instrument=late_student.instrument, practice_details=[],
@@ -570,8 +664,8 @@ def test_incomplete_finalized_week_repairs_once_without_duplicate_rewards(
         session, week_start=incomplete.week_start, now=NOW, apply=False
     )
     assert dry_run["action"] == "repaired"
-    assert dry_run["created"]["results"] == 4
-    assert session.scalar(select(func.count()).select_from(ContestResult)) == 0
+    assert dry_run["created"]["results"] == 1
+    assert session.get(ContestResult, missing.id) is None
 
     first = audit_or_repair_history(
         session, week_start=incomplete.week_start, now=NOW, apply=True

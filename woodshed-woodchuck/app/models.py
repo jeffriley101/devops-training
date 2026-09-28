@@ -1488,6 +1488,9 @@ class ContestWeek(Base):
     status: Mapped[str] = mapped_column(String(20), nullable=False)
     # Recorded with finalization; NULL is unknown, never implicit legacy.
     practice_scoring_mode: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    # Attests to the complete finalizer rules used for this frozen week.
+    # Existing finalized weeks remain unknown; result rows cannot prove this.
+    finalizer_rules_version: Mapped[str | None] = mapped_column(String(80), nullable=True)
     finalized_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
