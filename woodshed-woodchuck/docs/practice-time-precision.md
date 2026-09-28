@@ -71,15 +71,18 @@ and repairs to stay paused: old code does not honor precise scoring markers.
 Resolve service/schema compatibility and preserve or restore provenance before
 resuming historical repairs.
 
-The combined schema-compatibility update pins
-`app/team_continuity_repair.py::schema_guard` to exactly `t0p1q2r3s4t5`.
+The earlier combined schema-compatibility update pinned
+`app/team_continuity_repair.py::schema_guard` to `t0p1q2r3s4t5`. Current code
+requires `d17contest001` to include contest-rule provenance.
 Season preflight/activation, continuity maintenance and provisioning plan/apply
-share this guard. It requires the two new columns and existing structural
-constraints; unknown, multiple, unsupported or incomplete states still refuse
-before writes. The previous `s9n0o1p2q3r4` schema cannot support this ORM:
+share this guard. It requires both precision columns, the contest-rule
+provenance column, and existing structural constraints; unknown, multiple,
+unsupported or incomplete states still refuse
+before writes. The earlier `s9n0o1p2q3r4` schema cannot support the precision ORM:
 `ContestWeek` and `ContestResult` SELECTs require their new mapped columns,
 including during read-only planning. Upgrade first; do not rewrite
-`alembic_version` or bypass the guard. No further migration is introduced.
+`alembic_version` or bypass the guard. The earlier precision compatibility
+update introduced no further migration.
 
 Protected-history verification now includes `ContestResult.precise_score` and
 `ContestWeek.practice_scoring_mode`. Existing scores, ranks, provenance,

@@ -25,11 +25,11 @@ from sqlalchemy.pool import NullPool
 
 from . import team_continuity_inventory as inventory
 
-REVISION = "d16team001"  # Descendants require explicit code/schema review.
+REVISION = "d17contest001"  # Descendants require explicit code/schema review.
 CONFIRMATION = "APPLY TEAM CONTINUITY"
 ACKS = ("backup_taken", "writers_paused", "finalization_paused", "maintenance_mode")
 FIELDS = dict(inventory.FIELDS)
-FIELDS["contest_weeks"] += " verification_deadline_at finalize_after practice_scoring_mode"
+FIELDS["contest_weeks"] += " verification_deadline_at finalize_after practice_scoring_mode finalizer_rules_version"
 FIELDS["camp_point_awards"] += " activity_type points_awarded"
 FIELDS["practice_charts"] += " include_contests minutes source detected_playing_seconds"
 FIELDS["contest_results"] += " score precise_score rank division subject_key"

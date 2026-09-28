@@ -4,10 +4,10 @@ from datetime import timedelta
 
 import pytest
 from fastapi import HTTPException
-from sqlalchemy import select, text
+from sqlalchemy import event, select, text
 
 from app.contests import (
-    LEGACY_PRACTICE_SCORING, PRECISE_PRACTICE_SCORING,
+    FINALIZER_RULES_VERSION, LEGACY_PRACTICE_SCORING, PRECISE_PRACTICE_SCORING,
     _scoring_seconds, _weekly_team_scores, ensure_band_camp_data, finalize_contest_week,
 )
 from app.models import (
@@ -59,11 +59,12 @@ def test_missing_result_repair_retains_mode_and_cannot_issue_wrong_rewards(
     with pristine_database() as session:
         _, week, people, teams, charts = seed(session, base=base)
         if mode == LEGACY_PRACTICE_SCORING:
-            # A pre-migration finalized week with incomplete history, carrying
-            # the migration's attestation (not inferred from remaining results).
+            # This synthetic week uses today's eligibility and team rules with
+            # the older minute precision mode. Both facts must be attested.
             week.status = "finalized"
             week.finalized_at = FINAL_NOW
             week.practice_scoring_mode = mode
+            week.finalizer_rules_version = FINALIZER_RULES_VERSION
             session.commit()
         else:
             assert [_scoring_seconds(chart, week) for chart in charts] == [base + 120, base + 60]
@@ -72,6 +73,7 @@ def test_missing_result_repair_retains_mode_and_cannot_issue_wrong_rewards(
         session.commit()
         session.expire_all()  # Must work from persisted data, not transient state.
         assert week.practice_scoring_mode == mode
+        assert week.finalizer_rules_version == FINALIZER_RULES_VERSION
         assert [_scoring_seconds(chart, week) for chart in charts] == (
             [base + 120, base + 60])
         contest = session.scalar(select(Contest).where(Contest.key == contest_key))
@@ -120,6 +122,7 @@ def test_average_rounding_depends_on_original_mode(pristine_database, mode, expe
         week.status = "finalized"
         week.finalized_at = FINAL_NOW
         week.practice_scoring_mode = mode
+        week.finalizer_rules_version = FINALIZER_RULES_VERSION
         session.commit()
         scores = _weekly_team_scores(session, week, source_cutoff=FINAL_NOW)
         assert scores["open"]["averages"][teams[0].id] == expected
@@ -156,6 +159,43 @@ def test_unknown_mode_refuses_even_with_surviving_results(pristine_database, evi
         assert snapshot(session, (ContestResult, *HISTORY, ContestWeek)) == before
 
 
+@pytest.mark.parametrize("stored_version", [None, "older_contest_rules"])
+def test_finalized_repair_refuses_unknown_or_incompatible_rules_before_writes(
+    pristine_database, stored_version,
+):
+    with pristine_database() as session:
+        _, week, _, _, _ = seed(session)
+        finalize_contest_week(session, week_start=week.week_start, now=FINAL_NOW)
+        session.commit()
+        missing = session.scalar(select(ContestResult).where(
+            ContestResult.contest_week_id == week.id
+        ))
+        assert missing is not None
+        session.delete(missing)
+        week.finalizer_rules_version = stored_version
+        session.commit()
+        before = snapshot(session, (ContestResult, *HISTORY, ContestWeek))
+        writes = []
+
+        def capture(_connection, _cursor, statement, _parameters, _context, _many):
+            if statement.lstrip().split(None, 1)[0].upper() in {
+                "INSERT", "UPDATE", "DELETE", "CREATE", "ALTER", "DROP",
+            }:
+                writes.append(statement)
+
+        engine = session.get_bind()
+        event.listen(engine, "before_cursor_execute", capture)
+        try:
+            with pytest.raises(HTTPException) as error:
+                finalize_contest_week(session, week_start=week.week_start,
+                                      now=FINAL_NOW + timedelta(days=1), repair_finalized=True)
+        finally:
+            event.remove(engine, "before_cursor_execute", capture)
+        assert error.value.status_code == 409
+        assert writes == []
+        assert snapshot(session, (ContestResult, *HISTORY, ContestWeek)) == before
+
+
 @pytest.mark.parametrize("mode", [LEGACY_PRACTICE_SCORING, PRECISE_PRACTICE_SCORING])
 def test_conflicting_snapshot_mode_refuses_repair(pristine_database, mode):
     with pristine_database() as session:
@@ -174,7 +214,7 @@ def test_conflicting_snapshot_mode_refuses_repair(pristine_database, mode):
         assert snapshot(session, (ContestResult, *HISTORY, ContestWeek)) == before
 
 
-def test_season_tools_guard_rejects_incomplete_precision_schema():
+def test_season_tools_guard_rejects_old_precision_schema():
     from sqlalchemy import create_engine
     from app.team_continuity_repair import schema_guard, RepairError
     engine = create_engine("sqlite://")
@@ -183,7 +223,7 @@ def test_season_tools_guard_rejects_incomplete_precision_schema():
                     "CREATE TABLE team_families (id INTEGER)", "CREATE TABLE teams (id INTEGER)",
                     "INSERT INTO alembic_version VALUES ('t0p1q2r3s4t5')"):
             connection.execute(text(ddl))
-        with pytest.raises(RepairError, match="team_family_constraints_missing"):
+        with pytest.raises(RepairError, match="revision_not_approved"):
             schema_guard(connection)
     engine.dispose()
 

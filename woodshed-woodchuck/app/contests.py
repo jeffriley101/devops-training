@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictInt
 from sqlalchemy import func, or_, select, true
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import set_committed_value
 
 from .practice_duration import qualified_practice_clause, chart_seconds
 from .account_routes import current_profile
@@ -352,6 +353,19 @@ def ensure_contest_definitions(session: Session) -> list[Contest]:
             contest.crown_category = definition["crown_category"]
         contests.append(contest)
     return contests
+
+
+def _contest_definitions_match(contests: dict[str, Contest]) -> bool:
+    """A rules attestation needs the expected persisted scoring/reward settings."""
+    if set(contests) != {definition["key"] for definition in CONTEST_DEFINITIONS}:
+        return False
+    return all(
+        (contests[definition["key"]].metric_type,
+         contests[definition["key"]].subject_type,
+         contests[definition["key"]].crown_category)
+        == (definition["metric_type"], definition["subject_type"], definition["crown_category"])
+        for definition in CONTEST_DEFINITIONS
+    )
 
 
 def ensure_current_contest_data(
@@ -1048,6 +1062,19 @@ def _eligible_weekly_team_rosters(
 
 LEGACY_PRACTICE_SCORING = "legacy_minutes"
 PRECISE_PRACTICE_SCORING = "precise_seconds"
+# Bump this whenever a finalizer rule affecting source eligibility, standings,
+# team identity, results, or derived rewards changes. It is written only when
+# this finalizer completes a new week; older weeks have unknown provenance.
+FINALIZER_RULES_VERSION = "contest_finalizer_v1"
+
+
+def historical_rules_incompatibility(week: ContestWeek) -> str | None:
+    """Return a fail-closed reason before reconstructing finalized artifacts."""
+    if week.finalizer_rules_version is None:
+        return "historical_rules_unknown"
+    if week.finalizer_rules_version != FINALIZER_RULES_VERSION:
+        return "historical_rules_incompatible"
+    return None
 
 
 def _practice_scoring_mode(week: ContestWeek) -> str:
@@ -1082,6 +1109,29 @@ def _validate_practice_scoring_mode(session: Session, week: ContestWeek) -> str:
             "Cannot repair contest week: original finalization cutoff is missing."
         ))
     return mode
+
+
+def historical_repair_block_reason(session: Session, week: ContestWeek) -> str | None:
+    """Classify missing or conflicting finalized-week provenance for audit reports."""
+    reason = historical_rules_incompatibility(week)
+    if reason is not None:
+        return reason
+    if week.finalized_at is None:
+        return "historical_finalization_cutoff_unknown"
+    if week.practice_scoring_mode not in {LEGACY_PRACTICE_SCORING, PRECISE_PRACTICE_SCORING}:
+        return "historical_practice_scoring_unknown"
+    try:
+        _validate_practice_scoring_mode(session, week)
+    except HTTPException as error:
+        if error.status_code == 409:
+            return "historical_practice_scoring_conflict"
+        raise
+    contests = {row.key: row for row in session.scalars(select(Contest).where(
+        Contest.key.in_([definition["key"] for definition in CONTEST_DEFINITIONS])
+    )).all()}
+    if not _contest_definitions_match(contests):
+        return "historical_contest_definitions_incompatible"
+    return None
 
 
 def _scoring_seconds(chart, week: ContestWeek) -> int:
@@ -1883,13 +1933,8 @@ def _contest_result_once(
     return result, True
 
 
-def finalize_contest_week(
-    session: Session, *, week_start: date, now: datetime,
-    repair_finalized: bool = False,
-) -> ContestWeek:
-    """Finalize a week, or fill deterministic gaps when explicitly repairing."""
-    if now.tzinfo is None or now.utcoffset() is None:
-        raise ValueError("The current time must be timezone-aware.")
+def locked_contest_week(session: Session, *, week_start: date) -> ContestWeek | None:
+    """Lock and refresh the durable week before deciding its finalization path."""
     # Share continuity's writer fence before taking week/reward locks. An
     # activation at midnight must serialize with a later source finalization.
     from .team_continuity import lock_team_seasons
@@ -1901,12 +1946,35 @@ def finalize_contest_week(
     week = session.scalar(select(ContestWeek).join(Season).where(
         ContestWeek.week_start == week_start,
         contest_season_clause(),
-    ).with_for_update())
+    ).with_for_update().execution_options(populate_existing=True))
+    if week is not None and week.finalized_at is not None and week.finalized_at.tzinfo is None:
+        # SQLite drops timezone information when an identity is refreshed.
+        # Existing finalized_at values are UTC; keep the ORM value aware
+        # without marking the historical row dirty.
+        set_committed_value(week, "finalized_at", aware_utc(week.finalized_at))
+    return week
+
+
+def finalize_contest_week(
+    session: Session, *, week_start: date, now: datetime,
+    repair_finalized: bool = False,
+) -> ContestWeek:
+    """Finalize a week, or fill deterministic gaps when explicitly repairing."""
+    if now.tzinfo is None or now.utcoffset() is None:
+        raise ValueError("The current time must be timezone-aware.")
+    week = locked_contest_week(session, week_start=week_start)
     if week is None:
         raise HTTPException(status_code=404, detail="Contest week not found.")
     was_finalized = week.status == "finalized"
     if was_finalized and not repair_finalized:
         return week
+    if was_finalized:
+        incompatibility = historical_rules_incompatibility(week)
+        if incompatibility is not None:
+            raise HTTPException(status_code=409, detail=(
+                f"Cannot repair contest week: {incompatibility}. Original finalizer "
+                "semantics cannot be proven compatible; manual review is required."
+            ))
     now_utc = now.astimezone(timezone.utc)
     week_end_at = datetime.combine(week.week_end, time.min, CENTRAL).astimezone(timezone.utc)
     if not was_finalized and now_utc < week_end_at:
@@ -1926,6 +1994,11 @@ def finalize_contest_week(
     )).all()}
     if len(contests) != len(CONTEST_DEFINITIONS):
         raise RuntimeError("Band Camp contest definitions are missing.")
+    if not _contest_definitions_match(contests):
+        raise HTTPException(status_code=409, detail=(
+            "Cannot finalize contest week: contest definitions conflict with "
+            "the recorded finalizer rules; manual review is required."
+        ))
 
     source_cutoff = (
         aware_utc(week.finalized_at)
@@ -2088,7 +2161,9 @@ def finalize_contest_week(
             _add_dandelion(session, profile_id, PARTICIPATION_DANDELIONS)
     _set_finalization_stage(session, "final_week_status_flush_commit")
     if not was_finalized:
-        week.status = "finalized"; week.finalized_at = now_utc
+        week.status = "finalized"
+        week.finalized_at = now_utc
+        week.finalizer_rules_version = FINALIZER_RULES_VERSION
     session.flush()
     return week
 

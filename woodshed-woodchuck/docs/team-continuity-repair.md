@@ -87,14 +87,15 @@ Repeated no-op applies are safe while state remains unchanged.
 
 ## Schema, transaction and timing rules
 
-Only the single revision `t0p1q2r3s4t5` is currently approved. The combined
-ORM requires the precision migration; `s9n0o1p2q3r4`, other older revisions,
-unknown descendants, multiple heads and incomplete schemas fail closed. Required
+Only the single revision `d17contest001` is currently approved. The current
+ORM requires contest-rule provenance and the earlier precision migration;
+`t0p1q2r3s4t5`, other older revisions, unknown descendants, multiple heads,
+and incomplete schemas fail closed. Required
 tables/columns and the named non-null family FK, RESTRICT deletion, family index,
 and season/family unique constraint are checked. A future
 revision needs explicit compatibility review before changing this allowlist.
-Snapshots include fractional `precise_score` and per-week `practice_scoring_mode`;
-regenerate/review plans after upgrading. Follow the
+Snapshots include fractional `precise_score`, per-week `practice_scoring_mode`,
+and `finalizer_rules_version`; regenerate/review plans after upgrading. Follow the
 [precision release ordering](practice-time-precision.md#release-ordering-and-maintenance-compatibility):
 migrate before starting the new production code and coordinate web/finalizer
 upgrades with all finalization writers paused/drained.
@@ -171,13 +172,15 @@ H2B. A normal uncontrolled push is not the repair procedure.
 5. Run H2A with the deliberately selected database and a new evidence file:
    `python -m app.team_continuity_inventory --output <FINAL_INVENTORY_PATH>`.
    Compare to the reviewed 4-Team/11-member incident; take a quiescent backup.
-6. Deliberately deploy the reviewed commit in Render. Pre-deploy runs the full
-   chain `o5j6k7l8m9n0 → p6k7l8m9n0o1 → q7l8m9n0o1p2 → r8m9n0o1p2q3 → s9n0o1p2q3r4 → t0p1q2r3s4t5`.
+6. Deliberately deploy the reviewed commit in Render. Pre-deploy runs
+   `alembic upgrade head` through `d17contest001`. The earlier chain included
+   `o5j6k7l8m9n0 → p6k7l8m9n0o1 → q7l8m9n0o1p2 → r8m9n0o1p2q3 → s9n0o1p2q3r4 → t0p1q2r3s4t5`.
    Old workers must not create Teams after s9 requires family_id. Do not allow
    unrestricted old/new overlap. Keep billing flags disabled.
-7. Verify `alembic current` reports only `t0p1q2r3s4t5`, the compatible app is
-   running behind maintenance, old workers are gone, and the migration assigned one family per
-   existing Team without creating successors or changing historical identity.
+7. Verify `alembic current` reports only `d17contest001`, the compatible app is
+   running behind maintenance, old workers are gone, and the family migration
+   assigned one family per existing Team without creating successors or changing
+   historical identity.
 8. Inspect stored source Week 7 deadlines/state. If due/unfinalized, run the
    existing normal finalizer in isolation (`python -m app.contest_jobs
    finalize_due_weeks`). This command considers **all** due weeks: inspect that

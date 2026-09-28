@@ -21,8 +21,10 @@ trusted operational environment. Existing Contest definitions must be present;
 missing definitions fail finalization. Normal contest setup seeds them;
 `provision_weeks` and Season bootstrap do not.
 
-For the combined precision/provisioning release, migrate to `t0p1q2r3s4t5`
-**before starting the new web or finalizer code**. Pause/drain all finalization
+The earlier combined precision/provisioning release required `t0p1q2r3s4t5`.
+The current finalizer also maps `ContestWeek.finalizer_rules_version` and requires
+`d17contest001`. Migrate through that revision **before starting the current web
+or finalizer code**. Pause/drain all finalization
 writers, upgrade both services and every finalization entry point together,
 then resume; old/new finalizers must not overlap. Follow the
 [precision release procedure](practice-time-precision.md#release-ordering-and-maintenance-compatibility).
@@ -196,7 +198,17 @@ neither it nor local tests establish readiness for the next seasonal boundary.
 
 `python -m app.contest_jobs audit_history --week 2026-07-27` is a diagnostic
 simulation with savepoint rollback by default; `--apply` permits deterministic
-missing-artifact repair. It is not the routine finalizer retry or the strictly
+missing-artifact repair only when the finalized week records the same complete
+finalizer rules version as the running code and its practice scoring provenance
+is consistent. The persisted contest scoring/reward definitions must also match
+the attested rules. Migration `d17contest001` leaves existing finalized weeks with
+unknown rule provenance. For those weeks, dry-run and `--apply` return
+`manual_review` with no proposed artifacts; the command exits nonzero. Do not
+infer old rules from a week date or surviving result rows. Any future change to
+practice eligibility, BOARD activity qualification, team identity, contest
+ranking, or derived rewards must bump `FINALIZER_RULES_VERSION` before new
+weeks are finalized. An older running job binary does not enforce this guard.
+It is not the routine finalizer retry or the strictly
 read-only Team preflight. Review [H2B maintenance](team-continuity-repair.md) for
 activation conflicts/frozen history, and [canonical seasons](canonical-seasons.md)
 for bootstrap/closure. Rollover requires source finalization and explicit approved
