@@ -253,3 +253,27 @@ test('unavailable verification keeps account content closed',async()=>{
   assert.equal(await b.window.WWSessionBoundary.ready,false);
   assert.equal(b.shell.hidden,true);assert.equal(b.loadedScripts.length,0);
 });
+
+test('Guest submits every Secret attempt to server while blocking background fetch', async()=>{
+  const b=browser({account:'',guest:'local'});
+  for(const id of ['shed-secret-button','shed-secret-panel','shed-secret-form','shed-secret-passcode','shed-secret-feedback','shed-secret-close','shed-secret-cancel']) b.ids.set(id,element());
+  const submit=element(); const form=b.ids.get('shed-secret-form');form.querySelector=()=>submit;let submissions=0;form.submit=()=>{submissions++;};
+  b.load('app.js');
+  b.ids.get('shed-secret-button').listeners.click();
+  assert.equal(b.ids.get('shed-secret-panel').hidden,false);
+  b.ids.get('shed-secret-passcode').value='C002';
+  await form.listeners.submit({preventDefault(){}});
+  assert.equal(submissions,1);
+  assert.equal(b.window.location.assigned,undefined);
+  b.ids.get('shed-secret-passcode').value='  c001  ';
+  await form.listeners.submit({preventDefault(){}});
+  assert.equal(submissions,2);
+  assert.equal(b.requests.length,0);
+  assert.equal(b.shared.size,0);
+  // A stale Guest tab cannot begin an entry after another tab signs in.
+  b.window.location.assigned=undefined;
+  b.shared.set('woodshed:session-change:v1','1');
+  await form.listeners.submit({preventDefault(){}});
+  assert.equal(submissions,2);
+  assert.equal(b.window.location.assigned,undefined);
+});

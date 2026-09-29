@@ -71,10 +71,12 @@ from .session_config import session_secret, secure_session_cookie, is_production
 from .login_limits import protection_status
 from .tester_enrollments import (
     C001,
+    DIRECTOR1,
     SESSION_REGISTRATION_CONTEXT,
     establish_registration_context,
     c001_registration_open,
     registration_context,
+    registration_source,
 )
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -89,7 +91,8 @@ if is_production():
 
 
 local_kws_test = os.getenv('KWS_TEST_RUNTIME_MODE') == 'local'
-app = FastAPI(title="Woodshed Woodchuck", docs_url=None if local_kws_test else '/docs',
+from .c001_abuse import protection_lifespan
+app = FastAPI(title="Woodshed Woodchuck", lifespan=protection_lifespan, docs_url=None if local_kws_test else '/docs',
               redoc_url=None if local_kws_test else '/redoc',
               openapi_url=None if local_kws_test else '/openapi.json')
 if local_kws_test:
@@ -99,6 +102,8 @@ if local_kws_test:
     from starlette.middleware.httpsredirect import HTTPSRedirectMiddleware
     app.add_middleware(HTTPSRedirectMiddleware)
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=[os.environ['KWS_TEST_PUBLIC_HOST'], '127.0.0.1', 'localhost'])
+from .c001_abuse import EnrollmentProtection, BROWSER_KEY, FLASH_KEY
+app.add_middleware(EnrollmentProtection)
 app.add_middleware(SafeRequestLogContext)
 app.add_middleware(
     SessionMiddleware,
@@ -381,7 +386,7 @@ def guest_page(request: Request):
     # The signed C001 claim is registration context, not authentication. All
     # other account/adult/admin session state still requires explicit logout.
     tester_claim = registration_context(request)
-    context_only = bool(tester_claim) and set(request.session) == {SESSION_REGISTRATION_CONTEXT}
+    context_only = set(request.session) <= {SESSION_REGISTRATION_CONTEXT, BROWSER_KEY, FLASH_KEY}
     blocked = bool(profile is not None or (request.session and not context_only))
     signing_in = request.url.path == "/guest/login" and not blocked
     response = templates.TemplateResponse(
@@ -389,23 +394,49 @@ def guest_page(request: Request):
         context={"blocked": blocked, "signing_in": signing_in,
                  "account_id": account_id, "instruments": INSTRUMENT_OPTIONS,
                  "levels": LEVEL_OPTIONS, "goals": GOAL_OPTIONS,
-                 "c001_registration": bool(tester_claim) and not blocked},
+                 "secret_feedback": request.session.pop(FLASH_KEY, "") if not blocked else "",
+                 "c001_registration": bool(tester_claim) and not blocked,
+                 "c001_symbol_recognized": registration_source(request) == DIRECTOR1 and not blocked},
     )
     response.headers["Cache-Control"] = "no-store"
     response.headers["Referrer-Policy"] = "no-referrer"
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; connect-src "
         + ("'self'" if blocked or signing_in else "'none'")
-        + "; form-action 'none'; frame-ancestors 'none'; base-uri 'none'"
+        + "; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"
     )
     return response
+
+
+@app.post("/guest/secret-symbol")
+def guest_secret_symbol(request: Request, passcode: str = Form("")):
+    from .c001_abuse import record_outcome, _identity, activation_enabled
+    with SessionLocal() as session:
+        profile = current_profile(request, session)
+    if profile is not None or set(request.session) - {SESSION_REGISTRATION_CONTEXT, BROWSER_KEY, FLASH_KEY}:
+        raise HTTPException(409, "Use Secret Symbol from your current account or return to Guest Mode.")
+    if passcode.strip().casefold() != "c001":
+        record_outcome("secret_failure", _identity.get(), session_factory=SessionLocal)
+        request.session[FLASH_KEY] = "That passcode did not match. Try again."
+    else:
+        try:
+            establish_registration_context(request, C001, source=DIRECTOR1)
+            request.session[FLASH_KEY] = "C001 Pre-Beta recognized."
+            if not activation_enabled():
+                request.session[FLASH_KEY] += " New activation is temporarily unavailable; Guest tools remain available."
+        except ValueError as error:
+            request.session[FLASH_KEY] = str(error)
+    return RedirectResponse("/guest", 303, headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
 
 
 @app.get("/prebeta/C001")
 def prebeta_c001(request: Request):
     """Deliberate, public C001 entry; no account or enrollment is created."""
     try:
-        establish_registration_context(request, C001)
+        # Both QR/link entry and the Guest Secret Symbol use this resolver.
+        # The entry marker selects a fixed source; arbitrary source values are ignored.
+        source = DIRECTOR1 if request.query_params.get("entry") == "secret-symbol" else None
+        establish_registration_context(request, C001, source=source)
     except ValueError as error:
         return templates.TemplateResponse(
             request=request, name="c001_entry.html",

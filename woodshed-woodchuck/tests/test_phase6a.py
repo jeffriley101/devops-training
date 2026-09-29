@@ -67,7 +67,9 @@ def test_secret_client_accessibility_and_no_client_passcode_leak() -> None:
     css = (ROOT / "static/css/styles.css").read_text(encoding="utf-8")
     assert home.count('id="shed-secret-button"') == 1
     assert 'type="button"' in home and 'aria-controls="shed-secret-panel"' in home
-    assert 'label for="shed-secret-passcode"' in home
+    assert '{% include "_shed_secret.html" %}' in home
+    panel = (ROOT / "templates/_shed_secret.html").read_text(encoding="utf-8")
+    assert 'label for="shed-secret-passcode"' in panel
     assert "bottom: max(0.45rem, env(safe-area-inset-bottom))" in css and "left: max(0.45rem, env(safe-area-inset-left))" in css
     assert "union" not in (home + javascript).casefold()
     assert 'feedback.textContent = payload.redeemed ? "+20 dandelions"' in javascript

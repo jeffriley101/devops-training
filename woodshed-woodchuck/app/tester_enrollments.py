@@ -16,6 +16,7 @@ from .models import TesterEnrollment, WoodchuckProfile
 
 PILOT_D1 = "PILOT-D1"
 C001 = "C001"
+DIRECTOR1 = "DIRECTOR1"
 LIFETIME_TESTER_COHORTS = frozenset({PILOT_D1, C001})
 SESSION_REGISTRATION_CONTEXT = "tester_registration_context"
 PILOT_D1_DATE = date(2026, 9, 16)
@@ -38,7 +39,7 @@ def normalize_cohort_key(value: str) -> str:
     return key
 
 
-def enroll_tester(session, profile_id: int, cohort_key: str, joined_at: datetime) -> TesterEnrollment:
+def enroll_tester(session, profile_id: int, cohort_key: str, joined_at: datetime, *, source: str | None = None, reactivating: bool = False) -> TesterEnrollment:
     """Idempotently record one authorized profile/cohort enrollment.
 
     This service deliberately does not create billing, membership, or seat rows.
@@ -58,12 +59,20 @@ def enroll_tester(session, profile_id: int, cohort_key: str, joined_at: datetime
         TesterEnrollment.profile_id == profile_id,
         TesterEnrollment.cohort_key == key,
     ))
+    if key == C001 and (existing is None or reactivating):
+        from .age_privacy import eligible
+        from .c001_abuse import authorize_activation
+        session.flush()
+        if profile.status != "active" or not eligible(session, profile_id):
+            raise ValueError("C001 activation requires an eligible active account.")
+        authorize_activation(session, profile_id, already_enrolled=existing is not None)
     if existing is not None:
         return existing
     row = TesterEnrollment(
         profile_id=profile_id,
         cohort_key=key,
         joined_at=utc(joined_at),
+        source=source,
     )
     session.add(row)
     session.flush()
@@ -90,26 +99,41 @@ def c001_registration_open() -> bool:
     return os.getenv("C001_REGISTRATION_DISABLED", "").strip().lower() in {"", "0", "false", "no", "off"}
 
 
-def establish_registration_context(request, cohort_key: str) -> None:
+def establish_registration_context(request, cohort_key: str, *, source: str | None = None) -> None:
     key = normalize_cohort_key(cohort_key)
     if key != C001:
         raise ValueError("This public tester entry is unavailable.")
+    if source not in (None, DIRECTOR1):
+        raise ValueError("Unknown tester entry source.")
     existing = registration_context(request)
     if existing == key:
+        if source and registration_source(request) is None:
+            request.session[SESSION_REGISTRATION_CONTEXT] = {"cohort_key": key, "source": source}
         return
     if not c001_registration_open():
         raise ValueError("C001 registration is currently closed. Guest tools remain available.")
     request.session[SESSION_REGISTRATION_CONTEXT] = {"cohort_key": key}
+    if source:
+        request.session[SESSION_REGISTRATION_CONTEXT]["source"] = source
 
 
 def registration_context(request) -> str | None:
     """Read only signed server session context; visiting Guest is not a claim."""
     value = request.session.get(SESSION_REGISTRATION_CONTEXT)
-    if not isinstance(value, dict) or set(value) != {"cohort_key"}:
+    if not isinstance(value, dict) or set(value) not in ({"cohort_key"}, {"cohort_key", "source"}):
         return None
     if value.get("cohort_key") != C001:
         return None
+    if "source" in value and value["source"] != DIRECTOR1:
+        return None
     return C001
+
+
+def registration_source(request) -> str | None:
+    """Attribution comes from the validated signed claim, never account form fields."""
+    if registration_context(request):
+        return request.session[SESSION_REGISTRATION_CONTEXT].get("source")
+    return None
 
 
 def clear_registration_context(request) -> None:

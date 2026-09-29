@@ -169,7 +169,7 @@ def create_account(
     from .age_screen import registration_age
     from .age_privacy import declare_age
     from .tester_enrollments import (clear_registration_context, clock as tester_clock,
-                                     enroll_tester, registration_context)
+                                     enroll_tester, registration_context, registration_source)
     tester_claim = registration_context(request)
     try:
         age_band = registration_age(age_band)
@@ -220,7 +220,9 @@ def create_account(
             )
             declare_age(session, profile.id, age_band)
             if tester_claim is not None:
-                enroll_tester(session, profile.id, tester_claim, tester_clock())
+                enroll_tester(session, profile.id, tester_claim, tester_clock(), source=registration_source(request))
+                from .c001_abuse import record_creation
+                record_creation(session, profile.id)
             authoritative_state = preserve_server_values(submitted_state)
             account = {}
             account.update({
@@ -393,6 +395,13 @@ def delete_account(
 
 @router.post("/daily-secret")
 def redeem_daily_secret(request: Request, submitted: DailySecretSubmission):
+    if submitted.passcode.strip().casefold() == "c001":
+        # Existing accounts cannot join via the public new-account entry.
+        # Guest uses a native form POST with the shared registration resolver.
+        with SessionLocal() as session:
+            if current_profile(request, session) is None:
+                raise HTTPException(status_code=401, detail="Student sign-in is required.")
+        return {"recognized": True, "message": "C001 Pre-Beta is for new accounts. Your account has not changed."}
     if submitted.passcode.strip().casefold() != "union":
         raise HTTPException(status_code=400, detail="That passcode did not match. Try again.")
     with SessionLocal() as session:

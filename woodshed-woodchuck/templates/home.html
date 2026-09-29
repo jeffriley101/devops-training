@@ -99,19 +99,7 @@
     <p id="shed-team-feedback" role="status" aria-live="polite"></p>
   </section>
 
-  <section id="shed-secret-panel" class="mentor-card shed-secret-panel hidden" hidden aria-labelledby="shed-secret-title">
-    <h2 id="shed-secret-title">Secret</h2>
-    <form id="shed-secret-form" class="stack-form">
-      <label for="shed-secret-passcode">Passcode</label>
-      <input id="shed-secret-passcode" name="passcode" type="password" autocomplete="off" required />
-      <p id="shed-secret-feedback" role="status" aria-live="polite"></p>
-      <div class="button-row">
-        <button class="btn btn-primary" type="submit">Submit</button>
-        <button id="shed-secret-cancel" class="btn btn-secondary" type="button">Cancel</button>
-        <button id="shed-secret-close" class="btn btn-secondary" type="button">Close</button>
-      </div>
-    </form>
-  </section>
+  {% include "_shed_secret.html" %}
 
   <section id="change-name-panel" class="mentor-card change-profile-panel hidden" aria-labelledby="change-name-title" hidden>
     <div class="section-head"><p class="chip">Edit Profile</p><h2 id="change-name-title">Change Name</h2></div>

@@ -77,7 +77,14 @@ def test_signup_denied_before_any_account_record(age_db,band):
           'goal':'Practice every day','initial_state':json.dumps({'progress':{'credits':9999}})}
     if band is not None:data['age_band']=band
     assert c.post('/account/create',data=data).status_code==403
-    assert counts(age_db)==before
+    after = counts(age_db)
+    # Rejected attempts now persist only the required short-lived protection
+    # counters. No account, age declaration, consent, enrollment or access row.
+    assert after.pop('c001_abuse_events') == before.pop('c001_abuse_events') + 2
+    assert after == before
+    from app.c001_models import AbuseEvent
+    with age_db() as session:
+        assert sorted(session.scalars(select(AbuseEvent.kind))) == ['age_rejected', 'creation']
     assert c.get('/account/me').json()['authenticated'] is False
 
 @pytest.mark.parametrize('band',['13to17','adult'])

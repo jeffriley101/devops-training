@@ -86,6 +86,8 @@ def anonymize_woodchuck_account(
     if profile.status == "deleted":
         return
     now = _utc(now)
+    from .c001_abuse import record_deletion
+    record_deletion(session, profile.id)
     original_id = profile.woodchuck_id
 
     session.execute(update(TeamMembership).where(

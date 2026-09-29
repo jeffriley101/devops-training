@@ -38,6 +38,40 @@ process.stdin.on('end',async()=>{
  };
  const snapshot=()=>fetch(config.origin+'/test/snapshot').then(r=>r.json());
  try{
+   if(config.scenario==='c001') {
+   // Classroom code uses the real shared SHED form and deliberate QR route.
+   const g=await tab();await g.navigate('/guest');
+   const beforeSymbol=await snapshot();
+   await g.evaluate(`for(const s of document.querySelectorAll('#guest-setup-form select'))s.value=s.options[1].value;document.querySelector('#guest-setup-form button').click();`);
+   const preferences=await g.evaluate(`localStorage.getItem('woodshed:guest:v1:preferences')`);
+   await g.evaluate(`document.getElementById('shed-secret-button').click()`);
+   await g.evaluate(`document.getElementById('shed-secret-passcode').value='C002';document.querySelector('#shed-secret-form button[type=submit]').click()`);
+   await g.until(`document.getElementById('guest-secret-feedback')?.textContent.includes('did not match')`);
+   assert.equal(await g.evaluate(`!!document.querySelector('a[href="/setup"]')`),false);
+   for(let i=0;i<2;i++) {
+     await g.evaluate(`document.getElementById('shed-secret-button').click()`);
+     await g.evaluate(`document.getElementById('shed-secret-passcode').value='  c001  ';document.querySelector('#shed-secret-form button[type=submit]').click()`);
+     await g.until(`location.pathname==='/guest' && document.readyState==='complete' && document.body.innerText.includes('C001 Pre-Beta recognized.') && document.getElementById('shed-secret-panel').hidden`);
+     assert.equal(await g.evaluate(`document.body.dataset.guest`),'local');
+     assert.equal(await g.evaluate(`document.getElementById('guest-tools').hidden`),false);
+     assert.equal(await g.evaluate(`localStorage.getItem('woodshed:guest:v1:preferences')`),preferences);
+     assert.deepEqual(await snapshot(),beforeSymbol);
+   }
+   assert.equal(await g.evaluate(`fetch('/account/daily-secret',{method:'POST'}).then(()=>false,()=>true)`),true);
+   await g.evaluate(`document.querySelector('a[href="/setup"]').click()`);
+   await g.until(`location.pathname==='/setup' && document.readyState==='complete'`);
+   await g.evaluate(`document.getElementById('registration-age').value='13to17';document.querySelector('form[action="/setup"] button').click()`);
+   await g.until(`!!document.getElementById('account-create-form') && document.readyState==='complete'`);
+   await g.evaluate(`document.getElementById('woodchuck-name').value='Classroom Tester';document.getElementById('student-pin').value='2468';for(const s of document.querySelectorAll('#account-create-form select'))s.value=s.options[1].value;document.querySelector('#account-create-form button[type=submit]').click()`);
+   await g.until(`!!document.getElementById('created-woodchuck-id')?.textContent.trim()`);
+   const enrolled=await fetch(config.origin+'/test/c001').then(r=>r.json());
+   assert.deepEqual(enrolled,[{cohort:'C001',source:'DIRECTOR1',full:true}]);
+   const afterSymbol=await snapshot();
+   assert.equal(afterSymbol.counts.woodchuck_profiles,beforeSymbol.counts.woodchuck_profiles+1);
+   assert.equal(afterSymbol.counts.tester_enrollments,beforeSymbol.counts.tester_enrollments+1);
+     console.log(JSON.stringify({secret_symbol_c001_registration:true}));
+     return;
+   }
    const before=await snapshot();const g=await tab();await g.navigate('/guest');
    const guestStart=events.length;
    await g.evaluate(`localStorage.setItem('woodshedWoodchuckState.v1','saved-account-cache');localStorage.setItem('woodshedWoodchuckMetronomeBpm','88');sessionStorage.setItem('woodshed:p-book:verifier-draft:v1','account draft');`);

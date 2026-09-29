@@ -36,13 +36,21 @@ with SessionLocal() as session:
 @app.get('/test/snapshot')
 def snapshot():
     with SessionLocal() as s:
-        return {'counts':{t.name:s.scalar(select(func.count()).select_from(t)) for t in Base.metadata.sorted_tables},
+        return {'counts':{t.name:s.scalar(select(func.count()).select_from(t)) for t in Base.metadata.sorted_tables if not t.name.startswith('c001_')},
                 'states':{p.woodchuck_id:s.get(WoodchuckState,p.id).state_json for p in s.scalars(select(WoodchuckProfile))}}
+@app.get('/test/c001')
+def c001():
+    from app.models import TesterEnrollment
+    from app.memberships import student_has_full_access
+    with SessionLocal() as s:
+        return [{'cohort':e.cohort_key,'source':e.source,'full':student_has_full_access(s,e.profile_id)}
+                for e in s.scalars(select(TesterEnrollment))]
 '''
 
 
 @pytest.mark.skipif(not shutil.which('node') or not Path('/opt/google/chrome/chrome').exists(), reason='Local Node and Chromium required')
-def test_real_guest_tools_sessions_and_old_tabs(tmp_path):
+@pytest.mark.parametrize("scenario", ["boundary", "c001"])
+def test_real_guest_tools_sessions_and_old_tabs(tmp_path, scenario):
     source = Path(__file__).resolve().parents[1]
     (tmp_path/'guest_test_app.py').write_text(SERVER)
     with socket.socket() as sock:
@@ -66,13 +74,16 @@ def test_real_guest_tools_sessions_and_old_tabs(tmp_path):
                     assert server.poll() is None,(tmp_path/'uvicorn.log').read_text()
                     time.sleep(.05)
             else: pytest.fail('Disposable Uvicorn did not start')
-            config={'origin':origin,'chrome':'/opt/google/chrome/chrome','profile':str(tmp_path/'chrome'),'output':str(tmp_path)}
+            config={'scenario':scenario,'origin':origin,'chrome':'/opt/google/chrome/chrome','profile':str(tmp_path/'chrome'),'output':str(tmp_path)}
             (tmp_path/'browser-command.json').write_text(json.dumps(config,indent=2))
             result=subprocess.run(['node',str(source/'tests/guest_browser_driver.cjs')],input=json.dumps(config),text=True,capture_output=True,cwd=source,env=env,timeout=110)
             (tmp_path/'browser-stdout.txt').write_text(result.stdout)
             (tmp_path/'browser-stderr.txt').write_text(result.stderr)
             assert result.returncode==0,result.stdout+'\n'+result.stderr
             proof=json.loads(result.stdout)
+            if scenario == 'c001':
+                assert proof['secret_symbol_c001_registration'] is True
+                return
             assert proof['guest_application_requests']==[]
             assert proof['all_database_tables_unchanged_during_guest'] is True
             assert proof['old_tab_blocked'] is True

@@ -104,7 +104,7 @@ async def request_permission(request:Request):
     enforce_login_limit(request,'student',str(data.get('parent_email','')))
     with SessionLocal() as s:
         p=current_profile(request,s)
-        from .tester_enrollments import clear_registration_context,registration_context
+        from .tester_enrollments import clear_registration_context,registration_context,registration_source
         claim=registration_context(request) if p is None else None
         if data.get('confirm_account')!=(p.woodchuck_id if p else 'new'):raise HTTPException(409,'Account changed; reload the form.')
         status=student_consent_status(s,p.id) if p else None
@@ -112,7 +112,7 @@ async def request_permission(request:Request):
             raise HTTPException(503,'Parent permission status is temporarily unavailable. Please use Help.')
         if status not in (None,'no_flow','expired','request_closed','request_superseded','permission_withdrawn'):
             raise HTTPException(409,'A parent permission request already exists. Reload this page for its status.')
-        try:service.request_consent(s,parent_email=data.get('parent_email',''),director_email=data.get('director_email',''),director_name=data.get('director_name',''),profile=p,cohort_key=claim if claim else None);s.commit()
+        try:service.request_consent(s,parent_email=data.get('parent_email',''),director_email=data.get('director_email',''),director_name=data.get('director_name',''),profile=p,cohort_key=claim if claim else None,cohort_source=registration_source(request) if claim else None);s.commit()
         except ValueError as e:raise HTTPException(409,str(e))
         if claim:clear_registration_context(request)
     return page(request,'message',message='The parent request was sent. No new child account, membership or director invitation was created.')
