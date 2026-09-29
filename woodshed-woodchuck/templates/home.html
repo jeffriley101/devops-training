@@ -1,5 +1,9 @@
 {% extends "base.html" %}
 
+{% block dashboard_styles %}
+{% if shed_season.artwork_theme == "harvest" %}<link rel="stylesheet" href="/static/css/seasonal-presentation.css?v=1" />{% endif %}
+{% endblock %}
+
 {% block content %}
 <section class="card woodshed-page">
   <div class="woodshed-scene artwork-scene shed-artwork-scene" aria-label="Interactive Woodshed room">
@@ -7,6 +11,9 @@
     <div class="woodshed-character-layer" data-presentation-only aria-label="Your Woodchuck">
       <img class="character-art woodshed-character-art" data-student-woodchuck src="{{ shed_character_url }}" alt="Your Woodchuck" />
     </div>
+    {% if shed_season.artwork_theme == "harvest" %}
+    {% with halloween_surface = "shed" %}{% include "_halloween_decor.html" %}{% endwith %}
+    {% endif %}
     <div id="shed-decoration-layer" class="shed-decoration-layer" aria-label="Placed SHED decorations"></div>
     <div id="woodshed-hotspots" class="scene-hotspots" aria-label="Woodshed room controls">
       <button id="woodchuck-name-value" class="scene-hotspot" data-scene-cell="L1" type="button" aria-controls="change-name-panel" aria-expanded="false" aria-label="Change Woodchuck name"></button>

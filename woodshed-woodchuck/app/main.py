@@ -492,6 +492,9 @@ def home(request: Request):
     member_since = None
     character_url = shed_character_url(None)
     with SessionLocal() as session:
+        shed_season = board_season_presentation(season_covering_date(
+            session, datetime.now(ZoneInfo("America/Chicago")).date()
+        ))
         profile = current_profile(request, session)
         if profile is not None:
             character_url = shed_character_url(profile.instrument)
@@ -513,6 +516,7 @@ def home(request: Request):
         member_since=member_since,
         shed_cabin_background_url=shed_artwork_url(None),
         shed_character_url=character_url,
+        shed_season=shed_season,
     )
 
 

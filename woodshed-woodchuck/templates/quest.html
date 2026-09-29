@@ -1,12 +1,20 @@
 {% extends "base.html" %}
 
+{% block dashboard_styles %}
+{% if board_season.artwork_theme == "harvest" %}<link rel="stylesheet" href="/static/css/seasonal-presentation.css?v=1" />{% endif %}
+{% endblock %}
+
 {% block content %}
 <p class="notice-card">Bonus Challenges and hours, care, and marching activities are available for practice. Their self-reports currently earn no rewards or completion credit. Daily trivia still earns its usual reward.</p>
-<section class="card board-page">
+<section class="card board-page"{% if board_season.artwork_theme %} data-season-theme="{{ board_season.artwork_theme }}"{% endif %}>
   <a id="plunge-burrow-button" class="board-plunge-button" href="/plunge-burrow" aria-label="Play Plunge Burrow" title="Play Plunge Burrow"><span aria-hidden="true">🕳️</span></a>
+  {% if board_season.artwork_theme == "harvest" %}
+  {% with halloween_surface = "board" %}{% include "_halloween_decor.html" %}{% endwith %}
+  {% else %}
   <div class="back-to-school-streamers" aria-hidden="true">
     {% for index in range(9) %}<span></span>{% endfor %}
   </div>
+  {% endif %}
   <div class="section-head">
     <h2 class="board-season-title" aria-label="{{ board_season.title }}">
       {% for word in board_season.title_words %}
@@ -16,7 +24,7 @@
     </h2>
   </div>
 
-  <section class="board-banner">
+  <section class="board-banner{% if board_season.polaroid_url %} board-banner--season-art{% endif %}">
     <div>
       <p class="board-kicker">Get your name on the Board</p>
       <h3 id="board-player-name">Your Woodchuck</h3>
@@ -44,7 +52,18 @@
         <strong id="board-player-season-points">0</strong>
       </p>
     </div>
-
+    {% if board_season.polaroid_url %}
+    <figure class="season-polaroid">
+      <a class="season-polaroid-link" href="{{ board_season.master_url }}" data-season-art-open aria-label="Open {{ board_season.title }} illustration">
+        <span class="season-photo-pin" aria-hidden="true"></span>
+        <object class="season-polaroid-image" data="{{ board_season.polaroid_url }}" type="image/jpeg" width="1200" height="900" tabindex="-1" aria-label="Woodshed musicians with pumpkins and autumn leaves; the photo is captioned Late Fall / Harvest">
+          <span class="season-image-fallback">Halloween artwork is unavailable. Open the full illustration to try again.</span>
+        </object>
+        <span class="season-polaroid-action">Open full illustration</span>
+      </a>
+      <figcaption>{{ board_season.title }} at the Woodshed</figcaption>
+    </figure>
+    {% endif %}
   </section>
 
   <div class="board-layout">
@@ -439,4 +458,19 @@
 
 <script id="quest-pool-data" type="application/json">{{ quest_pool | tojson }}</script>
 <script id="sax-viking-messages-data" type="application/json">{{ sax_viking_messages | tojson }}</script>
+{% if board_season.master_url %}
+<dialog id="season-art-dialog" class="season-art-dialog" aria-labelledby="season-art-title" hidden>
+  <div class="season-art-dialog-head">
+    <h2 id="season-art-title">{{ board_season.title }} at the Woodshed</h2>
+    <form method="dialog"><button class="btn btn-secondary" type="submit" autofocus>Close image</button></form>
+  </div>
+  <object class="season-master-image" data="{{ board_season.master_url }}" type="image/png" width="1800" height="900" tabindex="-1" aria-label="The Viking Sax and Woodshed musicians among pumpkins, autumn leaves and a barn">
+    <p class="season-image-fallback" role="status">The Halloween illustration could not load. Close this window and try again later.</p>
+  </object>
+</dialog>
+{% endif %}
+{% endblock %}
+
+{% block page_scripts %}
+{% if board_season.master_url %}<script src="/static/js/visible-art.js?v=1"></script>{% endif %}
 {% endblock %}
