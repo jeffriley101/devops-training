@@ -8,20 +8,44 @@ from .models import ArcadeHighScore, ArcadePlaySession, WoodchuckProfile
 
 def publishable_attempt_bests(session, game_key):
     """Public best can be lower than a lifetime best earned while private."""
-    if game_key != "history-mystery":
-        # No independent evidence exists for these browser-scored games.
-        return {}
     from .age_privacy import can_publish
     from .age_models import AccountPrivacy
-    rows = session.execute(select(ArcadePlaySession.profile_id, func.max(ArcadePlaySession.submitted_score))
+    rows = session.execute(select(ArcadePlaySession.profile_id, func.max(ArcadePlaySession.authoritative_score))
+        .join(WoodchuckProfile, WoodchuckProfile.id == ArcadePlaySession.profile_id)
         .join(AccountPrivacy, AccountPrivacy.profile_id == ArcadePlaySession.profile_id)
-        .where(ArcadePlaySession.game_key == game_key, ArcadePlaySession.submitted_score > 0,
+        .where(ArcadePlaySession.game_key == game_key, ArcadePlaySession.authoritative_score > 0,
+               ArcadePlaySession.completed_at.is_not(None), WoodchuckProfile.status == "active",
                AccountPrivacy.age_band.in_(['13to17', 'adult']),
                ArcadePlaySession.started_at >= AccountPrivacy.public_from,
                ArcadePlaySession.completed_at >= AccountPrivacy.public_from)
         .group_by(ArcadePlaySession.profile_id))
     # Reuse the shared current-consent gate as well as both historical boundaries.
-    return {pid: score for pid, score in rows if can_publish(session, pid)}
+    bests = {pid: score for pid, score in rows if can_publish(session, pid)}
+    # A pre-migration History result can still be independently checked when its
+    # signed answer evidence survives. Never infer authority from submitted_score.
+    if game_key == 'history-mystery':
+        from .models import WoodchuckState
+        from .history_attempts import history_score, HistoryAttemptError
+        legacy = session.execute(select(ArcadePlaySession, WoodchuckState)
+            .join(WoodchuckState, WoodchuckState.profile_id == ArcadePlaySession.profile_id)
+            .join(WoodchuckProfile, WoodchuckProfile.id == ArcadePlaySession.profile_id)
+            .join(AccountPrivacy, AccountPrivacy.profile_id == ArcadePlaySession.profile_id)
+            .where(ArcadePlaySession.game_key == game_key,
+                   ArcadePlaySession.authoritative_score.is_(None),
+                   ArcadePlaySession.completed_at.is_not(None),
+                   ArcadePlaySession.started_at >= AccountPrivacy.public_from,
+                   ArcadePlaySession.completed_at >= AccountPrivacy.public_from,
+                   WoodchuckProfile.status == 'active'))
+        for play, state in legacy:
+            if not can_publish(session, play.profile_id):
+                continue
+            try:
+                verified = history_score(state, play, require_finished=True)
+            except HistoryAttemptError:
+                continue
+            if verified > 0 and verified == play.submitted_score:
+                bests[play.profile_id] = max(bests.get(play.profile_id, 0), verified)
+    return bests
 
 
 ARCADE_GAME_KEYS = frozenset({
@@ -107,34 +131,11 @@ def arcade_score_payload(
             ArcadeHighScore.game_key == key,
         )
     ) or 0
-    rows = session.execute(
-        select(ArcadeHighScore, WoodchuckProfile)
-        .join(
-            WoodchuckProfile,
-            WoodchuckProfile.id == ArcadeHighScore.profile_id,
-        )
-        .where(
-            ArcadeHighScore.game_key == key,
-            ArcadeHighScore.best_score > 0,
-            WoodchuckProfile.status == "active",
-        )
-        .order_by(
-            ArcadeHighScore.best_score.desc(),
-            func.lower(WoodchuckProfile.display_name),
-            WoodchuckProfile.display_name,
-            WoodchuckProfile.id,
-        )
-    ).all()
-
     public_bests = publishable_attempt_bests(session, key)
-    visible = []
-    for score, profile in rows:
-        # Aggregate timestamps do not establish when the scoring attempt began.
-        value = (score.best_score if profile.id == profile_id
-                 else public_bests.get(profile.id, 0))
-        if value > 0:
-            visible.append((value, profile))
-    rows = sorted(visible, key=lambda row: (-row[0], row[1].display_name.lower(), row[1].display_name, row[1].id))
+    profiles = session.scalars(select(WoodchuckProfile).where(
+        WoodchuckProfile.id.in_(public_bests), WoodchuckProfile.status == 'active'))
+    rows = sorted(((public_bests[p.id], p) for p in profiles),
+                  key=lambda row: (-row[0], row[1].display_name.lower(), row[1].display_name, row[1].id))
     leaderboard: list[dict[str, object]] = []
     prior_score: int | None = None
     rank = 0

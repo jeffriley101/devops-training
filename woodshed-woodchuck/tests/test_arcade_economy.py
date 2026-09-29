@@ -249,9 +249,12 @@ def test_repeated_shared_game_completion_keeps_one_score_and_one_payout(
         completed = client.post(
             f"/arcade/plays/{play['play_token']}/complete", json={"score": score}
         )
-        assert completed.status_code == 200
-        assert completed.json()["best_score"] == 0
-        assert completed.json()["leaderboard"] == []
+        if game_key in {"scale-keyboard", "interval-basic-training"}:
+            assert completed.status_code == 409  # an owned token is not scoring evidence
+        else:
+            assert completed.status_code == 200
+            assert completed.json()["best_score"] == 0
+            assert completed.json()["leaderboard"] == []
 
     with economy_database() as session:
         plays = session.scalars(select(ArcadePlaySession).where(
@@ -262,7 +265,7 @@ def test_repeated_shared_game_completion_keeps_one_score_and_one_payout(
             ArcadeHighScore.profile_id == profile.id,
             ArcadeHighScore.game_key == game_key,
         )).all()
-    assert len(plays) == len(scores)
+    assert len(plays) == (1 if game_key in {"scale-keyboard", "interval-basic-training"} else len(scores))
     assert len(high_scores) == 0
 
 
@@ -425,13 +428,13 @@ def test_all_nine_clients_use_shared_start_and_completion_contract() -> None:
     assert 'startPlay("wheel-of-woodchuck")' in WHEEL_JS
     assert "completePlay(\n      activePlayToken" in WHEEL_JS
     assert 'startPlay("scale-keyboard")' in SCALE_JS
-    assert "completePlay(activePlayToken, finalScore)" in SCALE_JS
+    assert "authority.complete()" in SCALE_JS
     assert 'startPlay("thirds")' in THIRDS_JS
-    assert "completePlay(token, game.score)" in THIRDS_JS
+    assert "authority.complete()" in THIRDS_JS
     assert "startPlay(GAME_KEY)" in NINES_JS
-    assert "completePlay(token, game.score)" in NINES_JS
+    assert "authority.complete()" in NINES_JS
     assert "startPlay(GAME_KEY)" in INTERVAL_JS
-    assert "completePlay(token, game.score)" in INTERVAL_JS
+    assert "authority.complete()" in INTERVAL_JS
     assert "startPlay(GAME_KEY)" in HISTORY_JS
     assert "completePlay(token, game.score)" in HISTORY_JS
     assert 'body: JSON.stringify({ game_key: gameKey, request_id: requestId })' in ECONOMY_JS

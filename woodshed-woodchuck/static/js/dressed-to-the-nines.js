@@ -126,6 +126,7 @@
   if (!page) return;
 
   const game = new DressedToTheNinesGame();
+  const authority = root.WoodshedArcadeEconomy.challengeRun(game, GAME_KEY);
   const scoreOutput = document.getElementById("nines-score");
   const bestOutput = document.getElementById("nines-best");
   const timeOutput = document.getElementById("nines-time");
@@ -187,7 +188,7 @@
     answerButtons.forEach(function (button) {
       button.disabled = !running || answerLocked;
     });
-    startButton.disabled = running || starting;
+    startButton.disabled = running || starting || authority.saving;
     startButton.textContent = running ? "Game Running" : "New Game";
   }
 
@@ -200,9 +201,12 @@
     message.textContent = `Final score: ${game.score}`;
     const token = activePlayToken;
     activePlayToken = null;
-    finishPromise = root.WoodshedArcadeEconomy.completePlay(token, game.score)
+    finishPromise = authority.complete()
       .then(function (payload) {
+        game.score = payload.score;
+        render();
         renderLeaderboard(payload);
+        message.textContent = `Final score: ${payload.score}`;
         return payload;
       })
       .catch(function (error) {
@@ -221,7 +225,7 @@
   }
 
   function startGame() {
-    if (starting || game.status === "running") return;
+    if (starting || authority.saving || game.status === "running") return;
     starting = true;
     startButton.disabled = true;
     message.textContent = "Starting…";
@@ -229,7 +233,7 @@
       activePlayToken = payload.play_token;
       finishPromise = null;
       answerLocked = false;
-      game.start();
+      authority.start(payload);
       message.textContent = "Choose the ninth.";
       lastTickAt = performance.now();
       window.clearInterval(timer);
@@ -245,10 +249,13 @@
   }
 
   answerButtons.forEach(function (button) {
-    button.addEventListener("click", function () {
+    button.addEventListener("click", async function () {
       if (answerLocked) return;
       answerLocked = true;
-      const result = game.submit(button.dataset.ninesAnswer);
+      render();
+      let result;
+      try { result = await authority.action(button.dataset.ninesAnswer); }
+      catch (error) { message.textContent = error.message; answerLocked = false; render(); return; }
       if (!result.accepted) {
         answerLocked = false;
         return;

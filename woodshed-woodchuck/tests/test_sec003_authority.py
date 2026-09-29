@@ -145,6 +145,9 @@ def test_all_unchecked_arcade_aliases_withhold_value(authority_db, game, score):
                         (f'/arcade/scores/{game}', {'play_token':token, 'score':score}),
                         (path, {'score':score})]:
         result = client.post(route, json=body)
+        if game in {'thirds', 'dressed-to-the-nines', 'interval-basic-training', 'scale-keyboard'}:
+            assert result.status_code == 409, result.text
+            continue
         assert result.status_code == 200, result.text
         assert result.json()['payout'] == 0
         assert result.json()['result_authority'] == 'self_reported'
@@ -156,7 +159,8 @@ def test_all_unchecked_arcade_aliases_withhold_value(authority_db, game, score):
     with authority_db() as session:
         assert session.scalar(select(func.count()).select_from(ArcadeHighScore)) == 0
         play = session.scalar(select(ArcadePlaySession))
-        assert play.payout == 0 and play.reward_granted_at is None
+        assert play.payout in (None, 0) and play.reward_granted_at is None
+        assert play.authoritative_score is None
 
 
 @pytest.mark.parametrize('score', [-1, 2147483648, 1.5, '1', True, None])

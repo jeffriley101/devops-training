@@ -278,7 +278,7 @@ def test_score_completion_uses_one_play_token_and_persistent_top_five() -> None:
     assert 'startPlay("scale-keyboard")' in GAME_JS
     assert "const finalScore = game.snapshot().score" in GAME_JS
     assert "scoreOutput.textContent = String(finalScore)" in GAME_JS
-    assert "completePlay(activePlayToken, finalScore)" in GAME_JS
+    assert "authority.complete()" in GAME_JS
     assert "if (finishPromise) return finishPromise" in GAME_JS
     assert 'WoodshedArcadeEconomy.loadScores("scale-keyboard")' in GAME_JS
     assert 'data-arcade-leaderboard="scale-keyboard"' in TEMPLATE
@@ -287,7 +287,7 @@ def test_score_completion_uses_one_play_token_and_persistent_top_five() -> None:
 
 def test_each_accepted_press_renders_the_accumulated_score() -> None:
     press_handler = GAME_JS[GAME_JS.index("function pressKey"):GAME_JS.index("function finishRun")]
-    assert "const result = game.press(midi)" in press_handler
+    assert "authority.action(midi)" in press_handler
     assert "scoreOutput.textContent = String(result.score)" in press_handler
     assert "render();" in press_handler
     renderer = GAME_JS[GAME_JS.index("function render()"):GAME_JS.index("function loadNextScale")]

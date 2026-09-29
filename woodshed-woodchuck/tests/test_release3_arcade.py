@@ -63,6 +63,9 @@ def start(db, game='thirds', key=None, pid=1, now=None):
 
 
 def complete(db, play, score=0, now=None):
+    if play.game_key in arcade.challenges.GAMES:
+        started = play.started_at.replace(tzinfo=timezone.utc) if play.started_at.tzinfo is None else play.started_at
+        now = max(now or datetime.now(timezone.utc), started + timedelta(seconds=30))
     with db() as s:
         result = arcade.complete_arcade_play(s, profile_id=play.profile_id, play_token=play.play_token, score=score, now=now)
         s.commit()
@@ -165,9 +168,9 @@ def test_http_mismatched_game_direct_score_and_replayed_completion(db):
     assert c.post('/account/login', data={'woodchuck_id': 'WC-R3-1', 'pin': '2468'}).status_code == 200
     assert c.post('/arcade/plays', json={'game_key': 'blue'}).status_code == 422
     key = uuid4().hex
-    play = c.post('/arcade/plays', json={'game_key': 'thirds', 'request_id': key}).json()
+    play = c.post('/arcade/plays', json={'game_key': 'radio-tuner', 'request_id': key}).json()
     token = play['play_token']
-    assert c.post('/arcade/scores/thirds', json={'score': 10}).status_code == 422
+    assert c.post('/arcade/scores/radio-tuner', json={'score': 10}).status_code == 422
     assert c.post('/arcade/scores/blue', json={'score': 10, 'play_token': token}).status_code == 409
     assert c.post('/arcade/plays', json={'game_key': 'blue', 'request_id': key}).status_code == 409
     first = c.post(f'/arcade/plays/{token}/complete', json={'score': 10}).json()
@@ -273,7 +276,7 @@ def test_aggregate_without_completed_attempt_provenance_is_self_only(db, game, p
                     else arcade_score_payload(s, profile_id=pid, game_key=game))
         assert scores(8)['leaderboard'] == []
         assert scores(1)['best_score'] == 1000
-        assert scores(1)['leaderboard'] == [dict(rank=1, display_name='Player 1', score=1000, is_current_user=True)]
+        assert scores(1)['leaderboard'] == ([dict(rank=1, display_name='Player 1', score=1000, is_current_user=True)] if game == 'plunge-burrow' else [])
 
 
 def test_concurrent_tabs_and_duplicate_completions(db):
@@ -284,12 +287,12 @@ def test_concurrent_tabs_and_duplicate_completions(db):
         barrier.wait(); return start(db, key=key)
     with ThreadPoolExecutor(max_workers=4) as pool: runs = list(pool.map(worker, keys))
     assert len({r.play.id for r in runs}) == 1
-    def finish(_): return complete(db, runs[0].play, 12)
+    def finish(_): return complete(db, runs[0].play, 0)
     with ThreadPoolExecutor(max_workers=4) as pool: results = list(pool.map(finish, range(4)))
     assert sum(not r['already_completed'] for r in results) == 1
     for key in keys: assert start(db, key=key).play.id == runs[0].play.id
     with db() as s:
         assert count(s, ArcadeAttemptPack) == count(s, ArcadePlaySession) == 1
-        assert count(s, ArcadeHighScore) == 0
+        assert count(s, ArcadeHighScore) == 1
         assert s.get(WoodchuckState, 1).state_json['progress']['credits'] == 0
         assert arcade.remaining_attempts(s, 1, 'thirds') == 2

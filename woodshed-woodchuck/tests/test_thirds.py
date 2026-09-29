@@ -298,7 +298,7 @@ def test_thirds_migration_extends_only_existing_arcade_game_constraints() -> Non
 
 def test_thirds_client_finishes_once_through_existing_economy_contract() -> None:
     assert 'startPlay("thirds")' in GAME_JS
-    assert "completePlay(token, game.score)" in GAME_JS
+    assert "authority.complete()" in GAME_JS
     assert "if (finishPromise) return finishPromise" in GAME_JS
     assert 'fetch("/arcade/scores/thirds"' in GAME_JS
     assert 'data-arcade-leaderboard="thirds"' in TEMPLATE
