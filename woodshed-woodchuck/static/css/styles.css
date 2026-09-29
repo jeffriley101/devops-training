@@ -5019,6 +5019,30 @@ select {
   }
 }
 
+/* Brand artwork sits in the same foreground layer as the welcome controls. */
+.welcome-hero-logo {
+  position: absolute;
+  z-index: 1;
+  top: clamp(1rem, 4%, 2rem);
+  left: 50%;
+  width: min(44%, 25rem);
+  max-width: calc(100% - 2rem);
+  height: auto;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.welcome-hero-content {
+  z-index: 2;
+}
+
+@media (max-width: 640px) {
+  .welcome-hero-logo {
+    top: 1rem;
+    width: min(76%, 18rem);
+  }
+}
+
 .sound-effects-controls {
   position: fixed;
   z-index: 1200;
