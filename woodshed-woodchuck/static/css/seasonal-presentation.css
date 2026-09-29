@@ -1,0 +1,188 @@
+/* Halloween presentation only. Season selection comes from the server. */
+.halloween-decor,
+.halloween-decor * {
+  pointer-events: none;
+  user-select: none;
+}
+.halloween-decor { position: relative; overflow: hidden; }
+.halloween-decor > span { position: absolute; display: block; }
+.halloween-decor--board { height: 3.8rem; margin: -.25rem 0 .25rem; }
+.halloween-decor > .halloween-garland {
+  inset: .45rem 12% auto;
+  height: 2.7rem;
+  display: flex;
+  justify-content: space-around;
+  gap: .35rem;
+  border-top: 2px solid #513126;
+  transform: rotate(-1deg);
+}
+.halloween-garland i {
+  width: clamp(.9rem, 3vw, 2rem);
+  height: 75%;
+  background: #eb893f;
+  clip-path: polygon(0 0, 100% 0, 94% 72%, 50% 100%, 6% 72%);
+  transform: rotate(5deg);
+}
+.halloween-garland i:nth-child(3n + 2) { background: #352a3f; transform: rotate(-6deg); }
+.halloween-garland i:nth-child(3n) { background: #986cb1; transform: rotate(3deg); }
+.halloween-pumpkin {
+  width: 2.5rem;
+  height: 1.9rem;
+  border: 2px solid #633220;
+  border-radius: 43% 43% 40% 40%;
+  background: #e78a35;
+  box-shadow: inset .35rem 0 #c9642a, inset -.35rem 0 #f6ae4d, 2px 2px #4c282640;
+}
+.halloween-pumpkin::before {
+  content: "";
+  position: absolute;
+  inset: 0 25%;
+  border-inline: 1px solid #a95129;
+  border-radius: 45%;
+}
+.halloween-pumpkin::after {
+  content: "";
+  position: absolute;
+  top: -.55rem;
+  left: 44%;
+  width: .45rem;
+  height: .6rem;
+  background: #52613a;
+  border: 1px solid #333c24;
+  transform: rotate(12deg);
+}
+.halloween-pumpkin--left { left: .6rem; bottom: .3rem; transform: rotate(-8deg); }
+.halloween-pumpkin--right { right: .6rem; bottom: .3rem; transform: rotate(6deg) scale(.85); }
+.halloween-bat {
+  width: 2.2rem;
+  height: 1.05rem;
+  background: #34283e;
+  clip-path: polygon(0 0, 25% 19%, 38% 47%, 40% 12%, 50% 30%, 60% 12%, 62% 47%, 75% 19%, 100% 0, 88% 71%, 74% 58%, 63% 94%, 50% 80%, 37% 94%, 26% 58%, 12% 71%);
+}
+.halloween-bat--left { left: 3%; top: .2rem; transform: rotate(-15deg); }
+.halloween-bat--right { right: 4%; top: .2rem; transform: rotate(15deg); }
+.halloween-decor--board .halloween-pumpkin--right { right: 3.1rem; }
+.halloween-decor--board .halloween-bat--right { right: 4rem; }
+.halloween-leaf {
+  width: 1.2rem;
+  height: 1.6rem;
+  background: #b5482b;
+  clip-path: polygon(50% 0, 66% 28%, 93% 18%, 80% 50%, 100% 64%, 60% 81%, 53% 100%, 43% 100%, 45% 81%, 0 64%, 20% 50%, 7% 18%, 34% 28%);
+}
+.halloween-leaf--left { left: 9%; bottom: .1rem; transform: rotate(32deg); }
+.halloween-leaf--right { right: 10%; bottom: .1rem; transform: rotate(-38deg); background: #e7b552; }
+.halloween-web {
+  top: 0;
+  right: 0;
+  width: 3.5rem;
+  height: 3.5rem;
+  opacity: .75;
+  background: repeating-radial-gradient(circle at 100% 0, transparent 0 9px, #fff2d1 10px 11px, transparent 12px 18px);
+  clip-path: polygon(0 0, 100% 0, 100% 100%);
+}
+.halloween-web::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, transparent 49%, #fff2d1 50% 51%, transparent 52%);
+}
+
+/* Keep other seasons' existing title and paper notices untouched. */
+.board-page[data-season-theme="harvest"] .board-season-title span:not(.letter-gap) {
+  font-size: clamp(1.25rem, 5.3vw, 3.4rem);
+  background: #ef994f;
+  color: #302132;
+}
+.board-page[data-season-theme="harvest"] .board-season-title span:nth-child(3n + 2) {
+  background: #382b42;
+  color: #fff0d2;
+}
+.board-page[data-season-theme="harvest"] .board-season-title span:nth-child(3n) {
+  background: #c4a2d4;
+}
+.board-banner--season-art > div { min-width: 0; }
+.season-polaroid {
+  width: min(100% - 1rem, 22rem);
+  min-width: 0;
+  margin: 1rem auto .5rem;
+  transform: rotate(-2deg);
+  text-align: center;
+  color: #35283b;
+}
+.season-polaroid-link {
+  position: relative;
+  display: block;
+  color: inherit;
+  background: #f9f6ed;
+  box-shadow: 3px 6px 8px #39261750;
+  text-decoration: none;
+}
+.season-polaroid-link:focus-visible { outline: 4px solid #583070; outline-offset: 5px; }
+.season-photo-pin {
+  position: absolute;
+  z-index: 1;
+  top: -.4rem;
+  left: calc(50% - .5rem);
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid #482d60;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 25%, #eee0ff 0 10%, #9974b9 25%, #523565 80%);
+  box-shadow: 1px 3px 2px #39261770;
+  pointer-events: none;
+}
+.season-polaroid-image,
+.season-master-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+/* Image objects provide native text fallback even with JavaScript disabled. */
+.season-polaroid-image { aspect-ratio: 4 / 3; pointer-events: none; }
+.season-polaroid-action { display: block; padding: 0 .5rem .75rem; font-size: .82rem; text-decoration: underline; }
+.season-polaroid figcaption { margin-top: .75rem; font-weight: 800; }
+.season-image-fallback { display: block; padding: 1.5rem; color: #35283b; background: #f9f6ed; }
+.season-art-dialog:not([open]) { display: none; }
+.season-art-dialog {
+  width: min(72rem, calc(100% - 2rem));
+  max-width: none;
+  max-height: calc(100dvh - 2rem);
+  padding: clamp(.7rem, 2vw, 1.5rem);
+  overflow: auto;
+  color: #35283b;
+  background: #f9f6ed;
+  border: 3px solid #83618e;
+  border-radius: .5rem;
+  box-shadow: 0 12px 50px #0007;
+}
+.season-art-dialog::backdrop { background: #1c1524d9; }
+.season-art-dialog-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .75rem; margin-bottom: 1rem; }
+.season-art-dialog-head h2 { margin: 0; font-size: clamp(1.1rem, 3vw, 1.6rem); }
+.season-art-dialog-head button { min-height: 44px; }
+.season-art-dialog-head button:focus-visible { outline: 3px solid #583070; outline-offset: 3px; }
+.season-master-image { aspect-ratio: 2 / 1; max-height: calc(100dvh - 10rem); }
+
+/* Foreground paper accents use the existing isolated artwork scene. Owned
+   decorations (z=2, or 6 when dragging) and room hotspots (z=5) stay above it. */
+.artwork-scene > .halloween-decor--shed {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: none;
+  z-index: 1;
+}
+.halloween-decor--shed .halloween-garland { top: 2%; left: 12%; right: 12%; height: 5%; }
+.halloween-decor--shed .halloween-garland i { width: 9%; }
+.halloween-decor--shed .halloween-web { width: 20%; height: 12%; }
+.halloween-decor--shed .halloween-pumpkin { width: 10%; height: 4.5%; bottom: 2.5%; }
+.halloween-decor--shed .halloween-pumpkin--left { left: 4%; }
+.halloween-decor--shed .halloween-pumpkin--right { right: 4%; }
+.halloween-decor--shed .halloween-bat { width: 9%; height: 2.5%; top: 10%; }
+.halloween-decor--shed .halloween-bat--left { left: 4%; }
+.halloween-decor--shed .halloween-bat--right { right: 8%; top: 8%; }
+.halloween-decor--shed .halloween-leaf--left { left: 12%; bottom: 10%; }
+.halloween-decor--shed .halloween-leaf--right { right: 5%; bottom: 13%; }
+@media (min-width: 760px) {
+  .board-banner--season-art { grid-template-columns: minmax(0, 1fr) minmax(0, 22rem); }
+}

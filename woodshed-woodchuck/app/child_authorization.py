@@ -93,7 +93,7 @@ def parent_permission_html(notice,director,approve_url,withdraw_url):
     return ''.join(body)
 
 def request_consent(session,*,parent_email,director_email='',director_name='',profile=None,
-                    cohort_key=None):
+                    cohort_key=None,cohort_source=None):
     require_under13_review()
     version,notice,_=notice_policy()
     from .verifiers import validate_email
@@ -122,7 +122,7 @@ def request_consent(session,*,parent_email,director_email='',director_name='',pr
     if session.scalar(select(func.count(PendingConsent.id)).where(PendingConsent.created_at>now-timedelta(hours=1)))>=125:
         raise ValueError('Permission requests are temporarily busy.')
     token=generate_invitation_token()
-    row=PendingConsent(profile_id=profile.id if profile else None,parent_email=email,director_email=director,director_name=name,review_allowed=False,approve_hash=hash_invitation_token(token),created_at=now,expires_at=now+PENDING_TTL,notice_version=version,cohort_key=cohort_key,cohort_claimed_at=cohort_claimed_at)
+    row=PendingConsent(profile_id=profile.id if profile else None,parent_email=email,director_email=director,director_name=name,review_allowed=False,approve_hash=hash_invitation_token(token),created_at=now,expires_at=now+PENDING_TTL,notice_version=version,cohort_key=cohort_key,cohort_claimed_at=cohort_claimed_at,cohort_source=cohort_source if cohort_key else None)
     session.add(row);session.flush()
     director_text=director_copy(row)
     approve_url=public_link('/family/approve/'+token)
@@ -160,6 +160,7 @@ def activate(session,token,*,profile,fields):
     verification=verified_for_activation(session,row)
     if not row.confirmed_at or row.profile_id!=(profile.id if profile else None):raise ValueError('Confirm the originally authorized account; authorization is not student authentication.')
     if session.scalar(select(ConsentEvidence.id).where(ConsentEvidence.activation_hash==hash_invitation_token(token))):raise ValueError('Activation already used. Sign in to your existing account.')
+    new_profile = profile is None
     if profile:
         profile=session.scalar(select(WoodchuckProfile).where(WoodchuckProfile.id==profile.id).with_for_update().execution_options(populate_existing=True))
         if profile.status!='active':raise ValueError('Account unavailable.')
@@ -175,13 +176,20 @@ def activate(session,token,*,profile,fields):
         state=preserve_server_values({});state['profile']={'woodchuckName':profile.display_name,'instrument':profile.instrument,'level':profile.level,'goal':profile.goal}
         state['account']={'woodchuckId':profile.woodchuck_id,'authenticated':True,'serverRevision':0}
         session.add(WoodchuckState(profile_id=profile.id,state_json=state,revision=0))
-        if row.cohort_key:
-            from .tester_enrollments import enroll_tester
-            if not row.cohort_claimed_at:raise ValueError('Incomplete tester cohort claim.')
-            enroll_tester(session,profile.id,row.cohort_key,row.cohort_claimed_at)
     rule=declare_age(session,profile.id,'under13')
     e=ConsentEvidence(profile_id=profile.id,parent_email=row.parent_email,activation_hash=hash_invitation_token(token),withdrawal_hash=hash_invitation_token(derived_token(row,'withdraw')),notice_version=row.notice_version,notice_sha256=verification.notice_sha256,approved_at=row.approved_at,confirmed_at=row.confirmed_at)
     session.add(e);session.flush();rule.consent_id=e.id
+    session.flush()
+    from .tester_enrollments import enroll_tester, C001
+    from .models import TesterEnrollment
+    existing_tester=session.scalar(select(TesterEnrollment).where(TesterEnrollment.profile_id==profile.id,TesterEnrollment.cohort_key==C001))
+    if new_profile and row.cohort_key:
+        if not row.cohort_claimed_at:raise ValueError('Incomplete tester cohort claim.')
+        enroll_tester(session,profile.id,row.cohort_key,row.cohort_claimed_at,source=row.cohort_source)
+        from .c001_abuse import record_creation
+        record_creation(session,profile.id)
+    elif existing_tester:
+        enroll_tester(session,profile.id,C001,existing_tester.joined_at,reactivating=True)
     permission=None
     if verification.director_allowed:
         permission=DirectorPermission(profile_id=profile.id,consent_id=e.id,email=row.director_email,director_name=row.director_name,review_allowed=row.review_allowed,authorized_at=clock())

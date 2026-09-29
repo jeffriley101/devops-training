@@ -27,14 +27,13 @@ from app.memberships import student_has_full_access
 CLAIMED = datetime(2026, 9, 20, 15, 30, 12, 345678, tzinfo=timezone.utc)
 
 
-@pytest.fixture
-def tester_db(monkeypatch):
+@pytest.fixture(params=["sqlite", "postgresql"])
+def tester_db(monkeypatch, request, tmp_path):
     monkeypatch.delenv("C001_REGISTRATION_DISABLED", raising=False)
-    engine = create_engine(
-        "sqlite://",
-        poolclass=StaticPool,
-        connect_args={"check_same_thread": False},
-    )
+    from tests.test_team_families import disposable_url
+    engine = (create_engine("sqlite://", poolclass=StaticPool,
+                            connect_args={"check_same_thread": False})
+              if request.param == "sqlite" else create_engine(disposable_url(tmp_path, "postgresql")))
     Base.metadata.create_all(engine)
     factory = sessionmaker(bind=engine, expire_on_commit=False, autoflush=False)
     for name, module in list(sys.modules.items()):
@@ -141,10 +140,12 @@ def test_c001_guest_context_only_comes_from_deliberate_route_and_creates_nothing
         assert (count(session, Enrollment), count(session, WoodchuckProfile)) == before
 
 
-def test_c001_13plus_creation_is_atomic_full_and_does_not_touch_memberships(tester_db):
+@pytest.mark.parametrize("entry,source", [("/prebeta/C001", None), ("/prebeta/C001?entry=secret-symbol", "DIRECTOR1")])
+@pytest.mark.parametrize("age", ["adult", "13to17"])
+def test_c001_13plus_creation_is_atomic_full_and_does_not_touch_memberships(tester_db, entry, source, age):
     client = TestClient(app)
-    client.get("/prebeta/C001")
-    created = client.post("/account/create", data=account_form())
+    client.get(entry)
+    created = client.post("/account/create", data=account_form(age))
     assert created.status_code == 200, created.text
     profile_id = created.json()["profile"]["id"]
     with tester_db() as session:
@@ -153,7 +154,9 @@ def test_c001_13plus_creation_is_atomic_full_and_does_not_touch_memberships(test
             Enrollment.cohort_key == testers.C001,
         ))
         assert testers.utc(enrollment.joined_at) == CLAIMED
+        assert enrollment.source == source
         assert student_has_full_access(session, profile_id)
+        assert student_has_full_access(session, profile_id, at=CLAIMED + timedelta(days=3650))
         assert count(session, Enrollment) == 1
         assert count(session, BillingAccount) == count(session, Membership) == 0
         assert count(session, MembershipSeat) == count(session, ProviderSubscription) == 0
@@ -161,6 +164,9 @@ def test_c001_13plus_creation_is_atomic_full_and_does_not_touch_memberships(test
     assert duplicate.status_code == 400
     with tester_db() as session:
         assert count(session, WoodchuckProfile) == count(session, Enrollment) == 1
+
+    from app.analytics import build_report
+    assert build_report(tester_db, cohort_key=testers.C001)["enrolled"] == 1
 
     ordinary = TestClient(app)
     plain = ordinary.post("/account/create", data={**account_form(), "display_name": "Ordinary"})
@@ -212,10 +218,12 @@ def prepare_child_services(monkeypatch):
     monkeypatch.setattr(consent, "send_copy", lambda *args, **kwargs: None)
 
 
-def test_c001_under13_claim_survives_cross_device_activation_and_retry(tester_db, monkeypatch):
+@pytest.mark.parametrize("entry,source", [("/prebeta/C001", None), ("/prebeta/C001?entry=secret-symbol", "DIRECTOR1")])
+def test_c001_under13_claim_survives_cross_device_activation_and_retry(tester_db, monkeypatch, entry, source):
     prepare_child_services(monkeypatch)
     student = TestClient(app)
-    student.get("/prebeta/C001")
+    student.get(entry)
+    assert student.post("/account/create", data=account_form("under13")).status_code == 403
     page = student.get("/family/request")
     assert "preserve the new account's C001 claim" in page.text
     response = student.post("/family/request", data={
@@ -228,11 +236,17 @@ def test_c001_under13_claim_survives_cross_device_activation_and_retry(tester_db
         pending = session.scalar(select(PendingConsent))
         assert pending.profile_id is None
         assert pending.cohort_key == testers.C001
+        assert pending.cohort_source == source
         assert testers.utc(pending.cohort_claimed_at) == CLAIMED
         assert count(session, WoodchuckProfile) == count(session, Enrollment) == 0
 
         activation_token = generate_invitation_token()
         pending.activation_hash = hash_invitation_token(activation_token)
+        session.commit()
+        with pytest.raises(ValueError):
+            consent.activate(session, activation_token, profile=None, fields={})
+        session.rollback()
+        assert count(session, WoodchuckProfile) == count(session, Enrollment) == 0
         pending.approved_at = CLAIMED + timedelta(hours=1)
         pending.confirmed_at = CLAIMED + timedelta(hours=1)
         session.commit()
@@ -268,6 +282,7 @@ def test_c001_under13_claim_survives_cross_device_activation_and_retry(tester_db
             Enrollment.profile_id == profile_id,
         ))
         assert enrollment.cohort_key == testers.C001
+        assert enrollment.source == source
         assert testers.utc(enrollment.joined_at) == CLAIMED
         assert evidence.profile_id == profile_id and permission is None
         assert eligible(parent_device_session, profile_id)
@@ -325,3 +340,104 @@ def test_membership_and_tester_access_coexist_without_spreading_tester_benefit(t
         assert not student_has_full_access(session, other.id)
         assert count(session, Enrollment) == 1
         assert count(session, MembershipSeat) == 1
+
+
+def test_secret_entry_context_is_idempotent_and_creates_no_persistent_rows(tester_db):
+    client = TestClient(app)
+    def counts():
+        with tester_db() as session:
+            return {table.name: session.scalar(select(func.count()).select_from(table))
+                    for table in Base.metadata.sorted_tables if not table.name.startswith('c001_')}
+    before = counts()
+    assert 'Create a C001 Pre-Beta account' not in client.get('/guest').text
+    for _ in range(2):
+        guest = client.get('/prebeta/C001?entry=secret-symbol')
+        assert guest.status_code == 200
+        assert guest.context['request'].session == {
+            testers.SESSION_REGISTRATION_CONTEXT: {'cohort_key': 'C001', 'source': 'DIRECTOR1'}}
+        assert 'C001 Pre-Beta recognized.' in guest.text
+        assert 'data-guest="local"' in guest.text
+        assert "connect-src 'none'" in guest.headers['content-security-policy']
+        assert counts() == before
+    # A later QR visit must not erase the known classroom attribution.
+    again = client.get('/prebeta/C001')
+    assert testers.registration_source(again.context['request']) == 'DIRECTOR1'
+
+
+def test_secret_entry_existing_account_is_informational_only(tester_db):
+    client = TestClient(app)
+    created = client.post('/account/create', data=account_form())
+    assert created.status_code == 200
+    with tester_db() as session:
+        before = {table.name: session.scalar(select(func.count()).select_from(table))
+                  for table in Base.metadata.sorted_tables if not table.name.startswith('c001_')}
+    for _ in range(2):
+        response = client.post('/account/daily-secret', json={'passcode': ' c001 '})
+        assert response.status_code == 200
+        assert 'Your account has not changed' in response.json()['message']
+    with tester_db() as session:
+        assert not student_has_full_access(session, created.json()['profile']['id'])
+        assert before == {table.name: session.scalar(select(func.count()).select_from(table))
+                          for table in Base.metadata.sorted_tables if not table.name.startswith('c001_')}
+    assert testers.registration_context(client.get('/guest').context['request']) is None
+
+
+def test_invalid_secret_and_forged_attribution_do_not_create_claim(tester_db):
+    client = TestClient(app)
+    bad = client.post('/account/daily-secret', json={'passcode': 'C002'})
+    assert bad.status_code == 400
+    assert bad.json()['detail'] == 'That passcode did not match. Try again.'
+    guest = client.get('/guest?source=DIRECTOR1&cohort=C001')
+    assert testers.registration_context(guest.context['request']) is None
+    created = client.post('/account/create', data={**account_form(), 'source': 'DIRECTOR1', 'cohort_key': 'C001'})
+    assert created.status_code == 200
+    with tester_db() as session:
+        assert count(session, Enrollment) == 0
+        assert not student_has_full_access(session, created.json()['profile']['id'])
+
+
+def test_secret_entry_respects_closure_and_keeps_established_claim(tester_db, monkeypatch):
+    client = TestClient(app)
+    client.get('/prebeta/C001?entry=secret-symbol')
+    monkeypatch.setenv('C001_REGISTRATION_DISABLED', 'true')
+    fresh = TestClient(app)
+    assert fresh.get('/prebeta/C001?entry=secret-symbol').status_code == 503
+    assert testers.registration_context(fresh.get('/guest').context['request']) is None
+    assert client.get('/prebeta/C001?entry=secret-symbol').status_code == 200
+    created = client.post('/account/create', data=account_form())
+    assert created.status_code == 200
+    with tester_db() as session:
+        assert session.scalar(select(Enrollment)).source == 'DIRECTOR1'
+
+
+def test_existing_non_c001_secret_still_rewards_once(tester_db):
+    from app.models import RewardGrant
+    client = TestClient(app)
+    assert client.post('/account/create', data=account_form()).status_code == 200
+    first = client.post('/account/daily-secret', json={'passcode': ' UnIoN '})
+    repeat = client.post('/account/daily-secret', json={'passcode': 'union'})
+    assert first.status_code == repeat.status_code == 200
+    assert first.json()['redeemed'] is True and first.json()['amount'] == 20
+    assert repeat.json()['redeemed'] is False and repeat.json()['amount'] == 0
+    with tester_db() as session:
+        assert count(session, Enrollment) == 0
+        grants = list(session.scalars(select(RewardGrant).where(RewardGrant.source_key.like('daily-secret:%'))))
+        assert len(grants) == 1 and grants[0].amount == 20
+
+
+def test_classroom_registration_has_no_125_tester_cap(tester_db):
+    with tester_db() as session:
+        for index in range(125):
+            row = WoodchuckProfile(woodchuck_id=f'WC-COHORT-{index}', display_name='Existing tester',
+                pin_hash='synthetic', instrument='Flute', level='Beginner', goal='Practice')
+            session.add(row)
+            session.flush()
+            session.add(Enrollment(profile_id=row.id, cohort_key='C001', joined_at=CLAIMED))
+        session.commit()
+    client = TestClient(app)
+    assert client.get('/prebeta/C001?entry=secret-symbol').status_code == 200
+    created = client.post('/account/create', data=account_form('13to17'))
+    assert created.status_code == 200
+    with tester_db() as session:
+        assert count(session, Enrollment) == 126
+        assert student_has_full_access(session, created.json()['profile']['id'])

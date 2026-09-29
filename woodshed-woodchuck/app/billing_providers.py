@@ -41,9 +41,6 @@ class SubscriptionEvent:
     # Only verified payment may supply these; billing periods are not entitlement.
     paid_through: datetime | None = None
     payment_reference: str | None = None
-    # Optional adapter evidence, retained in the existing JSON inbox. Omitted
-    # for older adapters/events so their durable normalized facts stay unchanged.
-    stripe_invoice: dict | None = None
 
 
 @dataclass(frozen=True)
@@ -88,7 +85,7 @@ class BillingProvider(Protocol):
     def create_checkout(self, *, plan: Plan, idempotency_key: str, expires_at: datetime) -> CheckoutResult: ...
     def cancel_subscription(self, *, external_subscription_id: str) -> None: ...
     def create_portal_session(self, *, external_customer_id: str) -> str: ...
-    def verify_and_parse_webhook(self, body: bytes, headers: dict) -> SubscriptionEvent | None: ...
+    def verify_and_parse_webhook(self, body: bytes, headers: dict) -> SubscriptionEvent: ...
     def inspect_evidence(self, request: EvidenceRequest) -> ProviderEvidence: ...
 
 
@@ -114,11 +111,7 @@ PROVIDERS = {name: DisabledProvider(name) for name in ("paypal", "stripe")}
 def enabled_provider(name, config):
     if name not in PROVIDERS or not config.provider_enabled(name):
         raise BillingUnavailable("Billing provider is unavailable.")
-    provider = PROVIDERS[name]
-    if name == "stripe" and type(provider) is DisabledProvider:
-        from .stripe_billing import StripeProvider
-        return StripeProvider.from_environment() or provider
-    return provider
+    return PROVIDERS[name]
 
 
 def _lock(session, model, id):
@@ -239,10 +232,7 @@ def _facts(event):
                 or event.paid_through <= event.period_start or not isinstance(event.payment_reference, str)
                 or not 1 <= len(event.payment_reference) <= 255):
             raise ValueError("Invalid confirmed entitlement.")
-    facts = {key: value.isoformat() if isinstance(value, datetime) else value for key, value in asdict(event).items()}
-    if event.stripe_invoice is None:
-        facts.pop("stripe_invoice")
-    return facts
+    return {key: value.isoformat() if isinstance(value, datetime) else value for key, value in asdict(event).items()}
 
 
 def receive_verified_event(session, provider, event, *, payload_hash):
@@ -309,7 +299,6 @@ def _provision(session, record, application, event):
     if attempt is None:
         raise RecoverableApplication("unknown_checkout")
     attempt = _lock(session, CheckoutAttempt, attempt.id)
-    _check_stripe_invoice(record, event, attempt=attempt)
     # Adapter-verified payment occurrence controls authorization. Webhook receipt
     # and local processing may arrive later; an expired state preserves history
     # and prevents browser reuse without erasing a payment completed in time.
@@ -329,7 +318,6 @@ def _provision(session, record, application, event):
     session.flush()
     sub = ProviderSubscription(membership_id=member.id, provider=record.provider,
         external_subscription_id=event.external_subscription_id, plan_code=attempt.plan_code,
-        external_customer_id=event.stripe_invoice["customer_id"] if event.stripe_invoice else None,
         amount_cents=attempt.amount_cents, currency=attempt.currency, interval=attempt.interval,
         provider_status=event.provider_status, cancel_at_period_end=event.cancel_at_period_end,
         current_period_start=event.period_start, current_period_end=event.period_end)
@@ -342,25 +330,7 @@ def _provision(session, record, application, event):
           amount_cents=attempt.amount_cents)
     audit(session, member, actor, "provider_subscription_created", provider=record.provider)
     attempt.subscription_id, attempt.status = sub.id, "completed"
-    if event.stripe_invoice:
-        attempt.provider_checkout_id = event.stripe_invoice["checkout_id"]
     return sub
-
-
-def _check_stripe_invoice(record, event, *, attempt=None, sub=None):
-    """Compare authenticated Stripe facts with local authorization under locks."""
-    facts = event.stripe_invoice
-    if facts is None:
-        return
-    price = sub or attempt
-    if (record.provider != "stripe" or price is None or
-            tuple(facts.get(key) for key in ("plan_code", "amount_cents", "currency", "interval")) !=
-            (price.plan_code, price.amount_cents, price.currency, price.interval)):
-        raise RecoverableApplication("stripe_price_conflict")
-    if attempt and attempt.provider_checkout_id not in (None, facts.get("checkout_id")):
-        raise RecoverableApplication("stripe_checkout_conflict")
-    if sub and sub.external_customer_id != facts.get("customer_id"):
-        raise RecoverableApplication("stripe_customer_conflict")
 
 
 def lock_verified_event(session, event_id):
@@ -417,7 +387,6 @@ def apply_locked_event(session, record, application, locked_accounts):
                 raise RecoverableApplication("unknown_checkout")
             sub = _lock(session, ProviderSubscription, sub.id)
             member = _lock(session, Membership, sub.membership_id)
-            _check_stripe_invoice(record, event, attempt=attempt, sub=sub)
             if attempt and (attempt.subscription_id != sub.id or attempt.billing_account_id != member.billing_account_id):
                 raise RecoverableApplication("subscription_correlation_conflict")
             if member.status != "active" or member.revoked_at:
@@ -440,14 +409,12 @@ def apply_locked_event(session, record, application, locked_accounts):
             # Lifecycle ordering never suppresses older independent payments.
             # Equal-time conflicting status remains available for reconciliation.
             lifecycle_error = None
-            if not event.stripe_invoice and sub.last_event_at and utc(sub.last_event_at) == event.occurred_at:
+            if sub.last_event_at and utc(sub.last_event_at) == event.occurred_at:
                 if (sub.provider_status, sub.cancel_at_period_end, bool(sub.terminated_at),
                     utc(sub.current_period_start), utc(sub.current_period_end)) != (
                     event.provider_status, event.cancel_at_period_end, event.terminal, event.period_start, event.period_end):
                     lifecycle_error = "equal_time_lifecycle_conflict"
-            # A paid invoice proves paid coverage, not current subscription status.
-            # This minimal Stripe adapter does not manufacture lifecycle facts.
-            if not event.stripe_invoice and (sub.last_event_at is None or utc(sub.last_event_at) < event.occurred_at):
+            if sub.last_event_at is None or utc(sub.last_event_at) < event.occurred_at:
                 if sub.terminated_at and not event.terminal:
                     raise RecoverableApplication("subscription_terminated")
                 sub.provider_status = event.provider_status
@@ -480,8 +447,6 @@ def apply_locked_event(session, record, application, locked_accounts):
 def process_webhook(session_factory, provider, body, headers, *, config=None):
     config = config or BillingConfig.from_environment()
     event = enabled_provider(provider, config).verify_and_parse_webhook(body, headers)
-    if event is None:
-        return None, False  # Verified but outside this adapter's supported events.
     with session_factory() as session:
         try:
             record, fresh = receive_verified_event(session, provider, event, payload_hash=sha256(body).hexdigest())

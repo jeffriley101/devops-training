@@ -25,6 +25,7 @@ class PendingConsent(Base):
     # Generic registration context survives the cross-device parent/KWS path.
     # It is only an eventual enrollment claim; it grants no account or access.
     cohort_key: Mapped[str | None] = mapped_column(String(40))
+    cohort_source: Mapped[str | None] = mapped_column(String(40))
     cohort_claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 class ConsentEvidence(Base):

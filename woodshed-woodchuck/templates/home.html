@@ -1,5 +1,9 @@
 {% extends "base.html" %}
 
+{% block dashboard_styles %}
+{% if shed_season.artwork_theme == "harvest" %}<link rel="stylesheet" href="/static/css/seasonal-presentation.css?v=1" />{% endif %}
+{% endblock %}
+
 {% block content %}
 <section class="card woodshed-page">
   <div class="woodshed-scene artwork-scene shed-artwork-scene" aria-label="Interactive Woodshed room">
@@ -7,6 +11,9 @@
     <div class="woodshed-character-layer" data-presentation-only aria-label="Your Woodchuck">
       <img class="character-art woodshed-character-art" data-student-woodchuck src="{{ shed_character_url }}" alt="Your Woodchuck" />
     </div>
+    {% if shed_season.artwork_theme == "harvest" %}
+    {% with halloween_surface = "shed" %}{% include "_halloween_decor.html" %}{% endwith %}
+    {% endif %}
     <div id="shed-decoration-layer" class="shed-decoration-layer" aria-label="Placed SHED decorations"></div>
     <div id="woodshed-hotspots" class="scene-hotspots" aria-label="Woodshed room controls">
       <button id="woodchuck-name-value" class="scene-hotspot" data-scene-cell="L1" type="button" aria-controls="change-name-panel" aria-expanded="false" aria-label="Change Woodchuck name"></button>
@@ -99,19 +106,7 @@
     <p id="shed-team-feedback" role="status" aria-live="polite"></p>
   </section>
 
-  <section id="shed-secret-panel" class="mentor-card shed-secret-panel hidden" hidden aria-labelledby="shed-secret-title">
-    <h2 id="shed-secret-title">Secret</h2>
-    <form id="shed-secret-form" class="stack-form">
-      <label for="shed-secret-passcode">Passcode</label>
-      <input id="shed-secret-passcode" name="passcode" type="password" autocomplete="off" required />
-      <p id="shed-secret-feedback" role="status" aria-live="polite"></p>
-      <div class="button-row">
-        <button class="btn btn-primary" type="submit">Submit</button>
-        <button id="shed-secret-cancel" class="btn btn-secondary" type="button">Cancel</button>
-        <button id="shed-secret-close" class="btn btn-secondary" type="button">Close</button>
-      </div>
-    </form>
-  </section>
+  {% include "_shed_secret.html" %}
 
   <section id="change-name-panel" class="mentor-card change-profile-panel hidden" aria-labelledby="change-name-title" hidden>
     <div class="section-head"><p class="chip">Edit Profile</p><h2 id="change-name-title">Change Name</h2></div>

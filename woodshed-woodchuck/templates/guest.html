@@ -28,6 +28,7 @@
   </form>
   <a class="btn btn-secondary" href="/guest">Back to Guest tools</a>
   {% else %}
+  {% if secret_feedback %}<p id="guest-secret-feedback" role="status">{{ secret_feedback }}</p>{% elif c001_symbol_recognized %}<p role="status">C001 Pre-Beta recognized.</p>{% endif %}
   <p>No account needed. Preferences stay in this browser and can be discarded below. The tuner uses your microphone locally; no audio is uploaded. Browsing still makes ordinary web requests that may appear in operational logs.</p>
   <form id="guest-setup-form" class="stack-form">
     {% for field, label, choices in [('instrument', 'Instrument', instruments), ('level', 'Level', levels), ('goal', 'Practice goal', goals)] %}
@@ -40,12 +41,14 @@
     <button class="btn btn-primary" type="submit">Explore locally</button>
   </form>
   <div id="guest-tools" hidden>
-    <h2>Local practice tools</h2>
+    <h2>Guest SHED · Local practice tools</h2>
     <p>Use the metronome and tuner. Tempo and setup preferences survive reload; no practice history, scores or rewards are recorded.</p>
     <div class="button-row">
       <button id="metronome-open-button" class="btn" type="button" aria-controls="metronome-panel" aria-expanded="false">Metronome</button>
+      <button id="shed-secret-button" class="btn" type="button" aria-controls="shed-secret-panel" aria-expanded="false">Secret Symbol</button>
       <button id="tuner-open-button" class="btn" type="button" aria-controls="tuner-panel" aria-expanded="false">Tuner</button>
     </div>
+  {% include "_shed_secret.html" %}
   <section
     id="metronome-panel"
     class="metronome-panel hidden"
@@ -181,7 +184,7 @@
   <p>You can keep exploring as a Guest, or create a new C001 tester account. Guest exploration still creates no account, enrollment or Full Access.</p>
   <a class="btn btn-primary" href="/setup">Create a C001 Pre-Beta account</a>
   {% else %}
-  <p>C001 registration starts only from the official C001 entry link. Guest exploration does not establish eligibility, create an account or grant Full Access.</p>
+  <p>C001 registration starts from the official C001 entry link or C001 in Secret Symbol in the Guest SHED. Guest exploration does not establish eligibility, create an account or grant Full Access.</p>
   {% endif %}
 </section>
 </main></div>
@@ -194,7 +197,7 @@
 <script src="/static/js/account.js?v=r4-17"></script>
 {% elif not blocked %}
 <script src="/static/js/tuner.js?v=2"></script>
-<script src="/static/js/app.js?v=r4a-91"></script>
+<script src="/static/js/app.js?v=c001-93"></script>
 {% endif %}
 <script src="/static/js/guest.js?v=1"></script>
 {% if account_id %}</template>

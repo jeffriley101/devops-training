@@ -42,7 +42,7 @@ def guest_db(monkeypatch):
 
 def counts(factory):
     with factory() as session:
-        return {table.name: session.scalar(select(func.count()).select_from(table)) for table in Base.metadata.sorted_tables}
+        return {table.name: session.scalar(select(func.count()).select_from(table)) for table in Base.metadata.sorted_tables if not table.name.startswith('c001_')}
 
 
 def test_guest_gets_never_bootstrap_accounts_set_session_or_persist_activity(guest_db):
@@ -57,7 +57,7 @@ def test_guest_gets_never_bootstrap_accounts_set_session_or_persist_activity(gue
         assert 'WC-GUEST-' not in response.text
         assert 'account-state-bootstrap' not in response.text
         assert 'account-create-form' not in response.text
-        assert 'C001 registration starts only from the official C001 entry link' in response.text
+        assert 'C001 registration starts from the official C001 entry link or C001 in Secret Symbol' in response.text
     assert "connect-src 'none'" in client.get('/guest').headers['content-security-policy']
     assert 'account-create-form' in client.get('/setup?age=adult').text  # Ordinary entry is retained.
     assert counts(guest_db) == before

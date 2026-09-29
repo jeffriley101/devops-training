@@ -34,13 +34,26 @@ def declare_age(session, profile_id, age_band, *, at=None):
     if rule and rule.age_band!='unknown':
         if rule.age_band!=age_band:raise ValueError('A recorded age cannot be changed here. Contact support for a protected correction.')
         return rule
+    was_eligible = eligible(session, profile_id)
     instant=utc(at or datetime.now(timezone.utc))
     if rule is None:
         rule=AccountPrivacy(profile_id=profile_id);session.add(rule)
     rule.age_band=age_band;rule.declared_at=instant
     rule.public_from=instant if age_band in ('13to17','adult') else None
     rule.private_plunge_best=profile.plunge_best_score or 0
-    session.flush();return rule
+    session.flush()
+    if age_band in ('13to17', 'adult') and not was_eligible:
+        _reactivate_tester(session, profile_id)
+    return rule
+
+
+def _reactivate_tester(session, profile_id):
+    from .models import TesterEnrollment
+    from .tester_enrollments import C001, enroll_tester
+    row = session.scalar(select(TesterEnrollment).where(TesterEnrollment.profile_id == profile_id, TesterEnrollment.cohort_key == C001))
+    if row:
+        enroll_tester(session, profile_id, C001, row.joined_at, reactivating=True)
+
 
 def can_publish(session, profile_id, *, at=None):
     rule = session.get(AccountPrivacy, profile_id)
@@ -277,6 +290,7 @@ def correct_age(session, profile_id, age_band, *, expected_band, expected_declar
     if rule.age_band != expected_band or utc(rule.declared_at).isoformat() != expected_declared_at:
         raise ValueError('The age record changed. Reload before correcting it.')
     instant = datetime.now(timezone.utc)
+    was_eligible = eligible(session, profile_id)
     previous = rule.age_band
     rule.age_band = age_band
     rule.declared_at = instant
@@ -286,4 +300,6 @@ def correct_age(session, profile_id, age_band, *, expected_band, expected_declar
         corrected_band=age_band, corrected_at=instant, actor_fingerprint=actor,
         case_reference=case_reference, wording_version='support-age-correction-v1'))
     session.flush()
+    if not was_eligible:
+        _reactivate_tester(session, profile_id)
     return rule

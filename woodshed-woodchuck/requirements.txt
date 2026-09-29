@@ -10,4 +10,3 @@ qrcode>=8,<9
 
 httpx>=0.27,<1
 redis>=6.4,<7
-stripe==15.6.1

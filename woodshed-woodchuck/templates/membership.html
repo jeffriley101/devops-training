@@ -18,7 +18,6 @@
 <section class="card"><h2>Which account would you like to use?</h2>
 {% for choice, name in choices %}<p><a href="/membership?as_account={{ choice.kind }}">{{ name }} — {{ choice.kind|title }} account</a></p>{% endfor %}</section>
 {% else %}
-{% if checkout_returned %}<section class="card"><p>Your checkout has returned. Full Access appears after payment is confirmed. Refresh this page if your payment is still processing.</p></section>{% endif %}
 {% if actor.kind == 'student' %}<section class="card"><h2>{{ '✓ Full Access' if full else 'Open Access' }}</h2>
 {% if full %}<p>Your account has Full Access.</p>{% endif %}</section>{% endif %}
 {% if actor.kind == 'student' %}<section class="card"><h2>Practice Insights with Full Access</h2>
@@ -38,12 +37,7 @@
 <button class="btn btn-primary">Add student</button></form>{% endif %}
 </section>{% endfor %}
 {% if not memberships %}<section class="card"><h2>Full Access for up to five students</h2>
-{% for plan in plans %}<p>{{ plan.label }}</p>
-{% if stripe_checkout and not full %}<form method="post" action="/membership/checkout">
-<input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="as_account" value="{{ actor.kind }}">
-<input type="hidden" name="provider" value="stripe"><input type="hidden" name="plan_code" value="{{ plan.code }}">
-<button class="btn btn-primary">Choose {{ plan.label }}</button></form>{% endif %}{% endfor %}
-{% if stripe_checkout %}<p>Checkout is in test mode. Open Access stays free and requires no card.</p>
-{% else %}<p>Purchasing is not available yet.</p>{% endif %}</section>{% endif %}
+{% for plan in plans %}<p>{{ plan.label }}</p>{% endfor %}
+<p>Purchasing is not available yet.</p></section>{% endif %}
 {% endif %}
 {% endblock %}

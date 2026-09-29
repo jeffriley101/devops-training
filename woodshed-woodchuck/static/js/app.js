@@ -6,6 +6,7 @@
   // Guest runs only these existing local tools. No account bootstrap, autosave,
   // timer/chart, inventory, teams, analytics or paid-game consumers are wired.
   if (localGuest) {
+    wireShedSecret();
     wireMetronome();
     wireTuner();
     return;
@@ -925,8 +926,15 @@
       event.preventDefault();
       const submit = form.querySelector("button[type='submit']");
       submit.disabled = true;
-      const requestAccount = stateApi.accountRequest();
+      const requestAccount = stateApi?.accountRequest();
       try {
+        if (localGuest) {
+          if (!window.WWSessionBoundary.isCurrent()) return;
+          // Every attempt reaches the server limiter, including invalid symbols.
+          // Native navigation preserves Guest's generic fetch prohibition.
+          form.submit();
+          return;
+        }
         const response = await fetch("/account/daily-secret", {
           method: "POST", credentials: "same-origin",
           headers: { "Content-Type": "application/json" },
@@ -936,6 +944,10 @@
         if (!response.ok) throw new Error(payload.detail || "The secret could not be checked.");
         const next = stateApi.stateForResponse(requestAccount);
         if (!next) return;
+        if (payload.recognized) {
+          feedback.textContent = payload.message;
+          return;
+        }
         playNewCrownIfConfirmed(payload);
         playNewMedalIfConfirmed(payload);
         stateApi.applyEconomy(next, payload);

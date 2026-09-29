@@ -19,6 +19,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .db import Base
+from .c001_models import AbuseEvent, ActivationControl
 from .age_models import AccountPrivacy
 from .session_revocations import RevokedBrowserSession
 from .membership_models import (BillingAccount, Membership, MembershipSeat,
@@ -128,6 +129,7 @@ class TesterEnrollment(Base):
         index=True,
     )
     cohort_key: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    source: Mapped[str | None] = mapped_column(String(40))
     joined_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
