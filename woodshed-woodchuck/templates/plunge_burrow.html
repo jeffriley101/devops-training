@@ -22,7 +22,7 @@
 
   <div class="plunge-status" aria-label="Game status">
     <p>Score <strong id="plunge-score">0</strong></p>
-    <p>Best <strong id="plunge-best">0</strong></p>
+    <p>Personal Best <strong id="plunge-best">0</strong></p>
     <p>Hearts <strong id="plunge-hearts" aria-label="3 hearts">♥ ♥ ♥</strong></p>
     <p>Dandelions <strong id="plunge-dandelions">0</strong></p>
     <p>Status <strong id="plunge-state">Ready</strong></p>
@@ -63,7 +63,7 @@
     </aside>
   </div>
 
-  <section class="plunge-scoreboard" aria-labelledby="plunge-scoreboard-title">
+  <section class="plunge-scoreboard" aria-labelledby="plunge-scoreboard-title" hidden>
     <h2 id="plunge-scoreboard-title">Top 5</h2>
     <ol id="plunge-leaderboard" aria-label="Plunge Burrow Top 5 leaderboard">
       {% for rank in range(1, 6) %}

@@ -24,7 +24,7 @@
 
   <div class="arcade-game-status" aria-label="Game status">
     <p>Score <strong id="arcade-game-score">0</strong></p>
-    <p>Best <strong id="arcade-game-best">0</strong></p>
+    <p>Personal Best <strong id="arcade-game-best">0</strong></p>
     <p>Time <strong id="arcade-game-time">{% if arcade_game.key == "blue" %}20{% else %}30{% endif %}</strong></p>
   </div>
 
@@ -60,7 +60,7 @@
     <p id="arcade-game-message" role="status" aria-live="polite">Ready</p>
   </div>
 
-  <section class="arcade-game-leaderboard" aria-labelledby="arcade-game-leaderboard-title">
+  <section class="arcade-game-leaderboard" aria-labelledby="arcade-game-leaderboard-title" hidden>
     <h2 id="arcade-game-leaderboard-title">Top 5</h2>
     <ol data-arcade-leaderboard="{{ arcade_game.key }}"><li>Loading…</li></ol>
   </section>
