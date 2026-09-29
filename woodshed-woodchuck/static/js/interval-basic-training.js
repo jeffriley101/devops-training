@@ -161,6 +161,7 @@
   if (!page) return;
 
   const game = new IntervalBasicTrainingGame();
+  const authority = root.WoodshedArcadeEconomy.challengeRun(game, GAME_KEY);
   const scoreOutput = document.getElementById("interval-score");
   const bestOutput = document.getElementById("interval-best");
   const timeOutput = document.getElementById("interval-time");
@@ -291,8 +292,10 @@
       : `Time! Final score: ${game.score}. Saving…`;
     const token = activePlayToken;
     activePlayToken = null;
-    finishPromise = root.WoodshedArcadeEconomy.completePlay(token, game.score)
+    finishPromise = authority.complete()
       .then(function (payload) {
+        game.score = payload.score;
+        render();
         renderLeaderboard(payload);
         const saved = payload.updated
           ? `New personal best: ${payload.best_score}!`
@@ -327,6 +330,7 @@
     try {
       const play = await root.WoodshedArcadeEconomy.startPlay(GAME_KEY);
       activePlayToken = play.play_token;
+      authority.start(play);
     } catch (error) {
       message.textContent = error.message || "That game could not start.";
       starting = false;
@@ -339,7 +343,6 @@
     } catch (_error) { /* A muted/unavailable sound graph must not lose a paid run. */ }
     finishPromise = null;
     answerLocked = false;
-    game.start();
     lastTickAt = performance.now();
     if (timer !== null) root.clearInterval(timer);
     timer = root.setInterval(tick, 100);
@@ -350,11 +353,14 @@
   }
 
   answerButtons.forEach(function (button) {
-    button.addEventListener("click", function () {
+    button.addEventListener("click", async function () {
       if (answerLocked || audioLocked) return;
       answerLocked = true;
       cancelQuestionAudio();
-      const result = game.answer(button.dataset.intervalAnswer);
+      render();
+      let result;
+      try { result = await authority.action(button.dataset.intervalAnswer); }
+      catch (error) { message.textContent = error.message; answerLocked = false; render(); return; }
       if (!result.accepted) {
         answerLocked = false;
         render();

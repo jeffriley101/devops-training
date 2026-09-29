@@ -134,7 +134,7 @@ def test_nines_uses_sand_drop_and_shared_arcade_mute() -> None:
     assert 'data-arcade-soundtrack="dressed-to-the-nines"' in TEMPLATE
     assert 'data-arcade-soundtrack-toggle' in TEMPLATE
     assert '/static/js/arcade-soundtrack.js?v=7' in TEMPLATE
-    assert '/static/js/dressed-to-the-nines.js?v=2' in TEMPLATE
+    assert '/static/js/dressed-to-the-nines.js?v=3' in TEMPLATE
     assert 'url: "/static/audio/arcade/sand-drop.mp3?v=2"' in soundtrack
 
 
@@ -281,7 +281,7 @@ def test_nines_daily_reward_cap_is_per_game(nines_database) -> None:
 
 def test_nines_uses_shared_client_contract_and_has_distinct_cabinet() -> None:
     assert "startPlay(GAME_KEY)" in GAME_JS
-    assert "completePlay(token, game.score)" in GAME_JS
+    assert "authority.complete()" in GAME_JS
     assert "if (finishPromise) return finishPromise" in GAME_JS
     assert "fetch(`/arcade/scores/${GAME_KEY}`" in GAME_JS
     assert "if (answerLocked) return" in GAME_JS

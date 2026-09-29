@@ -176,7 +176,7 @@ def test_arcade_room_renders_nine_touch_friendly_cabinets() -> None:
     mobile = CSS[CSS.index("@media (max-width: 760px)"):]
     assert ".arcade-cabinet-grid { grid-template-columns: 1fr; }" in mobile
     assert '/static/js/arcade.js?v=15' in ARCADE
-    assert '/static/js/arcade-economy.js?v=7' in ARCADE
+    assert '/static/js/arcade-economy.js?v=8' in ARCADE
 
 
 def test_arcade_pages_route_game_specific_soundtracks() -> None:
@@ -331,7 +331,7 @@ def test_arcade_landing_renders_personal_bests_from_existing_score_payload() -> 
     assert "data-arcade-personal-best" in ARCADE_JS
     assert "renderPersonalBest(gameKey, payload.best_score)" in room
     assert "data-arcade-personal-best" in room
-    assert ARCADE.index('/static/js/arcade-economy.js?v=7') < ARCADE.index('/static/js/arcade.js?v=15')
+    assert ARCADE.index('/static/js/arcade-economy.js?v=8') < ARCADE.index('/static/js/arcade.js?v=15')
     assert ARCADE.count('data-arcade-leaderboard=') == 8
     assert 'data-arcade-leaderboard="history-mystery"' not in ARCADE
 
@@ -598,9 +598,8 @@ def test_top_five_uses_olympic_ties_and_public_active_names(
             session, profile_id=profiles[0].id, game_key="blue"
         )
 
-    assert [(row["rank"], row["display_name"], row["score"]) for row in payload["leaderboard"]] == [
-        (1, "Current", 60),  # Retained owner-only legacy best; no shared unchecked ranking.
-    ]
+    assert payload["leaderboard"] == []
+    assert payload["best_score"] == 60  # Legacy personal best stays separate from Top 5.
     assert "Deleted Secret" not in str(payload)
     assert "woodchuck_id" not in str(payload)
     assert "profile_id" not in str(payload)

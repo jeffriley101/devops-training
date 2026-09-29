@@ -3,10 +3,12 @@ from __future__ import annotations
 import logging
 
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel, ConfigDict, Field, StrictInt
+from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictStr
 from sqlalchemy.exc import SQLAlchemyError
 
 from .account_routes import current_profile
+from . import arcade_challenges as challenges
+from .arcade_rewards import action_arcade_play, _utc_now
 from .arcade_scores import (
     MAX_ARCADE_SCORE,
     arcade_score_payload,
@@ -118,6 +120,8 @@ def create_arcade_play(submitted: ArcadePlayStart, request: Request):
                 "charged_now": 0 if result.resumed else result.play.entry_cost,
                 "already_completed": result.play.completed_at is not None,
                 "attempt_closed": result.play.completed_at is not None or expired,
+                **({'challenge': challenges.snapshot(result.play, _utc_now(None))}
+                   if result.play.game_key in challenges.GAMES and result.play.challenge_state else {}),
                 **({"history": history_snapshot(session.get(WoodchuckState, profile.id), result.play)}
                    if result.play.game_key == "history-mystery" and result.play.completed_at is None and not expired else {}),
             }
@@ -153,7 +157,7 @@ def finish_arcade_play(
             )
             session.commit()
             return payload
-        except (ArcadePlayConflictError, HistoryAttemptError) as error:
+        except (ArcadePlayConflictError, HistoryAttemptError, challenges.ChallengeError) as error:
             session.rollback()
             raise HTTPException(status_code=409, detail=str(error)) from error
         except ValueError as error:
@@ -177,7 +181,7 @@ def answer_history(play_token: str, submitted: HistoryAnswerSubmission, request:
                                           question_index=submitted.question_index, choice=submitted.choice)
             session.commit()
             return payload
-        except (ArcadePlayConflictError, HistoryAttemptError) as error:
+        except (ArcadePlayConflictError, HistoryAttemptError, challenges.ChallengeError) as error:
             session.rollback()
             raise HTTPException(status_code=409, detail=str(error)) from error
         except ValueError as error:
@@ -229,7 +233,7 @@ def update_arcade_scores(
                 )
             session.commit()
             return payload
-        except (ArcadePlayConflictError, HistoryAttemptError) as error:
+        except (ArcadePlayConflictError, HistoryAttemptError, challenges.ChallengeError) as error:
             session.rollback()
             raise HTTPException(status_code=409, detail=str(error)) from error
         except ValueError as error:
@@ -240,3 +244,31 @@ def update_arcade_scores(
             raise _unexpected_arcade_error(
                 operation="scores-complete", game_key=_request_game_key(request)
             ) from error
+
+
+class ArcadeActionSubmission(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    action_index: StrictInt = Field(ge=0, le=10000)
+    answer: StrictInt | StrictStr
+
+
+@router.post('/plays/{play_token}/action')
+def answer_arcade_action(play_token: str, submitted: ArcadeActionSubmission, request: Request):
+    with SessionLocal() as session:
+        profile = current_profile(request, session)
+        if profile is None:
+            raise HTTPException(status_code=401, detail='Student sign-in is required.')
+        try:
+            payload = action_arcade_play(session, profile_id=profile.id, play_token=play_token,
+                                        action_index=submitted.action_index, answer=submitted.answer)
+            session.commit()
+            return payload
+        except challenges.ChallengeError as error:
+            session.rollback()
+            raise HTTPException(status_code=409, detail=str(error)) from error
+        except ValueError as error:
+            session.rollback()
+            raise HTTPException(status_code=404, detail=str(error)) from error
+        except SQLAlchemyError as error:
+            session.rollback()
+            raise _unexpected_arcade_error(operation='action', game_key=_request_game_key(request)) from error

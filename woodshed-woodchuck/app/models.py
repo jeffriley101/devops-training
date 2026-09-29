@@ -1097,6 +1097,8 @@ class ArcadePlaySession(Base):
         DateTime(timezone=True), nullable=True
     )
     submitted_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    authoritative_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    challenge_state: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     payout: Mapped[int | None] = mapped_column(Integer, nullable=True)
     reward_granted_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True

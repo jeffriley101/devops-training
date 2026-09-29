@@ -116,6 +116,8 @@
 
   const scales = root.SCALE_KEYBOARD_SCALES || [];
   const game = new ScaleKeyboardGame({ scales });
+  const authority = root.WoodshedArcadeEconomy.challengeRun(game, "scale-keyboard");
+  let starting = false;
   const keyboard = document.getElementById("scale-keyboard-keys");
   const prompt = document.getElementById("scale-keyboard-prompt");
   const progress = document.getElementById("scale-keyboard-progress");
@@ -193,7 +195,7 @@
     const state = game.snapshot();
     scoreOutput.textContent = String(state.score);
     timeOutput.textContent = String(Math.ceil(state.remainingMs / 1000));
-    startButton.disabled = state.status === "running";
+    startButton.disabled = state.status === "running" || starting || authority.saving;
     startButton.textContent = state.status === "running" ? "Game Running" : "New Game";
     if (state.currentScale) {
       prompt.textContent = `PLAY: ${state.currentScale.name.toUpperCase()}`;
@@ -202,21 +204,25 @@
       }).join(" ");
     }
     keyboard.querySelectorAll("button").forEach(function (key) {
-      key.disabled = state.status !== "running" || betweenScales;
+      key.disabled = state.status !== "running" || betweenScales || authority.busy;
     });
   }
 
   function loadNextScale() {
     betweenScales = false;
-    game.chooseScale();
     renderKeyboard();
     message.textContent = "Next scale!";
     render();
   }
 
-  function pressKey(midi, key) {
-    if (betweenScales) return;
-    const result = game.press(midi);
+  async function pressKey(midi, key) {
+    if (betweenScales || authority.busy) return;
+    let result;
+    try {
+      const request = authority.action(midi);
+      render();
+      result = await request;
+    } catch (error) { message.textContent = error.message; render(); return; }
     if (!result.accepted) return;
     scoreOutput.textContent = String(result.score);
     try {
@@ -230,7 +236,7 @@
     if (result.completed) {
       betweenScales = true;
       playFeedback("arcadeCheer");
-      message.textContent = `${game.currentScale.name} complete! +500`;
+      message.textContent = `Scale complete! +500`;
       keyboard.querySelectorAll("button").forEach(function (button) { button.disabled = true; });
       nextScaleTimer = root.setTimeout(loadNextScale, 500);
     } else {
@@ -250,8 +256,10 @@
     render();
     scoreOutput.textContent = String(finalScore);
     message.textContent = `Time! Final score: ${finalScore}. Saving…`;
-    finishPromise = root.WoodshedArcadeEconomy.completePlay(activePlayToken, finalScore)
+    finishPromise = authority.complete()
       .then(function (payload) {
+        game.score = payload.score;
+        render();
         renderLeaderboard(payload);
         message.textContent = payload.updated
           ? `New personal best: ${payload.best_score}!`
@@ -273,21 +281,24 @@
   }
 
   async function startGame() {
-    if (game.status === "running") return;
+    if (game.status === "running" || starting || authority.saving) return;
+    starting = true;
     startButton.disabled = true;
     message.textContent = "Starting…";
     try {
       const play = await root.WoodshedArcadeEconomy.startPlay("scale-keyboard");
       activePlayToken = play.play_token;
+      authority.start(play);
+      starting = false;
     } catch (error) {
       message.textContent = error.message || "That game could not start.";
+      starting = false;
       startButton.disabled = false;
       return;
     }
     if (root.WoodshedAudio) root.WoodshedAudio.unlock();
     finishPromise = null;
     betweenScales = false;
-    game.start();
     renderKeyboard();
     lastTickAt = performance.now();
     timer = root.setInterval(tick, 100);

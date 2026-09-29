@@ -105,6 +105,7 @@
   if (!page) return;
 
   const game = new ThirdsGame();
+  const authority = root.WoodshedArcadeEconomy.challengeRun(game, "thirds");
   const scoreOutput = document.getElementById("thirds-score");
   const bestOutput = document.getElementById("thirds-best");
   const timeOutput = document.getElementById("thirds-time");
@@ -158,9 +159,9 @@
     timeOutput.textContent = String(Math.ceil(state.remainingMs / 1000));
     chordOutput.textContent = state.currentCard ? state.currentCard.chord.toUpperCase() : "READY";
     const running = state.status === "running";
-    input.disabled = !running;
-    submitButton.disabled = !running;
-    startButton.disabled = running || starting;
+    input.disabled = !running || authority.busy;
+    submitButton.disabled = !running || authority.busy;
+    startButton.disabled = running || starting || authority.saving;
     startButton.textContent = running ? "Game Running" : "New Game";
   }
 
@@ -173,9 +174,12 @@
     message.textContent = `Final score: ${game.score}`;
     const token = activePlayToken;
     activePlayToken = null;
-    finishPromise = root.WoodshedArcadeEconomy.completePlay(token, game.score)
+    finishPromise = authority.complete()
       .then(function (payload) {
+        game.score = payload.score;
+        render();
         renderLeaderboard(payload);
+        message.textContent = `Final score: ${payload.score}`;
         return payload;
       })
       .catch(function (error) {
@@ -194,14 +198,14 @@
   }
 
   function startGame() {
-    if (starting || game.status === "running") return;
+    if (starting || authority.saving || game.status === "running") return;
     starting = true;
     startButton.disabled = true;
     message.textContent = "Starting…";
     root.WoodshedArcadeEconomy.startPlay("thirds").then(function (payload) {
       activePlayToken = payload.play_token;
       finishPromise = null;
-      game.start();
+      authority.start(payload);
       input.value = "";
       message.textContent = "Type the third.";
       lastTickAt = performance.now();
@@ -217,9 +221,15 @@
     });
   }
 
-  form.addEventListener("submit", function (event) {
+  form.addEventListener("submit", async function (event) {
     event.preventDefault();
-    const result = game.submit(input.value);
+    if (authority.busy) return;
+    let result;
+    try {
+      const request = authority.action(normalizeAnswer(input.value));
+      render();
+      result = await request;
+    } catch (error) { message.textContent = error.message; render(); return; }
     if (!result.accepted) {
       message.textContent = result.reason === "invalid-answer" ? "Type one note from A to G." : "Start a new game first.";
       input.focus();

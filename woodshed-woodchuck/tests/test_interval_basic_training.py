@@ -136,7 +136,7 @@ def test_interval_soundtrack_is_idle_only_and_uses_shared_mute_state() -> None:
     assert 'data-arcade-soundtrack="interval-basic-training"' in TEMPLATE
     assert 'data-arcade-soundtrack-toggle' in TEMPLATE
     assert '/static/js/arcade-soundtrack.js?v=7' in TEMPLATE
-    assert '/static/js/interval-basic-training.js?v=3' in TEMPLATE
+    assert '/static/js/interval-basic-training.js?v=4' in TEMPLATE
     assert 'url: "/static/audio/arcade/black-hole-rappelling.mp3?v=2"' in soundtrack
     assert 'document.addEventListener("woodshed:arcade-soundtrack-run-state"' in soundtrack
     assert "if (stopped || runActive || !applyPreferences()) {" in soundtrack
@@ -383,7 +383,7 @@ def test_client_second_miss_and_timer_share_one_completion_guard() -> None:
     assert "if (result.ended)" in GAME_JS
     assert "finishGame();" in GAME_JS
     assert "if (game.status === \"ended\") finishGame()" in GAME_JS
-    assert "completePlay(token, game.score)" in GAME_JS
+    assert "authority.complete()" in GAME_JS
     assert "Two wrong answers ended the run." in GAME_JS
 
 

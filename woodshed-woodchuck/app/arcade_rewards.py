@@ -10,6 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from . import arcade_challenges as challenges
 from .arcade_scores import MAX_ARCADE_SCORE, arcade_score_payload, record_arcade_high_score
 from .economy import lock_state
 from .history_attempts import (
@@ -202,7 +203,7 @@ def arcade_play_status(
         "attempts_remaining": remaining_attempts(session, profile_id, key),
         "completed_reward_plays": completed,
         "daily_reward_limit": DAILY_REWARDED_PLAY_LIMIT,
-        "result_authority": "server_scored" if key == "history-mystery" else "self_reported",
+        "result_authority": "server_scored" if key == "history-mystery" or key in challenges.GAMES else "self_reported",
         "reward_eligible": key == "history-mystery" and completed < DAILY_REWARDED_PLAY_LIMIT,
         "daily_play_available": daily_play_available,
         "daily_play_resumable": daily_play_resumable,
@@ -245,7 +246,7 @@ def start_arcade_play(
         if prior.game_key != key:
             raise ArcadePlayConflictError('That start request belongs to another game.')
         completed = _completed_plays_today(session, profile_id=profile_id, game_key=key, now=timestamp)
-        return ArcadePlayStartResult(prior, _balance(state), completed < DAILY_REWARDED_PLAY_LIMIT,
+        return ArcadePlayStartResult(prior, _balance(state), key == "history-mystery" and completed < DAILY_REWARDED_PLAY_LIMIT,
                                      completed, state.revision, resumed=True)
 
     def remember(play):
@@ -284,6 +285,18 @@ def start_arcade_play(
             .order_by(ArcadePlaySession.started_at.desc(), ArcadePlaySession.id.desc())
             .with_for_update()
         )
+        if unfinished_play is not None and key in challenges.GAMES and (
+                not unfinished_play.challenge_state or challenges.elapsed(unfinished_play, timestamp) > challenges.RUN_SECONDS + challenges.ACTION_GRACE_SECONDS):
+            if unfinished_play.challenge_state:
+                complete_arcade_play(session, profile_id=profile_id, play_token=unfinished_play.play_token,
+                                    score=unfinished_play.challenge_state['score'], now=timestamp)
+            else:
+                # A pre-repair unfinished attempt has no verifiable evidence.
+                unfinished_play.completed_at = timestamp
+                unfinished_play.submitted_score = 0
+                unfinished_play.payout = 0
+                session.flush()
+            unfinished_play = None
         if unfinished_play is not None:
             remember(unfinished_play)
             completed = _completed_plays_today(
@@ -342,6 +355,9 @@ def start_arcade_play(
         raise
     if key == "history-mystery":
         initialize_history(state, play)
+    if key in challenges.GAMES:
+        challenges.initialize(play)
+        session.flush()
     remember(play)
     return ArcadePlayStartResult(
         play=play,
@@ -401,7 +417,7 @@ def complete_arcade_play(
             "play_token": play.play_token,
             "score": int(play.submitted_score),
             "payout": int(play.payout or 0) if play.game_key == "history-mystery" else 0,
-            "result_authority": "server_scored" if play.game_key == "history-mystery" else "self_reported",
+            "result_authority": "server_scored" if play.authoritative_score is not None else "self_reported",
             "reward_eligible": play.game_key == "history-mystery",
             "balance": _balance(state) if state is not None else 0,
             "state_revision": state.revision if state is not None else 0,
@@ -415,6 +431,13 @@ def complete_arcade_play(
         state = _state_for_update(session, profile_id)
         if history_score(state, play, require_finished=True) != score:
             raise HistoryAttemptError("The score must match the quiz answers.")
+
+    if play.game_key in challenges.GAMES:
+        if challenges.final_score(play, timestamp) != score:
+            raise challenges.ChallengeError('The score must match the verified actions.')
+        play.authoritative_score = score
+    elif play.game_key == 'history-mystery':
+        play.authoritative_score = score
 
     completed_before = _completed_plays_today(
         session,
@@ -431,7 +454,7 @@ def complete_arcade_play(
         _set_balance(state, new_balance)
 
     updated = False
-    if play.game_key == "history-mystery":
+    if play.authoritative_score is not None:
         _best, updated = record_arcade_high_score(
             session, profile_id=profile_id, game_key=play.game_key, score=score)
     # Other scores are private acknowledgments only. Retain attempt accounting
@@ -449,7 +472,7 @@ def complete_arcade_play(
         "payout": payout,
         "balance": new_balance,
         "state_revision": state.revision,
-        "result_authority": "server_scored" if play.game_key == "history-mystery" else "self_reported",
+        "result_authority": "server_scored" if play.authoritative_score is not None else "self_reported",
         "reward_eligible": reward_eligible,
         "daily_reward_limit": DAILY_REWARDED_PLAY_LIMIT,
         "already_completed": False,
@@ -478,3 +501,18 @@ def answer_history_play(session, *, profile_id, play_token, question_index, choi
     else:
         payload.update(balance=_balance(state), state_revision=state.revision)
     return payload
+
+
+def action_arcade_play(session, *, profile_id, play_token, action_index, answer, now=None):
+    # The same lock order as start/complete serializes duplicates and completion.
+    active = session.scalar(select(WoodchuckProfile.id).where(
+        WoodchuckProfile.id == profile_id, WoodchuckProfile.status == 'active'
+    ).with_for_update())
+    play = session.scalar(select(ArcadePlaySession).where(
+        ArcadePlaySession.play_token == play_token
+    ).with_for_update().execution_options(populate_existing=True))
+    if active is None or play is None or play.profile_id != profile_id or play.game_key not in challenges.GAMES:
+        raise ValueError('That Arcade play is unavailable.')
+    result = challenges.accept_action(play, action_index=action_index, answer=answer, now=_utc_now(now))
+    session.flush()
+    return result

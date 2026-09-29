@@ -7,7 +7,7 @@
   function safeEndpoint(endpoint) {
     const path = String(endpoint || "").split("?")[0];
     if (path === "/arcade/plays") return path;
-    if (/^\/arcade\/plays\/[^/]+\/(complete|answer)$/.test(path)) {
+    if (/^\/arcade\/plays\/[^/]+\/(complete|answer|action)$/.test(path)) {
       return path.replace(/\/plays\/[^/]+\//, "/plays/{play_token}/");
     }
     if (/^\/arcade\/(scores|plays\/status)\/[^/]+$/.test(path)) {
@@ -139,8 +139,10 @@
       else if (Number.isInteger(payload.attempts_remaining)) output.textContent = `${payload.attempts_remaining} purchased attempts remaining`;
     });
     document.querySelectorAll("[data-arcade-economy-message]").forEach(function (message) {
-      if (payload.reward_eligible === false) {
-        message.textContent = "Daily prize plays complete — scores still count.";
+      if (payload.result_authority === "self_reported") {
+        message.textContent = "Practice play: no prizes or shared scores.";
+      } else if (payload.reward_eligible === false) {
+        message.textContent = payload.game_key === "history-mystery" ? "Daily prize plays complete — scores still count." : "Verified scores count toward Top 5 when sharing is allowed. Prizes are disabled.";
       }
     });
   }
@@ -190,7 +192,7 @@
           : payload.charged_now > 0 ? "100 Dandelions paid · 3 attempts included; this attempt has started."
           : "Attempt started. No charge.";
         if (payload.result_authority === "self_reported") message.textContent += " Practice play: no prizes or shared scores.";
-        else if (payload.reward_eligible === false) message.textContent += " Daily prize plays complete — scores still count.";
+        else if (payload.reward_eligible === false) message.textContent += payload.game_key === "history-mystery" ? " Daily prize plays complete — scores still count." : " Verified scores count toward Top 5 when sharing is allowed. Prizes are disabled.";
       });
       return payload;
     });
@@ -218,7 +220,7 @@
         if (payload.result_authority === "self_reported") {
           message.textContent = "Practice run complete. No prizes or shared scores.";
         } else if (payload.reward_eligible === false) {
-          message.textContent = "Daily prize plays complete — scores still count.";
+          message.textContent = payload.game_key === "history-mystery" ? "Daily prize plays complete — scores still count." : "Verified scores count toward Top 5 when sharing is allowed. Prizes are disabled.";
         } else if (payload.payout > 0) {
           message.textContent = `+${payload.payout} 🌼`;
         } else {
@@ -255,11 +257,65 @@
     });
   }
 
+  // Shared adapter: browser models only render the server snapshot during live play.
+  function challengeRun(game, gameKey) {
+    let token = null;
+    let index = 0;
+    let pending = null;
+    let finishing = false;
+    let saving = false;
+    function apply(state) {
+      index = state.action_index;
+      game.score = state.score;
+      game.mistakes = state.mistakes;
+      game.noteIndex = state.note_index;
+      game.remainingMs = state.remaining_ms;
+      game.status = finishing || state.finished ? "ended" : "running";
+      game.endReason = state.mistakes >= 2 ? "two-mistakes" : state.finished ? "time" : null;
+      if (gameKey === "thirds") game.currentCard = state.question;
+      else if (gameKey === "scale-keyboard") game.currentScale = state.question;
+      else game.currentQuestion = state.question;
+    }
+    return {
+      get busy() { return pending !== null; },
+      get saving() { return saving; },
+      start(payload) {
+        if (!payload.challenge) throw new Error("Start a new game to receive a verified challenge.");
+        token = payload.play_token;
+        finishing = false;
+        game.submitted = false;
+        apply(payload.challenge);
+      },
+      action(answer) {
+        if (pending || finishing || game.status !== "running") return Promise.resolve({ accepted: false });
+        pending = arcadeRequest({
+          gameKey, operation: "action", endpoint: `/arcade/plays/${encodeURIComponent(token)}/action`,
+          fetchOptions: { method: "POST", credentials: "same-origin",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action_index: index, answer }) },
+        }).then(function (payload) {
+          apply(payload.challenge);
+          return Object.assign({ accepted: true, score: game.score, ended: game.status === "ended" }, payload.action_result);
+        }).finally(function () { pending = null; });
+        return pending;
+      },
+      async complete() {
+        finishing = true;
+        saving = true;
+        try {
+          if (pending) await pending;
+          return await completePlay(token, game.score);
+        } finally { saving = false; }
+      },
+    };
+  }
+
   const playTokens = new Map();
   const pendingStarts = new Map();
 
   root.WoodshedArcadeEconomy = Object.freeze({
     ArcadeRequestError,
+    challengeRun,
     arcadeRequest,
     answerHistory,
     completePlay,
