@@ -23,16 +23,36 @@ def check_csrf(request, supplied):
     origin = request.headers.get("origin")
     if not origin:
         return
-    configured = os.getenv("PUBLIC_BASE_URL", "").strip() or os.getenv("RENDER_EXTERNAL_URL", "").strip()
-    expected_endpoint = _origin_endpoint(configured) if configured else _request_host_endpoint(request)
+    configured = [
+        value
+        for value in (
+            os.getenv("PUBLIC_BASE_URL", "").strip(),
+            os.getenv("RENDER_EXTERNAL_URL", "").strip(),
+        )
+        if value
+    ]
+
+    if configured:
+        allowed_endpoints = {_origin_endpoint(value) for value in configured}
+        if None in allowed_endpoints:
+            raise HTTPException(403, "Invalid request origin.")
+    else:
+        request_endpoint = _request_host_endpoint(request)
+        allowed_endpoints = {request_endpoint} if request_endpoint else set()
+
     if origin == "null":
         fetch_site = request.headers.get("sec-fetch-site")
         request_endpoint = _request_host_endpoint(request)
-        if (fetch_site != "same-origin" or expected_endpoint is None or
-                request_endpoint != expected_endpoint):
+        if (
+            fetch_site != "same-origin"
+            or request_endpoint is None
+            or request_endpoint not in allowed_endpoints
+        ):
             raise HTTPException(403, "Invalid request origin.")
         return
-    if _origin_endpoint(origin) is None or expected_endpoint is None or _origin_endpoint(origin) != expected_endpoint:
+
+    origin_endpoint = _origin_endpoint(origin)
+    if origin_endpoint is None or origin_endpoint not in allowed_endpoints:
         raise HTTPException(403, "Invalid request origin.")
 
 

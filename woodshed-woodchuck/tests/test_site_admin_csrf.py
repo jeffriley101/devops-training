@@ -25,6 +25,24 @@ def test_matching_origin_and_host_succeeds(monkeypatch):
     monkeypatch.delenv("RENDER_EXTERNAL_URL", raising=False)
     check_csrf(request("https://woodshed.example", host="WOodshed.Example"), "token")
 
+def test_public_base_and_render_origins_are_both_allowed(monkeypatch):
+    monkeypatch.setenv("PUBLIC_BASE_URL", "https://woodshedwoodchuck.com")
+    monkeypatch.setenv("RENDER_EXTERNAL_URL", "https://woodshed-woodchuck.onrender.com")
+
+    check_csrf(
+        request(
+            "https://woodshedwoodchuck.com",
+            host="woodshedwoodchuck.com",
+        ),
+        "token",
+    )
+    check_csrf(
+        request(
+            "https://woodshed-woodchuck.onrender.com",
+            host="woodshed-woodchuck.onrender.com",
+        ),
+        "token",
+    )
 
 def test_public_base_url_wins_over_proxy_host(monkeypatch):
     monkeypatch.setenv("PUBLIC_BASE_URL", "https://woodshed.example/app?from=render")
