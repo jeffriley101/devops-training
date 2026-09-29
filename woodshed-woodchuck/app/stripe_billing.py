@@ -1,4 +1,4 @@
-"""Small, test-only Checkout/invoice adapter. No transport inside DB transactions.
+"""Small Checkout/invoice adapter. No transport inside DB transactions.
 
 Checkout creates its Customer. Existing columns retain cs_/cus_/sub_/in_ IDs;
 the existing verified-facts JSON retains Price and PaymentIntent correlation.
@@ -25,7 +25,7 @@ PLAN_ENV = {
 
 def require(condition):
     if not condition:
-        raise ValueError("Stripe evidence does not match the supported sandbox purchase.")
+        raise ValueError("Stripe evidence does not match the supported purchase.")
 
 
 def identifier(value, prefix):
@@ -46,6 +46,7 @@ class StripeSettings:
     monthly_price: str
     annual_price: str
     base_url: str
+    mode: str
 
     @classmethod
     def from_environment(cls):
@@ -53,23 +54,33 @@ class StripeSettings:
             "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "STRIPE_ACCOUNT_ID",
             *PLAN_ENV.values(), "PUBLIC_BASE_URL")]
         key, signing, account, monthly, annual, base = values
-        if (os.getenv("STRIPE_MODE", "").strip() != "test" or not all((key, signing, account, base))
+        mode = os.getenv("STRIPE_MODE", "").strip()
+        if (mode not in ("test", "live") or not all((key, signing, account, base))
                 or not (monthly or annual)):
             return None
         try:
             origin = urlsplit(base)
         except ValueError:
             return None
-        if (not key.startswith(("sk_test_", "rk_test_")) or not signing.startswith("whsec_")
+        if (not key.startswith((f"sk_{mode}_", f"rk_{mode}_")) or not signing.startswith("whsec_")
                 or not account.startswith("acct_")
                 or any(value and not value.startswith("price_") for value in (monthly, annual))
                 or monthly == annual
                 or origin.username or origin.password or origin.query or origin.fragment
                 or origin.path not in ("", "/") or not origin.hostname
                 or not (origin.scheme == "https" or
-                        origin.scheme == "http" and origin.hostname in ("localhost", "127.0.0.1"))):
+                        mode == "test" and origin.scheme == "http"
+                        and origin.hostname in ("localhost", "127.0.0.1"))):
             return None
-        return cls(key, signing, account, monthly, annual, base.rstrip("/"))
+        return cls(key, signing, account, monthly, annual, base.rstrip("/"), mode)
+
+    @property
+    def livemode(self):
+        return self.mode == "live"
+
+    @property
+    def checkout_id_prefix(self):
+        return f"cs_{self.mode}_"
 
     @property
     def prices(self):
@@ -95,7 +106,7 @@ class StripeProvider(DisabledProvider):
             return result.to_dict() if isinstance(result, stripe.StripeObject) else result
         except stripe.StripeError:
             # Never expose transport details, request bodies or credentials.
-            raise BillingUnavailable("Stripe sandbox is temporarily unavailable.") from None
+            raise BillingUnavailable("Stripe is temporarily unavailable.") from None
 
     def _account(self):
         account = self._call(self.client.v1.accounts.retrieve_current)
@@ -107,7 +118,7 @@ class StripeProvider(DisabledProvider):
         plan = PLANS[codes[0]]
         price = self._call(self.client.v1.prices.retrieve, price_id)
         recurring = price.get("recurring") or {}
-        require(price.get("id") == price_id and price.get("livemode") is False
+        require(price.get("id") == price_id and price.get("livemode") is self.settings.livemode
                 and price.get("type") == "recurring" and price.get("billing_scheme") == "per_unit"
                 and price.get("unit_amount") == plan.amount_cents and price.get("currency") == "usd"
                 and recurring.get("interval") == plan.interval and recurring.get("interval_count") == 1
@@ -132,13 +143,13 @@ class StripeProvider(DisabledProvider):
             "success_url": self.settings.base_url + "/membership?checkout=returned",
             "cancel_url": self.settings.base_url + "/membership",
         }, options={"idempotency_key": idempotency_key})
-        require(result.get("livemode") is False)
+        require(result.get("livemode") is self.settings.livemode)
         url = urlsplit(result.get("url") or "")
         require(url.scheme == "https" and url.hostname == "checkout.stripe.com" and not url.username)
-        return CheckoutResult(result["url"], identifier(result.get("id"), "cs_test_"))
+        return CheckoutResult(result["url"], identifier(result.get("id"), self.settings.checkout_id_prefix))
 
     def _event(self, event):
-        require(event.get("livemode") is False and not event.get("account")
+        require(event.get("livemode") is self.settings.livemode and not event.get("account")
                 and event.get("api_version") == API_VERSION)
         if event.get("type") != "invoice.paid":
             return None
@@ -151,19 +162,19 @@ class StripeProvider(DisabledProvider):
         except (ValueError, stripe.SignatureVerificationError):
             raise ValueError("Invalid Stripe webhook signature or payload.") from None
         event = event.to_dict()
-        require(event.get("livemode") is False and not event.get("account"))
+        require(event.get("livemode") is self.settings.livemode and not event.get("account"))
         if event.get("type") != "invoice.paid":
             return None
         self._account()
         # Direct-account webhooks lack an account ID. Retrieval with the verified
-        # account's test key binds the event to that account (no Connect support).
+        # account's configured key binds the event to that account (no Connect support).
         canonical = self._call(self.client.v1.events.retrieve, identifier(event.get("id"), "evt_"))
         require(canonical.get("id") == event.get("id"))
         return self._event(canonical)
 
     def _invoice(self, invoice, event_id):
         """Normalize immutable paid-invoice facts, never today's subscription state."""
-        require(invoice.get("object") == "invoice" and invoice.get("livemode") is False
+        require(invoice.get("object") == "invoice" and invoice.get("livemode") is self.settings.livemode
                 and invoice.get("status") == "paid" and invoice.get("collection_method") == "charge_automatically"
                 and invoice.get("billing_reason") in ("subscription_create", "subscription_cycle")
                 and not (invoice.get("automatic_tax") or {}).get("enabled")
@@ -197,12 +208,12 @@ class StripeProvider(DisabledProvider):
                               params={"subscription": subscription, "limit": 2})
         require(not sessions.get("has_more") and len(sessions.get("data", [])) == 1)
         checkout = sessions["data"][0]
-        require(checkout.get("livemode") is False and checkout.get("mode") == "subscription"
+        require(checkout.get("livemode") is self.settings.livemode and checkout.get("mode") == "subscription"
                 and checkout.get("subscription") == subscription and checkout.get("customer") == customer
                 and checkout.get("client_reference_id") == reference
                 and (checkout.get("metadata") or {}).get("woodshed_plan_code") == plan.code
                 and checkout.get("payment_method_types") == ["card"])
-        checkout_id = identifier(checkout.get("id"), "cs_test_")
+        checkout_id = identifier(checkout.get("id"), self.settings.checkout_id_prefix)
         # invoice.paid also covers out-of-band settlement. Require an actual,
         # fully successful card PaymentIntent linked through InvoicePayment.
         payments = self._call(self.client.v1.invoice_payments.list,
@@ -216,7 +227,7 @@ class StripeProvider(DisabledProvider):
         intent = self._call(self.client.v1.payment_intents.retrieve, payment_id,
                             params={"expand": ["latest_charge"]})
         charge = intent.get("latest_charge") or {}
-        require(intent.get("livemode") is False and intent.get("status") == "succeeded"
+        require(intent.get("livemode") is self.settings.livemode and intent.get("status") == "succeeded"
                 and intent.get("customer") == customer and intent.get("currency") == "usd"
                 and intent.get("amount_received") == plan.amount_cents
                 and isinstance(charge, dict) and charge.get("paid") is True
@@ -240,8 +251,10 @@ class StripeProvider(DisabledProvider):
         if request.external_event_id and request.external_event_id.startswith("evt_"):
             event = self._event(self._call(self.client.v1.events.retrieve, request.external_event_id))
         elif request.provider_checkout_id:
-            checkout = self._call(self.client.v1.checkout.sessions.retrieve, request.provider_checkout_id)
-            require(checkout.get("livemode") is False and checkout.get("client_reference_id") == request.checkout_reference)
+            checkout_id = identifier(request.provider_checkout_id, self.settings.checkout_id_prefix)
+            checkout = self._call(self.client.v1.checkout.sessions.retrieve, checkout_id)
+            require(checkout.get("livemode") is self.settings.livemode
+                    and checkout.get("client_reference_id") == request.checkout_reference)
             if not checkout.get("invoice"):
                 return ProviderEvidence(request, datetime.now(timezone.utc), "found",
                     checkout_reference=request.checkout_reference, provider_checkout_id=request.provider_checkout_id)

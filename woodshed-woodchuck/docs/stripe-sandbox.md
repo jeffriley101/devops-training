@@ -1,4 +1,4 @@
-# Minimal Stripe sandbox billing
+# Minimal Stripe billing: sandbox and explicit live mode
 
 This adapter supports hosted card-only Checkout for `full_monthly_7` ($7 USD/month)
 and `full_annual_49` ($49 USD/year). Stripe quantity is always one. Woodshed retains
@@ -6,7 +6,7 @@ its five-student membership/seat rules. Open Access never requires a card.
 Checkout explicitly hides Link, which can otherwise offer bank payments even with
 `payment_method_types=["card"]`.
 
-## Configuration
+## Sandbox configuration
 
 All settings come from environment configuration. Do not put credentials in source
 control. Missing/invalid configuration retains `DisabledProvider`; flags alone do
@@ -17,7 +17,7 @@ configured Prices are offered; a monthly-only sandbox does not need an annual Pr
 | --- | --- |
 | `PUBLIC_SUBSCRIPTIONS_ENABLED` | `true` to permit new sandbox purchases |
 | `STRIPE_BILLING_ENABLED` | `true` for the adapter, webhooks, and inspection |
-| `STRIPE_MODE` | Exactly `test`; live mode is unsupported |
+| `STRIPE_MODE` | `test` for the sandbox; required, never inferred from the key |
 | `STRIPE_SECRET_KEY` | Test secret key (or test restricted key with required permissions) |
 | `STRIPE_WEBHOOK_SECRET` | Signing secret for this sandbox endpoint |
 | `STRIPE_ACCOUNT_ID` | Expected sandbox `acct_...` identity |
@@ -35,13 +35,54 @@ at `/membership/webhooks/stripe`. Do not use a Connect destination. Changing SDK
 webhook versions requires rerunning adapter tests against the new response shapes.
 
 The key needs account/event/Price/Checkout/InvoicePayment/PaymentIntent/invoice read
-access and Checkout creation access. Checkout itself creates its Customer. No live
-objects, products, Prices, keys, destinations, or Dashboard settings are created by
-the application or by its tests.
+access and Checkout creation access. Checkout itself creates its Customer. Tests
+use fake HTTP transport and create no Stripe objects. The application does not
+provision products, Prices, keys, webhook destinations, or Dashboard settings.
 
 Keep the two Price mappings fixed while sandbox checkouts/subscriptions exist.
 Changing them does not migrate existing subscriptions; old-Price deliveries will
 fail verification and require operator reconciliation.
+
+## Production configuration (keep disabled)
+
+Production must remain disabled until its live configuration is explicitly supplied,
+reviewed, and activation is separately authorized. This code change does not enable
+production, deploy, change Render, or create any Stripe resources. Keep both
+`STRIPE_BILLING_ENABLED=false` and `PUBLIC_SUBSCRIPTIONS_ENABLED=false` during setup.
+
+| Variable | Live configuration for later review |
+| --- | --- |
+| `STRIPE_MODE` | `live` |
+| `STRIPE_SECRET_KEY` | `rk_live_...` with the permissions above (preferred), or `sk_live_...` |
+| `STRIPE_WEBHOOK_SECRET` | `whsec_...` for the live direct-account webhook endpoint |
+| `STRIPE_ACCOUNT_ID` | Expected live account `acct_...`; verified using the configured key |
+| `STRIPE_PRICE_FULL_MONTHLY_7` | Fixed live recurring $7 USD/month Price, licensed/per-unit, interval count one |
+| `STRIPE_PRICE_FULL_ANNUAL_49` | Fixed live recurring $49 USD/year Price, licensed/per-unit, interval count one |
+| `PUBLIC_BASE_URL` | Production HTTPS origin |
+| `CHECKOUT_VALIDITY_SECONDS` | Keep the existing default of 3600 |
+| `STRIPE_BILLING_ENABLED` | Keep `false` pending explicit activation |
+| `PUBLIC_SUBSCRIPTIONS_ENABLED` | Keep `false` pending explicit activation |
+
+At least one supported Price must be configured. Keep Price mappings fixed while
+checkouts/subscriptions exist. Store credentials in the platform's secret settings,
+never in source control. The live webhook must use API version
+`2026-08-26.dahlia`, deliver `invoice.paid` to `/membership/webhooks/stripe`, and use
+its own signing secret. Provisioning that endpoint is outside this change.
+
+`STRIPE_MODE` accepts only `test` or `live` after trimming surrounding whitespace.
+Missing, blank, or other values disable the adapter. Test mode requires `sk_test_`
+or `rk_test_` keys, verified evidence with `livemode=false`, and `cs_test_` Checkout
+IDs. Live mode requires `sk_live_` or `rk_live_` keys, verified evidence with
+`livemode=true`, and `cs_live_` Checkout IDs. A matching key alone never selects a
+mode. Wrong-mode evidence is rejected during Checkout, webhook processing, and
+inspection/reconciliation.
+
+The flags retain their separate roles: public subscriptions gate new purchases;
+Stripe billing gates the adapter, webhooks, and inspection. After a future launch,
+stopping new purchases alone must leave Stripe billing enabled to process outstanding
+payments. Keep sandbox application data isolated from production; switching modes
+does not migrate subscriptions or stored evidence. Live credentials, permissions,
+Prices, and webhook delivery have not been verified by these offline tests.
 
 ## Payment and storage boundary
 
@@ -53,7 +94,7 @@ fail verification and require operator reconciliation.
    authorization to work around that. Its one-hour lifetime is shorter than Stripe's
    idempotency retention window.
 3. A return URL only displays a pending-confirmation message. It never grants access.
-4. The adapter verifies the webhook signature, rejects live/Connect events, verifies
+4. The adapter verifies the webhook signature, rejects wrong-mode/Connect events, verifies
    the key's account, and retrieves the event under that account. A paid invoice must
    match the allowlisted Price, quantity one, local checkout snapshot, Customer, and
    actual successful card PaymentIntent. Tax, discounts, prorations, adjustments,
@@ -95,15 +136,16 @@ This first path does not implement Portal, subscription lifecycle synchronizatio
 cancellation, replacement after Stripe termination, refunds, tax collection, launch
 pricing, plan changes/proration, separate invoicing UI/APIs, alternate payment methods,
 custom dunning, schedules, or background jobs. Ignored webhook types grant nothing.
-Operate test subscriptions in the Stripe sandbox Dashboard. Full refund/lifecycle
-automation and production readiness require a separate reviewed change.
+Operate test subscriptions in the Stripe sandbox Dashboard. Refund and lifecycle
+automation remain outside this adapter. Live activation requires separate human review
+and configuration. Automatic tax remains disabled; tax collection is outside this change.
 
 ## Validation and rollback
 
 `tests/test_stripe_billing.py` uses real SDK serialization/signature verification
-with fake HTTP transport, and disposable SQLite/PostgreSQL databases. It makes no
-Stripe API calls. Also run the existing membership, billing hardening, checkout
-expiry, recovery, reconciliation, replacement, and tester suites. PostgreSQL cases
+with fake HTTP transport in both test and live modes, and disposable SQLite/PostgreSQL
+databases. It makes no Stripe API calls. Also run the existing membership, billing
+hardening, checkout expiry, recovery, reconciliation, replacement, and tester suites. PostgreSQL cases
 use the existing `WW_BILLING_TEST_POSTGRES_URL` guard: local host only and database
 name `ww_billing_a2_test`.
 
