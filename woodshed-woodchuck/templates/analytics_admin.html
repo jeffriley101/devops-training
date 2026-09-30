@@ -84,9 +84,10 @@
 <section class="card">
   <h2>Per-student summary</h2>
   <p>Internal numeric IDs only. Last observed is the latest available evidence in this window, not an exact last-visit time; entry-only visits retain the first observation of each day.</p>
+  {% if selected_cohort %}<p>Joined and Source come from the stored enrollment for {{ selected_cohort }}. Unrecorded Source remains unrecorded.</p>{% endif %}
   <div class="analytics-table-wrap"><table class="analytics-table">
-    <thead><tr><th scope="col">Student ID</th><th scope="col">Last observed (Central)</th><th scope="col">Active days</th><th scope="col">Practice saved</th><th scope="col">Activities</th></tr></thead>
-    <tbody>{% for student in report.students %}<tr><th scope="row">{{ student.id }}</th><td>{{ student.last_seen.strftime('%Y-%m-%d %H:%M %Z') if student.last_seen else 'None in window' }}</td><td>{{ student.active_days }}</td><td>{{ student.practice_charts }} charts · {{ student.practice_duration }}</td><td>{{ student.areas|join(', ') or 'None recorded' }}</td></tr>{% else %}<tr><td colspan="5">No student accounts.</td></tr>{% endfor %}</tbody>
+    <thead><tr><th scope="col">Student ID</th>{% if selected_cohort %}<th scope="col">Joined (Central)</th><th scope="col">Source</th>{% endif %}<th scope="col">Last observed (Central)</th><th scope="col">Active days</th><th scope="col">Practice saved</th><th scope="col">Activities</th></tr></thead>
+    <tbody>{% for student in report.students %}<tr><th scope="row">{{ student.id }}</th>{% if selected_cohort %}<td>{{ student.joined_at.strftime('%Y-%m-%d %H:%M %Z') }}</td><td>{{ student.source if student.source is not none else 'Unrecorded' }}</td>{% endif %}<td>{{ student.last_seen.strftime('%Y-%m-%d %H:%M %Z') if student.last_seen else 'None in window' }}</td><td>{{ student.active_days }}</td><td>{{ student.practice_charts }} charts · {{ student.practice_duration }}</td><td>{{ student.areas|join(', ') or 'None recorded' }}</td></tr>{% else %}<tr><td colspan="{{ 7 if selected_cohort else 5 }}">No student accounts.</td></tr>{% endfor %}</tbody>
   </table></div>
 </section>
 <section class="card">

@@ -1,6 +1,7 @@
 """Small rollout delta; synthetic SQLite records and no delivery services."""
 import base64
 from types import SimpleNamespace
+from urllib.parse import urlsplit
 
 import pytest
 from fastapi.testclient import TestClient
@@ -62,7 +63,7 @@ def test_closure_preserves_established_claim_and_lifetime_access(tester_db, monk
         assert count(session, Enrollment) == 1
 
 
-def test_qr_contains_only_canonical_entry_without_claim_or_host_input(tester_db, monkeypatch):
+def test_qr_contains_canonical_director_entry_without_claim_or_host_input(tester_db, monkeypatch):
     import app.main as main
     original = main.qr_data_uri
     values = []
@@ -77,12 +78,22 @@ def test_qr_contains_only_canonical_entry_without_claim_or_host_input(tester_db,
     closed_sentence = 'Scan to explore Guest tools. New C001 registration is currently closed.'
     assert open_sentence in response.text
     assert closed_sentence not in response.text
-    assert values == ['https://woodshed-woodchuck.onrender.com/prebeta/C001']
+    assert values == ['https://woodshed-woodchuck.onrender.com/prebeta/C001?entry=director1']
+    assert 'Director #1 invitation' in response.text
+    assert response.context['entry_url'] == values[0]
     assert 'untrusted.example' not in response.text and 'token=private' not in response.text
     assert 'svg' in base64.b64decode(response.context['entry_qr'].split(',')[1]).decode()
     assert '@media print' in response.text
     assert response.headers['cache-control'] == 'no-store'
     assert 'set-cookie' not in response.headers
+    # Exercise the exact link encoded by the QR using the local TestClient.
+    encoded = urlsplit(values[0])
+    assert client.get(encoded.path + '?' + encoded.query, follow_redirects=False).status_code == 303
+    guest = client.get('/guest')
+    assert testers.registration_context(guest.context['request']) == 'C001'
+    assert testers.registration_source(guest.context['request']) == 'DIRECTOR1'
+    with tester_db() as session:
+        assert count(session, WoodchuckProfile) == count(session, Enrollment) == 0
     monkeypatch.setenv('C001_REGISTRATION_DISABLED', 'true')
     closed = client.get('/prebeta/C001/display')
     assert closed_sentence in closed.text

@@ -12,9 +12,10 @@
 <h1>Woodshed Woodchuck</h1><h2>C001 Pre-Beta</h2>
 {% if message %}<p role="status">{{ message }}</p><p><a href="/guest">Explore Guest tools</a></p>
 {% else %}
+<p>Director #1 invitation</p>
 {% if registration_open %}<p>Scan to explore Guest tools or begin C001 registration.</p>
 {% else %}<p>Scan to explore Guest tools. New C001 registration is currently closed.</p>{% endif %}
-<img class="c001-qr" src="{{ entry_qr }}" width="320" height="320" alt="QR code for the public C001 entry URL below">
+<img class="c001-qr" src="{{ entry_qr }}" width="320" height="320" alt="QR code for the Director #1 C001 entry URL below">
 <p><a href="{{ entry_url }}">{{ entry_url }}</a></p>
 {% if not registration_open %}<p role="status">New C001 registration claims are currently closed. Guest tools remain available.</p>{% endif %}
 <p>Account creation follows age and parent-permission requirements.</p>

@@ -117,21 +117,25 @@ def build_report(session_factory, *, now=None, cohort_key=None):
     start = datetime.combine(first_day, time.min, CENTRAL).astimezone(timezone.utc)
 
     cohort_members = None
+    cohort_sources = {}
     if cohort_key is not None:
         from .tester_enrollments import normalize_cohort_key
         cohort_key = normalize_cohort_key(cohort_key)
         with session_factory() as session:
+            enrollments = session.execute(
+                select(TesterEnrollment.profile_id, TesterEnrollment.joined_at,
+                       TesterEnrollment.source)
+                .join(WoodchuckProfile, WoodchuckProfile.id == TesterEnrollment.profile_id)
+                .where(
+                    TesterEnrollment.cohort_key == cohort_key,
+                    WoodchuckProfile.status == "active",
+                )
+            ).all()
             cohort_members = {
                 profile_id: as_utc(joined_at)
-                for profile_id, joined_at in session.execute(
-                    select(TesterEnrollment.profile_id, TesterEnrollment.joined_at)
-                    .join(WoodchuckProfile, WoodchuckProfile.id == TesterEnrollment.profile_id)
-                    .where(
-                        TesterEnrollment.cohort_key == cohort_key,
-                        WoodchuckProfile.status == "active",
-                    )
-                ).all()
+                for profile_id, joined_at, _ in enrollments
             }
+            cohort_sources = {profile_id: source for profile_id, _, source in enrollments}
 
     def included(profile_id, timestamp=None):
         if cohort_members is None:
@@ -286,6 +290,8 @@ def build_report(session_factory, *, now=None, cohort_key=None):
         "pristine_without_save": len(observed_days[EVENT_LABELS["pristine_entered"]] - observed_days["Pristine charts saved"]),
         "students": [{
             "id": profile_id,
+            "joined_at": cohort_members[profile_id].astimezone(CENTRAL) if cohort_members is not None else None,
+            "source": cohort_sources.get(profile_id),
             "last_seen": last_seen[profile_id].astimezone(CENTRAL) if profile_id in last_seen else None,
             "active_days": len(by_profile.get(profile_id, ())),
             "practice_charts": practice_by_profile[profile_id],

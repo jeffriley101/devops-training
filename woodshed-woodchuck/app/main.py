@@ -438,9 +438,9 @@ def guest_secret_symbol(request: Request, passcode: str = Form("")):
 def prebeta_c001(request: Request):
     """Deliberate, public C001 entry; no account or enrollment is created."""
     try:
-        # Both QR/link entry and the Guest Secret Symbol use this resolver.
-        # The entry marker selects a fixed source; arbitrary source values are ignored.
-        source = DIRECTOR1 if request.query_params.get("entry") == "secret-symbol" else None
+        # Only these fixed invitation markers select the server-owned source.
+        # Bare entry remains unattributed; arbitrary source values are ignored.
+        source = DIRECTOR1 if request.query_params.get("entry") in {"director1", "secret-symbol"} else None
         establish_registration_context(request, C001, source=source)
     except ValueError as error:
         return templates.TemplateResponse(
@@ -457,7 +457,7 @@ def prebeta_c001(request: Request):
 @app.get("/prebeta/C001/display")
 def c001_display(request: Request):
     # The established public site URL is independent of Host, cookies and query strings.
-    entry_url = SHOP_SHARE_URL.rstrip("/") + "/prebeta/C001"
+    entry_url = SHOP_SHARE_URL.rstrip("/") + "/prebeta/C001?entry=director1"
     return templates.TemplateResponse(
         request=request, name="c001_entry.html",
         context={"entry_url": entry_url, "entry_qr": qr_data_uri(entry_url),

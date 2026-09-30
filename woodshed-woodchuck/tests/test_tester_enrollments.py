@@ -140,7 +140,11 @@ def test_c001_guest_context_only_comes_from_deliberate_route_and_creates_nothing
         assert (count(session, Enrollment), count(session, WoodchuckProfile)) == before
 
 
-@pytest.mark.parametrize("entry,source", [("/prebeta/C001", None), ("/prebeta/C001?entry=secret-symbol", "DIRECTOR1")])
+@pytest.mark.parametrize("entry,source", [
+    ("/prebeta/C001", None),
+    ("/prebeta/C001?entry=secret-symbol", "DIRECTOR1"),
+    ("/prebeta/C001?entry=director1", "DIRECTOR1"),
+])
 @pytest.mark.parametrize("age", ["adult", "13to17"])
 def test_c001_13plus_creation_is_atomic_full_and_does_not_touch_memberships(tester_db, entry, source, age):
     client = TestClient(app)
@@ -218,7 +222,11 @@ def prepare_child_services(monkeypatch):
     monkeypatch.setattr(consent, "send_copy", lambda *args, **kwargs: None)
 
 
-@pytest.mark.parametrize("entry,source", [("/prebeta/C001", None), ("/prebeta/C001?entry=secret-symbol", "DIRECTOR1")])
+@pytest.mark.parametrize("entry,source", [
+    ("/prebeta/C001", None),
+    ("/prebeta/C001?entry=secret-symbol", "DIRECTOR1"),
+    ("/prebeta/C001?entry=director1", "DIRECTOR1"),
+])
 def test_c001_under13_claim_survives_cross_device_activation_and_retry(tester_db, monkeypatch, entry, source):
     prepare_child_services(monkeypatch)
     student = TestClient(app)
@@ -226,6 +234,17 @@ def test_c001_under13_claim_survives_cross_device_activation_and_retry(tester_db
     assert student.post("/account/create", data=account_form("under13")).status_code == 403
     page = student.get("/family/request")
     assert "preserve the new account's C001 claim" in page.text
+    forged = student.post("/family/request", data={
+        "csrf": page.context["csrf"],
+        "confirm_account": "new",
+        "parent_email": "parent@example.test",
+        "cohort_key": "FORGED",
+        "cohort_source": "FORGED",
+        "source": "FORGED",
+    })
+    assert forged.status_code == 400
+    with tester_db() as session:
+        assert count(session, PendingConsent) == count(session, Enrollment) == 0
     response = student.post("/family/request", data={
         "csrf": page.context["csrf"],
         "confirm_account": "new",
@@ -250,6 +269,8 @@ def test_c001_under13_claim_survives_cross_device_activation_and_retry(tester_db
         pending.approved_at = CLAIMED + timedelta(hours=1)
         pending.confirmed_at = CLAIMED + timedelta(hours=1)
         session.commit()
+        # Approval still has not created the authorized persistent account.
+        assert count(session, WoodchuckProfile) == count(session, Enrollment) == 0
 
     verification = SimpleNamespace(
         notice_sha256=consent.NOTICE_SHA256,
@@ -259,6 +280,7 @@ def test_c001_under13_claim_survives_cross_device_activation_and_retry(tester_db
     )
     from app import kws_verification
     monkeypatch.setattr(kws_verification, "verified_for_activation", lambda session, row: verification)
+    monkeypatch.setattr(consent, "clock", lambda: CLAIMED + timedelta(hours=2))
 
     # Closure stops new claims, but must not strand an established parent flow.
     monkeypatch.setenv("C001_REGISTRATION_DISABLED", "true")
@@ -441,3 +463,148 @@ def test_classroom_registration_has_no_125_tester_cap(tester_db):
     with tester_db() as session:
         assert count(session, Enrollment) == 126
         assert student_has_full_access(session, created.json()['profile']['id'])
+
+
+@pytest.mark.parametrize("entry", [
+    "/prebeta/C001?source=DIRECTOR1",
+    "/prebeta/C001?source=FORGED",
+    "/prebeta/C001?entry=DIRECTOR1",
+    "/prebeta/C001?entry=unknown&source=DIRECTOR1",
+])
+def test_c001_unknown_markers_and_query_or_form_sources_cannot_forge_source(tester_db, entry):
+    client = TestClient(app)
+    page = client.get(entry)
+    assert testers.registration_context(page.context["request"]) == testers.C001
+    assert testers.registration_source(page.context["request"]) is None
+    created = client.post("/account/create", data={
+        **account_form("13to17"), "source": "DIRECTOR1", "cohort_source": "FORGED",
+        "cohort_key": "FORGED", "entry": "director1",
+    })
+    assert created.status_code == 200, created.text
+    with tester_db() as session:
+        row = session.scalar(select(Enrollment))
+        assert row.cohort_key == testers.C001
+        assert row.source is None
+        assert testers.utc(row.joined_at) == CLAIMED
+
+
+def test_director_context_survives_guest_setup_refresh_and_bare_navigation(tester_db):
+    client = TestClient(app)
+    entry = client.get("/prebeta/C001?entry=director1&source=FORGED")
+    assert entry.status_code == 200
+    assert testers.registration_source(entry.context["request"]) == testers.DIRECTOR1
+    assert "data-guest=\"local\"" in entry.text
+    with tester_db() as session:
+        assert count(session, Enrollment) == count(session, WoodchuckProfile) == 0
+    for path in ("/guest", "/setup", "/guest", "/prebeta/C001", "/prebeta/C001?source=FORGED"):
+        page = client.get(path)
+        assert page.status_code == 200
+        assert testers.registration_context(page.context["request"]) == testers.C001
+        assert testers.registration_source(page.context["request"]) == testers.DIRECTOR1
+
+    failed = client.post("/account/create", data={**account_form(), "initial_state": "{"})
+    assert failed.status_code == 400
+    assert testers.registration_source(client.get("/guest").context["request"]) == testers.DIRECTOR1
+    created = client.post("/account/create", data={**account_form(), "source": "FORGED"})
+    assert created.status_code == 200, created.text
+    # Once persisted, later route visits cannot change the enrollment attribution.
+    client.get("/prebeta/C001?source=FORGED")
+    with tester_db() as session:
+        row = session.scalar(select(Enrollment))
+        assert row.source == testers.DIRECTOR1
+        assert testers.utc(row.joined_at) == CLAIMED
+        assert count(session, Enrollment) == 1
+
+
+def test_unsigned_browser_context_cannot_create_tester_enrollment(tester_db):
+    from base64 import b64encode
+
+    original = TestClient(app)
+    original.get("/prebeta/C001?entry=director1")
+    signed_cookie = original.cookies.get("session")
+    _, timestamp, signature = signed_cookie.split(".")
+    forged_payload = b64encode(json.dumps({testers.SESSION_REGISTRATION_CONTEXT: {
+        "cohort_key": "C001", "source": "DIRECTOR1",
+    }, "untrusted": True}).encode()).decode()
+    attacker = TestClient(app)
+    attacker.cookies.set("session", ".".join((forged_payload, timestamp, signature)))
+    assert testers.registration_context(attacker.get("/guest").context["request"]) is None
+    created = attacker.post("/account/create", data={**account_form(), "source": "DIRECTOR1"})
+    assert created.status_code == 200, created.text
+    with tester_db() as session:
+        assert count(session, Enrollment) == 0
+
+
+def test_duplicate_enrollment_and_deleted_profile_preserve_historical_provenance(tester_db):
+    from app.account_deletion import anonymize_woodchuck_account
+
+    with tester_db() as session:
+        original_rows = []
+        for suffix, source in (("DIRECTOR", testers.DIRECTOR1), ("NULL", None)):
+            student = profile(session, suffix, CLAIMED - timedelta(days=5), age="13to17")
+            row = testers.enroll_tester(session, student.id, testers.C001,
+                                        CLAIMED - timedelta(days=4), source=source)
+            original_rows.append((row.id, student.id, testers.utc(row.joined_at), row.source))
+        session.commit()
+        for row_id, student_id, joined_at, source in original_rows:
+            duplicate = testers.enroll_tester(session, student_id, testers.C001, CLAIMED,
+                                               source=None if source else testers.DIRECTOR1)
+            assert duplicate.id == row_id
+            assert testers.utc(duplicate.joined_at) == joined_at
+            assert duplicate.source == source
+            anonymize_woodchuck_account(session,
+                profile=session.get(WoodchuckProfile, student_id), now=CLAIMED)
+        session.commit()
+        session.expire_all()
+        after = list(session.scalars(select(Enrollment).order_by(Enrollment.id)))
+        assert [(row.id, row.profile_id, testers.utc(row.joined_at), row.source)
+                for row in after] == original_rows
+        assert all(session.get(WoodchuckProfile, row.profile_id).status == "deleted" for row in after)
+        assert all(not student_has_full_access(session, row.profile_id) for row in after)
+
+
+def test_c001_reauthorization_preserves_original_joined_at_and_source(tester_db, monkeypatch):
+    from app import kws_verification
+
+    prepare_child_services(monkeypatch)
+    original_join = CLAIMED - timedelta(days=4)
+    with tester_db() as session:
+        student = profile(session, "REAUTH", original_join)
+        rule = declare_age(session, student.id, "under13")
+        evidence = ConsentEvidence(profile_id=student.id, parent_email="parent@example.test",
+            notice_version=consent.NOTICE_VERSION, notice_sha256=consent.NOTICE_SHA256,
+            approved_at=original_join, confirmed_at=original_join)
+        session.add(evidence)
+        session.flush()
+        rule.consent_id = evidence.id
+        session.flush()
+        enrollment = testers.enroll_tester(session, student.id, testers.C001,
+                                           original_join, source=testers.DIRECTOR1)
+        session.commit()
+        consent.withdraw_evidence(session, evidence)
+        session.commit()
+        assert not eligible(session, student.id)
+        before = enrollment.id, testers.utc(enrollment.joined_at), enrollment.source
+        token = generate_invitation_token()
+        pending = consent.request_consent(session, profile=student, parent_email="parent@example.test")
+        assert pending.cohort_key is None and pending.cohort_source is None
+        pending.activation_hash = hash_invitation_token(token)
+        pending.approved_at = pending.confirmed_at = CLAIMED
+        session.commit()
+        student_id = student.id
+
+    verification = SimpleNamespace(notice_sha256=consent.NOTICE_SHA256, director_allowed=False,
+        state="verified", activated_consent_id=None)
+    monkeypatch.setattr(kws_verification, "verified_for_activation", lambda session, row: verification)
+    monkeypatch.setattr(consent, "clock", lambda: CLAIMED + timedelta(hours=1))
+    with tester_db() as session:
+        student = session.get(WoodchuckProfile, student_id)
+        activated, _, _ = consent.activate(session, token, profile=student, fields={})
+        session.commit()
+        session.expire_all()
+        row = session.scalar(select(Enrollment).where(Enrollment.profile_id == student_id))
+        assert activated.id == student_id
+        assert (row.id, testers.utc(row.joined_at), row.source) == before
+        assert count(session, Enrollment) == count(session, WoodchuckProfile) == 1
+        assert eligible(session, student_id)
+        assert student_has_full_access(session, student_id)
