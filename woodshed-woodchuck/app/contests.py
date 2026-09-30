@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import hmac
 import os
 import re
@@ -8,7 +9,7 @@ from datetime import date, datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel, ConfigDict, Field, StrictInt
+from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictStr, field_validator
 from sqlalchemy import func, or_, select, true
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -148,11 +149,23 @@ ACTIVITY_CROWN_KEYS = {
 router = APIRouter(prefix="/contests", tags=["contests"])
 
 
-class CampPointAwardCreate(BaseModel):
+class BoardSelfAttestationDay(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    activity_type: str
     activity_date: date
+
+    @field_validator("activity_date", mode="before")
+    @classmethod
+    def calendar_date(cls, value):
+        if isinstance(value, date) and not isinstance(value, datetime):
+            return value
+        if not isinstance(value, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
+            raise ValueError("Use a calendar date in YYYY-MM-DD format.")
+        return value
+
+
+class CampPointAwardCreate(BoardSelfAttestationDay):
+    activity_type: StrictStr
 
 
 class TriviaAnswerSubmission(BaseModel):
@@ -170,13 +183,8 @@ class QuestCompletionSubmission(BaseModel):
     note: str = Field(default="", max_length=500)
 
 
-class BonusChallengeProgressSubmission(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    activity_date: date
-    challenge_instance: str = Field(min_length=1, max_length=200)
-    minutes: StrictInt | None = Field(default=None, ge=1, le=1440)
-    note: str = Field(default="", max_length=500)
+class BonusChallengeProgressSubmission(BoardSelfAttestationDay):
+    challenge_instance: StrictStr = Field(min_length=1, max_length=200)
 
 
 TRIVIA_QUESTIONS = (
@@ -900,6 +908,11 @@ def student_camp_point_totals(
     }
 
 
+def _board_activity_key(activity_date: date, activity: str) -> str:
+    namespace = "band-camp" if activity == "trivia" else "board-self-report-v2"
+    return f"{namespace}:{activity_date.isoformat()}:{activity}"
+
+
 def create_camp_point_award(
     session: Session,
     *,
@@ -911,13 +924,11 @@ def create_camp_point_award(
     activity = activity_type.strip().casefold()
     if activity not in CAMP_POINT_ACTIVITIES:
         raise ValueError("Unsupported Band Camp point activity.")
-    if activity != "trivia":
-        raise ValueError("Self-reported BOARD activities do not qualify for rewards or contest credit.")
     if now.tzinfo is None or now.utcoffset() is None:
         raise ValueError("The award time must be timezone-aware.")
     if activity_date != now.astimezone(CENTRAL).date():
         raise ValueError("Band Camp activities can only be recorded for today.")
-    duplicate_key = f"band-camp:{activity_date.isoformat()}:{activity}"
+    duplicate_key = _board_activity_key(activity_date, activity)
     existing = session.scalar(select(CampPointAward).where(
         qualified_camp_point_clause(),
         CampPointAward.profile_id == profile.id,
@@ -2894,6 +2905,16 @@ def quest_definition(instrument: str, quest_id: str) -> dict[str, object] | None
     )
 
 
+def _bonus_daily_key(activity_date: date) -> str:
+    # A fixed daily key keeps eligibility unique even after an instrument change.
+    return f"bonus-challenge:self-report-v2:{activity_date.isoformat()}"
+
+
+def _bonus_reward_key(resolved: dict[str, object]) -> str:
+    fingerprint = hashlib.sha256(str(resolved["instance_key"]).encode()).hexdigest()
+    return f"{_bonus_daily_key(resolved['activity_date'])}:{fingerprint}"
+
+
 def resolve_current_bonus_challenge(
     session: Session,
     *,
@@ -2910,32 +2931,25 @@ def resolve_current_bonus_challenge(
     if not configured:
         return None
 
-    selected = None
-    completion = session.scalar(select(QuestCompletion).where(
-        QuestCompletion.profile_id == profile.id,
-        QuestCompletion.activity_date == central_date,
-    ))
-    if completion is not None:
-        selected = quest_definition(profile.instrument, completion.quest_id)
-
-    if selected is None:
-        selected = configured[central_date.timetuple().tm_yday % len(configured)]
+    selected = configured[central_date.timetuple().tm_yday % len(configured)]
 
     challenge_id = str(selected["id"])
-    instance_key = (
-        f"{central_date.isoformat()}:{instrument_key}:{challenge_id}"
-    )
-    logged_minutes = 0
-    completed = False
-    if completion is not None and completion.quest_id == challenge_id:
-        logged_minutes = completion.logged_minutes
-        completed = True
+    # Bind the instance to the assigned task as well as date and instrument.
+    definition_key = hashlib.sha256(
+        f"{challenge_id}:{selected['text']}:{selected['target_minutes']}".encode()
+    ).hexdigest()
+    instance_key = f"{central_date.isoformat()}:{instrument_key}:{challenge_id}:{definition_key}"
+    completed = session.scalar(select(CampPointAward.id).where(
+        qualified_camp_point_clause(),
+        CampPointAward.profile_id == profile.id,
+        CampPointAward.duplicate_key == _bonus_daily_key(central_date),
+    )) is not None
     return {
         "instance_key": instance_key,
         "challenge_id": challenge_id,
         "task": str(selected["text"]),
         "target_minutes": int(selected["target_minutes"]),
-        "logged_minutes": logged_minutes,
+        "logged_minutes": 0,
         "completed": completed,
         "activity_date": central_date,
     }
@@ -3044,20 +3058,47 @@ def current_bonus_challenge(request: Request) -> dict[str, object]:
         }
 
 
-def require_earned_bonus(session, *, profile, activity_date, challenge_instance=None, quest_id=None):
-    """Both aliases share the same fail-closed evidence boundary.
-
-    Approved general practice does not establish that the assigned challenge
-    was performed. Until challenge-specific evidence exists, neither a button
-    nor caller-supplied logged minutes can create an authoritative completion.
-    """
-    resolved = resolve_current_bonus_challenge(session, profile=profile, now=datetime.now(timezone.utc))
+def require_earned_bonus(session, *, profile, activity_date, challenge_instance, now):
+    """Validate the current assignment for the deliberate I Played It event."""
+    resolved = resolve_current_bonus_challenge(session, profile=profile, now=now)
     if resolved is None or activity_date != resolved["activity_date"]:
         raise HTTPException(400, "Choose today's Bonus Challenge.")
-    if ((challenge_instance is not None and challenge_instance != resolved["instance_key"])
-        or (quest_id is not None and quest_id != resolved["challenge_id"])):
+    if challenge_instance != resolved["instance_key"]:
         raise HTTPException(409, "This Bonus Challenge changed. Refresh BOARD and try again.")
-    raise HTTPException(409, "Bonus Challenge self-reports do not currently qualify for rewards or completion credit.")
+    return resolved
+
+
+def _record_bonus_self_attestation(session, profile, resolved, now):
+    daily_key = _bonus_daily_key(resolved["activity_date"])
+    source_key = _bonus_reward_key(resolved)
+    existing = session.scalar(select(CampPointAward).where(
+        CampPointAward.profile_id == profile.id,
+        CampPointAward.duplicate_key == daily_key,
+    ))
+    if existing is not None:
+        grant = session.scalar(select(RewardGrant.id).where(
+            RewardGrant.profile_id == profile.id,
+            RewardGrant.source_key == source_key,
+            RewardGrant.reward_type == "dandelion",
+        ))
+        if grant is None:
+            raise HTTPException(409, "Today's Bonus Challenge was already completed. Try again tomorrow.")
+        return False
+    session.add(CampPointAward(
+        profile_id=profile.id, activity_type="quest", points_awarded=2,
+        occurred_at=now, duplicate_key=daily_key,
+        team_id=_active_team_id_for_event(session, profile.id, now),
+    ))
+    # This unique daily insert wins eligibility before any balance mutation.
+    session.flush()
+    if not _grant_once(session, profile_id=profile.id, result_id=None,
+                       source_key=source_key, reward_type="dandelion",
+                       category_key="bonus-challenge", amount=5):
+        raise HTTPException(409, "Today's Bonus Challenge reward was already recorded.")
+    _add_dandelion(session, profile.id, 5)
+    # Completion lives in the v2 award ledger. QuestCompletion requires positive
+    # minutes; a self-attestation must not fabricate minutes to satisfy it.
+    return True
 
 
 @router.post("/bonus-challenge/progress")
@@ -3066,8 +3107,33 @@ def record_bonus_challenge_progress(request: Request, submitted: BonusChallengeP
         profile = current_profile(request, session)
         if profile is None:
             raise HTTPException(401, "Student sign-in is required.")
-        require_earned_bonus(session, profile=profile, activity_date=submitted.activity_date,
-                             challenge_instance=submitted.challenge_instance)
+        lock_state(session, profile.id)
+        # The profile may have changed while this request waited for its lock.
+        session.refresh(profile)
+        now = datetime.now(timezone.utc)
+        resolved = require_earned_bonus(
+            session, profile=profile, activity_date=submitted.activity_date,
+            challenge_instance=submitted.challenge_instance, now=now,
+        )
+        try:
+            created = _record_bonus_self_attestation(session, profile, resolved, now)
+            session.commit()
+        except IntegrityError:
+            # A concurrent daily insert committed the entire award transaction.
+            session.rollback()
+            lock_state(session, profile.id)
+            resolved = require_earned_bonus(
+                session, profile=profile, activity_date=submitted.activity_date,
+                challenge_instance=submitted.challenge_instance, now=datetime.now(timezone.utc),
+            )
+            if not resolved["completed"]:
+                raise HTTPException(500, "Bonus Challenge could not be saved. Please try again.")
+            created = _record_bonus_self_attestation(session, profile, resolved, now)
+        return bonus_challenge_progress_payload(
+            session, profile_id=profile.id, activity_date=resolved["activity_date"],
+            challenge_id=resolved["challenge_id"], target_minutes=resolved["target_minutes"],
+            logged_minutes=0, completed=True, created=created, now=now,
+        )
 
 
 @router.post("/quest/completions")
@@ -3076,8 +3142,7 @@ def complete_quest(request: Request, submitted: QuestCompletionSubmission):
         profile = current_profile(request, session)
         if profile is None:
             raise HTTPException(401, "Student sign-in is required.")
-        require_earned_bonus(session, profile=profile, activity_date=submitted.activity_date,
-                             quest_id=submitted.quest_id)
+        raise HTTPException(409, "Use today's Bonus Challenge on BOARD and click I Played It.")
 
 
 @router.get("/current")
@@ -3111,7 +3176,10 @@ def daily_camp_point_awards(
         awards = session.scalars(select(CampPointAward).where(
             qualified_camp_point_clause(),
             CampPointAward.profile_id == profile.id,
-            CampPointAward.duplicate_key.like(f"{prefix}%"),
+            or_(
+                CampPointAward.duplicate_key.like(f"{prefix}%"),
+                CampPointAward.duplicate_key.like(f"board-self-report-v2:{activity_date.isoformat()}:%"),
+            ),
         )).all()
         trivia_attempt = session.scalar(select(DailyTriviaAttempt).where(
             DailyTriviaAttempt.profile_id == profile.id,
@@ -3271,9 +3339,8 @@ def award_camp_points(
             raise HTTPException(status_code=400, detail=str(error)) from error
         except IntegrityError:
             session.rollback()
-            duplicate_key = (
-                f"band-camp:{submitted.activity_date.isoformat()}:"
-                f"{submitted.activity_type.strip().casefold()}"
+            duplicate_key = _board_activity_key(
+                submitted.activity_date, submitted.activity_type.strip().casefold()
             )
             award = session.scalar(select(CampPointAward).where(
                 qualified_camp_point_clause(),

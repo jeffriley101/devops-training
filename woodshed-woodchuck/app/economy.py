@@ -1,7 +1,7 @@
 """The existing state row holds the balance; only server actions may change it."""
 from copy import deepcopy
 
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 
 from .models import WoodchuckProfile, WoodchuckState
 
@@ -72,6 +72,21 @@ def economy_payload(state):
 
 
 def qualified_camp_point_clause():
-    """Unverified legacy check-ins must not generate new standings/crowns."""
+    """Keep legacy check-ins excluded; qualify only new server-issued v2 keys."""
     from .models import CampPointAward
-    return CampPointAward.activity_type.in_(("trivia", "contest-placement", "placement"))
+    return or_(
+        CampPointAward.activity_type.in_(("trivia", "contest-placement", "placement")),
+        *(
+            and_(
+                CampPointAward.activity_type == activity,
+                CampPointAward.points_awarded == 1,
+                CampPointAward.duplicate_key.like(f"board-self-report-v2:____-__-__:{activity}"),
+            )
+            for activity in ("hours", "care", "marching")
+        ),
+        and_(
+            CampPointAward.activity_type == "quest",
+            CampPointAward.points_awarded == 2,
+            CampPointAward.duplicate_key.like("bonus-challenge:self-report-v2:____-__-__"),
+        ),
+    )
