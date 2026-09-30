@@ -280,7 +280,9 @@ def test_c001_under13_claim_survives_cross_device_activation_and_retry(tester_db
     )
     from app import kws_verification
     monkeypatch.setattr(kws_verification, "verified_for_activation", lambda session, row: verification)
-    monkeypatch.setattr(consent, "clock", lambda: CLAIMED + timedelta(hours=2))
+    activated_at = CLAIMED + timedelta(hours=2)
+    monkeypatch.setattr(consent, "clock", lambda: activated_at)
+    monkeypatch.setattr(testers, "clock", lambda: consent.clock())
 
     # Closure stops new claims, but must not strand an established parent flow.
     monkeypatch.setenv("C001_REGISTRATION_DISABLED", "true")
@@ -305,16 +307,25 @@ def test_c001_under13_claim_survives_cross_device_activation_and_retry(tester_db
         ))
         assert enrollment.cohort_key == testers.C001
         assert enrollment.source == source
-        assert testers.utc(enrollment.joined_at) == CLAIMED
+        assert testers.utc(enrollment.joined_at) == activated_at
+        assert testers.utc(enrollment.joined_at) != CLAIMED
+        pending = parent_device_session.scalar(select(PendingConsent))
+        assert testers.utc(pending.cohort_claimed_at) == CLAIMED
+        assert pending.cohort_source == source
         assert evidence.profile_id == profile_id and permission is None
         assert eligible(parent_device_session, profile_id)
         assert student_has_full_access(parent_device_session, profile_id)
 
+    monkeypatch.setattr(consent, "clock", lambda: activated_at + timedelta(hours=1))
     with tester_db() as retry:
         with pytest.raises(ValueError):
             consent.activate(retry, activation_token, profile=None, fields={})
         retry.rollback()
         assert count(retry, WoodchuckProfile) == count(retry, Enrollment) == 1
+        enrollment = retry.scalar(select(Enrollment))
+        assert testers.utc(enrollment.joined_at) == activated_at
+        assert enrollment.source == source
+        assert testers.utc(retry.scalar(select(PendingConsent)).cohort_claimed_at) == CLAIMED
 
 
 def test_failed_expired_or_withdrawn_child_claim_never_creates_enrollment(tester_db, monkeypatch):

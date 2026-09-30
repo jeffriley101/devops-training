@@ -1,11 +1,16 @@
 # C001 measurement machine map
 
 Program: **PRE-BETA**. Cohort: **C001**. Verified against base
-`cbeb6838c5e6366e2a3d9ab6e7999277fbbe3b60` and this attribution repair.
+`cbeb6838c5e6366e2a3d9ab6e7999277fbbe3b60`, the Director attribution repair,
+and the prospective under-13 Joined correction.
 These definitions use persisted evidence. They do not add telemetry, change
 credit/reward rules, or rewrite enrollment history.
 
-## Joined v1 — VERIFIED, with a timestamp qualification
+Joined, Source, Product Activation, each Return source below, and Retention v1
+are **VERIFIED**. Non-authoritative activity is intentionally **NON-QUALIFYING**;
+the external-student population is an **OPERATIONAL RULE / BASELINE**.
+
+## Joined v1 — VERIFIED
 
 - **Table:** `tester_enrollments` (`TesterEnrollment`).
 - **Condition:** one existing row with `cohort_key = 'C001'`, identified by
@@ -20,10 +25,12 @@ entering a Secret Symbol create registration context, not an enrollment.
 For under-13 entry, `child_pending_consents.cohort_key/cohort_source/cohort_claimed_at`
 retain the claim. Starting the parent request and successful parent approval
 alone do not create enrollment. Successful parent-authorized account activation
-creates it. **Its `joined_at` preserves the earlier parent-request claim time**;
-it is not the activation/insert time. Thus a pending request contributes zero
-Joined rows, but a later activated row has the original claim timestamp. There
-is no enrollment-created-at column from which to recover its insertion time.
+creates it. For new child profiles, **`joined_at` is the successful authorized
+activation time**, supplied by the existing server activation clock.
+`cohort_claimed_at` remains unchanged as the original acquisition/claim timestamp.
+Retries cannot change either timestamp or the stored Source. This correction is
+prospective: historical enrollment timestamps, including earlier child claim-time
+values, remain unchanged; there is no migration or backfill.
 
 `enroll_tester()` returns an existing row without changing source or time.
 Duplicate actions and account reauthorization retain that history. Deletion
@@ -33,10 +40,12 @@ The existing dashboard's **Enrolled active testers** count filters active
 profiles and is a different population. Physical profile deletion would cascade
 its enrollment; it is not the current deletion workflow.
 
-**OPEN:** enrollment does not independently certify that an account belongs to
-a genuine external student rather than staff/test activity. Confirm the approved
-external-student population operationally; no route-based classification or
-historical provenance rewrite is authorized here.
+**OPERATIONAL RULE / BASELINE:** enrollment proves C001 membership, not genuine
+external-student identity. C001 Day 1 and formal cohort reporting exclude known
+staff, administrative, development, and synthetic/test accounts using the clean
+pre-C001 baseline and known test-account inventory. This exclusion is operational;
+it is not an inferred database flag, a provenance rewrite, or a persisted
+Joined/Source machine-definition blocker.
 
 ## Source — VERIFIED
 
@@ -99,17 +108,18 @@ Return evidence.
 
 | Category | Status | Table / qualification | Timestamp |
 | --- | --- | --- | --- |
-| Recorded practice | VERIFIED shared qualified subset; OPEN separate practice authority | `practice_charts` with positive duration and `qualified_practice_clause()` | `created_at` |
-| Credited Practice Chart | VERIFIED | Same independently approved positive-duration BOOK rows as Product Activation | `created_at`; approval must exist by as-of |
-| Arcade/game | VERIFIED supported subset; OPEN unqualified or stale completions | `arcade_play_sessions`: `completed_at` and `authoritative_score` non-null. History Mystery completion follows all five server-validated answers, including a zero score. Timed challenge games require server-owned `challenge_state.version = 1`, `index > 0`, and valid `last_elapsed` proving an accepted action on the completion's Central date (details below). | `completed_at` for the supported same-action-day subset |
+| Recorded practice | VERIFIED using qualified BOOK subset | `practice_charts` with positive duration and `qualified_practice_clause()` | `created_at`; approval must exist by as-of |
+| Credited Practice Chart | VERIFIED using qualified BOOK subset | Same independently approved positive-duration BOOK rows as Product Activation | `created_at`; approval must exist by as-of |
+| Arcade/game | VERIFIED for the explicitly authoritative subset | `arcade_play_sessions`: `completed_at` and `authoritative_score` non-null. History Mystery completion follows all five server-validated answers, including a zero score. Timed challenge games require server-owned `challenge_state.version = 1`, `index > 0`, and valid `last_elapsed` proving an accepted action on the completion's Central date (details below). | `completed_at` for the supported same-action-day subset |
 | BOARD daily attestations | VERIFIED | `camp_point_awards` under `qualified_camp_point_clause()`, restricted to `hours/care/marching`: 1 point and `board-self-report-v2:YYYY-MM-DD:{activity}`; or `quest`: 2 points and `bonus-challenge:self-report-v2:YYYY-MM-DD` | `occurred_at` |
 | BOARD trivia answer | VERIFIED | `daily_trivia_attempts`, persisted server-validated daily answer attempt (correct or incorrect), unique profile/date | `created_at` |
 
 There is no separate independently qualified practice-session ledger: the safe
-recorded-practice and credited-chart sources currently collapse to the same BOOK
-chart evidence. Private BOOK/Pristine logs preserve reported duration but do not
-prove independently credited practice. Counting them as a separate qualifying
-Return category remains **OPEN**; this pass does not promote them.
+recorded-practice and credited-chart categories are two business labels over the
+same current machine evidence. Private/unapproved BOOK and browser Pristine logs
+are **NON-QUALIFYING** for Return v1; this intentional exclusion is not a gate
+blocker. Future independently authoritative practice-session evidence would
+require a future metric version.
 
 Current server-scored timed games are `thirds`, `dressed-to-the-nines`,
 `interval-basic-training`, and `scale-keyboard`. An untouched timer can be
@@ -126,11 +136,13 @@ instant no later than completion. Missing/invalid timing evidence is excluded.
 Thus yesterday's actions auto-sealed by today's game start do not count a Return
 today. Cross-midnight runs whose last action and eventual completion have
 different Central dates, and completions lacking sufficient persisted timing,
-remain **OPEN** outside this supported subset. Game start alone, old attempts
-closed without verified actions, and completed caller-scored games are excluded
-from the verified subset. Meaningful
-completion authority for `plunge-burrow`, `blue`, `radio-tuner`, and
-`wheel-of-woodchuck`, and unavailable legacy proof, remains **OPEN**.
+are **NON-QUALIFYING**. Game start alone, stale auto-closed runs without qualifying
+activity that day, and legacy/caller-scored attempts without sufficient authority
+are also **NON-QUALIFYING**. `plunge-burrow`, `blue`, `radio-tuner`, and
+`wheel-of-woodchuck` do not qualify for Return v1. These deliberate exclusions
+are not C001 measurement blockers. SEC-003 Phase 2 may later make additional
+games eligible; a material change in Return v1 coverage would require a
+metric-version review. This map changes no Arcade behavior or scoring.
 
 INC002 v2 BOARD keys are issued by server actions, not accepted from callers.
 They certify an intended deliberate self-attestation, not independently
@@ -148,14 +160,15 @@ excluded from Return. Unique profile/key or profile/date constraints and
 transactional retries retain the same evidence; read-only deduplication avoids
 multiple Return events from several qualifying sources on one day.
 
-## Retention v1 — VERIFIED calculation for supported sources
+## Retention v1 — VERIFIED / calculable
 
 For each Product-Activated student, compute
 `qualifying_activity_Central_date - activation_Central_date`. Retention v1 is
 true when any Return-qualifying day has offset **6, 7, or 8**. Day 0, day 5, and
 day 9 do not count. This uses Central calendar dates, including DST boundaries,
 and is not an elapsed-hours window. It is calculable from the verified sources
-above; unresolved practice/game categories limit coverage, not the frozen rule.
+above. The intentionally non-qualifying practice/game categories do not alter
+the frozen rule or block calculation.
 
 The existing 30-day analytics dashboard's `day1_active`,
 `returned_after_day1`, `returning`, and broad activity counts are observation

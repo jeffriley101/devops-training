@@ -172,6 +172,7 @@ def test_login_page_entry_and_unqualified_saved_practice_do_not_count_return(mea
     session.add(AnalyticsEvent(profile_id=profile.id, event_type="arcade_entered",
         occurred_at=later, activity_date=later.astimezone(CENTRAL).date()))
     chart(session, profile, timestamp=later, status=None)
+    chart(session, profile, timestamp=later, source="pristine")
     assert return_days(session, profile.id) == set()
 
 
@@ -189,6 +190,9 @@ def test_login_page_entry_and_unqualified_saved_practice_do_not_count_return(mea
     ("thirds", True, 0, {"version": 1, "index": 1, "last_elapsed": float("nan")}, False),
     ("thirds", True, 0, {"version": 1, "index": 1, "last_elapsed": 31}, False),
     ("blue", True, None, None, False),
+    ("radio-tuner", True, None, None, False),
+    ("wheel-of-woodchuck", True, None, None, False),
+    ("plunge-burrow", True, None, None, False),
     ("history-mystery", True, 0, None, True),
 ])
 def test_arcade_requires_supported_completed_meaningful_evidence(
