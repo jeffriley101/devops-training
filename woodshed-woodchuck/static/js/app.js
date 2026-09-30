@@ -2610,7 +2610,7 @@
         `/contests/camp-points/awards/${encodeURIComponent(today)}`,
         { credentials: "same-origin", cache: "no-store" }
       );
-      if (!response.ok) return;
+      if (!response.ok) throw new Error("Today's activity status could not be loaded.");
       const payload = await response.json();
       if (payload.trivia_question && Array.isArray(payload.trivia_question.choices)) {
         trivia = payload.trivia_question;
@@ -2775,7 +2775,7 @@
     let current = prepareCurrentDay(stateApi.getState());
     renderBoard(current);
     loadPersistedCampAwards().catch(() => {
-      // Keep the user's locker disclosure state when server status is unavailable.
+      feedbackEl.textContent = "Today's activity status could not be loaded. Refresh BOARD to try again.";
     });
 
     if (triviaOptionsEl) {
@@ -2789,7 +2789,7 @@
 
     if (hoursCheckbox) {
       hoursCheckbox.addEventListener("change", async function () {
-        if (!hoursCheckbox.checked) return;
+        if (!hoursCheckbox.checked || campAwardsInFlight.has("hours")) return;
         let next = prepareCurrentDay(stateApi.getState());
         const requestAccount = stateApi.accountRequest();
         if (serverConfirmedAwards.has("hours")) return;
@@ -2833,10 +2833,14 @@
         let next = prepareCurrentDay(stateApi.getState());
         const requestAccount = stateApi.accountRequest();
 
-        if (next.bandCamp.daily.careComplete) return;
+        if (serverConfirmedAwards.has("care") || careButton.disabled) return;
+        const readyText = careButton.textContent;
+        careButton.disabled = true;
+        careButton.textContent = "Saving care…";
 
         try {
           const persistedAward = await persistCampPoint("care");
+          if (!persistedAward) throw new Error("Instrument care could not be saved.");
           next = stateApi.stateForResponse(requestAccount);
           if (!next) return;
           next = prepareCurrentDay(next);
@@ -2845,6 +2849,9 @@
             playCampReward(false);
           }
         } catch (error) {
+          careButton.disabled = false;
+          careButton.textContent = readyText;
+          careActivity.open = true;
           feedbackEl.textContent = error.message || "Board Activity Points could not be saved.";
           return;
         }
@@ -2948,7 +2955,7 @@
         let next = prepareCurrentDay(stateApi.getState());
         const requestAccount = stateApi.accountRequest();
 
-        if (next.bandCamp.daily.marchingComplete || marchingButton.disabled) return;
+        if (serverConfirmedAwards.has("marching") || marchingButton.disabled) return;
 
         const readyText = marchingButton.textContent;
         marchingButton.disabled = true;

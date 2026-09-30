@@ -83,16 +83,17 @@ def test_shared_book_pristine_duration_budget(authority_db):
 
 
 @pytest.mark.parametrize('activity', ['hours','care','marching'])
-def test_board_assertions_never_award(authority_db, activity):
+def test_board_self_attestations_award_only_fixed_daily_value(authority_db, activity):
     client, profile = signed_client(authority_db, 'BOARD')
     before = balance(authority_db, profile.id)
     for _ in range(3):
         result = client.post('/contests/camp-points/awards', json={
             'activity_type':activity, 'activity_date':today()})
-        assert result.status_code == 400, result.text
+        assert result.status_code == 200, result.text
+        assert result.json()['award']['points_awarded'] == 1
     with authority_db() as session:
-        assert session.scalar(select(func.count()).select_from(CampPointAward)) == 0
-    assert balance(authority_db, profile.id) == before
+        assert session.scalar(select(func.count()).select_from(CampPointAward)) == 1
+    assert balance(authority_db, profile.id) == before + 1
 
 
 def test_independent_review_qualifies_book_once_at_existing_rate(authority_db):
@@ -202,7 +203,7 @@ def test_plunge_arbitrary_amounts_cannot_persist(authority_db, points):
 
 
 @pytest.mark.parametrize('legacy', [False, True])
-def test_bonus_aliases_reject_invented_completion_and_retries(authority_db, legacy):
+def test_bonus_self_attestation_is_fixed_and_legacy_alias_stays_closed(authority_db, legacy):
     from app.models import QuestCompletion
     client, profile = signed_client(authority_db, 'BONUS')
     before = balance(authority_db, profile.id)
@@ -216,11 +217,11 @@ def test_bonus_aliases_reject_invented_completion_and_retries(authority_db, lega
         payload['challenge_instance'] = challenge['instance_key']
     for _ in range(3):
         response = client.post(route, json=payload)
-        assert response.status_code == 409, response.text
+        assert response.status_code == (409 if legacy else 200), response.text
     with authority_db() as session:
         assert session.scalar(select(func.count()).select_from(QuestCompletion)) == 0
-        assert session.scalar(select(func.count()).select_from(CampPointAward)) == 0
-    assert balance(authority_db, profile.id) == before
+        assert session.scalar(select(func.count()).select_from(CampPointAward)) == (0 if legacy else 1)
+    assert balance(authority_db, profile.id) == before + (0 if legacy else 5)
 
 
 def test_bonus_assignment_ignores_browser_daily_state(authority_db):

@@ -491,13 +491,15 @@ def test_camp_point_award_endpoint_is_authenticated_idempotent_and_private(
     with pytest.raises(HTTPException) as unauthorized:
         contest_module.award_camp_points(request_with_session(), submitted)
     assert unauthorized.value.status_code == 401
-    for _ in range(2):
-        with pytest.raises(HTTPException) as rejected:
-            contest_module.award_camp_points(request_with_session(student.id), submitted)
-        assert rejected.value.status_code == 400
+    for created in (True, False):
+        result = contest_module.award_camp_points(request_with_session(student.id), submitted)
+        assert result["created"] is created
+        assert result["award"]["points_awarded"] == 1
+        assert result["credits"] == 1
     persisted = contest_module.daily_camp_point_awards(submitted.activity_date, request_with_session(student.id))
-    assert persisted["awards"] == []
-    assert session.scalar(select(func.count()).select_from(CampPointAward)) == 0
+    assert [award["activity_type"] for award in persisted["awards"]] == ["care"]
+    assert session.scalar(select(func.count()).select_from(CampPointAward)) == 1
+    assert session.scalar(select(func.count()).select_from(RewardGrant)) == 1
 
     with pytest.raises(HTTPException) as unauthorized_read:
         contest_module.daily_camp_point_awards(
