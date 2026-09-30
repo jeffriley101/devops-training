@@ -437,6 +437,68 @@ def test_report_central_day_window_and_dst(db):
     assert report["active_today"] == 1 and report["returning"] == 0
 
 
+def test_c001_report_reads_stored_enrollment_source_and_joined_time_without_writes(db):
+    joined = NOW - timedelta(days=5)
+    with db() as session:
+        session.add_all([
+            Enrollment(profile_id=1, cohort_key="C001", source="DIRECTOR1", joined_at=joined),
+            Enrollment(profile_id=1, cohort_key="PILOT-D1", source="OTHER-COHORT", joined_at=joined),
+            Enrollment(profile_id=2, cohort_key="C001", source=None, joined_at=joined + timedelta(days=1)),
+            Enrollment(profile_id=3, cohort_key="C001", source="DELETED-HISTORY", joined_at=joined),
+            Enrollment(profile_id=4, cohort_key="C001", source="LEGACY-SOURCE", joined_at=joined),
+        ])
+        session.commit()
+        history = [(row.id, row.profile_id, row.cohort_key, row.source, row.joined_at)
+                   for row in session.scalars(select(Enrollment).order_by(Enrollment.id))]
+
+    statements = []
+    engine = db.kw["bind"]
+
+    def capture_statement(_connection, _cursor, statement, _parameters, _context, _many):
+        statements.append(statement.lstrip().split(None, 1)[0].upper())
+
+    event.listen(engine, "before_cursor_execute", capture_statement)
+    try:
+        report = analytics.build_report(db, now=NOW, cohort_key="C001")
+    finally:
+        event.remove(engine, "before_cursor_execute", capture_statement)
+
+    assert statements and set(statements) == {"SELECT"}
+    assert report["enrolled"] == 3  # Existing report excludes deleted accounts.
+    students = {row["id"]: row for row in report["students"]}
+    assert set(students) == {1, 2, 4}
+    assert students[1]["joined_at"] == joined
+    assert students[1]["joined_at"] != NOW - timedelta(days=60)  # Profile creation is not Joined.
+    assert students[1]["source"] == "DIRECTOR1"
+    assert students[2]["source"] is None
+    assert students[4]["source"] == "LEGACY-SOURCE"
+    with db() as session:
+        assert [(row.id, row.profile_id, row.cohort_key, row.source, row.joined_at)
+                for row in session.scalars(select(Enrollment).order_by(Enrollment.id))] == history
+
+
+def test_c001_admin_report_does_not_infer_source_from_navigation_or_query(db):
+    joined = NOW - timedelta(days=2)
+    with db() as session:
+        session.add_all([
+            Enrollment(profile_id=1, cohort_key="C001", source=None, joined_at=joined),
+            Enrollment(profile_id=2, cohort_key="C001", source="DIRECTOR1", joined_at=joined),
+        ])
+        session.commit()
+
+    result = admin_client()
+    assert result.get("/prebeta/C001?entry=secret-symbol").status_code == 200
+    page = result.get("/admin/analytics?cohort=C001&source=FORGED")
+    assert page.status_code == 200
+    students = {row["id"]: row for row in page.context["report"]["students"]}
+    assert students[1]["source"] is None
+    assert students[2]["source"] == "DIRECTOR1"
+    assert all(row["joined_at"] == joined for row in students.values())
+    assert "Unrecorded" in page.text and "DIRECTOR1" in page.text
+    assert "FORGED" not in page.text
+    assert "Joined (Central)" in page.text
+
+
 def test_exact_30_and_7_day_boundaries_and_recent_limit(db):
     with db() as session:
         for number, (profile_id, instant) in enumerate([

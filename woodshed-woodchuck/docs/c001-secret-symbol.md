@@ -13,11 +13,16 @@ locally and background fetch remains blocked. Invalid symbols show the existing
 friendly error. Deliberate submissions write short-lived protection counters,
 never student activity, accounts, enrollments, access, consent or KWS records.
 
-Both entry paths use `establish_registration_context()`. Classroom entry stores
-`cohort_key=C001, source=DIRECTOR1` in the signed session. The original
-`/prebeta/C001` QR/direct link remains available and preserves any existing
-source; ordinary QR claims and historical records are not assigned invented
-attribution. C001 is a public invitation, not an authentication credential.
+Both entry paths use `establish_registration_context()`. Secret Symbol and the
+Director #1 QR/link `/prebeta/C001?entry=director1` store
+`cohort_key=C001, source=DIRECTOR1` in the signed session. The C001 display page
+encodes that Director #1 URL. The original bare `/prebeta/C001` link remains
+available without inventing attribution and preserves an existing signed source.
+Only the fixed `director1` and existing `secret-symbol` entry markers map to the
+server-owned `DIRECTOR1` constant; query/form `source` values are ignored.
+Historical records are never reassigned. C001 is a public invitation, not an
+authentication credential. See [C001 measurement](c001-measurement.md) for the
+verified durable measurement sources and remaining gaps.
 
 Registration persists the source on `TesterEnrollment`. Under-13 requests keep
 it on `PendingConsent.cohort_source` through the existing verified parent flow.
