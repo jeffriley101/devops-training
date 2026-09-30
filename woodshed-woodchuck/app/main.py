@@ -221,6 +221,11 @@ def welcome(request: Request):
     return _render(request, "welcome.html", title="Woodshed Woodchuck")
 
 
+@app.get("/privacy")
+def privacy_policy(request: Request):
+    return _render(request, "privacy.html", title="Privacy Policy")
+
+
 @app.get("/login")
 def login_page(request: Request):
     return _render(

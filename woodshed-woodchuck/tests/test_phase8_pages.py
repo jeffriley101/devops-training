@@ -77,3 +77,17 @@ def test_main_templates_still_render() -> None:
         assert client.get("/p-book").status_code == 200
         assert client.get("/quest").status_code == 200
         assert client.get("/store").status_code == 200
+
+
+def test_public_privacy_policy_is_linked_and_renders_anonymously() -> None:
+    welcome = (ROOT / "templates/welcome.html").read_text(encoding="utf-8")
+    assert 'href="/privacy">Privacy Policy</a>' in welcome
+
+    with TestClient(app) as client:
+        response = client.get("/privacy", follow_redirects=False)
+
+    assert response.status_code == 200
+    assert "<h1>Privacy Policy</h1>" in response.text
+    assert "Children under 13 and parent permission" in response.text
+    assert "Epic Kids Web Services (KWS)" in response.text
+    assert "support@woodshedwoodchuck.com" in response.text
