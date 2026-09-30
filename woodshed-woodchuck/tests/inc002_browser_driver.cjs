@@ -77,7 +77,8 @@ process.stdin.on('end', async () => {
     for (const [width, account] of [[1440, 'A'], [390, 'B']]) {
       await send('Emulation.setDeviceMetricsOverride', { width, height: width === 1440 ? 1000 : 844, deviceScaleFactor: 1, mobile: false }, page.sessionId);
       await send('Page.navigate', { url: config.origin + '/guest/login' }, page.sessionId);
-      await page.until(`location.pathname === '/guest/login' && document.readyState === 'complete'`);
+      await page.until(`location.pathname === '/guest/login' && document.readyState === 'complete' && !!window.WWSessionBoundary && window.WWSessionBoundary.isCurrent()`);
+      await page.evaluate('window.WWSessionBoundary.ready');
       await page.evaluate(`fetch('/account/login', {method:'POST', body:new URLSearchParams({woodchuck_id:'WC-GUEST-${account}',pin:'2468'})}).then(r => {if(!r.ok) throw Error('Login failed');})`);
       await page.navigate();
       const before = await page.evaluate(`fetch('/test/snapshot').then(r=>r.json())`);
