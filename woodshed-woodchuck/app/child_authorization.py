@@ -185,7 +185,8 @@ def activate(session,token,*,profile,fields):
     existing_tester=session.scalar(select(TesterEnrollment).where(TesterEnrollment.profile_id==profile.id,TesterEnrollment.cohort_key==C001))
     if new_profile and row.cohort_key:
         if not row.cohort_claimed_at:raise ValueError('Incomplete tester cohort claim.')
-        enroll_tester(session,profile.id,row.cohort_key,row.cohort_claimed_at,source=row.cohort_source)
+        # The pending claim is acquisition history; Joined begins at activation.
+        enroll_tester(session,profile.id,row.cohort_key,clock(),source=row.cohort_source)
         from .c001_abuse import record_creation
         record_creation(session,profile.id)
     elif existing_tester:
