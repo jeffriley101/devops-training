@@ -11,6 +11,7 @@ from sqlalchemy import func, inspect, or_, select, text
 
 from .contests import CENTRAL, CONTEST_DEFINITIONS, aware_utc, contest_week_schedule
 from .db import SessionLocal
+from .team_authority import lock_authority, rules_version_for_start
 from .models import (CampPointAward, Contest, ContestResult, ContestWeek, CrownAward,
                      CrownProgress, DirectorTeamContest, PracticeChart, RewardGrant,
                      RewardInventoryPlacement, Season, Team, TeamJoinRequest,
@@ -169,6 +170,7 @@ def calendar_plan(session, *, repair=False):
 
 def apply_calendar_plan(session, *, repair=False):
     """Re-plan under the caller's transaction; never trust a stale supplied plan."""
+    lock_authority(session)
     plan = calendar_plan(session, repair=repair)
     if not plan["safe"]:
         raise SeasonConfigurationError("Calendar operation blocked: " + "; ".join(plan["blockers"]))
@@ -183,7 +185,8 @@ def apply_calendar_plan(session, *, repair=False):
         start = datetime.fromisoformat(change["start"]).date()
         end, deadline, finalizes = contest_week_schedule(start)
         session.add(ContestWeek(season_id=by_key[change["season"]].id, week_start=start, week_end=end,
-                                verification_deadline_at=deadline, finalize_after=finalizes, status="open"))
+                                verification_deadline_at=deadline, finalize_after=finalizes, status="open",
+                                team_membership_rules_version=rules_version_for_start(session, start)))
     session.flush()
     return plan
 

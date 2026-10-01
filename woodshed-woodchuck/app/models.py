@@ -14,6 +14,7 @@ from sqlalchemy import (
     JSON,
     String,
     UniqueConstraint,
+    event,
     text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
@@ -1240,11 +1241,27 @@ class Team(Base):
             name="ck_team_director_led_private",
         ),
         UniqueConstraint("join_code", name="uq_team_join_code"),
+        Index("uq_team_operating_family", "family_id", unique=True,
+              sqlite_where=text("is_operating = true"),
+              postgresql_where=text("is_operating = true")),
+        Index("uq_team_operating_name", "normalized_name", unique=True,
+              sqlite_where=text("is_operating = true"),
+              postgresql_where=text("is_operating = true")),
+        Index("uq_team_operating_emblem", "emblem_key", unique=True,
+              sqlite_where=text("is_operating = true"),
+              postgresql_where=text("is_operating = true")),
+        Index("uq_team_operating_public_creator", "creator_profile_id", unique=True,
+              sqlite_where=text("is_operating = true AND visibility = 'public' AND creator_profile_id IS NOT NULL"),
+              postgresql_where=text("is_operating = true AND visibility = 'public' AND creator_profile_id IS NOT NULL")),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    season_id: Mapped[int] = mapped_column(
-        ForeignKey("seasons.id", ondelete="CASCADE"), nullable=False, index=True
+    # Origin/history metadata only. Operating identity is explicitly marked.
+    season_id: Mapped[int | None] = mapped_column(
+        ForeignKey("seasons.id", ondelete="RESTRICT"), nullable=True, index=True
+    )
+    is_operating: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("false"), nullable=False
     )
     family_id: Mapped[int] = mapped_column(
         ForeignKey(
@@ -1328,20 +1345,32 @@ class TeamMembership(Base):
     __table_args__ = (
         Index(
             "uq_team_membership_active_profile_season", "profile_id", "season_id",
-            unique=True, sqlite_where=text("ended_at IS NULL"),
-            postgresql_where=text("ended_at IS NULL"),
+            unique=True, sqlite_where=text("ended_at IS NULL AND is_persistent = false"),
+            postgresql_where=text("ended_at IS NULL AND is_persistent = false"),
         ),
+        Index("uq_team_membership_persistent_active_profile", "profile_id", unique=True,
+              sqlite_where=text("is_persistent = true AND ended_at IS NULL"),
+              postgresql_where=text("is_persistent = true AND ended_at IS NULL")),
         Index("ix_team_membership_season_team", "season_id", "team_id"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    season_id: Mapped[int] = mapped_column(ForeignKey("seasons.id", ondelete="CASCADE"), nullable=False, index=True)
+    season_id: Mapped[int | None] = mapped_column(ForeignKey("seasons.id", ondelete="RESTRICT"), nullable=True, index=True)
+    is_persistent: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"), nullable=False)
     team_id: Mapped[int] = mapped_column(ForeignKey("teams.id", ondelete="CASCADE"), nullable=False, index=True)
     profile_id: Mapped[int] = mapped_column(ForeignKey("woodchuck_profiles.id", ondelete="CASCADE"), nullable=False, index=True)
     selected_week_start: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+
+def _install_persistent_membership_guards(target, connection, **kwargs):
+    from .team_authority_schema import install
+    install(connection)
+
+
+event.listen(TeamMembership.__table__, "after_create", _install_persistent_membership_guards)
 
 
 class TeamJoinRequest(Base):
@@ -1354,16 +1383,20 @@ class TeamJoinRequest(Base):
         Index(
             "uq_team_join_request_pending_profile_season",
             "profile_id", "season_id", unique=True,
-            sqlite_where=text("status = 'pending'"),
-            postgresql_where=text("status = 'pending'"),
+            sqlite_where=text("status = 'pending' AND is_persistent = false"),
+            postgresql_where=text("status = 'pending' AND is_persistent = false"),
         ),
+        Index("uq_team_join_request_persistent_pending_profile", "profile_id", unique=True,
+              sqlite_where=text("is_persistent = true AND status = 'pending'"),
+              postgresql_where=text("is_persistent = true AND status = 'pending'")),
         Index("ix_team_join_request_team_status", "team_id", "status"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    season_id: Mapped[int] = mapped_column(
-        ForeignKey("seasons.id", ondelete="CASCADE"), nullable=False, index=True
+    season_id: Mapped[int | None] = mapped_column(
+        ForeignKey("seasons.id", ondelete="RESTRICT"), nullable=True, index=True
     )
+    is_persistent: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"), nullable=False)
     team_id: Mapped[int] = mapped_column(
         ForeignKey("teams.id", ondelete="CASCADE"), nullable=False, index=True
     )
@@ -1384,6 +1417,40 @@ class TeamJoinRequest(Base):
     resolved_by_profile_id: Mapped[int | None] = mapped_column(
         ForeignKey("woodchuck_profiles.id", ondelete="SET NULL"), nullable=True
     )
+
+
+class PersistentTeamControl(Base):
+    """Explicit cutover authority; absent/disabled control uses legacy readers."""
+
+    __tablename__ = "persistent_team_control"
+    __table_args__ = (
+        CheckConstraint("id = 1", name="ck_persistent_team_control_singleton"),
+        CheckConstraint("(activated_at IS NULL AND rules_from_week_start IS NULL) OR "
+                        "(activated_at IS NOT NULL AND rules_from_week_start IS NOT NULL)",
+                        name="ck_persistent_team_control_activation"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    activated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    rules_from_week_start: Mapped[date | None] = mapped_column(Date, nullable=True)
+
+
+class TeamMembershipTransition(Base):
+    """Actual student choices only; carried membership creates no transition."""
+
+    __tablename__ = "team_membership_transitions"
+    __table_args__ = (
+        CheckConstraint("action IN ('join', 'switch', 'leave')", name="ck_team_transition_action"),
+        Index("ix_team_transition_profile_week", "profile_id", "week_start"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    profile_id: Mapped[int] = mapped_column(ForeignKey("woodchuck_profiles.id", ondelete="CASCADE"), nullable=False)
+    week_start: Mapped[date] = mapped_column(Date, nullable=False)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    action: Mapped[str] = mapped_column(String(10), nullable=False)
+    from_membership_id: Mapped[int | None] = mapped_column(ForeignKey("team_memberships.id", ondelete="SET NULL"), nullable=True)
+    to_membership_id: Mapped[int | None] = mapped_column(ForeignKey("team_memberships.id", ondelete="SET NULL"), nullable=True)
 
 
 class ProfileCapability(Base):
@@ -1475,6 +1542,10 @@ class ContestWeek(Base):
             "status IN ('open', 'pending', 'finalized')",
             name="ck_contest_week_status",
         ),
+        CheckConstraint(
+            "team_membership_rules_version IN ('legacy_seasonal_v1', 'persistent_v1')",
+            name="ck_contest_week_team_membership_rules",
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -1490,6 +1561,9 @@ class ContestWeek(Base):
         DateTime(timezone=True), nullable=False
     )
     status: Mapped[str] = mapped_column(String(20), nullable=False)
+    team_membership_rules_version: Mapped[str] = mapped_column(
+        String(40), default="legacy_seasonal_v1", server_default="legacy_seasonal_v1", nullable=False
+    )
     # Recorded with finalization; NULL is unknown, never implicit legacy.
     practice_scoring_mode: Mapped[str | None] = mapped_column(String(30), nullable=True)
     # Attests to the complete finalizer rules used for this frozen week.
@@ -1592,8 +1666,8 @@ class DirectorTeamContest(Base):
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    season_id: Mapped[int] = mapped_column(
-        ForeignKey("seasons.id", ondelete="RESTRICT"), nullable=False, index=True
+    season_id: Mapped[int | None] = mapped_column(
+        ForeignKey("seasons.id", ondelete="RESTRICT"), nullable=True, index=True
     )
     owner_profile_id: Mapped[int] = mapped_column(
         ForeignKey("woodchuck_profiles.id", ondelete="RESTRICT"),

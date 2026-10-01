@@ -13,6 +13,7 @@ from .contests import (
     contest_week_schedule,
     ensure_contest_definitions,
 )
+from .team_authority import lock_authority, rules_version_for_start
 from .models import ContestWeek, Season
 from .seasons import season_covering_date
 
@@ -83,6 +84,7 @@ def rollover_season(
 ) -> SeasonRolloverResult:
     if now.tzinfo is None or now.utcoffset() is None:
         raise SeasonRolloverError("The rollover time must be timezone-aware.")
+    lock_authority(session)
     source = session.scalar(
         select(Season).where(Season.key == source_key).with_for_update()
     )
@@ -184,6 +186,7 @@ def rollover_season(
                 season_id=next_season.id, week_start=week_start, week_end=week_end,
                 verification_deadline_at=verification_deadline_at,
                 finalize_after=finalize_after, status="open",
+                team_membership_rules_version=rules_version_for_start(session, week_start),
             ))
             weeks_created += 1
         week_start = week_end

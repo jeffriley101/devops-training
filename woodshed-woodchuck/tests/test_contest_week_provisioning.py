@@ -32,9 +32,10 @@ def db(request, tmp_path):
     Base.metadata.create_all(engine)
     with engine.begin() as c:
         c.execute(text("CREATE TABLE alembic_version (version_num VARCHAR(32) PRIMARY KEY)"))
-        c.execute(text("INSERT INTO alembic_version VALUES (:v)"), {"v": repair.REVISION})
+        c.execute(text("INSERT INTO alembic_version VALUES (:v)"), {"v": job.CALENDAR_REVISION})
     with Session(engine) as s:
         bootstrap_canonical_seasons(s)
+        s.add(m.PersistentTeamControl(id=1))
         s.commit()
     yield url, engine
     engine.dispose()
@@ -165,7 +166,31 @@ def test_bounded_transition_into_open_ended_season(db):
 
 def test_concurrent_provisioners_replan_after_lock(db, monkeypatch):
     def attempt(): return job.provision(db[0], apply=True, **PAIR)["created"]
-    assert ordered_race(monkeypatch, attempt, attempt) == (2, 0)
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Event, local
+    acquired, entering, release = Event(), Event(), Event()
+    role = local()
+    original = job.lock_authority
+    def fence(session):
+        if role.name == "second":
+            entering.set()
+        result = original(session)
+        if role.name == "first":
+            acquired.set()
+            assert release.wait(5)
+        return result
+    monkeypatch.setattr(job, "lock_authority", fence)
+    def worker(name):
+        role.name = name
+        return attempt()
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        first = executor.submit(worker, "first")
+        assert acquired.wait(5)
+        second = executor.submit(worker, "second")
+        assert entering.wait(5)
+        assert not second.done()
+        release.set()
+        assert (first.result(timeout=10), second.result(timeout=10)) == (2, 0)
     assert len(history.full_snapshot(db[1])["contest_weeks"]) == 2
 
 
@@ -208,7 +233,7 @@ def test_cli_scope_opt_in_and_safe_errors(db, monkeypatch, capsys):
 
 @pytest.mark.parametrize("backend", ["sqlite", "postgresql"])
 @pytest.mark.parametrize("scoring_mode", ["legacy_minutes", "precise_seconds"])
-def test_provision_preflight_activate_later_source_finalization(tmp_path, backend, scoring_mode):
+def test_provision_retired_activation_later_source_finalization(tmp_path, backend, scoring_mode):
     url = disposable_url(tmp_path, backend)
     engine = lifecycle.seed(url)
     try:
@@ -223,8 +248,11 @@ def test_provision_preflight_activate_later_source_finalization(tmp_path, backen
             s.delete(s.get(m.ContestWeek, 7))
             s.delete(s.get(m.ContestWeek, 8))
             s.commit()
-        before = history.full_snapshot(engine)
         assert activation.preflight(url, **PAIR, now=lifecycle.BOUNDARY - timedelta(days=1))["status"] == "NOT_READY"
+        with engine.begin() as connection:
+            connection.execute(text("UPDATE alembic_version SET version_num=:v"), {"v": job.CALENDAR_REVISION})
+            connection.execute(text("INSERT INTO persistent_team_control (id) VALUES (1)"))
+        before = history.full_snapshot(engine)
         assert job.provision(url, **PAIR)["missing"] == 2
         assert history.full_snapshot(engine) == before
         assert job.provision(url, apply=True, **PAIR)["created"] == 2
@@ -234,16 +262,12 @@ def test_provision_preflight_activate_later_source_finalization(tmp_path, backen
                 assert all(row in after[table] for row in before[table])
             else:
                 assert before[table] == after[table], table
-        assert activation.preflight(url, **PAIR, now=lifecycle.BOUNDARY - timedelta(days=1))["status"] == "READY"
-        assert activation.activate(url, **PAIR, now=lifecycle.BOUNDARY - timedelta(seconds=1))["status"] == "NOT_DUE"
-        activated = activation.activate(url, **PAIR, now=lifecycle.BOUNDARY)
-        assert (activated["teams_created"], activated["memberships_created"]) == (4, 11)
-        activated_history = history.full_snapshot(engine)
-        for table in before:
-            if table not in {"teams", "team_memberships"}:
-                assert activated_history[table] == after[table], table
-        assert activation.activate(url, **PAIR, now=lifecycle.BOUNDARY)["status"] == "ALREADY_COMPLETE"
-        assert history.full_snapshot(engine) == activated_history
+        with pytest.raises(repair.RepairError, match="require d17contest001"):
+            activation.preflight(url, **PAIR, now=lifecycle.BOUNDARY - timedelta(days=1))
+        retired = activation.activate(url, **PAIR, now=lifecycle.BOUNDARY)
+        assert retired["reason_codes"] == ["seasonal_team_activation_retired"]
+        assert retired["status"] == "NOT_READY"
+        assert history.full_snapshot(engine) == after
         with Session(engine) as s:
             source = finalize_contest_week(s, week_start=date(2026, 9, 21), now=lifecycle.DUE + timedelta(seconds=1))
             s.commit()

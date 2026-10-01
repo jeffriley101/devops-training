@@ -31,6 +31,7 @@ from .contests import (
 )
 from .db import SessionLocal
 from .team_continuity import lock_team_seasons
+from .team_authority import lock_authority
 from .seasons import season_covering_date
 from .models import (
     ContestWeek,
@@ -271,7 +272,9 @@ def moderate_team(
         team = session.get(Team, team_id)
         if team is None:
             raise HTTPException(status_code=404, detail="Team was not found.")
-        lock_team_seasons(session, team.season_id)
+        lock_authority(session)
+        if team.season_id is not None:
+            lock_team_seasons(session, team.season_id)
         session.refresh(team)
         if team.moderation_status != state:
             team.moderation_status = state

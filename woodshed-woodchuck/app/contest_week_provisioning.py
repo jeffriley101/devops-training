@@ -5,15 +5,84 @@ import argparse
 from datetime import date, datetime, time, timedelta, timezone
 import json
 import os
+import re
 import sys
 
-from sqlalchemy import or_, select, text
+from sqlalchemy import inspect, or_, select, text
 from sqlalchemy.orm import Session
 
 from . import team_continuity as domain, team_continuity_repair as repair
 from .contests import CENTRAL, aware_utc, contest_week_schedule
+from .team_authority import lock_authority, rules_version_for_start
 from .models import ContestWeek, Season
 from .seasons import CANONICAL_SEASONS, SeasonConfigurationError, validate_definition
+
+
+CALENDAR_REVISION = "p20team001"
+
+
+def schema_guard(connection):
+    """Approve the persistent-aware calendar schema without granting Team writes.
+
+    Historical continuity repair retains its separate exact-revision guard.
+    Calendar planning/apply reads only calendar state plus the dormant/active
+    authority singleton; it never imports or invokes the cutover application.
+    """
+    inspector = inspect(connection)
+    required = {
+        "seasons": {"id", "key", "name", "starts_on", "ends_on", "timezone", "status"},
+        "contest_weeks": {"id", "season_id", "week_start", "week_end", "status",
+            "verification_deadline_at", "finalize_after", "finalized_at",
+            "practice_scoring_mode", "finalizer_rules_version", "team_membership_rules_version",
+            "created_at", "updated_at"},
+        "persistent_team_control": {"id", "activated_at", "rules_from_week_start"},
+    }
+    tables = set(inspector.get_table_names())
+    if "alembic_version" not in tables:
+        raise repair.inventory.InventoryError("calendar_schema_required")
+    if list(connection.scalars(text("SELECT version_num FROM alembic_version"))) != [CALENDAR_REVISION]:
+        raise repair.inventory.InventoryError("revision_not_approved: require " + CALENDAR_REVISION)
+    for table, expected in required.items():
+        if table not in tables:
+            raise repair.inventory.InventoryError("required_calendar_schema_incomplete: " + table)
+        columns = {c["name"]: c for c in inspector.get_columns(table)}
+        if expected - columns.keys():
+            raise repair.inventory.InventoryError("required_calendar_schema_incomplete: " + table)
+    rules = next(c for c in inspector.get_columns("contest_weeks")
+                 if c["name"] == "team_membership_rules_version")
+    if rules["nullable"]:
+        raise repair.inventory.InventoryError("calendar_rules_constraint_missing_or_changed")
+    def sql_shape(value):
+        sql = re.sub(r"::(?:character varying|text)(?:\[\])?", "", str(value).lower())
+        return re.sub(r"[\s()]", "", sql)
+    checks = {c["name"]: c["sqltext"] for c in inspector.get_check_constraints("contest_weeks")}
+    domain = "'legacy_seasonal_v1', 'persistent_v1'"
+    expected = {
+        sql_shape("team_membership_rules_version IN (" + domain + ")"),
+        sql_shape("team_membership_rules_version = ANY (ARRAY[" + domain + "])")}
+    if sql_shape(checks.get("ck_contest_week_team_membership_rules", "")) not in expected:
+        raise repair.inventory.InventoryError("calendar_rules_constraint_missing_or_changed")
+    control_checks = {c["name"]: c["sqltext"] for c in inspector.get_check_constraints("persistent_team_control")}
+    expected_controls = {
+        "ck_persistent_team_control_singleton": "id = 1",
+        "ck_persistent_team_control_activation": (
+            "(activated_at IS NULL AND rules_from_week_start IS NULL) OR "
+            "(activated_at IS NOT NULL AND rules_from_week_start IS NOT NULL)")}
+    if any(sql_shape(control_checks.get(name, "")) != sql_shape(sql)
+           for name, sql in expected_controls.items()):
+        raise repair.inventory.InventoryError("calendar_authority_constraint_missing_or_changed")
+    control = connection.execute(text(
+        "SELECT id, activated_at, rules_from_week_start FROM persistent_team_control"
+    )).all()
+    if len(control) != 1 or control[0].id != 1:
+        raise repair.inventory.InventoryError("calendar_authority_singleton_missing")
+    if (control[0].activated_at is None) != (control[0].rules_from_week_start is None):
+        raise repair.inventory.InventoryError("calendar_authority_state_invalid")
+    boundary = control[0].rules_from_week_start
+    if isinstance(boundary, str):
+        boundary = date.fromisoformat(boundary)
+    if boundary is not None and boundary.weekday() != 0:
+        raise repair.inventory.InventoryError("calendar_authority_week_boundary_invalid")
 
 
 def scope(*, seasons=(), source=None, destination=None):
@@ -58,7 +127,7 @@ def build_plan(session, *, seasons=(), source=None, destination=None):
     rows = list(session.scalars(select(Season).order_by(Season.id).execution_options(populate_existing=True)))
     by_key = {row.key: row for row in rows}
     conflicts = []
-    prerequisites = ["run_team_preflight_before_activation", "activate_at_real_boundary", "finalize_source_separately_after_stored_deadlines"]
+    prerequisites = ["finalize_source_separately_after_stored_deadlines"]
     for definition in selected:
         row = by_key.get(definition.key)
         if row is None:
@@ -98,10 +167,12 @@ def build_plan(session, *, seasons=(), source=None, destination=None):
         item = {"season": definition.key, "season_id": season.id if season else None,
                 "week_start": start.isoformat(), "week_end": end.isoformat(),
                 "verification_deadline_at": deadline.isoformat(), "finalize_after": finalize.isoformat(),
+                "team_membership_rules_version": rules_version_for_start(session, start),
                 "action": "missing"}
         if len(overlaps) == 1 and len(matching) == 1:
             week = matching[0]
             item.update(action="unchanged", id=week.id, status=week.status,
+                        team_membership_rules_version=week.team_membership_rules_version,
                         finalized_at=aware_utc(week.finalized_at).isoformat() if week.finalized_at else None,
                         verification_deadline_at=aware_utc(week.verification_deadline_at).isoformat(),
                         finalize_after=aware_utc(week.finalize_after).isoformat(),
@@ -135,9 +206,10 @@ def provision(url, *, apply=False, seasons=(), source=None, destination=None):
     connect = repair.writer if apply else repair.inventory.readonly_connection
     with connect(url) as connection:
         try:
-            repair.schema_guard(connection)
+            schema_guard(connection)
             with Session(connection, autoflush=False, expire_on_commit=False) as session:
                 if apply:
+                    lock_authority(session)
                     ids = list(session.scalars(select(Season.id).where(Season.key.in_([s.key for s in selected]))))
                     domain.lock_team_seasons(session, *ids)
                     if connection.dialect.name == "postgresql":
@@ -159,7 +231,9 @@ def provision(url, *, apply=False, seasons=(), source=None, destination=None):
                             week_start=date.fromisoformat(week["week_start"]),
                             week_end=date.fromisoformat(week["week_end"]),
                             verification_deadline_at=datetime.fromisoformat(week["verification_deadline_at"]),
-                            finalize_after=datetime.fromisoformat(week["finalize_after"]), status="open"))
+                            finalize_after=datetime.fromisoformat(week["finalize_after"]), status="open",
+                            team_membership_rules_version=rules_version_for_start(
+                                session, date.fromisoformat(week["week_start"]))))
                 session.flush()
                 after = build_plan(session, **arguments)
                 if after["conflicts"] or after["missing"]:

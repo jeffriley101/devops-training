@@ -105,7 +105,13 @@ referential integrity before completion; application FK settings are not changed
 PostgreSQL locks Teams for the migration. Downgrade refuses if multiple seasonal
 Teams share a family, because removing the identity would lose continuity.
 
-### Explicit continuity engine (H1B; not activated)
+### Historical continuity engine (H1B; superseded for future operations)
+
+The following describes the historical seasonal implementation. Future seasons
+do not copy Teams or memberships. Normal seasonal activation is retired; use
+[persistent Team authority](persistent-team-cutover.md) for the separately
+reviewed Option B cutover. Historical diagnostics and repair guards remain
+unchanged and do not authorize a Halloween successor operation.
 
 `app/team_continuity.py` provides `plan_team_continuity` (read-only) and
 `apply_team_continuity` (fresh locked re-plan, caller-owned commit/rollback).

@@ -123,10 +123,36 @@ def public_team_identity_allowed(team):
 
 def team_public(session, team_id, *, at=None, identity_only=False, week=None):
     from .models import Team, TeamMembership, TeamWeekMembershipSnapshot
+    from .team_authority import persistent_enabled, week_uses_persistent
     team = session.get(Team, team_id)
     if team is None: return False
-    members = set(session.scalars(select(TeamMembership.profile_id).where(TeamMembership.team_id == team_id)))
-    members.update(session.scalars(select(TeamWeekMembershipSnapshot.profile_id).where(TeamWeekMembershipSnapshot.team_id == team_id)))
+    membership_query = select(TeamMembership.profile_id).where(TeamMembership.team_id == team_id)
+    snapshot_query = select(TeamWeekMembershipSnapshot.profile_id).where(TeamWeekMembershipSnapshot.team_id == team_id)
+    persistent = week_uses_persistent(week) if week is not None else persistent_enabled(session, at)
+    if persistent:
+        from sqlalchemy import or_
+        if week is not None:
+            from zoneinfo import ZoneInfo
+            start = datetime.combine(week.week_start, time.min, ZoneInfo('America/Chicago')).astimezone(timezone.utc)
+            end = datetime.combine(week.week_end, time.min, ZoneInfo('America/Chicago')).astimezone(timezone.utc)
+            membership_query = membership_query.where(
+                TeamMembership.is_persistent.is_(True),
+                TeamMembership.started_at < end,
+                or_(TeamMembership.ended_at.is_(None), TeamMembership.ended_at > start),
+            )
+            snapshot_query = snapshot_query.where(TeamWeekMembershipSnapshot.contest_week_id == week.id)
+        else:
+            moment = at or datetime.now(timezone.utc)
+            membership_query = membership_query.where(
+                TeamMembership.is_persistent.is_(True),
+                TeamMembership.started_at <= moment,
+                or_(TeamMembership.ended_at.is_(None), TeamMembership.ended_at > moment),
+            )
+    members = set(session.scalars(membership_query))
+    # Historical/finalized readers retain their roster evidence; a current
+    # persistent roster does not acquire every old seasonal snapshot member.
+    if not persistent or week is not None:
+        members.update(session.scalars(snapshot_query))
     if team.creator_profile_id: members.add(team.creator_profile_id)
     if not all(can_publish(session, pid, at=at) for pid in members):return False
     if identity_only:return True

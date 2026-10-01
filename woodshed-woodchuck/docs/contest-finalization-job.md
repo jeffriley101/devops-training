@@ -1,9 +1,10 @@
 # Ordinary weekly contest operations
 
 Prepare [approved calendar weeks](contest-week-provisioning.md) ahead. Use the
-existing operational finalizer for weekly results; supervise
-[seasonal Team activation](season-team-activation.md) separately. Neither job
-calls the other, and ordinary Mondays do not require a seasonal activation pause.
+existing operational finalizer for weekly results. Seasonal Team activation is
+retired; Team identity and membership persist across Mondays and presentation
+seasons. The [persistent authority cutover](persistent-team-cutover.md) is a
+separate reviewed operation, never an ordinary week or season job.
 
 ## What the repository establishes
 
@@ -22,13 +23,20 @@ missing definitions fail finalization. Normal contest setup seeds them;
 `provision_weeks` and Season bootstrap do not.
 
 The earlier combined precision/provisioning release required `t0p1q2r3s4t5`.
-The current finalizer also maps `ContestWeek.finalizer_rules_version` and requires
-`d17contest001`. Migrate through that revision **before starting the current web
+The persistent Team release also maps `ContestWeek.team_membership_rules_version`
+and requires `p20team001`. Migrate through that revision **before starting the current web
 or finalizer code**. Pause/drain all finalization
 writers, upgrade both services and every finalization entry point together,
 then resume; old/new finalizers must not overlap. Follow the
 [precision release procedure](practice-time-precision.md#release-ordering-and-maintenance-compatibility).
 Local compatibility tests do not establish that production has been upgraded.
+
+The current September 28, 2026 week retains `legacy_seasonal_v1` membership rules
+and `contest_finalizer_v1` finalization. A separately approved clean later week
+uses `persistent_v1` and `contest_finalizer_persistent_v1`. Finalized legacy weeks
+keep their stored results and snapshots; the new release never retags them.
+Older operational evidence below retains its original dates and release context;
+references to seasonal activation do not apply to future operations.
 
 The operational service name `woodshed-contest-finalizer` appears in the existing
 runbooks. No tracked Render Blueprint, cron expression or scheduler startup

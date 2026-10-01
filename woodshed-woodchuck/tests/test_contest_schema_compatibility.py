@@ -1,13 +1,12 @@
-"""Explicit revision approval and real migration coverage on disposable databases."""
-from datetime import date, timedelta
+"""Calendar p20 approval and unchanged legacy repair guards on disposable DBs."""
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import MetaData, create_engine, event, select, text
+from sqlalchemy import MetaData, Table, create_engine, event, select, text
 from sqlalchemy.engine import Engine
-from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
 
 from app import contest_week_provisioning as provisioning, models as m
@@ -18,10 +17,9 @@ from tests import test_season_team_activation as lifecycle
 from tests import test_team_continuity_repair as history
 from tests.test_contest_week_provisioning import db, PAIR  # noqa: F401
 from tests.test_team_families import disposable_url
-from tests.team_factory import make_team
 
-OLD = "c15arcade001"
-NEW = "d17contest001"
+OLD = "f19arcade001"
+NEW = "p20team001"
 
 
 def snapshot(engine):
@@ -32,15 +30,6 @@ def snapshot(engine):
                 for table in metadata.sorted_tables}
 
 
-def operations(url):
-    return (
-        lambda: provisioning.provision(url, **PAIR),
-        lambda: provisioning.provision(url, apply=True, **PAIR),
-        lambda: activation.preflight(url, **PAIR, now=lifecycle.BOUNDARY),
-        lambda: activation.activate(url, **PAIR, now=lifecycle.BOUNDARY),
-    )
-
-
 def assert_refused_without_writes(url, engine, reason):
     before = snapshot(engine)
     statements = []
@@ -48,9 +37,10 @@ def assert_refused_without_writes(url, engine, reason):
         statements.append(statement.strip().split()[0].upper())
     event.listen(Engine, "before_cursor_execute", capture)
     try:
-        for operation in operations(url):
-            with pytest.raises(repair.RepairError, match=reason):
-                operation()
+        for apply in (False, True):
+            with pytest.raises(repair.inventory.InventoryError, match=reason):
+                provisioning.provision(url, apply=apply, **PAIR)
+        assert activation.activate(url)["reason_codes"] == ["seasonal_team_activation_retired"]
     finally:
         event.remove(Engine, "before_cursor_execute", capture)
     assert not {"INSERT", "UPDATE", "DELETE", "CREATE", "ALTER", "DROP"}.intersection(statements)
@@ -58,32 +48,58 @@ def assert_refused_without_writes(url, engine, reason):
 
 
 @pytest.mark.parametrize("state", ["old", "unknown", "unsupported", "empty", "multiple",
-                                  "precise_score", "practice_scoring_mode", "finalizer_rules_version",
-                                  "family_index", "name_claims"])
+    "practice_scoring_mode", "finalizer_rules_version", "rules_column", "control_table", "control_row", "rules_check", "control_check", "boundary"])
 def test_schema_refusals_before_writes(db, state):
     with db[1].begin() as connection:
         if state in {"old", "unknown", "unsupported"}:
-            version = {"old": OLD, "unknown": "future_unapproved", "unsupported": "r8m9n0o1p2q3"}[state]
+            version = {"old": OLD, "unknown": "future_unapproved", "unsupported": "d17contest001"}[state]
             connection.execute(text("UPDATE alembic_version SET version_num=:v"), {"v": version})
         elif state == "empty":
             connection.execute(text("DELETE FROM alembic_version"))
         elif state == "multiple":
             connection.execute(text("INSERT INTO alembic_version VALUES (:v)"), {"v": OLD})
-        elif state == "family_index":
-            connection.execute(text("DROP INDEX ix_teams_family_id"))
-        elif state == "name_claims":
-            connection.execute(text("DROP TABLE team_name_claims"))
+        elif state in {"rules_check", "control_check"}:
+            from alembic.operations import Operations
+            from alembic.migration import MigrationContext
+            op = Operations(MigrationContext.configure(connection))
+            table, name, sql = (("contest_weeks", "ck_contest_week_team_membership_rules",
+                "team_membership_rules_version IN ('legacy_seasonal_v1', 'persistent_v1') OR 1=1")
+                if state == "rules_check" else ("persistent_team_control", "ck_persistent_team_control_singleton", "id=1 OR 1=1"))
+            with op.batch_alter_table(table) as batch:
+                batch.drop_constraint(name, type_="check")
+                batch.create_check_constraint(name, sql)
+        elif state == "boundary":
+            connection.execute(text("UPDATE persistent_team_control SET activated_at=:at, rules_from_week_start=:start"),
+                {"at": datetime(2026, 10, 1, 18, tzinfo=timezone.utc), "start": date(2026, 10, 6)})
+        elif state == "control_table":
+            connection.execute(text("DROP TABLE persistent_team_control"))
+        elif state == "control_row":
+            connection.execute(text("DELETE FROM persistent_team_control"))
+        elif state == "rules_column":
+            connection.execute(text("ALTER TABLE contest_weeks RENAME COLUMN team_membership_rules_version TO unapproved_rules"))
         else:
-            table = "contest_results" if state == "precise_score" else "contest_weeks"
-            connection.execute(text(f"ALTER TABLE {table} DROP COLUMN {state}"))
-    reason = ("required_schema_incomplete" if state in {"precise_score", "practice_scoring_mode",
-                                                     "finalizer_rules_version", "name_claims"}
-              else "team_family_constraints_missing" if state == "family_index" else "revision_not_approved")
+            connection.execute(text(f"ALTER TABLE contest_weeks DROP COLUMN {state}"))
+    reason = ("required_calendar_schema_incomplete" if state in {
+        "practice_scoring_mode", "finalizer_rules_version", "rules_column", "control_table"}
+        else {"control_row": "calendar_authority_singleton_missing",
+              "rules_check": "calendar_rules_constraint_missing_or_changed",
+              "control_check": "calendar_authority_constraint_missing_or_changed",
+              "boundary": "calendar_authority_week_boundary_invalid"}.get(state, "revision_not_approved"))
     assert_refused_without_writes(*db, reason)
 
 
+def test_historical_repair_guard_is_not_reapproved_by_calendar_guard(db):
+    before = snapshot(db[1])
+    with db[1].connect() as connection:
+        provisioning.schema_guard(connection)
+        with pytest.raises(repair.RepairError, match="require d17contest001"):
+            repair.schema_guard(connection)
+    assert activation.activate(db[0])["reason_codes"] == ["seasonal_team_activation_retired"]
+    assert snapshot(db[1]) == before
+
+
 @pytest.mark.parametrize("backend", ["sqlite", "postgresql"])
-def test_real_previous_schema_requires_upgrade_then_plan_apply_repeat(tmp_path, monkeypatch, backend):
+def test_real_base_upgrade_then_calendar_plan_apply_and_prospective_rules(tmp_path, monkeypatch, backend):
     url = disposable_url(tmp_path, backend)
     monkeypatch.setenv("DATABASE_URL", url)
     config = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
@@ -92,31 +108,28 @@ def test_real_previous_schema_requires_upgrade_then_plan_apply_repeat(tmp_path, 
     try:
         with Session(engine) as session:
             bootstrap_canonical_seasons(session)
-            source = session.scalar(select(m.Season).where(m.Season.key == lifecycle.SOURCE))
-            profile = m.WoodchuckProfile(woodchuck_id="WC-COMPAT", display_name="Compatibility",
-                pin_hash="test", instrument="Flute", level="Beginner", goal="Practice")
-            session.add(profile)
-            session.flush()
-            team = make_team(session, season_id=source.id, display_name="Compatibility",
-                normalized_name="compatibility", emblem_key="letter:C", creator_profile_id=profile.id)
-            session.add(team)
-            session.flush()
-            session.add(m.TeamMembership(season_id=source.id, team_id=team.id, profile_id=profile.id,
-                started_at=lifecycle.BOUNDARY - timedelta(days=7), selected_week_start=date(2026, 9, 21)))
+            session.add(m.WoodchuckProfile(id=1, woodchuck_id="WC-COMPAT", display_name="Compatibility",
+                pin_hash="test", instrument="Flute", level="Beginner", goal="Practice"))
             session.commit()
-        # The current continuity code requires the claim table, even if empty.
-        for model in (m.TeamNameClaim,):
-            with engine.connect() as connection, pytest.raises(DBAPIError):
-                connection.execute(select(model))
-        assert_refused_without_writes(url, engine, "require d17contest001; upgrade older schemas")
+        metadata = MetaData()
+        metadata.reflect(engine)
         end, deadline, finalize = contest_week_schedule(date(2026, 9, 14))
         with engine.begin() as connection:
-            source_id = connection.scalar(select(m.Season.id).where(m.Season.key == lifecycle.SOURCE))
-            connection.execute(m.ContestWeek.__table__.insert().values(
+            source_id = connection.scalar(select(metadata.tables["seasons"].c.id).where(
+                metadata.tables["seasons"].c.key == lifecycle.SOURCE))
+            connection.execute(metadata.tables["team_families"].insert().values(id=1, created_at=lifecycle.BOUNDARY))
+            connection.execute(metadata.tables["teams"].insert().values(id=10, family_id=1,
+                season_id=source_id, display_name="Compatibility", normalized_name="compatibility",
+                emblem_key="letter:C", creator_profile_id=1, created_at=lifecycle.BOUNDARY))
+            connection.execute(metadata.tables["team_memberships"].insert().values(id=20,
+                season_id=source_id, team_id=10, profile_id=1,
+                started_at=lifecycle.BOUNDARY - timedelta(days=7), selected_week_start=date(2026, 9, 21), created_at=lifecycle.BOUNDARY))
+            connection.execute(metadata.tables["contest_weeks"].insert().values(
                 season_id=source_id, week_start=date(2026, 9, 14), week_end=end,
                 verification_deadline_at=deadline + timedelta(hours=1),
                 finalize_after=finalize + timedelta(hours=1), status="finalized", finalized_at=finalize + timedelta(days=1),
-                practice_scoring_mode="legacy_minutes"))
+                practice_scoring_mode="legacy_minutes", created_at=lifecycle.BOUNDARY, updated_at=lifecycle.BOUNDARY))
+        assert_refused_without_writes(url, engine, "require p20team001")
         before = snapshot(engine)
         command.upgrade(config, NEW)
         migrated = snapshot(engine)
@@ -129,20 +142,31 @@ def test_real_previous_schema_requires_upgrade_then_plan_apply_repeat(tmp_path, 
             week = session.scalar(select(m.ContestWeek))
             assert week.practice_scoring_mode == "legacy_minutes"
             assert week.finalizer_rules_version is None
-            assert week.verification_deadline_at == before["contest_weeks"][0]._mapping["verification_deadline_at"]
+            assert week.team_membership_rules_version == "legacy_seasonal_v1"
         assert provisioning.provision(url, **PAIR)["missing"] == 2
         assert snapshot(engine) == migrated
         assert provisioning.provision(url, apply=True, **PAIR)["created"] == 2
-        assert activation.preflight(url, **PAIR, now=lifecycle.BOUNDARY)["status"] == "READY"
-        activated = activation.activate(url, **PAIR, now=lifecycle.BOUNDARY)
-        assert activated["verification"]["passed"]
-        assert (activated["teams_created"], activated["memberships_created"]) == (1, 1)
+        with engine.connect() as connection, pytest.raises(repair.RepairError, match="require d17contest001"):
+            repair.schema_guard(connection)
+        assert activation.activate(url)["reason_codes"] == ["seasonal_team_activation_retired"]
         after = snapshot(engine)
         assert provisioning.provision(url, apply=True, **PAIR)["status"] == "ALREADY_COMPLETE"
-        assert provisioning.provision(url, **PAIR)["missing"] == 0
-        assert activation.activate(url, **PAIR, now=lifecycle.BOUNDARY)["status"] == "ALREADY_COMPLETE"
         assert snapshot(engine) == after
-        assert all(row in after["contest_weeks"] for row in migrated["contest_weeks"])
+        with Session(engine) as session:
+            current = session.scalar(select(m.ContestWeek).where(m.ContestWeek.week_start == date(2026, 9, 28)))
+            prior_week = dict(session.execute(select(m.ContestWeek.__table__).where(m.ContestWeek.id == current.id)).mappings().one())
+            control = session.get(m.PersistentTeamControl, 1)
+            control.activated_at = datetime(2026, 10, 1, 18, tzinfo=timezone.utc)
+            control.rules_from_week_start = date(2026, 10, 5)
+            session.commit()
+        assert provisioning.provision(url, apply=True, seasons=[lifecycle.DEST])["created"] == 4
+        with Session(engine) as session:
+            assert dict(session.execute(select(m.ContestWeek.__table__).where(m.ContestWeek.week_start == date(2026, 9, 28))).mappings().one()) == prior_week
+            future = session.scalars(select(m.ContestWeek).where(m.ContestWeek.week_start >= date(2026, 10, 5))).all()
+            assert len(future) == 4 and {w.team_membership_rules_version for w in future} == {"persistent_v1"}
+            assert session.scalar(select(m.Team.id)) == 10
+            assert session.scalar(select(m.TeamMembership.id)) == 20
+        assert provisioning.provision(url, apply=True, seasons=[lifecycle.DEST])["status"] == "ALREADY_COMPLETE"
     finally:
         engine.dispose()
 

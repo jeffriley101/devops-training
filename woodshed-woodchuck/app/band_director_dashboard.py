@@ -8,10 +8,10 @@ from datetime import date, datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .band_director_context import current_roster_period
+from .band_director_context import current_roster_period, current_student_teams
 from .age_privacy import director_chart_visible, director_scope_start
 from .contests import CENTRAL
-from .models import PracticeChart, PracticeChartVerification, Team, TeamMembership
+from .models import PracticeChart, PracticeChartVerification
 from .teams import public_team_identity
 from .verifiers import band_director_students
 from .student_practice_metrics import (
@@ -47,18 +47,13 @@ def dashboard_metrics(session: Session, *, verifier_id: int,
     for chart in charts:
         by_student[chart.profile_id].append(chart)
 
-    # Team is the current-season active membership, independent of the selected
-    # practice week. Historical contest snapshots/rankings are not recomputed.
+    # Current authority persists independently of the selected practice week.
     season, _ = current_roster_period(session, today=today)
     teams = {}
-    if season is not None and ids:
-        for profile_id, team in session.execute(select(TeamMembership.profile_id, Team).join(
-            Team, Team.id == TeamMembership.team_id,
-        ).where(TeamMembership.profile_id.in_(ids), TeamMembership.season_id == season.id,
-                TeamMembership.ended_at.is_(None), Team.season_id == season.id)):
+    for profile_id, team in current_student_teams(session, profile_ids=ids, season=season).items():
+        if director_scope_start(session, profile_id) is None:
             name, emblem = public_team_identity(team)
-            if director_scope_start(session,profile_id) is None:
-                teams.setdefault(profile_id, {"name": name, "emblem": emblem})
+            teams[profile_id] = {"name": name, "emblem": emblem}
 
     students = []
     program_week_sums = [0.0] * 5

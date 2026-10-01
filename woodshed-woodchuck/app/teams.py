@@ -1,12 +1,12 @@
 from __future__ import annotations
 from .age_privacy import can_publish
 
-from datetime import datetime, time, timezone
+from datetime import datetime, time, timedelta, timezone
 import secrets
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -21,12 +21,15 @@ from .models import (
     TeamFamily,
     TeamJoinRequest,
     TeamMembership,
+    TeamMembershipTransition,
     TeamReport,
     WoodchuckProfile,
 )
 from .team_names import InvalidTeamName, normalized_team_name
 from .team_continuity import lock_team_seasons
 from .team_name_claims import claim_public_team_name, TEAM_NAME_TAKEN
+from .team_authority import effective_membership, lock_authority, persistent_enabled
+from .seasons import season_covering_date
 
 
 EMOJI_EMBLEMS = {
@@ -99,7 +102,11 @@ def team_payload(team: Team) -> dict[str, object]:
     }
 
 
-def active_membership(session: Session, *, profile_id: int, season_id: int) -> TeamMembership | None:
+def active_membership(session: Session, *, profile_id: int, season_id: int,
+                      at: datetime | None = None) -> TeamMembership | None:
+    moment = at or datetime.now(timezone.utc)
+    if persistent_enabled(session, moment):
+        return effective_membership(session, profile_id, moment)
     return session.scalar(select(TeamMembership).where(
         TeamMembership.profile_id == profile_id,
         TeamMembership.season_id == season_id,
@@ -116,6 +123,8 @@ def has_band_director_capability(session: Session, *, profile_id: int) -> bool:
 
 def membership_at(session: Session, *, profile_id: int, season_id: int, at: datetime) -> TeamMembership | None:
     moment = utc(at)
+    if persistent_enabled(session, moment):
+        return effective_membership(session, profile_id, moment)
     rows = session.scalars(select(TeamMembership).where(
         TeamMembership.profile_id == profile_id,
         TeamMembership.season_id == season_id,
@@ -124,25 +133,108 @@ def membership_at(session: Session, *, profile_id: int, season_id: int, at: date
     return next((row for row in rows if row.ended_at is None or utc(row.ended_at) > moment), None)
 
 
-def select_team(session: Session, *, profile: WoodchuckProfile, season: Season,
+def _season_id(season: Season | None) -> int | None:
+    return season.id if season is not None else None
+
+
+def _team_is_current(session: Session, team: Team, season_id: int, now: datetime) -> bool:
+    return bool(team.is_operating) if persistent_enabled(session, now) else team.season_id == season_id
+
+
+def _lock_team_writer(session: Session, season_id: int | None):
+    lock_authority(session)
+    if season_id is not None:
+        lock_team_seasons(session, season_id)
+
+
+def _lock_profile(session: Session, profile: WoodchuckProfile):
+    session.scalar(select(WoodchuckProfile).where(
+        WoodchuckProfile.id == profile.id
+    ).with_for_update().execution_options(populate_existing=True))
+    if profile.status != "active":
+        raise ValueError("This account cannot select a Team.")
+
+
+def persistent_correction_state(session: Session, profile_id: int, now: datetime):
+    """Count actual transitions; leaving never replenishes the same week's cap."""
+    week_start, _, _, _ = central_week_boundaries(now)
+    boundary = datetime.combine(week_start, time.min, CENTRAL).astimezone(timezone.utc)
+    # The carried roster is the instant BEFORE student transitions at Monday.
+    # A switch exactly at Monday must count against the carried membership;
+    # an initial join exactly at Monday must remain an initial choice.
+    carried = effective_membership(session, profile_id, boundary - timedelta(microseconds=1))
+    used = session.scalar(select(func.count(TeamMembershipTransition.id)).where(
+        TeamMembershipTransition.profile_id == profile_id,
+        TeamMembershipTransition.week_start == week_start,
+    )) or 0
+    allowance = 1 if carried is not None else 2
+    return week_start, used, allowance
+
+
+def _persistent_transition(session: Session, *, profile: WoodchuckProfile,
+                           season: Season | None, team: Team | None, now: datetime):
+    _lock_profile(session, profile)
+    current = effective_membership(session, profile.id, now)
+    if current is not None and team is not None and current.team_id == team.id:
+        return current, False
+    if current is None and team is None:
+        return None, False
+    current_team = session.get(Team, current.team_id) if current else None
+    week_start, used, allowance = persistent_correction_state(session, profile.id, now)
+    if used >= allowance and (current_team is None or current_team.moderation_status != "hidden"):
+        raise ValueError("Your team choice is locked until next contest week.")
+    moment = utc(now)
+    if current is not None:
+        current.ended_at = moment
+        session.flush()
+    membership = None
+    if team is not None:
+        membership = TeamMembership(
+            season_id=None, team_id=team.id, profile_id=profile.id,
+            is_persistent=True, selected_week_start=week_start, started_at=moment,
+        )
+        session.add(membership)
+        session.flush()
+    session.add(TeamMembershipTransition(
+        profile_id=profile.id, week_start=week_start, occurred_at=moment,
+        action="leave" if team is None else ("switch" if current else "join"),
+        from_membership_id=current.id if current else None,
+        to_membership_id=membership.id if membership else None,
+    ))
+    session.flush()
+    return membership, True
+
+
+def leave_team(session: Session, *, profile: WoodchuckProfile, season: Season | None,
+               now: datetime) -> bool:
+    _lock_team_writer(session, _season_id(season))
+    if not persistent_enabled(session, now):
+        raise ValueError("Persistent Team membership is not active.")
+    _, changed = _persistent_transition(session, profile=profile, season=season, team=None, now=now)
+    return changed
+
+
+def select_team(session: Session, *, profile: WoodchuckProfile, season: Season | None,
                 team: Team, now: datetime,
                 private_authorized: bool = False) -> tuple[TeamMembership, bool]:
-    lock_team_seasons(session, season.id)
+    _lock_team_writer(session, _season_id(season))
     session.refresh(team)
-    if team.season_id != season.id:
-        raise ValueError("That team is not in the active season.")
+    if not _team_is_current(session, team, _season_id(season), now):
+        raise ValueError("That team is not available.")
     if team.moderation_status == "hidden":
         raise ValueError("That team is not available.")
     if team.visibility == "private" and not private_authorized:
         raise ValueError("That Class requires director approval.")
+    if persistent_enabled(session, now):
+        return _persistent_transition(session, profile=profile, season=season, team=team, now=now)
     week_start, _, _, _ = central_week_boundaries(now)
-    current = active_membership(session, profile_id=profile.id, season_id=season.id)
+    current = active_membership(session, profile_id=profile.id, season_id=_season_id(season))
     if current and current.team_id == team.id:
         return current, False
     current_team = session.get(Team, current.team_id) if current else None
     week_membership_count = session.scalar(select(func.count(TeamMembership.id)).where(
         TeamMembership.profile_id == profile.id,
-        TeamMembership.season_id == season.id,
+        TeamMembership.season_id == _season_id(season),
         TeamMembership.selected_week_start == week_start,
     )) or 0
     if (
@@ -155,7 +247,7 @@ def select_team(session: Session, *, profile: WoodchuckProfile, season: Season,
         current.ended_at = now_utc
         session.flush()
     membership = TeamMembership(
-        season_id=season.id, team_id=team.id, profile_id=profile.id,
+        season_id=_season_id(season), team_id=team.id, profile_id=profile.id,
         selected_week_start=week_start, started_at=now_utc,
     )
     session.add(membership)
@@ -180,17 +272,22 @@ def _create_team_with_new_family(session: Session, **team_fields: object) -> Tea
 def _creation_conflict_message(error: IntegrityError, *, classroom: bool = False) -> str:
     constraint = getattr(getattr(error.orig, "diag", None), "constraint_name", "") or ""
     detail = str(error.orig)
-    if constraint == "uq_team_season_name" or "teams.season_id, teams.normalized_name" in detail:
+    if constraint in {"uq_team_season_name", "uq_team_operating_name"} or "teams.season_id, teams.normalized_name" in detail or "teams.normalized_name" in detail:
         return "That Class name is already taken." if classroom else TEAM_NAME_TAKEN
     if constraint == "uq_team_season_emblem" or "teams.season_id, teams.emblem_key" in detail:
         return "That emblem is already in use this season."
+    if constraint == "uq_team_operating_emblem" or "teams.emblem_key" in detail:
+        return "That emblem is already in use."
     return "That Class could not be created. Please try again." if classroom else "That Team could not be created. Please try again."
 
 
 def create_and_join_team(session: Session, *, profile: WoodchuckProfile,
-                         season: Season, name: str, emblem_key: str,
+                         season: Season | None, name: str, emblem_key: str,
                          now: datetime) -> tuple[Team, TeamMembership]:
-    lock_team_seasons(session, season.id)
+    _lock_team_writer(session, _season_id(season))
+    persistent = persistent_enabled(session, now)
+    if persistent:
+        _lock_profile(session, profile)
     if emblem_key not in APPROVED_EMBLEMS:
         raise ValueError("Choose an approved team emblem.")
     try:
@@ -198,15 +295,16 @@ def create_and_join_team(session: Session, *, profile: WoodchuckProfile,
     except InvalidTeamName as error:
         raise ValueError(str(error)) from error
     if session.scalar(select(Team.id).where(
-        Team.season_id == season.id,
+        Team.is_operating.is_(True) if persistent else Team.season_id == _season_id(season),
         Team.creator_profile_id == profile.id,
         Team.visibility == "public",
     )):
-        raise ValueError("You may create only one team per season.")
+        raise ValueError("You may create only one Team." if persistent else "You may create only one team per season.")
     try:
         team = _create_team_with_new_family(
-            session, season_id=season.id, display_name=display, normalized_name=normalized,
+            session, season_id=None if persistent else _season_id(season), display_name=display, normalized_name=normalized,
             emblem_key=emblem_key, creator_profile_id=profile.id,
+            is_operating=persistent,
         )
         session.flush()
         membership, _ = select_team(session, profile=profile, season=season, team=team, now=now)
@@ -230,10 +328,13 @@ def _new_join_code(session: Session) -> str:
 
 
 def create_director_team(
-    session: Session, *, profile: WoodchuckProfile, season: Season,
+    session: Session, *, profile: WoodchuckProfile, season: Season | None,
     name: str, emblem_key: str, now: datetime,
 ) -> Team:
-    lock_team_seasons(session, season.id)
+    _lock_team_writer(session, _season_id(season))
+    persistent = persistent_enabled(session, now)
+    if persistent:
+        _lock_profile(session, profile)
     if not has_band_director_capability(session, profile_id=profile.id):
         raise PermissionError("Band Director authorization is required.")
     if emblem_key not in APPROVED_EMBLEMS:
@@ -245,13 +346,14 @@ def create_director_team(
     try:
         team = _create_team_with_new_family(
             session,
-            season_id=season.id,
+            season_id=None if persistent else _season_id(season),
             display_name=display,
             normalized_name=normalized,
             emblem_key=emblem_key,
             creator_profile_id=profile.id,
             visibility="private",
             director_led=True,
+            is_operating=persistent,
             join_code=_new_join_code(session),
             created_at=now.astimezone(timezone.utc),
         )
@@ -267,10 +369,16 @@ def create_director_team(
 
 
 def selection_payload(session: Session, *, profile: WoodchuckProfile, now: datetime) -> dict[str, object]:
-    season, _, week = ensure_current_contest_data(session, now=now)
-    membership = active_membership(session, profile_id=profile.id, season_id=season.id)
+    persistent = persistent_enabled(session, now)
+    if persistent:
+        season = season_covering_date(session, utc(now).astimezone(CENTRAL).date())
+        week_start, week_end, _, _ = central_week_boundaries(now)
+    else:
+        season, _, week = ensure_current_contest_data(session, now=now)
+        week_start, week_end = week.week_start, week.week_end
+    membership = active_membership(session, profile_id=profile.id, season_id=_season_id(season), at=now)
     teams = session.scalars(select(Team).where(
-        Team.season_id == season.id,
+        Team.is_operating.is_(True) if persistent else Team.season_id == _season_id(season),
         Team.moderation_status != "hidden",
         Team.visibility == "public",
     ).order_by(
@@ -279,16 +387,19 @@ def selection_payload(session: Session, *, profile: WoodchuckProfile, now: datet
     current_team = session.get(Team, membership.team_id) if membership else None
     week_membership_count = session.scalar(select(func.count(TeamMembership.id)).where(
         TeamMembership.profile_id == profile.id,
-        TeamMembership.season_id == season.id,
-        TeamMembership.selected_week_start == week.week_start,
+        TeamMembership.season_id == _season_id(season),
+        TeamMembership.selected_week_start == week_start,
     )) or 0
     locked = bool(
         membership and week_membership_count >= 2
         and (current_team is None or current_team.moderation_status != "hidden")
     )
-    next_at = datetime.combine(week.week_end, time.min, CENTRAL).astimezone(timezone.utc)
+    if persistent:
+        _, used, allowance = persistent_correction_state(session, profile.id, now)
+        locked = used >= allowance and (current_team is None or current_team.moderation_status != "hidden")
+    next_at = datetime.combine(week_end, time.min, CENTRAL).astimezone(timezone.utc)
     return {
-        "season": {"key": season.key, "name": season.name},
+        "season": {"key": season.key, "name": season.name} if season else {"key": None, "name": "Current"},
         "teams": [
             {key: value for key, value in team_payload(team).items() if key in {"id", "name", "emblem"}}
             for team in teams if public_team_identity_allowed(team)
@@ -298,14 +409,15 @@ def selection_payload(session: Session, *, profile: WoodchuckProfile, now: datet
             "selected_week_start": membership.selected_week_start.isoformat() if membership else None,
             "locked": locked,
             "correction_available": bool(membership and not locked),
+            "leave_available": bool(persistent and membership and not locked),
             "correction_message": (
                 "Your team correction has been used for this week. You can choose again next Monday."
                 if locked else "You have one team correction available this week."
-            ) if membership else "Choose a team to get started.",
+            ) if membership or locked else "Choose a team to get started.",
             "next_change_at": next_at.isoformat() if locked else None,
         },
         "pending_private_request": _pending_request_payload(
-            session, profile_id=profile.id, season_id=season.id
+            session, profile_id=profile.id, season_id=_season_id(season), now=now
         ),
         "band_director": has_band_director_capability(
             session, profile_id=profile.id
@@ -315,11 +427,11 @@ def selection_payload(session: Session, *, profile: WoodchuckProfile, now: datet
 
 
 def _pending_request_payload(
-    session: Session, *, profile_id: int, season_id: int
+    session: Session, *, profile_id: int, season_id: int, now: datetime | None = None
 ) -> dict[str, object] | None:
     request_row = session.scalar(select(TeamJoinRequest).where(
         TeamJoinRequest.profile_id == profile_id,
-        TeamJoinRequest.season_id == season_id,
+        TeamJoinRequest.is_persistent.is_(True) if persistent_enabled(session, now) else TeamJoinRequest.season_id == season_id,
         TeamJoinRequest.status == "pending",
     ))
     if request_row is None:
@@ -336,7 +448,8 @@ def _pending_request_payload(
 
 
 def _owned_director_team(
-    session: Session, *, profile: WoodchuckProfile, team_id: int | None = None
+    session: Session, *, profile: WoodchuckProfile, team_id: int | None = None,
+    now: datetime | None = None,
 ) -> Team:
     if not has_band_director_capability(session, profile_id=profile.id):
         raise PermissionError("Band Director authorization is required.")
@@ -345,6 +458,8 @@ def _owned_director_team(
         Team.director_led.is_(True),
         Team.visibility == "private",
     ]
+    if persistent_enabled(session, now):
+        filters.append(Team.is_operating.is_(True))
     if team_id is not None:
         filters.append(Team.id == team_id)
     team = session.scalar(select(Team).where(*filters))
@@ -354,14 +469,16 @@ def _owned_director_team(
 
 
 def director_team_payload(
-    session: Session, *, profile: WoodchuckProfile, season: Season,
-    team_id: int | None = None,
+    session: Session, *, profile: WoodchuckProfile, season: Season | None,
+    team_id: int | None = None, now: datetime | None = None,
 ) -> dict[str, object]:
     authorized = has_band_director_capability(session, profile_id=profile.id)
     if not authorized:
         raise PermissionError("Band Director authorization is required.")
+    moment = now or datetime.now(timezone.utc)
+    persistent = persistent_enabled(session, moment)
     teams = list(session.scalars(select(Team).where(
-        Team.season_id == season.id,
+        Team.is_operating.is_(True) if persistent else Team.season_id == _season_id(season),
         Team.creator_profile_id == profile.id,
         Team.director_led.is_(True),
         Team.visibility == "private",
@@ -381,10 +498,14 @@ def director_team_payload(
         .join(WoodchuckProfile, WoodchuckProfile.id == TeamMembership.profile_id)
         .where(
             TeamMembership.team_id == team.id,
-            TeamMembership.ended_at.is_(None),
+            (or_(TeamMembership.ended_at.is_(None), TeamMembership.ended_at > moment)
+             if persistent else TeamMembership.ended_at.is_(None)),
             WoodchuckProfile.status == "active",
         ).order_by(WoodchuckProfile.display_name, WoodchuckProfile.id)
     ).all()
+    if persistent:
+        membership_rows = [(row, member) for row, member in membership_rows
+                           if row.is_persistent and utc(row.started_at) <= utc(moment)]
     request_rows = session.execute(
         select(TeamJoinRequest, WoodchuckProfile)
         .join(WoodchuckProfile, WoodchuckProfile.id == TeamJoinRequest.profile_id)
@@ -394,6 +515,8 @@ def director_team_payload(
             WoodchuckProfile.status == "active",
         ).order_by(TeamJoinRequest.requested_at, TeamJoinRequest.id)
     ).all()
+    if persistent:
+        request_rows = [(row, member) for row, member in request_rows if row.is_persistent]
     name, emblem = public_team_identity(team)
     return {
         "authorized": True,
@@ -432,8 +555,27 @@ def authenticated_context(request: Request, session: Session, now: datetime | No
     profile = current_profile(request, session)
     if profile is None:
         raise HTTPException(status_code=401, detail="Student sign-in is required.")
+    if request.method != "GET":
+        # A mutation that waited for cutover must take its timestamp AFTER
+        # acquiring the fence, otherwise it could select legacy writers using
+        # a pre-cutover timestamp against newly promoted authority.
+        lock_authority(session)
     moment = now or datetime.now(timezone.utc)
-    season, _, _ = ensure_current_contest_data(session, now=moment)
+    if persistent_enabled(session, moment):
+        season = season_covering_date(session, utc(moment).astimezone(CENTRAL).date())
+    else:
+        season, _, _ = ensure_current_contest_data(session, now=moment)
+        if request.method != "GET":
+            # Legacy calendar bootstrap may commit internally. Reestablish
+            # the fence and authentication before choosing any mutation path.
+            lock_authority(session)
+            session.expire(profile)
+            profile = current_profile(request, session)
+            if profile is None:
+                raise HTTPException(status_code=401, detail="Student sign-in is required.")
+            moment = now or datetime.now(timezone.utc)
+            if persistent_enabled(session, moment):
+                season = season_covering_date(session, utc(moment).astimezone(CENTRAL).date())
     return profile, season, moment
 
 
@@ -466,7 +608,7 @@ def join_team(request: Request, submitted: TeamJoin):
         profile, season, now = authenticated_context(request, session)
         team = session.get(Team, submitted.team_id)
         if (
-            team is None or team.season_id != season.id
+            team is None or not _team_is_current(session, team, _season_id(season), now)
             or team.moderation_status == "hidden"
             or team.visibility != "public"
         ):
@@ -482,16 +624,32 @@ def join_team(request: Request, submitted: TeamJoin):
         return payload
 
 
+@router.delete("/selection")
+def leave_selected_team(request: Request):
+    with SessionLocal() as session:
+        profile, season, now = authenticated_context(request, session)
+        try:
+            changed = leave_team(session, profile=profile, season=season, now=now)
+            session.commit()
+        except ValueError as error:
+            session.rollback()
+            raise HTTPException(status_code=409, detail=str(error)) from error
+        return {**selection_payload(session, profile=profile, now=now), "changed": changed}
+
+
 @router.post("/private-requests", status_code=201)
 def request_private_team_membership(
     request: Request, submitted: PrivateTeamJoin
 ):
     with SessionLocal() as session:
         profile, season, now = authenticated_context(request, session)
-        lock_team_seasons(session, season.id)
+        _lock_team_writer(session, _season_id(season))
+        persistent = persistent_enabled(session, now)
+        if persistent:
+            _lock_profile(session, profile)
         code = submitted.join_code.strip().upper().replace(" ", "")
         team = session.scalar(select(Team).where(
-            Team.season_id == season.id,
+            Team.is_operating.is_(True) if persistent else Team.season_id == _season_id(season),
             Team.join_code == code,
             Team.visibility == "private",
             Team.director_led.is_(True),
@@ -502,13 +660,13 @@ def request_private_team_membership(
         if team.creator_profile_id == profile.id:
             raise HTTPException(status_code=409, detail="Manage your team from Director Team Management.")
         membership = active_membership(
-            session, profile_id=profile.id, season_id=season.id
+            session, profile_id=profile.id, season_id=_season_id(season), at=now
         )
         if membership is not None and membership.team_id == team.id:
             return {"created": False, "status": "joined"}
         existing = session.scalar(select(TeamJoinRequest).where(
             TeamJoinRequest.profile_id == profile.id,
-            TeamJoinRequest.season_id == season.id,
+            TeamJoinRequest.is_persistent.is_(True) if persistent else TeamJoinRequest.season_id == _season_id(season),
             TeamJoinRequest.status == "pending",
         ))
         if existing is not None:
@@ -519,8 +677,9 @@ def request_private_team_membership(
                 )
             return {"created": False, "status": "pending", "request_id": existing.id}
         join_request = TeamJoinRequest(
-            season_id=season.id, team_id=team.id, profile_id=profile.id,
+            season_id=None if persistent else _season_id(season), team_id=team.id, profile_id=profile.id,
             status="pending", requested_at=now.astimezone(timezone.utc),
+            is_persistent=persistent,
         )
         session.add(join_request)
         try:
@@ -538,10 +697,10 @@ def request_private_team_membership(
 @router.get("/director")
 def get_director_team(request: Request, team_id: int | None = None):
     with SessionLocal() as session:
-        profile, season, _ = authenticated_context(request, session)
+        profile, season, now = authenticated_context(request, session)
         try:
             return director_team_payload(
-                session, profile=profile, season=season, team_id=team_id
+                session, profile=profile, season=season, team_id=team_id, now=now
             )
         except PermissionError as error:
             raise HTTPException(status_code=403, detail=str(error)) from error
@@ -565,7 +724,7 @@ def create_private_director_team(request: Request, submitted: TeamCreate):
         return {
             "created": True,
             **director_team_payload(
-                session, profile=profile, season=season, team_id=team.id
+                session, profile=profile, season=season, team_id=team.id, now=now
             ),
         }
 
@@ -573,17 +732,17 @@ def create_private_director_team(request: Request, submitted: TeamCreate):
 @router.post("/director/{team_id}/join-code")
 def regenerate_private_team_code(team_id: int, request: Request):
     with SessionLocal() as session:
-        profile, season, _ = authenticated_context(request, session)
-        lock_team_seasons(session, season.id)
+        profile, season, now = authenticated_context(request, session)
+        _lock_team_writer(session, _season_id(season))
         try:
             team = _owned_director_team(
-                session, profile=profile, team_id=team_id
+                session, profile=profile, team_id=team_id, now=now
             )
         except PermissionError as error:
             raise HTTPException(status_code=403, detail=str(error)) from error
         except LookupError as error:
             raise HTTPException(status_code=404, detail=str(error)) from error
-        if team.season_id != season.id:
+        if not _team_is_current(session, team, _season_id(season), now):
             raise HTTPException(status_code=404, detail="Director-led team was not found.")
         team.join_code = _new_join_code(session)
         session.commit()
@@ -594,9 +753,9 @@ def regenerate_private_team_code(team_id: int, request: Request):
 def join_owned_team_as_player(team_id: int, request: Request):
     with SessionLocal() as session:
         profile, season, now = authenticated_context(request, session)
-        lock_team_seasons(session, season.id)
+        _lock_team_writer(session, _season_id(season))
         try:
-            team = _owned_director_team(session, profile=profile, team_id=team_id)
+            team = _owned_director_team(session, profile=profile, team_id=team_id, now=now)
             membership, changed = select_team(
                 session, profile=profile, season=season, team=team, now=now,
                 private_authorized=True,
@@ -620,19 +779,20 @@ def resolve_private_team_request(
 ):
     with SessionLocal() as session:
         profile, season, now = authenticated_context(request, session)
-        lock_team_seasons(session, season.id)
+        _lock_team_writer(session, _season_id(season))
         try:
-            team = _owned_director_team(session, profile=profile, team_id=team_id)
+            team = _owned_director_team(session, profile=profile, team_id=team_id, now=now)
         except PermissionError as error:
             raise HTTPException(status_code=403, detail=str(error)) from error
         except LookupError as error:
             raise HTTPException(status_code=404, detail=str(error)) from error
-        if team.season_id != season.id:
+        if not _team_is_current(session, team, _season_id(season), now):
             raise HTTPException(status_code=404, detail="Director-led team was not found.")
         join_request = session.get(TeamJoinRequest, request_id)
         if (
             join_request is None or join_request.team_id != team.id
             or join_request.status != "pending"
+            or (persistent_enabled(session, now) and not join_request.is_persistent)
         ):
             raise HTTPException(status_code=404, detail="Pending request was not found.")
         action = submitted.action.strip().casefold()
@@ -667,19 +827,21 @@ def resolve_private_team_request(
 def remove_private_team_member(team_id: int, profile_id: int, request: Request):
     with SessionLocal() as session:
         profile, season, now = authenticated_context(request, session)
-        lock_team_seasons(session, season.id)
+        _lock_team_writer(session, _season_id(season))
         try:
-            team = _owned_director_team(session, profile=profile, team_id=team_id)
+            team = _owned_director_team(session, profile=profile, team_id=team_id, now=now)
         except PermissionError as error:
             raise HTTPException(status_code=403, detail=str(error)) from error
         except LookupError as error:
             raise HTTPException(status_code=404, detail=str(error)) from error
-        membership = session.scalar(select(TeamMembership).where(
-            TeamMembership.team_id == team.id,
-            TeamMembership.season_id == season.id,
-            TeamMembership.profile_id == profile_id,
-            TeamMembership.ended_at.is_(None),
-        ))
+        if not _team_is_current(session, team, _season_id(season), now):
+            raise HTTPException(status_code=404, detail="Director-led team was not found.")
+        member_profile = session.get(WoodchuckProfile, profile_id)
+        if member_profile is not None and persistent_enabled(session, now):
+            _lock_profile(session, member_profile)
+        membership = active_membership(session, profile_id=profile_id, season_id=_season_id(season), at=now)
+        if membership is not None and membership.team_id != team.id:
+            membership = None
         if membership is None:
             raise HTTPException(status_code=404, detail="Active team member was not found.")
         membership.ended_at = now.astimezone(timezone.utc)

@@ -2,16 +2,17 @@
 
 from datetime import date, datetime, time, timezone
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from .contests import (
-    CENTRAL, central_week_boundaries,
+    CENTRAL, central_week_boundaries, _membership_snapshot_at,
     weekly_camp_points, weekly_student_points,
 )
-from .models import Contest, ContestResult, ContestWeek, Season, Team, TeamWeekMembershipSnapshot
+from .models import Contest, ContestResult, ContestWeek, Season, Team, TeamMembership, TeamWeekMembershipSnapshot
 from .seasons import season_covering_date
-from .teams import active_membership, membership_at, public_team_identity
+from .teams import active_membership, public_team_identity
+from .team_authority import effective_membership, membership_for_week, persistent_enabled
 
 
 def _contest_week_emblem(session: Session, *, profile_id: int, week: ContestWeek):
@@ -22,9 +23,8 @@ def _contest_week_emblem(session: Session, *, profile_id: int, week: ContestWeek
     ))
     team_id = snapshot.team_id if snapshot is not None else None
     if snapshot is None and week.status != "finalized":
-        membership = membership_at(
-            session, profile_id=profile_id, season_id=week.season_id,
-            at=datetime.combine(week.week_end, time.min, CENTRAL).astimezone(timezone.utc),
+        membership = membership_for_week(
+            session, profile_id=profile_id, week=week, at=_membership_snapshot_at(week),
         )
         team_id = membership.team_id if membership else None
     team = session.get(Team, team_id) if team_id is not None else None
@@ -35,13 +35,59 @@ def current_roster_period(session: Session, *, today: date):
     # Do not use ensure_band_camp_data(): a dashboard read must not create or
     # commit seasons, weeks, or contest definitions.
     season = season_covering_date(session, today)
-    if season is None:
+    if season is None and not persistent_enabled(session):
         return None, None
     start, _, _, _ = central_week_boundaries(datetime.combine(today, time.min, CENTRAL))
-    week = session.scalar(select(ContestWeek).where(
-        ContestWeek.season_id == season.id, ContestWeek.week_start == start,
-    ))
+    query = select(ContestWeek).where(ContestWeek.week_start == start)
+    if not persistent_enabled(session):
+        query = query.where(ContestWeek.season_id == season.id)
+    week = session.scalars(query).one_or_none()
     return season, week
+
+
+def current_student_teams(session: Session, *, profile_ids, season: Season | None,
+                          at: datetime | None = None) -> dict[int, Team]:
+    """Batch the current authorized roster without recomputing historical weeks."""
+    if not profile_ids:
+        return {}
+    at = at or datetime.now(timezone.utc)
+    persistent = persistent_enabled(session, at=at)
+    if not persistent and season is None:
+        return {}
+    query = select(TeamMembership.profile_id, Team).join(
+        Team, Team.id == TeamMembership.team_id,
+    ).where(TeamMembership.profile_id.in_(profile_ids))
+    if persistent:
+        query = query.where(
+            TeamMembership.is_persistent.is_(True), Team.is_operating.is_(True),
+            TeamMembership.started_at <= at,
+            or_(TeamMembership.ended_at.is_(None), TeamMembership.ended_at > at),
+        )
+    else:
+        query = query.where(
+            TeamMembership.season_id == season.id, Team.season_id == season.id,
+            TeamMembership.ended_at.is_(None),
+        )
+    result = {}
+    for profile_id, team in session.execute(query):
+        if profile_id in result:
+            raise ValueError("Ambiguous current Team membership authority.")
+        result[profile_id] = team
+    return result
+
+
+def current_student_team(session: Session, *, profile_id: int, season: Season | None,
+                         at: datetime | None = None) -> Team | None:
+    """Current private roster identity is independent of the selected practice week."""
+    at = at or datetime.now(timezone.utc)
+    if persistent_enabled(session, at=at):
+        membership = effective_membership(session, profile_id=profile_id, at=at)
+        return session.get(Team, membership.team_id) if membership else None
+    if season is None:
+        return None
+    membership = active_membership(session, profile_id=profile_id, season_id=season.id, at=at)
+    team = session.get(Team, membership.team_id) if membership else None
+    return team if team is not None and team.season_id == season.id else None
 
 
 def student_contest_context(
@@ -50,12 +96,10 @@ def student_contest_context(
 ) -> dict[str, object]:
     """Called only with IDs supplied by band_director_students; no public ID API."""
     team_data = None
-    if season is not None:
-        membership = active_membership(session, profile_id=profile_id, season_id=season.id)
-        team = session.get(Team, membership.team_id) if membership else None
-        if team is not None and team.season_id == season.id:
-            name, emblem = public_team_identity(team)
-            team_data = {"name": name, "emblem": emblem}
+    team = current_student_team(session, profile_id=profile_id, season=season)
+    if team is not None:
+        name, emblem = public_team_identity(team)
+        team_data = {"name": name, "emblem": emblem}
     context = {"team": team_data, "contest": None}
     if week is None:
         return context

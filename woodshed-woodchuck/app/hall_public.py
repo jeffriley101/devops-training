@@ -12,7 +12,9 @@ def _medals(counts: dict) -> dict:
     return {key: counts[key] for key in ("gold", "silver", "bronze", "total")}
 
 
-def _named_key(value: dict) -> dict:
+def _named_key(value: dict | None) -> dict | None:
+    if value is None:
+        return None
     return {"key": value["key"], "name": value["name"]}
 
 

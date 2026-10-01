@@ -48,6 +48,10 @@ from .models import (
     WoodchuckProfile,
     WoodchuckState,
 )
+from .team_authority import (
+    effective_membership, lock_authority, persistent_enabled,
+    rules_version_for_start, week_uses_persistent,
+)
 from .team_practice_rating import (
     ACTIVE_MINUTES_THRESHOLD,
     calculate_team_practice_rating,
@@ -381,11 +385,23 @@ def ensure_current_contest_data(
     *,
     now: datetime,
 ) -> tuple[Season, list[Contest], ContestWeek]:
+    lock_authority(session)
     week_start, week_end, deadline, finalize_after = central_week_boundaries(now)
+    persistent = persistent_enabled(session, at=now)
 
     central_today = now.astimezone(CENTRAL).date()
     try:
         season = season_covering_date(session, central_today)
+        if season is None and persistent:
+            # A closed presentation label cannot disable an existing competition
+            # week. Retain its stored history label without changing that row.
+            stored = session.scalars(select(ContestWeek).where(
+                ContestWeek.week_start == week_start,
+            )).all()
+            if len(stored) > 1:
+                raise HTTPException(status_code=409, detail="Ambiguous contest week; explicit repair required.")
+            if stored:
+                season = session.get(Season, stored[0].season_id)
         if season is None:
             definition = canonical_definition_for_date(central_today)
             if definition is not None:
@@ -395,19 +411,20 @@ def ensure_current_contest_data(
         raise HTTPException(status_code=409, detail=str(error)) from error
     if season is None:
         raise HTTPException(status_code=409, detail="No active season covers the current date.")
-    if week_start < season.starts_on or (
+    if not persistent and (week_start < season.starts_on or (
         season.ends_on is not None and week_end > season.ends_on + timedelta(days=1)
-    ):
+    )):
         raise HTTPException(status_code=409, detail="Contest week crosses a season boundary.")
 
     contests = ensure_contest_definitions(session)
 
-    contest_week = session.scalar(
-        select(ContestWeek).where(
-            ContestWeek.season_id == season.id,
-            ContestWeek.week_start == week_start,
-        )
-    )
+    week_query = select(ContestWeek).where(ContestWeek.week_start == week_start)
+    if not persistent:
+        week_query = week_query.where(ContestWeek.season_id == season.id)
+    weeks = session.scalars(week_query).all()
+    if len(weeks) > 1:
+        raise HTTPException(status_code=409, detail="Ambiguous contest week; explicit repair required.")
+    contest_week = weeks[0] if weeks else None
     if contest_week is None:
         if session.scalar(select(ContestWeek.id).where(ContestWeek.week_start == week_start)) is not None:
             raise HTTPException(status_code=409, detail="Existing week belongs to another season; explicit repair required.")
@@ -418,6 +435,7 @@ def ensure_current_contest_data(
             verification_deadline_at=deadline,
             finalize_after=finalize_after,
             status="open",
+            team_membership_rules_version=rules_version_for_start(session, week_start),
         )
         session.add(contest_week)
     elif contest_week.week_end != week_end:
@@ -641,16 +659,14 @@ def _student_emblem_keys_for_week(
             snapshot.profile_id: snapshot.team_id for snapshot in snapshots
         }
     else:
-        at = datetime.combine(
-            contest_week.week_end, time.min, CENTRAL
-        ).astimezone(timezone.utc)
-        memberships = session.scalars(select(TeamMembership).where(
+        at = _membership_snapshot_at(contest_week)
+        filters = [
             TeamMembership.profile_id.in_(profile_ids),
-            TeamMembership.season_id == contest_week.season_id,
             TeamMembership.started_at <= at,
-        ).order_by(
-            TeamMembership.profile_id,
-            TeamMembership.started_at.desc(),
+        ]
+        filters.append(_membership_authority_clause(contest_week))
+        memberships = session.scalars(select(TeamMembership).where(*filters).order_by(
+            TeamMembership.profile_id, TeamMembership.started_at.desc(),
         )).all()
         for membership in memberships:
             if membership.profile_id in team_ids_by_profile:
@@ -864,11 +880,13 @@ def student_camp_point_totals(
     if season is None:
         season = season_covering_date(session, central_now.date())
     if season is not None and contest_week is None:
-        contest_week = session.scalar(select(ContestWeek).where(
-            ContestWeek.season_id == season.id,
+        query = select(ContestWeek).where(
             ContestWeek.week_start <= central_now.date(),
             ContestWeek.week_end > central_now.date(),
-        ))
+        )
+        if not persistent_enabled(session, at=now):
+            query = query.where(ContestWeek.season_id == season.id)
+        contest_week = session.scalars(query).one_or_none()
     if season is None or contest_week is None:
         return {"camp_points_this_week": 0, "camp_points_season": 0}
 
@@ -949,8 +967,22 @@ def create_camp_point_award(
     return award, True
 
 
+def _refresh_earning_profile(session: Session, request: Request, profile: WoodchuckProfile):
+    # Authentication precedes the fence. Refresh after waiting so deletion or
+    # session revocation cannot leave an authenticated cached profile writable.
+    session.refresh(profile)
+    profile = current_profile(request, session)
+    if profile is None:
+        raise HTTPException(status_code=401, detail="Student sign-in is required.")
+    return profile
+
+
 def _active_team_id_for_event(session: Session, profile_id: int, now: datetime) -> int | None:
     """Snapshot team attribution at the earning event; legacy awards remain null."""
+    lock_authority(session)
+    if persistent_enabled(session, at=now):
+        membership = effective_membership(session, profile_id=profile_id, at=now)
+        return membership.team_id if membership else None
     season = season_covering_date(session, now.astimezone(CENTRAL).date())
     if season is None:
         return None
@@ -1048,6 +1080,21 @@ def _team_rankings(
     return rows
 
 
+def _membership_authority_clause(week: ContestWeek):
+    # Legacy rows remain authoritative for their original weeks, including
+    # promoted rows; no existing row or snapshot is reinterpreted by activation.
+    if week_uses_persistent(week):
+        return TeamMembership.is_persistent.is_(True)
+    return TeamMembership.season_id == week.season_id
+
+
+def _membership_snapshot_at(week: ContestWeek) -> datetime:
+    at = datetime.combine(week.week_end, time.min, CENTRAL).astimezone(timezone.utc)
+    # A Monday transition belongs to the next competition week. Legacy readers
+    # retain their original exact-boundary rule for historical compatibility.
+    return at - timedelta(microseconds=1) if week_uses_persistent(week) else at
+
+
 def _eligible_weekly_team_rosters(
     session: Session, contest_week: ContestWeek
 ) -> dict[int, set[int]]:
@@ -1058,7 +1105,7 @@ def _eligible_weekly_team_rosters(
         contest_week.week_end, time.min, CENTRAL
     ).astimezone(timezone.utc)
     memberships = session.scalars(select(TeamMembership).where(
-        TeamMembership.season_id == contest_week.season_id,
+        _membership_authority_clause(contest_week),
         TeamMembership.started_at < end_at,
         or_(
             TeamMembership.ended_at.is_(None),
@@ -1077,13 +1124,22 @@ PRECISE_PRACTICE_SCORING = "precise_seconds"
 # team identity, results, or derived rewards changes. It is written only when
 # this finalizer completes a new week; older weeks have unknown provenance.
 FINALIZER_RULES_VERSION = "contest_finalizer_v1"
+PERSISTENT_FINALIZER_RULES_VERSION = "contest_finalizer_persistent_v1"
+
+
+def finalizer_rules_version(week: ContestWeek) -> str:
+    return PERSISTENT_FINALIZER_RULES_VERSION if week_uses_persistent(week) else FINALIZER_RULES_VERSION
 
 
 def historical_rules_incompatibility(week: ContestWeek) -> str | None:
     """Return a fail-closed reason before reconstructing finalized artifacts."""
     if week.finalizer_rules_version is None:
         return "historical_rules_unknown"
-    if week.finalizer_rules_version != FINALIZER_RULES_VERSION:
+    try:
+        expected = finalizer_rules_version(week)
+    except ValueError:
+        return "historical_rules_incompatible"
+    if week.finalizer_rules_version != expected:
         return "historical_rules_incompatible"
     return None
 
@@ -1259,6 +1315,7 @@ def _lifetime_team_practice_scores(
     session: Session, through_week: ContestWeek, *,
     source_cutoff: datetime | None = None,
     public_only: bool = False,
+    persistent_display: bool | None = None,
 ) -> dict[int, float]:
     """Aggregate qualifying public Team practice once per persistent family."""
     _practice_scoring_mode(through_week)
@@ -1278,16 +1335,23 @@ def _lifetime_team_practice_scores(
         if public_only and not chart_public(session, chart):
             continue
         scores[team.family_id] = scores.get(team.family_id, 0) + _scoring_seconds(chart, through_week)
-    # A current-season incarnation takes precedence even if it is unavailable;
-    # do not bypass its moderation/privacy state by showing an older incarnation.
+    if persistent_display is None:
+        persistent_display = persistent_enabled(session)
     representatives = {}
-    for team in session.scalars(select(Team).join(Season).where(
-        Team.family_id.in_(scores), Season.starts_on <= through_week.week_start
-    ).order_by((Team.season_id == through_week.season_id).desc(), Season.starts_on.desc(), Team.id.desc())):
-        if team.family_id in representatives:
-            continue
-        if team.season_id == through_week.season_id or public_team_identity_allowed(team):
+    if persistent_display:
+        for team in session.scalars(select(Team).where(
+            Team.family_id.in_(scores), Team.is_operating.is_(True),
+        )):
             representatives[team.family_id] = team
+    else:
+        # Historical finalizer/repair keeps its original seasonal representative.
+        for team in session.scalars(select(Team).join(Season).where(
+            Team.family_id.in_(scores), Season.starts_on <= through_week.week_start
+        ).order_by((Team.season_id == through_week.season_id).desc(), Season.starts_on.desc(), Team.id.desc())):
+            if team.family_id in representatives:
+                continue
+            if team.season_id == through_week.season_id or public_team_identity_allowed(team):
+                representatives[team.family_id] = team
     return {team.id: scores[family_id] / 60 for family_id, team in representatives.items()
             if public_team_identity_allowed(team)}
 
@@ -1383,13 +1447,15 @@ def _seasonal_team_point_scores(
 def team_leaderboards(
     session: Session, *, season: Season, contest_week: ContestWeek,
     source_cutoff: datetime | None = None,
-    _include_private: bool = False
+    _include_private: bool = False,
+    _historical_rules: bool = False,
 ) -> dict[str, dict[str, list[dict[str, object]]]]:
     weekly = _weekly_team_scores(
         session, contest_week, source_cutoff=source_cutoff, public_only=not _include_private
     )
     lifetime_practice = _lifetime_team_practice_scores(
-        session, contest_week, source_cutoff=source_cutoff, public_only=not _include_private
+        session, contest_week, source_cutoff=source_cutoff, public_only=not _include_private,
+        persistent_display=(week_uses_persistent(contest_week) if _historical_rules else None),
     )
     weekly_activity_points = _weekly_team_activity_point_scores(
         session, contest_week, source_cutoff=source_cutoff, public_only=not _include_private
@@ -1830,14 +1896,14 @@ def _increment_crown_progress(
 
 
 def _snapshot_memberships(session: Session, contest_week: ContestWeek) -> list[TeamWeekMembershipSnapshot]:
-    at = datetime.combine(contest_week.week_end, time.min, CENTRAL).astimezone(timezone.utc)
+    at = _membership_snapshot_at(contest_week)
     existing = session.scalars(select(TeamWeekMembershipSnapshot).where(
         TeamWeekMembershipSnapshot.contest_week_id == contest_week.id
     )).all()
     if existing:
         return list(existing)
     memberships = session.scalars(select(TeamMembership).where(
-        TeamMembership.season_id == contest_week.season_id,
+        _membership_authority_clause(contest_week),
         TeamMembership.started_at <= at,
     ).order_by(TeamMembership.profile_id, TeamMembership.started_at.desc())).all()
     chosen: dict[int, TeamMembership] = {}
@@ -1946,6 +2012,7 @@ def _contest_result_once(
 
 def locked_contest_week(session: Session, *, week_start: date) -> ContestWeek | None:
     """Lock and refresh the durable week before deciding its finalization path."""
+    lock_authority(session)
     # Share continuity's writer fence before taking week/reward locks. An
     # activation at midnight must serialize with a later source finalization.
     from .team_continuity import lock_team_seasons
@@ -2116,7 +2183,7 @@ def finalize_contest_week(
             team_members.setdefault(snapshot.team_id, set()).add(snapshot.profile_id)
     boards = team_leaderboards(
         session, season=season, contest_week=week, source_cutoff=source_cutoff,
-        _include_private=True,
+        _include_private=True, _historical_rules=True,
     )
     legacy_keys = set(session.scalars(select(Contest.key).where(
         Contest.key.in_(LEGACY_TEAM_CONTEST_REPLACEMENTS.values())
@@ -2174,7 +2241,7 @@ def finalize_contest_week(
     if not was_finalized:
         week.status = "finalized"
         week.finalized_at = now_utc
-        week.finalizer_rules_version = FINALIZER_RULES_VERSION
+        week.finalizer_rules_version = finalizer_rules_version(week)
     session.flush()
     return week
 
@@ -2312,6 +2379,22 @@ def _current_team_member_ids(
     if not isinstance(family_id, int):
         return set()
     now_utc = aware_utc(now)
+    if persistent_enabled(session, at=now_utc):
+        current_team_id = session.scalar(select(Team.id).where(
+            Team.family_id == family_id, Team.is_operating.is_(True),
+            Team.visibility == "public", Team.moderation_status != "hidden",
+        ))
+        if current_team_id is None:
+            return set()
+        return set(session.scalars(select(TeamMembership.profile_id).join(
+            WoodchuckProfile, WoodchuckProfile.id == TeamMembership.profile_id,
+        ).where(
+            TeamMembership.team_id == current_team_id,
+            TeamMembership.is_persistent.is_(True),
+            TeamMembership.started_at <= now_utc,
+            or_(TeamMembership.ended_at.is_(None), TeamMembership.ended_at > now_utc),
+            WoodchuckProfile.status == "active",
+        )))
     # Match the existing team-membership authority: a temporary display
     # entitlement follows the active current season, not the season in which
     # a lifetime medal was earned.
@@ -2459,6 +2542,15 @@ def hall_of_champions_payload(
         for team in session.scalars(select(Team).where(Team.id.in_(team_ids))).all()
     } if team_ids else {}
 
+    operating_by_family = {}
+    persistent_current = persistent_enabled(session, at=now or datetime.now(timezone.utc))
+    if persistent_current:
+        family_ids = {team.family_id for team in teams.values()}
+        operating_by_family = {
+            team.family_id: team for team in session.scalars(select(Team).where(
+                Team.family_id.in_(family_ids), Team.is_operating.is_(True),
+            ))
+        }
     students_by_profile: dict[int, dict[str, object]] = {}
     teams_by_subject: dict[str, dict[str, object]] = {}
     instruments_by_key: dict[str, dict[str, object]] = {}
@@ -2479,14 +2571,21 @@ def hall_of_champions_payload(
                 }
                 students_by_profile[result.profile_id] = champion
         elif result.subject_type == "team":
-            team = teams.get(result.team_id)
-            team_key = lifetime_team_identity(result, team)
+            historical_team = teams.get(result.team_id)
+            team = historical_team
+            if persistent_current and historical_team is not None:
+                operating = operating_by_family.get(historical_team.family_id)
+                if not _include_internal and (operating is None or not public_team_identity_allowed(operating)):
+                    continue
+                if operating is not None and not _include_internal:
+                    team = operating
+            team_key = lifetime_team_identity(result, historical_team)
             champion = teams_by_subject.get(team_key)
             if champion is None:
                 champion = {
-                    "team_id": result.team_id,
+                    "team_id": team.id if persistent_current and not _include_internal and team is not None else result.team_id,
                     "team_name": public_team_name(
-                        team, result.display_name_snapshot
+                        team, team.display_name if persistent_current and not _include_internal and team is not None else result.display_name_snapshot
                     ),
                     "emblem_key": public_team_emblem(team),
                     "_normalized_name": (
@@ -2620,7 +2719,7 @@ def hall_of_champions_payload(
             DirectorTeamContest.id == DirectorTeamContestResult.contest_id,
         )
         .outerjoin(Team, Team.id == DirectorTeamContestResult.team_id)
-        .join(Season, Season.id == DirectorTeamContest.season_id)
+        .outerjoin(Season, Season.id == DirectorTeamContest.season_id)
         .where(
             DirectorTeamContest.status == "finalized",
             DirectorTeamContestResult.rank == 1,
@@ -2645,7 +2744,7 @@ def hall_of_champions_payload(
             "title": event.title,
             "metric": event.metric,
             "metric_label": metric_labels[event.metric],
-            "season": {"key": season.key, "name": season.name},
+            "season": {"key": season.key, "name": season.name} if season else None,
             "starts_at": utc_iso(event.starts_at),
             "ends_at": utc_iso(event.ends_at),
             "winners": [],
@@ -3107,6 +3206,8 @@ def record_bonus_challenge_progress(request: Request, submitted: BonusChallengeP
         profile = current_profile(request, session)
         if profile is None:
             raise HTTPException(401, "Student sign-in is required.")
+        lock_authority(session)
+        profile = _refresh_earning_profile(session, request, profile)
         lock_state(session, profile.id)
         # The profile may have changed while this request waited for its lock.
         session.refresh(profile)
@@ -3121,10 +3222,13 @@ def record_bonus_challenge_progress(request: Request, submitted: BonusChallengeP
         except IntegrityError:
             # A concurrent daily insert committed the entire award transaction.
             session.rollback()
+            lock_authority(session)
+            profile = _refresh_earning_profile(session, request, profile)
             lock_state(session, profile.id)
+            now = datetime.now(timezone.utc)
             resolved = require_earned_bonus(
                 session, profile=profile, activity_date=submitted.activity_date,
-                challenge_instance=submitted.challenge_instance, now=datetime.now(timezone.utc),
+                challenge_instance=submitted.challenge_instance, now=now,
             )
             if not resolved["completed"]:
                 raise HTTPException(500, "Bonus Challenge could not be saved. Please try again.")
@@ -3237,6 +3341,8 @@ def check_trivia_answer(
         profile = current_profile(request, session)
         if profile is None:
             raise HTTPException(status_code=401, detail="Student sign-in is required.")
+        lock_authority(session)
+        profile = _refresh_earning_profile(session, request, profile)
         locked_state = lock_state(session, profile.id)
         now = datetime.now(timezone.utc)
         today = now.astimezone(CENTRAL).date()
@@ -3266,6 +3372,12 @@ def check_trivia_answer(
                 session.flush()
             except IntegrityError:
                 session.rollback()
+                lock_authority(session)
+                profile = _refresh_earning_profile(session, request, profile)
+                locked_state = lock_state(session, profile.id)
+                now = datetime.now(timezone.utc)
+                if now.astimezone(CENTRAL).date() != today:
+                    raise HTTPException(status_code=409, detail="Trivia day changed. Refresh BOARD and try again.")
                 attempt = session.scalar(select(DailyTriviaAttempt).where(
                     DailyTriviaAttempt.profile_id == profile.id,
                     DailyTriviaAttempt.activity_date == today,
@@ -3315,6 +3427,8 @@ def award_camp_points(
         profile = current_profile(request, session)
         if profile is None:
             raise HTTPException(status_code=401, detail="Student sign-in is required.")
+        lock_authority(session)
+        profile = _refresh_earning_profile(session, request, profile)
         locked_state = lock_state(session, profile.id)
         if submitted.activity_type.strip().casefold() == "trivia":
             attempt = session.scalar(select(DailyTriviaAttempt).where(

@@ -206,3 +206,19 @@ def test_hall_preserves_pristine_division_and_historical_moderation(hall_db):
     with hall_db() as session:
         assert session.scalar(select(ContestResult).where(ContestResult.subject_type == "team")).display_name_snapshot == "Team Alpha"
         assert session.scalar(select(DirectorTeamContestResult)).score == 42.5
+
+
+def test_director_hall_allows_no_presentation_season(hall_db):
+    with hall_db() as session:
+        event = session.scalar(select(DirectorTeamContest))
+        event.season_id = None
+        session.commit()
+        before = dict(session.execute(select(DirectorTeamContestResult.__table__)).mappings().one())
+
+    response = client_for(1).get("/contests/hall-of-champions")
+    assert response.status_code == 200
+    event = response.json()["director_team_contests"][0]
+    assert event["season"] is None
+    assert event["winners"] == [{"team_name": "Team Alpha", "emblem_key": "shield:gold", "score": 42.5}]
+    with hall_db() as session:
+        assert dict(session.execute(select(DirectorTeamContestResult.__table__)).mappings().one()) == before

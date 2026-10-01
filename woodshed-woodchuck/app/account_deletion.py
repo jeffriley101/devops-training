@@ -17,6 +17,7 @@ from .models import (
     StudentOrganizationMembership,
     StudentVerifierConnection,
     Team,
+    TeamJoinRequest,
     TeamMembership,
     TeamReport,
     TrustedVerifierInvitation,
@@ -25,6 +26,7 @@ from .models import (
 )
 from .security import hash_invitation_token, verify_pin
 from .team_continuity import lock_team_seasons
+from .team_authority import lock_authority, persistent_enabled
 
 
 DELETED_PUBLIC_NAME = "Deleted Woodchuck"
@@ -82,10 +84,15 @@ def anonymize_woodchuck_account(
     # Deletion spans all seasons. Fence before membership/team writes so a
     # continuation cannot add a roster row behind the anonymization update.
     with session.no_autoflush:
+        lock_authority(session)
         lock_team_seasons(session, *session.scalars(select(Season.id).order_by(Season.id)))
+        session.scalar(select(WoodchuckProfile).where(
+            WoodchuckProfile.id == profile.id
+        ).with_for_update().execution_options(populate_existing=True))
     if profile.status == "deleted":
         return
     now = _utc(now)
+    persistent = persistent_enabled(session, now)
     from .c001_abuse import record_deletion
     record_deletion(session, profile.id)
     original_id = profile.woodchuck_id
@@ -93,7 +100,14 @@ def anonymize_woodchuck_account(
     session.execute(update(TeamMembership).where(
         TeamMembership.profile_id == profile.id,
         TeamMembership.ended_at.is_(None),
+        TeamMembership.is_persistent.is_(True) if persistent else True,
     ).values(ended_at=now))
+    if persistent:
+        session.execute(update(TeamJoinRequest).where(
+            TeamJoinRequest.profile_id == profile.id,
+            TeamJoinRequest.is_persistent.is_(True),
+            TeamJoinRequest.status == "pending",
+        ).values(status="cancelled", resolved_at=now))
     session.execute(update(Team).where(
         Team.creator_profile_id == profile.id
     ).values(creator_profile_id=None))

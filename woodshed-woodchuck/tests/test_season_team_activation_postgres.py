@@ -23,22 +23,6 @@ def pg(tmp_path):
     engine.dispose()
 
 
-def test_canonical_and_history(pg):
-    spec.test_canonical_preflight_boundary_apply_repeat(pg)
-
-
-def test_source_finalization_after_activation(pg):
-    spec.test_later_normal_source_finalization(pg)
-
-
-def test_due_source_then_retry(pg):
-    spec.test_due_source_refuses_then_finalizes(pg)
-
-
-def test_rollback(pg, monkeypatch):
-    spec.test_failure_rolls_back(pg, monkeypatch)
-
-
 def test_preflight_database_readonly(pg, monkeypatch):
     original = repair.inventory.readonly_connection
     checked_count = []
@@ -59,51 +43,5 @@ def test_preflight_database_readonly(pg, monkeypatch):
         assert exc.value.orig.sqlstate == "25006"
 
 
-@pytest.mark.parametrize("competitor", ["activation", "creation", "join", "finalization"])
-@pytest.mark.parametrize("activation_first", [True, False])
-def test_serialized_workers(pg, monkeypatch, competitor, activation_first):
-    target_id = None
-    if competitor == "join":
-        with Session(pg[1]) as s:
-            target = make_team(s, season_id=2, display_name="Choice", normalized_name="choice",
-                               emblem_key="letter:X", creator_profile_id=99)
-            s.add(target); s.flush(); target_id = target.id; s.commit()
-    now = spec.DUE + timedelta(seconds=1) if competitor == "finalization" else spec.BOUNDARY
-    def activation():
-        return spec.activate(pg, now)["status"]
-    def other():
-        if competitor == "activation":
-            return activation()
-        with Session(pg[1]) as s:
-            if competitor == "finalization":
-                finalize_contest_week(s, week_start=spec.date(2026, 9, 21), now=now)
-                s.commit(); return "finalized"
-            profile, season = s.get(m.WoodchuckProfile, 26), s.get(m.Season, 2)
-            if competitor == "creation":
-                try:
-                    teams.create_and_join_team(s, profile=profile, season=season, name="Student Choice",
-                                               emblem_key="letter:Y", now=now)
-                    return "created"
-                except ValueError:
-                    s.rollback(); return "blocked"
-            teams.select_team(s, profile=profile, season=season, team=s.get(m.Team, target_id), now=now)
-            s.commit(); return "joined"
-    outcomes = ordered_race(monkeypatch, activation, other) if activation_first else ordered_race(monkeypatch, other, activation)
-    if competitor == "activation":
-        assert outcomes == ("READY", "ALREADY_COMPLETE")
-        assert spec.base.destination_counts(pg[1]) == (4, 11)
-    elif competitor == "finalization":
-        assert outcomes == (("NOT_READY", "finalized") if activation_first else ("finalized", "READY"))
-    elif activation_first:
-        assert outcomes[0] == "READY"
-    else:
-        assert outcomes[1] == "NOT_READY"
-        assert spec.base.destination_counts(pg[1]) == (1, 1)
-    with pg[1].connect() as c:
-        assert c.execute(text("SELECT family_id FROM teams WHERE season_id=2 GROUP BY family_id HAVING count(*)>1")).first() is None
-        assert c.execute(text("SELECT profile_id FROM team_memberships WHERE season_id=2 AND ended_at IS NULL GROUP BY profile_id HAVING count(*)>1")).first() is None
-
-
-@pytest.mark.parametrize("kind", ["frozen", "result", "snapshot"])
-def test_frozen_destination(pg, kind):
-    spec.test_whole_transition_refused(pg, kind)
+def test_retired_activation_preserves_postgres_history(pg):
+    spec.test_seasonal_activation_is_retired_without_copying(pg, spec.BOUNDARY)

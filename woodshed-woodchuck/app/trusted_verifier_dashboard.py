@@ -3,13 +3,13 @@ from datetime import datetime, timezone
 
 from sqlalchemy import select
 
-from .band_director_context import current_roster_period
+from .band_director_context import current_roster_period, current_student_team
 from .contests import CENTRAL
 from .models import CrownAward, PracticeChart, PracticeChartVerification, RewardGrant, Team
 from .practice_chart_routes import profile_practice_streak
 from .store_inventory import crown_name, PLACEABLE_REWARD_TYPES
 from .student_practice_metrics import practice_totals, student_practice_snapshot
-from .teams import active_membership, public_team_identity
+from .teams import public_team_identity
 from .verifiers import accepted_active_verifier_students, band_director_students, select_verifier_student
 
 
@@ -62,11 +62,10 @@ def verifier_dashboard_snapshot(session, *, verifier_id: int, connection_id=None
                        "minutes": season_totals["total"], "charts": season_totals["charts"],
                        "days": season_totals["days"], "verified": season_totals["verified"],
                        "pristine": season_totals["pristine"]}
-        membership = active_membership(session, profile_id=profile_id, season_id=season.id)
-        team = session.get(Team, membership.team_id) if membership else None
-        if team is not None and team.season_id == season.id:
-            name, _ = public_team_identity(team)
-            team_data = {"name": name}
+    team = current_student_team(session, profile_id=profile_id, season=season)
+    if team is not None:
+        name, _ = public_team_identity(team)
+        team_data = {"name": name}
     result["student"] = {k: v for k, v in student.items() if k != "profile_id"}
     result["student"].update(metrics, season=season_data, team=team_data,
                              practice_streak=profile_practice_streak(session, profile_id=profile_id, today=today),
@@ -93,11 +92,10 @@ def private_student_metrics(session, *, profile_id, today=None):
                        "minutes": season_totals["total"], "charts": season_totals["charts"],
                        "days": season_totals["days"], "verified": season_totals["verified"],
                        "pristine": season_totals["pristine"]}
-        membership = active_membership(session, profile_id=profile_id, season_id=season.id)
-        team = session.get(Team, membership.team_id) if membership else None
-        if team is not None and team.season_id == season.id:
-            name, _ = public_team_identity(team)
-            team_data = {"name": name}
+    team = current_student_team(session, profile_id=profile_id, season=season)
+    if team is not None:
+        name, _ = public_team_identity(team)
+        team_data = {"name": name}
     return dict(metrics, season=season_data, team=team_data,
                 practice_streak=profile_practice_streak(session, profile_id=profile_id, today=today),
                 achievements=recent_achievements(session, profile_id=profile_id))

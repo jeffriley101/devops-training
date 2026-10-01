@@ -51,6 +51,33 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
+        if connection.dialect.name == "sqlite":
+            # Batch recreation must not run with cascading foreign keys on:
+            # dropping a parent table could otherwise alter historical children.
+            # Save/disable outside the physical migration transaction, then run
+            # every DDL/DML operation atomically and validate before commit.
+            foreign_keys = connection.exec_driver_sql("PRAGMA foreign_keys").scalar()
+            connection.commit()
+            connection.exec_driver_sql("PRAGMA foreign_keys=OFF")
+            connection.commit()
+            try:
+                with connection.begin():
+                    connection.exec_driver_sql("BEGIN")
+                    context.configure(
+                        connection=connection,
+                        target_metadata=target_metadata,
+                        compare_type=True,
+                    )
+                    with context.begin_transaction():
+                        context.run_migrations()
+                    if list(connection.exec_driver_sql("PRAGMA foreign_key_check")):
+                        raise RuntimeError("migration_foreign_key_check_failed")
+            finally:
+                connection.exec_driver_sql(
+                    "PRAGMA foreign_keys=ON" if foreign_keys else "PRAGMA foreign_keys=OFF"
+                )
+                connection.commit()
+            return
         context.configure(
             connection=connection,
             target_metadata=target_metadata,

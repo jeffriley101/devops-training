@@ -6,7 +6,7 @@ from datetime import date, datetime, time, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, true
 from sqlalchemy.orm import Session
 
 from .practice_duration import chart_seconds, qualified_practice_clause
@@ -24,6 +24,7 @@ from .models import (
     TeamMembership,
     WoodchuckProfile,
 )
+from .team_authority import lock_authority, persistent_enabled
 from .team_practice_rating import (
     ACTIVE_MINUTES_THRESHOLD,
     calculate_team_practice_rating,
@@ -85,6 +86,12 @@ def _director_profile(request: Request, session: Session) -> WoodchuckProfile:
     profile = current_profile(request, session)
     if profile is None:
         raise HTTPException(status_code=401, detail="Student sign-in is required.")
+    if request.scope.get("method", "GET") not in {"GET", "HEAD", "OPTIONS"}:
+        lock_authority(session)
+        session.refresh(profile)
+        profile = current_profile(request, session)
+        if profile is None:
+            raise HTTPException(status_code=401, detail="Student sign-in is required.")
     if not has_band_director_capability(session, profile_id=profile.id):
         raise HTTPException(status_code=403, detail="Band Director authorization is required.")
     return profile
@@ -97,18 +104,23 @@ def _owned_team(
         team = _owned_director_team(session, profile=profile, team_id=team_id)
     except LookupError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
-    if season_id is not None and team.season_id != season_id:
+    if (not persistent_enabled(session) and season_id is not None
+            and team.season_id != season_id):
         raise HTTPException(status_code=404, detail="Director-led team was not found.")
     return team
 
 
 def _period_roster(
-    session: Session, *, team_id: int, starts_at: datetime, ends_at: datetime
+    session: Session, *, team_id: int, starts_at: datetime, ends_at: datetime,
+    persistent: bool | None = None,
 ) -> set[int]:
+    if persistent is None:
+        persistent = persistent_enabled(session)
+    authority = TeamMembership.is_persistent.is_(True) if persistent else true()
     return set(session.scalars(select(TeamMembership.profile_id).join(
         WoodchuckProfile, WoodchuckProfile.id == TeamMembership.profile_id
     ).where(
-        TeamMembership.team_id == team_id,
+        TeamMembership.team_id == team_id, authority,
         TeamMembership.started_at < _utc(ends_at),
         or_(TeamMembership.ended_at.is_(None), TeamMembership.ended_at > _utc(starts_at)),
         WoodchuckProfile.status == "active",
@@ -310,21 +322,34 @@ def create_director_contest(
         raise ValueError("Contest end must be after its start.")
     if submitted.finalizes_at < submitted.ends_at:
         raise ValueError("Contest finalization cannot precede its end.")
+    lock_authority(session)
+    persistent = persistent_enabled(session, at=now)
     unique_team_ids = list(dict.fromkeys(submitted.team_ids))
-    owned_teams = list(session.scalars(select(Team).where(
+    owned_query = select(Team).where(
         Team.id.in_(unique_team_ids),
         Team.creator_profile_id == profile.id,
         Team.director_led.is_(True),
         Team.visibility == "private",
         Team.moderation_status != "hidden",
-    )).all())
+    )
+    if persistent:
+        owned_query = owned_query.where(Team.is_operating.is_(True))
+    owned_teams = list(session.scalars(owned_query).all())
     if len(owned_teams) != len(unique_team_ids):
         raise PermissionError("A contest may include only director-led teams you manage.")
     season_ids = {team.season_id for team in owned_teams}
-    if len(season_ids) != 1:
+    if not persistent and len(season_ids) != 1:
         raise ValueError("Participating teams must belong to the same season.")
+    # Origin seasons are no longer authorization. The event keeps an optional
+    # calendar label from its start date, independent of participating Team rows.
+    if persistent:
+        from .seasons import season_covering_date
+        label = season_covering_date(session, submitted.starts_at.astimezone(CENTRAL).date())
+        label_id = label.id if label is not None else None
+    else:
+        label_id = next(iter(season_ids))
     contest = DirectorTeamContest(
-        season_id=next(iter(season_ids)),
+        season_id=label_id,
         owner_profile_id=profile.id,
         title=submitted.title,
         description=submitted.description,
@@ -358,6 +383,7 @@ def _contest_team_scores(
         team_id: _period_roster(
             session, team_id=team_id,
             starts_at=contest.starts_at, ends_at=contest.ends_at,
+            persistent=persistent_enabled(session, at=_utc(contest.created_at)),
         )
         for team_id in team_ids
     }
@@ -399,6 +425,7 @@ def finalize_director_contest(
     session: Session, *, contest: DirectorTeamContest, profile: WoodchuckProfile,
     now: datetime,
 ) -> tuple[DirectorTeamContest, bool]:
+    lock_authority(session)
     if contest.owner_profile_id != profile.id:
         raise PermissionError("That director contest is not available.")
     if contest.status == "finalized":

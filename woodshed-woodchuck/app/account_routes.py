@@ -369,11 +369,13 @@ def delete_account(
     pin: str = Form(...),
     confirmation: str = Form(...),
 ):
-    now = datetime.now(timezone.utc)
     with SessionLocal() as session:
         profile = current_profile(request, session)
         if profile is None:
             raise HTTPException(status_code=401, detail="Student sign-in is required.")
+        from .team_authority import lock_authority
+        lock_authority(session)
+        now = datetime.now(timezone.utc)
         try:
             verify_deletion_confirmation(
                 profile, woodchuck_id=woodchuck_id, pin=pin,

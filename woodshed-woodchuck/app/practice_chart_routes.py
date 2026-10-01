@@ -23,6 +23,7 @@ from .models import (
 )
 from .practice_duration import qualified_practice_clause, chart_seconds, chart_seconds_sql, format_minutes, format_seconds
 from .seasons import season_covering_date
+from .team_authority import effective_membership, lock_authority, persistent_enabled
 from .verifiers import validate_email
 from .practice_charts import (
     create_practice_chart_verification_request,
@@ -363,6 +364,23 @@ def delete_practice_email_preset(request: Request, preset_id: int):
         return {"deleted": True, "preset_id": preset_id}
 
 
+def _earning_team_membership(session, *, profile_id, include_team_contests, at):
+    """Resolve a new submission once; retries preserve their existing attribution."""
+    if not include_team_contests:
+        return None
+    lock_authority(session)
+    if persistent_enabled(session, at=at):
+        return effective_membership(session, profile_id=profile_id, at=at)
+    season = season_covering_date(session, at.astimezone(CENTRAL).date())
+    if season is None:
+        return None
+    return session.scalar(select(TeamMembership).where(
+        TeamMembership.profile_id == profile_id,
+        TeamMembership.season_id == season.id,
+        TeamMembership.ended_at.is_(None),
+    ))
+
+
 @router.post("", status_code=201)
 def create_student_practice_chart(
     request: Request,
@@ -378,15 +396,15 @@ def create_student_practice_chart(
             )
 
         try:
-            active_season = season_covering_date(session, datetime.now(CENTRAL).date())
-            team_membership = (
-                session.scalar(select(TeamMembership).where(
-                    TeamMembership.profile_id == profile.id,
-                    TeamMembership.season_id == active_season.id,
-                    TeamMembership.ended_at.is_(None),
-                ))
-                if active_season is not None and submitted.include_team_contests
-                else None
+            lock_authority(session)
+            session.refresh(profile)
+            profile = current_profile(request, session)
+            if profile is None:
+                raise HTTPException(status_code=401, detail="Student sign-in is required.")
+            team_membership = _earning_team_membership(
+                session, profile_id=profile.id,
+                include_team_contests=submitted.include_team_contests,
+                at=datetime.now(timezone.utc),
             )
             created = create_practice_chart_verification_request(
                 session,
@@ -485,15 +503,15 @@ def create_student_pristine_practice_chart(
                 detail="Student sign-in is required.",
             )
         try:
-            active_season = season_covering_date(session, datetime.now(CENTRAL).date())
-            team_membership = (
-                session.scalar(select(TeamMembership).where(
-                    TeamMembership.profile_id == profile.id,
-                    TeamMembership.season_id == active_season.id,
-                    TeamMembership.ended_at.is_(None),
-                ))
-                if active_season is not None and submitted.include_team_contests
-                else None
+            lock_authority(session)
+            session.refresh(profile)
+            profile = current_profile(request, session)
+            if profile is None:
+                raise HTTPException(status_code=401, detail="Student sign-in is required.")
+            team_membership = _earning_team_membership(
+                session, profile_id=profile.id,
+                include_team_contests=submitted.include_team_contests,
+                at=datetime.now(timezone.utc),
             )
             created = create_pristine_practice_chart(
                 session,

@@ -1,8 +1,4 @@
-"""Explicit operational jobs for prospective readiness and boundary activation.
-
-No web/startup caller. Preflight never grants permission to write; activation
-plans from current locked state and admits only the existing H1B insert delta.
-"""
+"""Historical continuity diagnostics. Seasonal Team-copy activation is retired."""
 from __future__ import annotations
 
 import argparse
@@ -87,7 +83,8 @@ def result(content, *, mode):
         status = "NOT_DUE"
     if not reasons and not summary["teams_to_create"] and not summary["memberships_to_create"]:
         status = "ALREADY_COMPLETE"
-    return {"operation": mode, "status": status, "source": content["source"],
+    return {"operation": mode, "status": status, "historical_diagnostic": True,
+            "seasonal_activation_retired": True, "source": content["source"],
             "destination": content["destination"], "boundary": content["boundary"],
             "source_team_count": sum(t["season_id"] == content["source"]["id"] for t in content["state"]["teams"]),
             "expected_boundary_membership_count": sum(len(t["members"]) for t in content["actions"]),
@@ -113,52 +110,23 @@ def preflight(url, *, source=None, destination=None, now=None):
 
 
 def activate(url, *, source=None, destination=None, now=None):
-    with repair.writer(url) as connection:
-        try:
-            repair.schema_guard(connection)
-            with Session(connection, autoflush=False, expire_on_commit=False) as session:
-                pair = discover(session, mode="team_activate", now=repair.clock(now), source=source, destination=destination)
-                if pair is None:
-                    return {"operation": "team_activate", "status": "NO_TRANSITION", "reason_codes": []}
-                src, dest = pair
-                domain.lock_continuity_rows(session, source_season_id=src.id, destination_season_id=dest.id)
-                # Discovery and all dates/statuses are revalidated AFTER locks.
-                src, dest = discover(session, mode="team_activate", now=repair.clock(now), source=src.key, destination=dest.key)
-                with repair.insertion_fence(connection, session):
-                    before = repair.build_plan(session, url, src.key, dest.key, now=now)["content"]
-                    report = result(before, mode="team_activate")
-                    if report["status"] in {"NOT_READY", "NOT_DUE"}:
-                        connection.rollback()
-                        return report
-                    repair.require_safe(before, database_generated=True)
-                    domain.apply_team_continuity(session, source_season_id=src.id,
-                                                 destination_season_id=dest.id, now=repair.clock(now))
-                    session.flush()
-                    after = repair.build_plan(session, url, src.key, dest.key, now=now)["content"]
-                    verification = repair.verify_content(before, after)
-                    report.update({"status": "ALREADY_COMPLETE" if not verification["new_team_count"] and not verification["new_membership_count"] else "READY",
-                                   "teams_created": verification["new_team_count"],
-                                   "memberships_created": verification["new_membership_count"],
-                                   "verification": verification,
-                                   "remaining_team_creates": after["summary"]["teams_to_create"],
-                                   "remaining_membership_creates": after["summary"]["memberships_to_create"]})
-                    # Use a fresh wall clock immediately before commit, including
-                    # when locks/verification straddle the stored source deadline.
-                    repair.verify_content(before, repair.build_plan(session, url, src.key, dest.key, now=now)["content"])
-                connection.commit()
-                return report
-        except BaseException:
-            connection.rollback()
-            raise
+    return {
+        "operation": "team_activate", "status": "NOT_READY",
+        "reason_codes": ["seasonal_team_activation_retired"],
+        "message": "Teams and memberships persist. Use the separately reviewed persistent authority cutover; seasonal copies are retired.",
+    }
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="Explicit seasonal team jobs; preflight is read-only.")
+    parser = argparse.ArgumentParser(description="Historical read-only continuity diagnostics; seasonal activation is retired.")
     parser.add_argument("operation", choices=("team_preflight", "team_activate"))
     parser.add_argument("--database-url", help="Explicit target; alternatively set DATABASE_URL")
     parser.add_argument("--source-season")
     parser.add_argument("--destination-season")
     args = parser.parse_args(argv)
+    if args.operation == "team_activate":
+        print(json.dumps(activate(None), sort_keys=True))
+        return 1
     try:
         url = args.database_url or os.environ.get("DATABASE_URL")
         repair.inventory.target_url(url)  # No fallback to the app's local DB.

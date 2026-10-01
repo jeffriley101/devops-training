@@ -980,6 +980,7 @@
     const reportPanel = document.getElementById("shed-team-report-panel");
     const privateStatus = document.getElementById("shed-private-team-status");
     const directorLink = document.getElementById("shed-director-team-link");
+    const leaveButton = document.getElementById("shed-team-leave");
     let currentTeamId = null;
     if (!trigger || !panel || !options || !status || !emblemChoice) return;
     function updateEmblemPreview() {
@@ -999,6 +1000,10 @@
         if (!response.ok) throw new Error(payload.detail || "Teams could not be loaded.");
         const current = payload.membership?.team || null;
         currentTeamId = current?.id || null;
+        if (leaveButton) {
+          leaveButton.hidden = !current || typeof payload.membership?.leave_available !== "boolean";
+          leaveButton.disabled = payload.membership?.leave_available !== true;
+        }
         if (reportPanel) reportPanel.hidden = !currentTeamId;
         if (directorLink) directorLink.hidden = payload.band_director !== true;
         if (privateStatus) {
@@ -1050,6 +1055,19 @@
     });
     document.getElementById("shed-team-close")?.addEventListener("click", () => {
       window.WWNavigation.dismissCurrent();
+    });
+    leaveButton?.addEventListener("click", async function () {
+      leaveButton.disabled = true;
+      try {
+        const response = await fetch("/teams/selection", {
+          method: "DELETE", credentials: "same-origin",
+        });
+        const payload = await response.json();
+        feedback.textContent = response.ok ? "You have left your Team." : (payload.detail || "Your Team could not be left.");
+      } catch (error) {
+        feedback.textContent = "Your Team could not be left. Check your connection and try again.";
+      }
+      await load();
     });
     document.getElementById("shed-team-create")?.addEventListener("click", async function () {
       const response = await fetch("/teams", {method: "POST", credentials: "same-origin", headers: {"Content-Type": "application/json"}, body: JSON.stringify({
@@ -3791,7 +3809,8 @@
         const title = document.createElement("strong");
         title.textContent = `${event.title} · ${event.metric_label}`;
         const period = document.createElement("p");
-        period.textContent = `${event.season.name} · ${formatCentralContestDate(event.starts_at)} – ${formatCentralContestDate(event.ends_at)} CT`;
+        const seasonLabel = event.season ? `${event.season.name} · ` : "";
+        period.textContent = `${seasonLabel}${formatCentralContestDate(event.starts_at)} – ${formatCentralContestDate(event.ends_at)} CT`;
         const winners = document.createElement("ul");
         winners.className = "champion-achievements";
         event.winners.forEach((winner) => {
@@ -3840,7 +3859,7 @@
             ? payload.director_team_contests.filter((event) => event &&
                 typeof event.title === "string" &&
                 typeof event.metric_label === "string" &&
-                event.season && typeof event.season.name === "string" &&
+                (event.season === null || (event.season && typeof event.season.name === "string")) &&
                 typeof event.starts_at === "string" &&
                 typeof event.ends_at === "string" &&
                 Array.isArray(event.winners) && event.winners.every((winner) =>
