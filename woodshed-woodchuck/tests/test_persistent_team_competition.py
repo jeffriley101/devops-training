@@ -32,12 +32,12 @@ def approved_chart(session, profile_id, team_id, practice_date, minutes=10):
     return chart
 
 
-def test_new_week_versioned_roster_keeps_current_week_legacy(http_db):
+def test_current_and_next_week_share_persistent_authority_without_membership_copies(http_db):
     factory, _, profile = http_db
     with factory() as session:
         _, _, current = contests.ensure_current_contest_data(session, now=NOW)
-        assert current.team_membership_rules_version == LEGACY_RULES
-        assert contests._eligible_weekly_team_rosters(session, current) == {}
+        assert current.team_membership_rules_version == PERSISTENT_RULES
+        assert contests._eligible_weekly_team_rosters(session, current) == {10: {profile.id}}
         membership = session.scalar(select(TeamMembership).where(TeamMembership.is_persistent.is_(True)))
         original = (membership.id, membership.started_at, membership.team_id)
         _, _, future = next_week(session)
@@ -45,7 +45,7 @@ def test_new_week_versioned_roster_keeps_current_week_legacy(http_db):
         assert contests._eligible_weekly_team_rosters(session, future) == {10: {profile.id}}
         assert (membership.id, membership.started_at, membership.team_id) == original
         assert len(session.scalars(select(Team).where(Team.is_operating.is_(True))).all()) == 5
-        assert current.team_membership_rules_version == LEGACY_RULES
+        assert current.team_membership_rules_version == PERSISTENT_RULES
 
 
 def test_persistent_snapshot_excludes_exact_next_week_transition(http_db):
@@ -81,8 +81,11 @@ def test_finalizer_versions_are_explicit_and_retry_preserves_results(http_db, pe
             _, _, week = next_week(session)
             practice_date, final_at = date(2026, 10, 6), datetime(2026, 10, 12, 18, tzinfo=timezone.utc)
         else:
-            _, _, week = contests.ensure_current_contest_data(session, now=NOW)
-            practice_date, final_at = date(2026, 10, 1), datetime(2026, 10, 5, 18, tzinfo=timezone.utc)
+            # Historical legacy competition precedes the single authority
+            # boundary and uses the original seasonal membership evidence.
+            _, _, week = contests.ensure_current_contest_data(
+                session, now=datetime(2026, 9, 23, 18, tzinfo=timezone.utc))
+            practice_date, final_at = date(2026, 9, 23), datetime(2026, 9, 28, 18, tzinfo=timezone.utc)
         approved_chart(session, profile.id, 10, practice_date)
         session.commit()
         contests.finalize_contest_week(session, week_start=week.week_start, now=final_at)
@@ -97,7 +100,8 @@ def test_finalizer_versions_are_explicit_and_retry_preserves_results(http_db, pe
         session.commit()
         assert list(session.execute(select(ContestResult.__table__)).mappings()) == before_results
         assert list(session.execute(select(TeamWeekMembershipSnapshot.__table__)).mappings()) == before_snapshots
-        assert len(before_snapshots) == int(persistent)
+        assert len(before_snapshots) == 1
+        assert before_snapshots[0]["team_id"] == 10
 
 
 def test_unknown_week_reader_fails_closed(http_db):
@@ -171,7 +175,7 @@ def test_director_contest_accepts_operating_teams_from_different_origins(http_db
             starts_at=NOW, ends_at=NOW + timedelta(days=8)) == {profile.id}
 
 
-def test_current_hall_moderation_cannot_bypass_hidden_operating_team(http_db):
+def test_historical_hall_survives_hidden_operating_successor(http_db):
     factory, _, profile = http_db
     with factory() as session:
         _, _, week = next_week(session)
@@ -199,7 +203,10 @@ def test_current_hall_moderation_cannot_bypass_hidden_operating_team(http_db):
         internal_before = contests.hall_of_champions_payload(session, _include_internal=True, now=NOW)["teams"]
         operating.moderation_status = "hidden"
         session.commit()
-        assert contests.hall_of_champions_payload(session, now=NOW)["teams"] == []
+        published = contests.hall_of_champions_payload(session, now=NOW)["teams"]
+        assert len(published) == 1
+        assert published[0]["team_name"] == "Old Eureka"
+        assert published[0]["team_id"] == historical.id
         assert contests.hall_of_champions_payload(session, _include_internal=True, now=NOW)["teams"] == internal_before
         assert dict(session.execute(select(ContestResult.__table__).where(ContestResult.id == result.id)).mappings().one()) == stored
 
@@ -242,7 +249,7 @@ def test_earning_revalidates_profile_after_authority_fence(http_db, monkeypatch,
     module = practice_chart_routes if kind == "book" else contests
     original = module.lock_authority
     invoked = []
-    def deletion_before_fence(session):
+    def deletion_before_fence(session, **kwargs):
         if not invoked:
             invoked.append(True)
             with factory() as other:
@@ -250,7 +257,7 @@ def test_earning_revalidates_profile_after_authority_fence(http_db, monkeypatch,
                 row.status = "deleted"
                 row.session_version += 1
                 other.commit()
-        return original(session)
+        return original(session, **kwargs)
     monkeypatch.setattr(module, "lock_authority", deletion_before_fence)
     if kind == "book":
         result = client.post("/practice-charts", json={"practice_date": "2026-10-01",

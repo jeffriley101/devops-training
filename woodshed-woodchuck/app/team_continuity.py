@@ -8,7 +8,7 @@ from dataclasses import dataclass, replace
 from datetime import date, datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import or_, select, text
+from sqlalchemy import inspect, or_, select, text
 
 from .models import (ContestResult, ContestWeek, DirectorTeamContest, Season,
                      Team, TeamFamily, TeamNameClaim, TeamMembership, TeamWeekMembershipSnapshot,
@@ -270,6 +270,14 @@ def apply_team_continuity(session, *, source_season_id, destination_season_id, n
     No provider calls, auto-activation, history edits, or family creation.
     """
     from .teams import _new_join_code
+    from .models import PersistentTeamControl
+
+    # The p20 migration installs this control even while authority is disabled.
+    # Keep historical planning available, but never copy seasonal Teams in a
+    # database governed by the persistent authority protocol.
+    if (inspect(session.connection()).has_table(PersistentTeamControl.__tablename__)
+            and session.get(PersistentTeamControl, 1) is not None):
+        raise ValueError("Seasonal Team continuity is retired under persistent Team control.")
 
     lock_continuity_rows(session, source_season_id=source_season_id,
                          destination_season_id=destination_season_id)

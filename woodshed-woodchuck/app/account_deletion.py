@@ -4,7 +4,7 @@ import hmac
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select, update
+from sqlalchemy import and_, or_, select, update
 from sqlalchemy.orm import Session
 
 from .accounts import normalize_woodchuck_id, retired_identifier_hash
@@ -26,7 +26,7 @@ from .models import (
 )
 from .security import hash_invitation_token, verify_pin
 from .team_continuity import lock_team_seasons
-from .team_authority import lock_authority, persistent_enabled
+from .team_authority import authority_write_time, persistent_enabled
 
 
 DELETED_PUBLIC_NAME = "Deleted Woodchuck"
@@ -84,7 +84,7 @@ def anonymize_woodchuck_account(
     # Deletion spans all seasons. Fence before membership/team writes so a
     # continuation cannot add a roster row behind the anonymization update.
     with session.no_autoflush:
-        lock_authority(session)
+        now = authority_write_time(session, at=now)
         lock_team_seasons(session, *session.scalars(select(Season.id).order_by(Season.id)))
         session.scalar(select(WoodchuckProfile).where(
             WoodchuckProfile.id == profile.id
@@ -97,10 +97,14 @@ def anonymize_woodchuck_account(
     record_deletion(session, profile.id)
     original_id = profile.woodchuck_id
 
+    membership_scope = and_(
+        TeamMembership.is_persistent.is_(True),
+        TeamMembership.started_at <= now,
+        or_(TeamMembership.ended_at.is_(None), TeamMembership.ended_at > now),
+    ) if persistent else TeamMembership.ended_at.is_(None)
     session.execute(update(TeamMembership).where(
         TeamMembership.profile_id == profile.id,
-        TeamMembership.ended_at.is_(None),
-        TeamMembership.is_persistent.is_(True) if persistent else True,
+        membership_scope,
     ).values(ended_at=now))
     if persistent:
         session.execute(update(TeamJoinRequest).where(

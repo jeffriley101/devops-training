@@ -9,6 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .economy import lock_state
+from .team_authority import authority_write_time, practice_chart_team_id
 from .models import (
     PracticeChart,
     PracticeChartVerification,
@@ -179,8 +180,27 @@ def create_practice_chart_verification_request(
         if connection is None or (connection.role=='band_director' and not (permitted_director(session,profile.id,verifier_id,review=True) or ordinary_director_connection(session,profile.id,verifier_id))):
             raise ValueError('Choose an accepted, authorized chart reviewer.')
 
-    # Serialize all practice sources, including private BOOK and Pristine.
+    # Classify after privacy/source normalization, before any profile/state lock.
+    # Pristine is private self-reported evidence and cannot enter competition.
+    if source == "pristine":
+        include_contests = include_team_contests = False
+        team_id = None
+    now = authority_write_time(session, clock=lambda: datetime.now(timezone.utc),
+        independent=not (include_contests or include_team_contests))
+    session.refresh(profile)
+    require_eligible(session, profile.id)
+    # Common order: authority control, profile, state, chart/reward rows.
     lock_state(session, profile.id)
+    session.refresh(profile)
+    require_eligible(session, profile.id)
+    # Consent/privacy can change while waiting for the profile lock. Recheck
+    # restrictions before creating evidence; never upgrade the supplied flags.
+    if protected_child(session, profile.id):
+        from .age_privacy import can_publish
+        if not can_publish(session, profile.id):
+            include_contests = False
+        include_team_contests = False
+        ordinary_email_preset_id = None
 
     if submission_key is None:
         raise ValueError("A P-Chart submission key is required.")
@@ -229,7 +249,6 @@ def create_practice_chart_verification_request(
 
     from .contests import CENTRAL
     from .practice_duration import chart_seconds_sql
-    now = datetime.now(timezone.utc)
     today = now.astimezone(CENTRAL).date()
     if not today - timedelta(days=1) <= practice_date <= today:
         raise ValueError("Practice logs must be for today or yesterday.")
@@ -244,10 +263,10 @@ def create_practice_chart_verification_request(
     # Submission is a self-report. Only independent review can qualify BOOK
     # for XP/competition; browser microphone time cannot establish Pristine status.
     credits_awarded = 0
-    if source == "pristine":
-        include_contests = include_team_contests = False
-        team_id = None
-
+    resolved_team_id = practice_chart_team_id(session, profile_id=profile.id,
+        include_team_contests=include_team_contests, at=now, practice_date=practice_date)
+    if include_team_contests and team_id is not None and team_id != resolved_team_id:
+        raise ValueError("Team attribution does not match the admitted practice operation.")
     chart = PracticeChart(
         profile_id=profile.id,
         practice_date=practice_date,
@@ -261,7 +280,8 @@ def create_practice_chart_verification_request(
         submission_key=submission_key,
         include_contests=include_contests,
         include_team_contests=include_team_contests,
-        team_id=team_id if include_team_contests else None,
+        team_id=resolved_team_id,
+        created_at=now,
         ordinary_email_preset_id=ordinary_email_preset_id,
     )
 
@@ -391,11 +411,18 @@ def respond_to_practice_chart_verification(
     if verification is None:
         raise LookupError("Verification request was not found.")
 
-    owner_id = session.scalar(select(PracticeChart.profile_id).where(
-        PracticeChart.id == verification.practice_chart_id))
-    if owner_id is None:
+    chart = session.get(PracticeChart, verification.practice_chart_id)
+    if chart is None:
         raise LookupError("The requested P-Chart was not found.")
-    state = lock_state(session, owner_id)
+    # Approval/rejection changes competition eligibility when either inclusion
+    # flag is set. Private review remains available during a staged boundary.
+    # Read-only classification precedes locks; refresh after the common fence.
+    reviewed_at = authority_write_time(session, clock=lambda: datetime.now(timezone.utc),
+        independent=not (chart.include_contests or chart.include_team_contests))
+    session.refresh(chart)
+    if chart.include_contests or chart.include_team_contests:
+        reviewed_at = authority_write_time(session, clock=lambda: datetime.now(timezone.utc))
+    state = lock_state(session, chart.profile_id)
     session.refresh(verification)
 
     if verification.status != "pending":
@@ -440,7 +467,7 @@ def respond_to_practice_chart_verification(
 
     verification.status = normalized_decision
     verification.response_note = normalized_note or None
-    verification.responded_at = datetime.now(timezone.utc)
+    verification.responded_at = reviewed_at
     if normalized_decision == "approved" and chart.source == "p-book" and not chart.credits_awarded:
         from .contests import CENTRAL
         now = verification.responded_at

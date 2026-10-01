@@ -18,7 +18,7 @@ from .models import ContestWeek, Season
 from .seasons import CANONICAL_SEASONS, SeasonConfigurationError, validate_definition
 
 
-CALENDAR_REVISION = "p20team001"
+CALENDAR_REVISION = "p21team001"
 
 
 def schema_guard(connection):
@@ -34,8 +34,9 @@ def schema_guard(connection):
         "contest_weeks": {"id", "season_id", "week_start", "week_end", "status",
             "verification_deadline_at", "finalize_after", "finalized_at",
             "practice_scoring_mode", "finalizer_rules_version", "team_membership_rules_version",
-            "created_at", "updated_at"},
-        "persistent_team_control": {"id", "activated_at", "rules_from_week_start"},
+            "created_at", "updated_at", "team_roster_frozen_at"},
+        "persistent_team_control": {"id", "activated_at", "rules_from_week_start",
+            "staged_for", "staged_plan", "staged_plan_sha256"},
     }
     tables = set(inspector.get_table_names())
     if "alembic_version" not in tables:

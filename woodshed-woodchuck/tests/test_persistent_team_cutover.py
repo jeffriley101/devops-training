@@ -19,6 +19,7 @@ OLD = NOW - timedelta(days=18)
 TEAM_IDS = list(range(10, 15))
 MEMBERSHIP_IDS = list(range(100, 120))
 BOUNDARY = date(2026, 10, 5)
+BOUNDARY_AT = datetime(2026, 10, 5, 5, tzinfo=timezone.utc)
 
 
 def seed(url):
@@ -31,7 +32,7 @@ def seed(url):
     Base.metadata.create_all(engine)
     with engine.begin() as c:
         c.execute(text("CREATE TABLE alembic_version (version_num VARCHAR(32) PRIMARY KEY NOT NULL)"))
-        c.execute(text("INSERT INTO alembic_version VALUES ('p20team001')"))
+        c.execute(text("INSERT INTO alembic_version VALUES ('p21team001')"))
     with Session(engine) as s:
         for sid, key, start, end in ((1, "band-camp-2026", date(2026, 7, 27), date(2026, 9, 13)),
                                     (2, "back-to-school-2026", date(2026, 9, 14), date(2026, 9, 27)),
@@ -110,7 +111,22 @@ def apply(db, approved, **kwargs):
     options = dict(acknowledgments={ack: True for ack in cutover.ACKS},
                    confirmation=cutover.CONFIRMATION, now=NOW)
     options.update(kwargs)
+    cutover.apply_cutover(db[0], approved, approved["plan_sha256"], **options)
+    return activate(db, approved)
+
+
+def stage(db, approved, **kwargs):
+    options = dict(acknowledgments={ack: True for ack in cutover.ACKS},
+                   confirmation=cutover.CONFIRMATION, now=NOW)
+    options.update(kwargs)
     return cutover.apply_cutover(db[0], approved, approved["plan_sha256"], **options)
+
+
+def activate(db, approved, **kwargs):
+    options = dict(acknowledgments={ack: True for ack in cutover.ACKS},
+                   confirmation=cutover.ACTIVATION_CONFIRMATION, now=BOUNDARY_AT)
+    options.update(kwargs)
+    return cutover.activate_cutover(db[0], approved, approved["plan_sha256"], **options)
 
 
 def snapshot(engine):
@@ -135,7 +151,10 @@ def test_five_existing_teams_twenty_memberships_promoted_no_copies(db):
         assert after[name] == before[name]
     assert sum(a["team_id"] is None for a in after["camp_point_awards"]) == 9
     assert next(m for m in after["team_memberships"] if m["id"] == 90) == next(m for m in before["team_memberships"] if m["id"] == 90)
-    assert next(w for w in after["contest_weeks"] if w["id"] == 2) == next(w for w in before["contest_weeks"] if w["id"] == 2)
+    closing = next(w for w in after["contest_weeks"] if w["id"] == 2)
+    expected_closing = dict(next(w for w in before["contest_weeks"] if w["id"] == 2),
+                            team_roster_frozen_at=cutover.normalized(BOUNDARY_AT))
+    assert closing == expected_closing
     assert next(w for w in after["contest_weeks"] if w["id"] == 3)["team_membership_rules_version"] == "persistent_v1"
 
 
@@ -205,7 +224,7 @@ def test_historical_only_family_remains_without_operating_authority(db):
         assert not s.get(m.Team, 99).is_operating
 
 
-def test_cutover_refuses_already_consumed_legacy_switch(db):
+def test_explicit_plan_can_approve_legacy_switch_carried_into_new_week(db):
     at = datetime(2026, 9, 29, 15, tzinfo=timezone.utc)
     with Session(db[1]) as s:
         original = s.get(m.TeamMembership, 119)
@@ -216,23 +235,21 @@ def test_cutover_refuses_already_consumed_legacy_switch(db):
         s.commit()
     before = snapshot(db[1])
     ids = [mid for mid in MEMBERSHIP_IDS if mid != 119] + [200]
-    with pytest.raises(cutover.CutoverError, match="not_carried|legacy_current_week"):
-        cutover.generate_plan(db[0], TEAM_IDS, ids, BOUNDARY, now=NOW)
+    cutover.generate_plan(db[0], TEAM_IDS, ids, BOUNDARY, now=NOW)
     assert snapshot(db[1]) == before
 
 
-def test_cutover_refuses_prior_leave_for_currently_teamless_student(db):
+def test_explicit_plan_can_preserve_prior_leave_without_inventing_membership(db):
     with Session(db[1]) as s:
         s.get(m.TeamMembership, 119).ended_at = datetime(2026, 9, 29, 15, tzinfo=timezone.utc)
         s.commit()
     before = snapshot(db[1])
-    with pytest.raises(cutover.CutoverError, match="legacy_current_week"):
-        cutover.generate_plan(db[0], TEAM_IDS, MEMBERSHIP_IDS[:-1], BOUNDARY, now=NOW)
+    cutover.generate_plan(db[0], TEAM_IDS, MEMBERSHIP_IDS[:-1], BOUNDARY, now=NOW)
     assert snapshot(db[1]) == before
 
 
-def test_cutover_refuses_other_profiles_legacy_current_week_choice(db):
-    # The guard must inspect all evidence, not just approved member profiles.
+def test_other_profiles_legacy_choices_do_not_consume_new_week_allowance(db):
+    # Ended legacy evidence stays historical, never silently promoted.
     with Session(db[1]) as s:
         s.add(m.WoodchuckProfile(id=99, woodchuck_id="WC-PERSIST-99", display_name="synthetic",
                 pin_hash="synthetic", instrument="Trumpet", level="Beginner", goal="Practice"))
@@ -243,8 +260,7 @@ def test_cutover_refuses_other_profiles_legacy_current_week_choice(db):
                 selected_week_start=date(2026, 9, 28)))
         s.commit()
     before = snapshot(db[1])
-    with pytest.raises(cutover.CutoverError, match="legacy_current_week"):
-        plan(db)
+    plan(db)
     assert snapshot(db[1]) == before
 
 
@@ -376,9 +392,10 @@ def test_unexpected_protected_write_rolls_back_entire_cutover(db):
         else:
             c.execute(text("CREATE TRIGGER test_forbidden_change AFTER UPDATE ON teams BEGIN UPDATE camp_point_awards SET team_id=10 WHERE id=1; END"))
     approved = plan(db)
+    stage(db, approved)
     before = snapshot(db[1])
     with pytest.raises(cutover.CutoverError, match="unexpected_row_change"):
-        apply(db, approved)
+        activate(db, approved)
     assert snapshot(db[1]) == before
 
 

@@ -7,6 +7,7 @@ from .band_director_context import current_roster_period, current_student_team
 from .contests import CENTRAL
 from .models import CrownAward, PracticeChart, PracticeChartVerification, RewardGrant, Team
 from .practice_chart_routes import profile_practice_streak
+from .seasons import season_covering_date
 from .store_inventory import crown_name, PLACEABLE_REWARD_TYPES
 from .student_practice_metrics import practice_totals, student_practice_snapshot
 from .teams import public_team_identity
@@ -73,8 +74,12 @@ def verifier_dashboard_snapshot(session, *, verifier_id: int, connection_id=None
     return result
 
 
-def private_student_metrics(session, *, profile_id, today=None):
-    """Shared private calculations; caller must authorize the subject first."""
+def private_student_metrics(session, *, profile_id, today=None, include_team_context=True):
+    """Shared private calculations; caller must authorize the subject first.
+
+    Family practice pages do not display Team authority. They can request only
+    calendar grouping so private practice remains available during cutover.
+    """
     today = today or datetime.now(CENTRAL).date()
     charts = session.scalars(select(PracticeChart).where(PracticeChart.profile_id == profile_id)).all()
     approved = set(session.scalars(select(PracticeChartVerification.practice_chart_id).join(
@@ -82,7 +87,10 @@ def private_student_metrics(session, *, profile_id, today=None):
     ).where(PracticeChart.profile_id == profile_id, PracticeChartVerification.status == "approved")))
     metrics = student_practice_snapshot(charts, approved, today=today)
     metrics.pop("rating_week_values")
-    season, _ = current_roster_period(session, today=today)
+    if include_team_context:
+        season, _ = current_roster_period(session, today=today)
+    else:
+        season = season_covering_date(session, today)
     season_data = team_data = None
     if season is not None:
         season_charts = [chart for chart in charts if chart.practice_date >= season.starts_on
@@ -92,7 +100,8 @@ def private_student_metrics(session, *, profile_id, today=None):
                        "minutes": season_totals["total"], "charts": season_totals["charts"],
                        "days": season_totals["days"], "verified": season_totals["verified"],
                        "pristine": season_totals["pristine"]}
-    team = current_student_team(session, profile_id=profile_id, season=season)
+    team = (current_student_team(session, profile_id=profile_id, season=season)
+            if include_team_context else None)
     if team is not None:
         name, _ = public_team_identity(team)
         team_data = {"name": name}

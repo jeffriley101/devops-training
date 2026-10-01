@@ -19,7 +19,7 @@ from tests.test_contest_week_provisioning import db, PAIR  # noqa: F401
 from tests.test_team_families import disposable_url
 
 OLD = "f19arcade001"
-NEW = "p20team001"
+NEW = "p21team001"
 
 
 def snapshot(engine):
@@ -129,7 +129,7 @@ def test_real_base_upgrade_then_calendar_plan_apply_and_prospective_rules(tmp_pa
                 verification_deadline_at=deadline + timedelta(hours=1),
                 finalize_after=finalize + timedelta(hours=1), status="finalized", finalized_at=finalize + timedelta(days=1),
                 practice_scoring_mode="legacy_minutes", created_at=lifecycle.BOUNDARY, updated_at=lifecycle.BOUNDARY))
-        assert_refused_without_writes(url, engine, "require p20team001")
+        assert_refused_without_writes(url, engine, "require p21team001")
         before = snapshot(engine)
         command.upgrade(config, NEW)
         migrated = snapshot(engine)

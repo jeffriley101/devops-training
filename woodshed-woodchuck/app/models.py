@@ -1428,11 +1428,17 @@ class PersistentTeamControl(Base):
         CheckConstraint("(activated_at IS NULL AND rules_from_week_start IS NULL) OR "
                         "(activated_at IS NOT NULL AND rules_from_week_start IS NOT NULL)",
                         name="ck_persistent_team_control_activation"),
+        CheckConstraint("(staged_for IS NULL AND staged_plan IS NULL AND staged_plan_sha256 IS NULL) OR "
+                        "(staged_for IS NOT NULL AND staged_plan IS NOT NULL AND staged_plan_sha256 IS NOT NULL)",
+                        name="ck_persistent_team_control_staging"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     activated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     rules_from_week_start: Mapped[date | None] = mapped_column(Date, nullable=True)
+    staged_for: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    staged_plan: Mapped[dict | None] = mapped_column(JSON(none_as_null=True), nullable=True)
+    staged_plan_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
 
 class TeamMembershipTransition(Base):
@@ -1564,6 +1570,8 @@ class ContestWeek(Base):
     team_membership_rules_version: Mapped[str] = mapped_column(
         String(40), default="legacy_seasonal_v1", server_default="legacy_seasonal_v1", nullable=False
     )
+    # Explicitly attests a frozen roster, including a roster with zero members.
+    team_roster_frozen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # Recorded with finalization; NULL is unknown, never implicit legacy.
     practice_scoring_mode: Mapped[str | None] = mapped_column(String(30), nullable=True)
     # Attests to the complete finalizer rules used for this frozen week.

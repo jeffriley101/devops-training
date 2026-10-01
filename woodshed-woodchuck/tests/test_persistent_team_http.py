@@ -7,7 +7,7 @@ from sqlalchemy import create_engine, event, select
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app import contests, main, practice_chart_routes, teams
+from app import contests, main, practice_chart_routes, practice_charts, teams
 from app.db import Base
 from app.models import (CampPointAward, PersistentTeamControl, Team, TeamMembership,
                         TeamMembershipTransition, TeamReport, PracticeChart)
@@ -40,7 +40,7 @@ def http_db(request, tmp_path, monkeypatch):
     for name, module in list(sys.modules.items()):
         if name.startswith("app.") and hasattr(module, "SessionLocal"):
             monkeypatch.setattr(module, "SessionLocal", factory)
-    for module in (contests, practice_chart_routes, teams):
+    for module in (contests, practice_chart_routes, practice_charts, teams):
         monkeypatch.setattr(module, "datetime", Clock)
     from app import team_authority
     monkeypatch.setattr(team_authority, "datetime", Clock)
@@ -68,8 +68,11 @@ def http_db(request, tmp_path, monkeypatch):
         session.add(TeamMembership(profile_id=profile.id, team_id=historic.id, season_id=old.id,
                     started_at=datetime(2026, 8, 1, 5, tzinfo=timezone.utc),
                     selected_week_start=date(2026, 7, 27)))
-        session.add(PersistentTeamControl(id=1, activated_at=NOW - timedelta(days=1),
-                    rules_from_week_start=date(2026, 10, 5)))
+        # Current authority and weekly rules have one Monday boundary. The
+        # forbidden Sep 30 / Oct 5 split must not survive in working fixtures.
+        session.add(PersistentTeamControl(id=1,
+                    activated_at=datetime(2026, 9, 28, 5, tzinfo=timezone.utc),
+                    rules_from_week_start=date(2026, 9, 28)))
         session.add(TeamReport(team_id=10, reporter_profile_id=profile.id,
                               category="other", details="WHY CAN'T I LEAVE"))
         null_types = ["care", "hours", "hours", "marching"] + ["trivia"] * 5

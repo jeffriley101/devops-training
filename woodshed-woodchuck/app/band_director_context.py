@@ -22,7 +22,7 @@ def _contest_week_emblem(session: Session, *, profile_id: int, week: ContestWeek
         TeamWeekMembershipSnapshot.profile_id == profile_id,
     ))
     team_id = snapshot.team_id if snapshot is not None else None
-    if snapshot is None and week.status != "finalized":
+    if snapshot is None and week.status != "finalized" and week.team_roster_frozen_at is None:
         membership = membership_for_week(
             session, profile_id=profile_id, week=week, at=_membership_snapshot_at(week),
         )

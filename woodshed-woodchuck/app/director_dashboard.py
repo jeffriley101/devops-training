@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import func, or_, select, true
 from sqlalchemy.orm import Session
 
-from .practice_duration import chart_seconds, qualified_practice_clause
+from .practice_duration import chart_seconds, qualified_practice_clause, team_qualified_practice_clause
 from .account_routes import current_profile
 from .contests import CENTRAL, central_week_boundaries, ensure_current_contest_data
 from .db import SessionLocal
@@ -24,7 +24,7 @@ from .models import (
     TeamMembership,
     WoodchuckProfile,
 )
-from .team_authority import lock_authority, persistent_enabled
+from .team_authority import authority_write_time, lock_authority, persistent_enabled
 from .team_practice_rating import (
     ACTIVE_MINUTES_THRESHOLD,
     calculate_team_practice_rating,
@@ -322,7 +322,7 @@ def create_director_contest(
         raise ValueError("Contest end must be after its start.")
     if submitted.finalizes_at < submitted.ends_at:
         raise ValueError("Contest finalization cannot precede its end.")
-    lock_authority(session)
+    now = authority_write_time(session, at=now)
     persistent = persistent_enabled(session, at=now)
     unique_team_ids = list(dict.fromkeys(submitted.team_ids))
     owned_query = select(Team).where(
@@ -389,9 +389,7 @@ def _contest_team_scores(
     }
     charts = session.scalars(select(PracticeChart).where(
         PracticeChart.team_id.in_(team_ids),
-        PracticeChart.include_contests.is_(True),
-        qualified_practice_clause(),
-        PracticeChart.include_team_contests.is_(True),
+        team_qualified_practice_clause(),
         PracticeChart.created_at >= _utc(contest.starts_at),
         PracticeChart.created_at < _utc(contest.ends_at),
     )).all() if team_ids else []
@@ -425,7 +423,7 @@ def finalize_director_contest(
     session: Session, *, contest: DirectorTeamContest, profile: WoodchuckProfile,
     now: datetime,
 ) -> tuple[DirectorTeamContest, bool]:
-    lock_authority(session)
+    now = authority_write_time(session, at=now)
     if contest.owner_profile_id != profile.id:
         raise PermissionError("That director contest is not available.")
     if contest.status == "finalized":

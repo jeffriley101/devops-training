@@ -22,6 +22,7 @@ from .contests import (
     locked_contest_week,
 )
 from .db import SessionLocal
+from .team_authority import authority_write_time
 from .contest_seasons import rollover_season
 from .models import (
     CampPointAward,
@@ -114,6 +115,7 @@ def audit_or_repair_history(
     Dry-run is the default and rolls back its savepoint. Open weeks are processed
     only after their preserved verification and finalization deadlines.
     """
+    now = authority_write_time(session, at=now)
     week = locked_contest_week(session, week_start=week_start)
     if week is None:
         raise ValueError("Contest week not found.")

@@ -1,5 +1,10 @@
 # Persistent Team authority review record
 
+This is the historical validation record for `bb477420`, before independent
+review found the split-boundary and historical Hall blockers. Its counts and
+release claims do not validate the remediation. The current staged `p21team001`
+procedure is documented in [persistent Team cutover](persistent-team-cutover.md).
+
 Branch: `fix/persistent-team-authority-v1`.
 Exact base: `9a388d6e8c6b212fcbd801dc7823256b10c1a3d7`.
 Migration: `p20team001`, following `f19arcade001`.

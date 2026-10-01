@@ -221,6 +221,7 @@ def grant_band_director(
     require_contest_admin(request)
     identifier = woodchuck_id.strip().upper()
     with SessionLocal() as session:
+        lock_authority(session)
         profile = session.scalar(select(WoodchuckProfile).where(
             WoodchuckProfile.woodchuck_id == identifier,
             WoodchuckProfile.status == "active",
@@ -247,6 +248,7 @@ def grant_band_director(
 def revoke_band_director(profile_id: int, request: Request):
     require_contest_admin(request)
     with SessionLocal() as session:
+        lock_authority(session)
         # Continuation validates capability while holding this profile lock.
         session.scalar(select(WoodchuckProfile).where(
             WoodchuckProfile.id == profile_id).with_for_update())
@@ -292,6 +294,7 @@ def resolve_team_report(
     if action not in {"dismissed", "actioned"}:
         raise HTTPException(status_code=400, detail="Invalid report action.")
     with SessionLocal() as session:
+        lock_authority(session)
         report = session.get(TeamReport, report_id)
         if report is None:
             raise HTTPException(status_code=404, detail="Report was not found.")

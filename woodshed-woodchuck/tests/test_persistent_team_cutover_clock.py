@@ -66,8 +66,8 @@ def test_waiting_team_request_uses_post_cutover_clock(authority_db, monkeypatch)
 def test_delete_route_acquires_authority_before_runtime_clock(authority_db, monkeypatch):
     acquired = []
     original = team_authority.lock_authority
-    def fence(session):
-        result = original(session)
+    def fence(session, **kwargs):
+        result = original(session, **kwargs)
         acquired.append(True)
         return result
     class Clock(datetime):

@@ -28,7 +28,7 @@ from .models import (
 from .team_names import InvalidTeamName, normalized_team_name
 from .team_continuity import lock_team_seasons
 from .team_name_claims import claim_public_team_name, TEAM_NAME_TAKEN
-from .team_authority import effective_membership, lock_authority, persistent_enabled
+from .team_authority import authority_write_time, effective_membership, lock_authority, persistent_enabled
 from .seasons import season_covering_date
 
 
@@ -141,10 +141,11 @@ def _team_is_current(session: Session, team: Team, season_id: int, now: datetime
     return bool(team.is_operating) if persistent_enabled(session, now) else team.season_id == season_id
 
 
-def _lock_team_writer(session: Session, season_id: int | None):
-    lock_authority(session)
+def _lock_team_writer(session: Session, season_id: int | None, *, at=None):
+    moment = authority_write_time(session, at=at)
     if season_id is not None:
         lock_team_seasons(session, season_id)
+    return moment
 
 
 def _lock_profile(session: Session, profile: WoodchuckProfile):
@@ -207,7 +208,7 @@ def _persistent_transition(session: Session, *, profile: WoodchuckProfile,
 
 def leave_team(session: Session, *, profile: WoodchuckProfile, season: Season | None,
                now: datetime) -> bool:
-    _lock_team_writer(session, _season_id(season))
+    now = _lock_team_writer(session, _season_id(season), at=now)
     if not persistent_enabled(session, now):
         raise ValueError("Persistent Team membership is not active.")
     _, changed = _persistent_transition(session, profile=profile, season=season, team=None, now=now)
@@ -217,7 +218,7 @@ def leave_team(session: Session, *, profile: WoodchuckProfile, season: Season | 
 def select_team(session: Session, *, profile: WoodchuckProfile, season: Season | None,
                 team: Team, now: datetime,
                 private_authorized: bool = False) -> tuple[TeamMembership, bool]:
-    _lock_team_writer(session, _season_id(season))
+    now = _lock_team_writer(session, _season_id(season), at=now)
     session.refresh(team)
     if not _team_is_current(session, team, _season_id(season), now):
         raise ValueError("That team is not available.")
@@ -283,8 +284,8 @@ def _creation_conflict_message(error: IntegrityError, *, classroom: bool = False
 
 def create_and_join_team(session: Session, *, profile: WoodchuckProfile,
                          season: Season | None, name: str, emblem_key: str,
-                         now: datetime) -> tuple[Team, TeamMembership]:
-    _lock_team_writer(session, _season_id(season))
+                         now: datetime, commit: bool = True) -> tuple[Team, TeamMembership]:
+    now = _lock_team_writer(session, _season_id(season), at=now)
     persistent = persistent_enabled(session, now)
     if persistent:
         _lock_profile(session, profile)
@@ -304,11 +305,15 @@ def create_and_join_team(session: Session, *, profile: WoodchuckProfile,
         team = _create_team_with_new_family(
             session, season_id=None if persistent else _season_id(season), display_name=display, normalized_name=normalized,
             emblem_key=emblem_key, creator_profile_id=profile.id,
-            is_operating=persistent,
+            is_operating=persistent, created_at=now.astimezone(timezone.utc),
         )
         session.flush()
         membership, _ = select_team(session, profile=profile, season=season, team=team, now=now)
-        session.commit(); session.refresh(team); session.refresh(membership)
+        if commit:
+            session.commit()
+        else:
+            session.flush()
+        session.refresh(team); session.refresh(membership)
     except IntegrityError as error:
         session.rollback()
         raise ValueError(_creation_conflict_message(error)) from error
@@ -329,9 +334,9 @@ def _new_join_code(session: Session) -> str:
 
 def create_director_team(
     session: Session, *, profile: WoodchuckProfile, season: Season | None,
-    name: str, emblem_key: str, now: datetime,
+    name: str, emblem_key: str, now: datetime, commit: bool = True,
 ) -> Team:
-    _lock_team_writer(session, _season_id(season))
+    now = _lock_team_writer(session, _season_id(season), at=now)
     persistent = persistent_enabled(session, now)
     if persistent:
         _lock_profile(session, profile)
@@ -357,7 +362,10 @@ def create_director_team(
             join_code=_new_join_code(session),
             created_at=now.astimezone(timezone.utc),
         )
-        session.commit()
+        if commit:
+            session.commit()
+        else:
+            session.flush()
         session.refresh(team)
     except IntegrityError as error:
         session.rollback()
@@ -368,13 +376,14 @@ def create_director_team(
     return team
 
 
-def selection_payload(session: Session, *, profile: WoodchuckProfile, now: datetime) -> dict[str, object]:
+def selection_payload(session: Session, *, profile: WoodchuckProfile, now: datetime,
+                      commit_bootstrap: bool = True) -> dict[str, object]:
     persistent = persistent_enabled(session, now)
     if persistent:
         season = season_covering_date(session, utc(now).astimezone(CENTRAL).date())
         week_start, week_end, _, _ = central_week_boundaries(now)
     else:
-        season, _, week = ensure_current_contest_data(session, now=now)
+        season, _, week = ensure_current_contest_data(session, now=now, commit=commit_bootstrap)
         week_start, week_end = week.week_start, week.week_end
     membership = active_membership(session, profile_id=profile.id, season_id=_season_id(season), at=now)
     teams = session.scalars(select(Team).where(
@@ -593,12 +602,13 @@ def create_team(request: Request, submitted: TeamCreate):
         try:
             team, _ = create_and_join_team(
                 session, profile=profile, season=season,
-                name=submitted.name, emblem_key=submitted.emblem_key, now=now,
+                name=submitted.name, emblem_key=submitted.emblem_key, now=now, commit=False,
             )
         except ValueError as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
-        payload = selection_payload(session, profile=profile, now=now)
+        payload = selection_payload(session, profile=profile, now=now, commit_bootstrap=False)
         payload.update({"created": True, "team": next(row for row in payload["teams"] if row["id"] == team.id)})
+        session.commit()
         return payload
 
 
@@ -615,11 +625,12 @@ def join_team(request: Request, submitted: TeamJoin):
             raise HTTPException(status_code=404, detail="Team was not found.")
         try:
             membership, changed = select_team(session, profile=profile, season=season, team=team, now=now)
-            session.commit(); session.refresh(membership)
+            session.flush()
+            payload = selection_payload(session, profile=profile, now=now, commit_bootstrap=False)
+            session.commit()
         except ValueError as error:
             session.rollback()
             raise HTTPException(status_code=409, detail=str(error)) from error
-        payload = selection_payload(session, profile=profile, now=now)
         payload.update({"changed": changed})
         return payload
 
@@ -630,11 +641,13 @@ def leave_selected_team(request: Request):
         profile, season, now = authenticated_context(request, session)
         try:
             changed = leave_team(session, profile=profile, season=season, now=now)
+            session.flush()
+            payload = selection_payload(session, profile=profile, now=now, commit_bootstrap=False)
             session.commit()
         except ValueError as error:
             session.rollback()
             raise HTTPException(status_code=409, detail=str(error)) from error
-        return {**selection_payload(session, profile=profile, now=now), "changed": changed}
+        return {**payload, "changed": changed}
 
 
 @router.post("/private-requests", status_code=201)
@@ -643,7 +656,7 @@ def request_private_team_membership(
 ):
     with SessionLocal() as session:
         profile, season, now = authenticated_context(request, session)
-        _lock_team_writer(session, _season_id(season))
+        now = _lock_team_writer(session, _season_id(season), at=now)
         persistent = persistent_enabled(session, now)
         if persistent:
             _lock_profile(session, profile)
@@ -715,25 +728,27 @@ def create_private_director_team(request: Request, submitted: TeamCreate):
         try:
             team = create_director_team(
                 session, profile=profile, season=season,
-                name=submitted.name, emblem_key=submitted.emblem_key, now=now,
+                name=submitted.name, emblem_key=submitted.emblem_key, now=now, commit=False,
             )
         except PermissionError as error:
             raise HTTPException(status_code=403, detail=str(error)) from error
         except ValueError as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
-        return {
+        payload = {
             "created": True,
             **director_team_payload(
                 session, profile=profile, season=season, team_id=team.id, now=now
             ),
         }
+        session.commit()
+        return payload
 
 
 @router.post("/director/{team_id}/join-code")
 def regenerate_private_team_code(team_id: int, request: Request):
     with SessionLocal() as session:
         profile, season, now = authenticated_context(request, session)
-        _lock_team_writer(session, _season_id(season))
+        now = _lock_team_writer(session, _season_id(season), at=now)
         try:
             team = _owned_director_team(
                 session, profile=profile, team_id=team_id, now=now
@@ -753,7 +768,7 @@ def regenerate_private_team_code(team_id: int, request: Request):
 def join_owned_team_as_player(team_id: int, request: Request):
     with SessionLocal() as session:
         profile, season, now = authenticated_context(request, session)
-        _lock_team_writer(session, _season_id(season))
+        now = _lock_team_writer(session, _season_id(season), at=now)
         try:
             team = _owned_director_team(session, profile=profile, team_id=team_id, now=now)
             membership, changed = select_team(
@@ -779,7 +794,7 @@ def resolve_private_team_request(
 ):
     with SessionLocal() as session:
         profile, season, now = authenticated_context(request, session)
-        _lock_team_writer(session, _season_id(season))
+        now = _lock_team_writer(session, _season_id(season), at=now)
         try:
             team = _owned_director_team(session, profile=profile, team_id=team_id, now=now)
         except PermissionError as error:
@@ -827,7 +842,7 @@ def resolve_private_team_request(
 def remove_private_team_member(team_id: int, profile_id: int, request: Request):
     with SessionLocal() as session:
         profile, season, now = authenticated_context(request, session)
-        _lock_team_writer(session, _season_id(season))
+        now = _lock_team_writer(session, _season_id(season), at=now)
         try:
             team = _owned_director_team(session, profile=profile, team_id=team_id, now=now)
         except PermissionError as error:
@@ -852,6 +867,7 @@ def remove_private_team_member(team_id: int, profile_id: int, request: Request):
 @router.post("/{team_id}/reports", status_code=201)
 def report_team(team_id: int, request: Request, submitted: TeamReportCreate):
     with SessionLocal() as session:
+        now = authority_write_time(session)
         profile = current_profile(request, session)
         from .age_privacy import sharing_allowed
         if profile and request.method != "GET" and not sharing_allowed(session, profile.id):
@@ -873,7 +889,7 @@ def report_team(team_id: int, request: Request, submitted: TeamReportCreate):
             return {"created": False, "report_id": existing.id, "status": existing.status}
         report = TeamReport(
             team_id=team.id, reporter_profile_id=profile.id,
-            category=submitted.category, details=details or None,
+            category=submitted.category, details=details or None, created_at=now,
         )
         session.add(report)
         try:

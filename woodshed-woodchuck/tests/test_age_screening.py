@@ -193,7 +193,7 @@ def test_background_writers_fail_closed_including_old_queued_observation(age_db)
     with age_db() as s:
         for operation in (lock_state,apply_daily_login):
             with pytest.raises(AgeScreenRequired):operation(s,profile_id=1)
-        assert _grant_once(s,profile_id=1,result_id=None,source_key='synthetic-finalizer',reward_type='dandelion') is False
+        assert _grant_once(s,earned_at=instant,profile_id=1,result_id=None,source_key='synthetic-finalizer',reward_type='dandelion') is False
         s.commit()
     assert counts(age_db)==before
     with age_db() as s:declare_age(s,1,'adult',at=instant+timedelta(seconds=1));s.commit()

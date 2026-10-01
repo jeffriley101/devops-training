@@ -15,7 +15,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import set_committed_value
 
-from .practice_duration import qualified_practice_clause, chart_seconds
+from .practice_duration import qualified_practice_clause, team_qualified_practice_clause, chart_seconds
 from .account_routes import current_profile
 from .economy import lock_state, economy_payload, qualified_camp_point_clause
 from .login_limits import enforce_login_limit
@@ -49,7 +49,7 @@ from .models import (
     WoodchuckState,
 )
 from .team_authority import (
-    effective_membership, lock_authority, persistent_enabled,
+    authority_write_time, effective_membership, lock_authority, persistent_enabled,
     rules_version_for_start, week_uses_persistent,
 )
 from .team_practice_rating import (
@@ -384,6 +384,7 @@ def ensure_current_contest_data(
     session: Session,
     *,
     now: datetime,
+    commit: bool = True,
 ) -> tuple[Season, list[Contest], ContestWeek]:
     lock_authority(session)
     week_start, week_end, deadline, finalize_after = central_week_boundaries(now)
@@ -441,7 +442,10 @@ def ensure_current_contest_data(
     elif contest_week.week_end != week_end:
         raise HTTPException(status_code=409, detail="Existing contest week has conflicting boundaries.")
 
-    session.commit()
+    if commit:
+        session.commit()
+    else:
+        session.flush()
     return season, contests, contest_week
 
 
@@ -650,7 +654,7 @@ def _student_emblem_keys_for_week(
         return {}
 
     team_ids_by_profile: dict[int, int | None] = {}
-    if contest_week.status == "finalized":
+    if contest_week.status == "finalized" or contest_week.team_roster_frozen_at is not None:
         snapshots = session.scalars(select(TeamWeekMembershipSnapshot).where(
             TeamWeekMembershipSnapshot.contest_week_id == contest_week.id,
             TeamWeekMembershipSnapshot.profile_id.in_(profile_ids),
@@ -939,11 +943,12 @@ def create_camp_point_award(
     activity_date: date,
     now: datetime,
 ) -> tuple[CampPointAward, bool]:
+    if now.tzinfo is None or now.utcoffset() is None:
+        raise ValueError("The award time must be timezone-aware.")
+    now = authority_write_time(session, at=now)
     activity = activity_type.strip().casefold()
     if activity not in CAMP_POINT_ACTIVITIES:
         raise ValueError("Unsupported Band Camp point activity.")
-    if now.tzinfo is None or now.utcoffset() is None:
-        raise ValueError("The award time must be timezone-aware.")
     if activity_date != now.astimezone(CENTRAL).date():
         raise ValueError("Band Camp activities can only be recorded for today.")
     duplicate_key = _board_activity_key(activity_date, activity)
@@ -959,6 +964,7 @@ def create_camp_point_award(
         activity_type=activity,
         points_awarded=1,
         occurred_at=now.astimezone(timezone.utc),
+        created_at=now.astimezone(timezone.utc),
         duplicate_key=duplicate_key,
         team_id=_active_team_id_for_event(session, profile.id, now),
     )
@@ -979,7 +985,7 @@ def _refresh_earning_profile(session: Session, request: Request, profile: Woodch
 
 def _active_team_id_for_event(session: Session, profile_id: int, now: datetime) -> int | None:
     """Snapshot team attribution at the earning event; legacy awards remain null."""
-    lock_authority(session)
+    now = authority_write_time(session, at=now)
     if persistent_enabled(session, at=now):
         membership = effective_membership(session, profile_id=profile_id, at=now)
         return membership.team_id if membership else None
@@ -1321,9 +1327,7 @@ def _lifetime_team_practice_scores(
     _practice_scoring_mode(through_week)
     filters = [
         PracticeChart.practice_date < through_week.week_end,
-        PracticeChart.include_contests.is_(True),
-        qualified_practice_clause(),
-        PracticeChart.include_team_contests.is_(True),
+        team_qualified_practice_clause(),
         PracticeChart.team_id.is_not(None),
     ]
     if source_cutoff is not None:
@@ -1366,9 +1370,7 @@ def _season_team_practice_scores(
     filters = [
         PracticeChart.practice_date >= season.starts_on,
         PracticeChart.practice_date < through_week.week_end,
-        PracticeChart.include_contests.is_(True),
-        qualified_practice_clause(),
-        PracticeChart.include_team_contests.is_(True),
+        team_qualified_practice_clause(),
         PracticeChart.team_id.is_not(None),
     ]
     if source_cutoff is not None:
@@ -1544,9 +1546,16 @@ def _grant_once(
     result_id: int | None,
     source_key: str,
     reward_type: str,
+    earned_at: datetime,
     category_key: str | None = None,
     amount: int = 1,
 ) -> bool:
+    """Record a reward at its earning time; the owning service admits the write.
+
+    BOARD passes its award's admitted instant. Finalization passes the admitted
+    operation time, or the original finalized_at when repairing historical gaps.
+    A retry preserves the existing grant, including its timestamp.
+    """
     from .age_privacy import eligible
     if not eligible(session,profile_id):return False
     pending = next((
@@ -1568,7 +1577,7 @@ def _grant_once(
     session.add(RewardGrant(
         profile_id=profile_id, contest_result_id=result_id,
         source_key=source_key, reward_type=reward_type,
-        category_key=category_key, amount=amount,
+        category_key=category_key, amount=amount, created_at=earned_at,
     ))
     return True
 
@@ -1578,6 +1587,7 @@ def _legacy_finalize_contest_week(
 ) -> ContestWeek:
     if now.tzinfo is None or now.utcoffset() is None:
         raise ValueError("The current time must be timezone-aware.")
+    now = authority_write_time(session, at=now)
     contest_week = session.scalar(
         select(ContestWeek)
         .join(Season, Season.id == ContestWeek.season_id)
@@ -1675,7 +1685,7 @@ def _legacy_finalize_contest_week(
             if medal is None:
                 continue
             result = ContestResult(
-                contest_week_id=contest_week.id, contest_id=points_contest.id,
+                created_at=now_utc, contest_week_id=contest_week.id, contest_id=points_contest.id,
                 division=division, subject_type="student", subject_key=str(profile_id),
                 profile_id=profile_id, instrument=None, display_name_snapshot=display,
                 score=score, rank=rank, medal=medal,
@@ -1691,7 +1701,7 @@ def _legacy_finalize_contest_week(
             instrument = str(row["instrument"])
             key, _ = normalize_instrument(instrument)
             session.add(ContestResult(
-                contest_week_id=contest_week.id, contest_id=instrument_contest.id,
+                created_at=now_utc, contest_week_id=contest_week.id, contest_id=instrument_contest.id,
                 division=division, subject_type="instrument", subject_key=key,
                 profile_id=None, instrument=instrument, display_name_snapshot=instrument,
                 score=int(row["total_minutes"]), rank=rank, medal=medal,
@@ -1706,7 +1716,7 @@ def _legacy_finalize_contest_week(
         if medal is None:
             continue
         result = ContestResult(
-            contest_week_id=contest_week.id,
+            created_at=now_utc, contest_week_id=contest_week.id,
             contest_id=camp_points_contest.id,
             division="open",
             subject_type="student",
@@ -1733,7 +1743,7 @@ def _legacy_finalize_contest_week(
             f"student:{profile_id}:gold"
         )
         if _grant_once(
-            session,
+            session, earned_at=now_utc,
             profile_id=profile_id,
             result_id=result.id,
             source_key=source,
@@ -1742,7 +1752,7 @@ def _legacy_finalize_contest_week(
             _add_dandelion(session, profile_id)
         category = points_contest.crown_category or points_contest.key
         if _grant_once(
-            session,
+            session, earned_at=now_utc,
             profile_id=profile_id,
             result_id=result.id,
             source_key=source,
@@ -1763,7 +1773,7 @@ def _legacy_finalize_contest_week(
             f"student:{profile_id}:gold"
         )
         if _grant_once(
-            session,
+            session, earned_at=now_utc,
             profile_id=profile_id,
             result_id=result.id,
             source_key=source,
@@ -1771,7 +1781,7 @@ def _legacy_finalize_contest_week(
         ):
             _add_dandelion(session, profile_id)
         if _grant_once(
-            session,
+            session, earned_at=now_utc,
             profile_id=profile_id,
             result_id=result.id,
             source_key=source,
@@ -1798,7 +1808,7 @@ def _legacy_finalize_contest_week(
             f"instrument:{instrument_key}:participant:{profile_id}"
         )
         if _grant_once(
-            session,
+            session, earned_at=now_utc,
             profile_id=profile_id,
             result_id=None,
             source_key=source,
@@ -1848,6 +1858,7 @@ def _crown_award_once(
         category_key=category,
         source_key=source_key,
         earned_at=earned_at,
+        created_at=earned_at,
     )
     session.add(award)
     return award
@@ -1900,7 +1911,7 @@ def _snapshot_memberships(session: Session, contest_week: ContestWeek) -> list[T
     existing = session.scalars(select(TeamWeekMembershipSnapshot).where(
         TeamWeekMembershipSnapshot.contest_week_id == contest_week.id
     )).all()
-    if existing:
+    if existing or contest_week.team_roster_frozen_at is not None:
         return list(existing)
     memberships = session.scalars(select(TeamMembership).where(
         _membership_authority_clause(contest_week),
@@ -1934,7 +1945,7 @@ def _reward_contest_result(
         )
         _set_finalization_stage(session, "rewards")
         if _grant_once(
-            session, profile_id=profile_id, result_id=result.id, source_key=source,
+            session, earned_at=now, profile_id=profile_id, result_id=result.id, source_key=source,
             reward_type="dandelion", amount=amount,
         ):
             _add_dandelion(session, profile_id, amount)
@@ -1947,14 +1958,14 @@ def _reward_contest_result(
         if existing_camp is None:
             session.add(CampPointAward(
                 profile_id=profile_id, activity_type="contest-placement",
-                points_awarded=PLACEMENT_CAMP_POINTS, occurred_at=now,
+                points_awarded=PLACEMENT_CAMP_POINTS, occurred_at=now, created_at=now,
                 duplicate_key=camp_key, team_id=snapshot_team_ids.get(profile_id),
             ))
         if result.rank == 1:
             _set_finalization_stage(session, "crown_progress")
             category = "team-crown" if result.subject_type == "team" else contest.crown_category
             if category and _grant_once(
-                session, profile_id=profile_id, result_id=result.id, source_key=source,
+                session, earned_at=now, profile_id=profile_id, result_id=result.id, source_key=source,
                 reward_type="crown_win", category_key=category,
             ):
                 _increment_crown_progress(
@@ -1978,6 +1989,7 @@ def _contest_result_once(
     score: float,
     rank: int,
     practice_scoring_mode: str,
+    earned_at: datetime,
     active_member_count: int | None = None,
 ) -> tuple[ContestResult, bool]:
     """Create one deterministic result while preserving an existing snapshot."""
@@ -2005,6 +2017,7 @@ def _contest_result_once(
         rank=rank,
         medal=medal_for_rank(rank),
         active_member_count=active_member_count,
+        created_at=earned_at,
     )
     session.add(result)
     return result, True
@@ -2040,6 +2053,9 @@ def finalize_contest_week(
     """Finalize a week, or fill deterministic gaps when explicitly repairing."""
     if now.tzinfo is None or now.utcoffset() is None:
         raise ValueError("The current time must be timezone-aware.")
+    # Validate the operation time even when the caller already holds admission.
+    # Repairs below retain the original finalization time for historical earnings.
+    now = authority_write_time(session, at=now)
     week = locked_contest_week(session, week_start=week_start)
     if week is None:
         raise HTTPException(status_code=404, detail="Contest week not found.")
@@ -2120,7 +2136,7 @@ def finalize_contest_week(
             if rank not in PLACEMENT_DANDELIONS:
                 continue
             result, _created = _contest_result_once(
-                session, contest_week_id=week.id, practice_scoring_mode=scoring_mode,
+                session, earned_at=source_cutoff, contest_week_id=week.id, practice_scoring_mode=scoring_mode,
                 contest=contests["weekly-points-leaders"], division=division,
                 subject_type="student", subject_key=str(profile_id),
                 profile_id=profile_id, instrument=None, team_id=None,
@@ -2133,7 +2149,7 @@ def finalize_contest_week(
             continue
         key, _ = normalize_instrument(str(row["instrument"]))
         result, _created = _contest_result_once(
-            session, contest_week_id=week.id, practice_scoring_mode=scoring_mode,
+            session, earned_at=source_cutoff, contest_week_id=week.id, practice_scoring_mode=scoring_mode,
             contest=contests["weekly-practice-by-instrument"], division="open",
             subject_type="instrument", subject_key=key, profile_id=None,
             instrument=str(row["instrument"]), team_id=None,
@@ -2162,7 +2178,7 @@ def finalize_contest_week(
         if rank not in PLACEMENT_DANDELIONS:
             continue
         result, _created = _contest_result_once(
-            session, contest_week_id=week.id, practice_scoring_mode=scoring_mode,
+            session, earned_at=source_cutoff, contest_week_id=week.id, practice_scoring_mode=scoring_mode,
             contest=contests["weekly-camp-points"], division="open",
             subject_type="student", subject_key=str(profile_id),
             profile_id=profile_id, instrument=None, team_id=None,
@@ -2175,7 +2191,7 @@ def finalize_contest_week(
     snapshot_team_ids = {row.profile_id: row.team_id for row in snapshots}
     has_chart = set(session.scalars(select(PracticeChart.profile_id).where(
         PracticeChart.created_at <= source_cutoff,
-        qualified_practice_clause(),
+        team_qualified_practice_clause(),
     ).distinct()).all())
     team_members: dict[int, set[int]] = {}
     for snapshot in snapshots:
@@ -2210,7 +2226,7 @@ def finalize_contest_week(
                 if rank not in PLACEMENT_DANDELIONS:
                     continue
                 result, _created = _contest_result_once(
-                    session, contest_week_id=week.id, practice_scoring_mode=scoring_mode, contest=contest,
+                    session, earned_at=source_cutoff, contest_week_id=week.id, practice_scoring_mode=scoring_mode, contest=contest,
                     division=division, subject_type="team",
                     subject_key=str(row["team_id"]), profile_id=None,
                     instrument=None, team_id=int(row["team_id"]),
@@ -2233,7 +2249,7 @@ def finalize_contest_week(
     for profile_id in {chart.profile_id for chart in charts}:
         source = f"contest:{week.id}:weekly-participation:profile:{profile_id}"
         if _grant_once(
-            session, profile_id=profile_id, result_id=None, source_key=source,
+            session, earned_at=source_cutoff, profile_id=profile_id, result_id=None, source_key=source,
             reward_type="participation_dandelion", amount=PARTICIPATION_DANDELIONS,
         ):
             _add_dandelion(session, profile_id, PARTICIPATION_DANDELIONS)
@@ -2573,19 +2589,23 @@ def hall_of_champions_payload(
         elif result.subject_type == "team":
             historical_team = teams.get(result.team_id)
             team = historical_team
+            use_operating_display = False
             if persistent_current and historical_team is not None:
                 operating = operating_by_family.get(historical_team.family_id)
-                if not _include_internal and (operating is None or not public_team_identity_allowed(operating)):
-                    continue
-                if operating is not None and not _include_internal:
+                # Historical publication was checked above. A public operating
+                # identity may supply presentation; a restricted successor leaves
+                # the published achievement under its historical Team identity.
+                if (not _include_internal and operating is not None
+                        and public_team_identity_allowed(operating)):
                     team = operating
+                    use_operating_display = True
             team_key = lifetime_team_identity(result, historical_team)
             champion = teams_by_subject.get(team_key)
             if champion is None:
                 champion = {
-                    "team_id": team.id if persistent_current and not _include_internal and team is not None else result.team_id,
+                    "team_id": team.id if use_operating_display else result.team_id,
                     "team_name": public_team_name(
-                        team, team.display_name if persistent_current and not _include_internal and team is not None else result.display_name_snapshot
+                        team, team.display_name if use_operating_display else result.display_name_snapshot
                     ),
                     "emblem_key": public_team_emblem(team),
                     "_normalized_name": (
@@ -3168,6 +3188,9 @@ def require_earned_bonus(session, *, profile, activity_date, challenge_instance,
 
 
 def _record_bonus_self_attestation(session, profile, resolved, now):
+    now = authority_write_time(session, at=now)
+    resolved = require_earned_bonus(session, profile=profile,
+        activity_date=resolved["activity_date"], challenge_instance=resolved["instance_key"], now=now)
     daily_key = _bonus_daily_key(resolved["activity_date"])
     source_key = _bonus_reward_key(resolved)
     existing = session.scalar(select(CampPointAward).where(
@@ -3185,12 +3208,12 @@ def _record_bonus_self_attestation(session, profile, resolved, now):
         return False
     session.add(CampPointAward(
         profile_id=profile.id, activity_type="quest", points_awarded=2,
-        occurred_at=now, duplicate_key=daily_key,
+        occurred_at=now, created_at=now, duplicate_key=daily_key,
         team_id=_active_team_id_for_event(session, profile.id, now),
     ))
     # This unique daily insert wins eligibility before any balance mutation.
     session.flush()
-    if not _grant_once(session, profile_id=profile.id, result_id=None,
+    if not _grant_once(session, earned_at=now, profile_id=profile.id, result_id=None,
                        source_key=source_key, reward_type="dandelion",
                        category_key="bonus-challenge", amount=5):
         raise HTTPException(409, "Today's Bonus Challenge reward was already recorded.")
@@ -3207,25 +3230,25 @@ def record_bonus_challenge_progress(request: Request, submitted: BonusChallengeP
         if profile is None:
             raise HTTPException(401, "Student sign-in is required.")
         lock_authority(session)
+        now = authority_write_time(session, clock=lambda: datetime.now(timezone.utc))
         profile = _refresh_earning_profile(session, request, profile)
         lock_state(session, profile.id)
         # The profile may have changed while this request waited for its lock.
         session.refresh(profile)
-        now = datetime.now(timezone.utc)
         resolved = require_earned_bonus(
             session, profile=profile, activity_date=submitted.activity_date,
             challenge_instance=submitted.challenge_instance, now=now,
         )
         try:
             created = _record_bonus_self_attestation(session, profile, resolved, now)
-            session.commit()
+            session.flush()
         except IntegrityError:
             # A concurrent daily insert committed the entire award transaction.
             session.rollback()
             lock_authority(session)
+            now = authority_write_time(session, clock=lambda: datetime.now(timezone.utc))
             profile = _refresh_earning_profile(session, request, profile)
             lock_state(session, profile.id)
-            now = datetime.now(timezone.utc)
             resolved = require_earned_bonus(
                 session, profile=profile, activity_date=submitted.activity_date,
                 challenge_instance=submitted.challenge_instance, now=now,
@@ -3233,11 +3256,13 @@ def record_bonus_challenge_progress(request: Request, submitted: BonusChallengeP
             if not resolved["completed"]:
                 raise HTTPException(500, "Bonus Challenge could not be saved. Please try again.")
             created = _record_bonus_self_attestation(session, profile, resolved, now)
-        return bonus_challenge_progress_payload(
+        payload = bonus_challenge_progress_payload(
             session, profile_id=profile.id, activity_date=resolved["activity_date"],
             challenge_id=resolved["challenge_id"], target_minutes=resolved["target_minutes"],
             logged_minutes=0, completed=True, created=created, now=now,
         )
+        session.commit()
+        return payload
 
 
 @router.post("/quest/completions")
@@ -3326,7 +3351,7 @@ def daily_camp_point_awards(
 
 
 def _award_board_dandelion(session, profile_id, award, created):
-    if created and _grant_once(session, profile_id=profile_id, result_id=None,
+    if created and _grant_once(session, earned_at=award.occurred_at, profile_id=profile_id, result_id=None,
                               source_key=f"board-activity:{award.id}",
                               reward_type="dandelion", category_key="board-activity"):
         _add_dandelion(session, profile_id)
@@ -3342,9 +3367,9 @@ def check_trivia_answer(
         if profile is None:
             raise HTTPException(status_code=401, detail="Student sign-in is required.")
         lock_authority(session)
+        now = authority_write_time(session, clock=lambda: datetime.now(timezone.utc))
         profile = _refresh_earning_profile(session, request, profile)
         locked_state = lock_state(session, profile.id)
-        now = datetime.now(timezone.utc)
         today = now.astimezone(CENTRAL).date()
         if submitted.activity_date != today:
             raise HTTPException(status_code=400, detail="Trivia can only be answered for today.")
@@ -3366,6 +3391,7 @@ def check_trivia_answer(
                 activity_date=today,
                 selected_answer=choice["id"],
                 correct=choice["id"] == question["correct_answer_id"],
+                created_at=now,
             )
             session.add(attempt)
             try:
@@ -3373,9 +3399,9 @@ def check_trivia_answer(
             except IntegrityError:
                 session.rollback()
                 lock_authority(session)
+                now = authority_write_time(session, clock=lambda: datetime.now(timezone.utc))
                 profile = _refresh_earning_profile(session, request, profile)
                 locked_state = lock_state(session, profile.id)
-                now = datetime.now(timezone.utc)
                 if now.astimezone(CENTRAL).date() != today:
                     raise HTTPException(status_code=409, detail="Trivia day changed. Refresh BOARD and try again.")
                 attempt = session.scalar(select(DailyTriviaAttempt).where(
@@ -3397,8 +3423,8 @@ def check_trivia_answer(
             )
             _award_board_dandelion(session, profile.id, award, award_created)
             _reconcile_crown_categories(session, profile_id=profile.id)
-        session.commit()
-        return {
+        session.flush()
+        payload = {
             **economy_payload(locked_state),
             "question": question["question"],
             "selected_answer_id": (
@@ -3416,6 +3442,8 @@ def check_trivia_answer(
             } if award is not None else None),
             **student_camp_point_totals(session, profile_id=profile.id, now=now),
         }
+        session.commit()
+        return payload
 
 
 @router.post("/camp-points/awards")
@@ -3428,6 +3456,7 @@ def award_camp_points(
         if profile is None:
             raise HTTPException(status_code=401, detail="Student sign-in is required.")
         lock_authority(session)
+        now = authority_write_time(session, clock=lambda: datetime.now(timezone.utc))
         profile = _refresh_earning_profile(session, request, profile)
         locked_state = lock_state(session, profile.id)
         if submitted.activity_type.strip().casefold() == "trivia":
@@ -3437,7 +3466,6 @@ def award_camp_points(
             ))
             if attempt is None or not attempt.correct:
                 raise HTTPException(status_code=400, detail="Answer today's trivia correctly first.")
-        now = datetime.now(timezone.utc)
         try:
             award, created = create_camp_point_award(
                 session,
@@ -3448,11 +3476,14 @@ def award_camp_points(
             )
             _award_board_dandelion(session, profile.id, award, created)
             _reconcile_crown_categories(session, profile_id=profile.id)
-            session.commit()
+            session.flush()
         except ValueError as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
         except IntegrityError:
             session.rollback()
+            now = authority_write_time(session, clock=lambda: datetime.now(timezone.utc))
+            profile = _refresh_earning_profile(session, request, profile)
+            locked_state = lock_state(session, profile.id)
             duplicate_key = _board_activity_key(
                 submitted.activity_date, submitted.activity_type.strip().casefold()
             )
@@ -3464,7 +3495,7 @@ def award_camp_points(
             if award is None:
                 raise HTTPException(status_code=500, detail="Camp points could not be saved.")
             created = False
-        return {
+        payload = {
             **economy_payload(locked_state),
             "created": created,
             **student_camp_point_totals(
@@ -3476,6 +3507,8 @@ def award_camp_points(
                 "occurred_at": utc_iso(award.occurred_at),
             },
         }
+        session.commit()
+        return payload
 
 
 @router.post("/weeks/{week_start}/finalize")

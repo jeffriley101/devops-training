@@ -15,6 +15,7 @@ from .consent_status import student_consent_status
 from . import child_authorization as service,parent_access
 from .child_models import ConsentEvidence,DirectorPermission,PendingConsent
 from .models import WoodchuckProfile,PracticeChart,PracticeChartVerification,StudentVerifierConnection,TrustedVerifier
+from .team_authority import lock_authority
 class FamilyPageRoute(PrivateRoute):
     """Render page validation errors without changing JSON data endpoints."""
     def get_route_handler(self):
@@ -67,7 +68,7 @@ def metrics(s,p):
     from .trusted_verifier_dashboard import private_student_metrics
     from .student_practice_metrics import practice_insights
     from .feature_access import can_use_feature
-    data=private_student_metrics(s,profile_id=p.id)
+    data=private_student_metrics(s,profile_id=p.id,include_team_context=False)
     if can_use_feature(s,p.id,'practice_insights'):
         charts=s.scalars(select(PracticeChart).where(PracticeChart.profile_id==p.id)).all()
         approved=set(s.scalars(select(PracticeChartVerification.practice_chart_id).join(PracticeChart).where(PracticeChart.profile_id==p.id,PracticeChartVerification.status=='approved')))
@@ -247,7 +248,7 @@ def director_view(request:Request):
         p=s.get(WoodchuckProfile,permission.profile_id);c=s.get(StudentVerifierConnection,permission.connection_id)
         reviews=s.execute(select(PracticeChartVerification.id,PracticeChartVerification.practice_chart_id,PracticeChartVerification.status).join(PracticeChart).where(PracticeChart.profile_id==p.id,PracticeChartVerification.verifier_id==c.verifier_id)).all()
         from .trusted_verifier_dashboard import private_student_metrics
-        basic=private_student_metrics(s,profile_id=p.id)
+        basic=private_student_metrics(s,profile_id=p.id,include_team_context=False)
         data={'name':p.display_name,'instrument':p.instrument,'charts':charts(s,p.id),'metrics':{key:basic[key] for key in ('weekly','lifetime','rating','trend','practice_streak')},'can_review':permission.review_allowed,'reviews':[dict(r._mapping) for r in reviews]}
         if request.url.path.endswith('/data'):return data
         return page(request,'director',**data)
@@ -257,6 +258,9 @@ async def review(request:Request,review_id:int):
     data=await form(request,{'decision','note'})
     from .practice_charts import respond_to_practice_chart_verification
     with SessionLocal() as s:
+        # The service classifies the chart; take the shared mutex before the
+        # private director authorization rows or profile/state can be locked.
+        lock_authority(s, allow_pending=True)
         permission=director(s,request,review=True);c=s.get(StudentVerifierConnection,permission.connection_id);v=s.get(TrustedVerifier,c.verifier_id)
         try:respond_to_practice_chart_verification(s,verifier=v,verification_id=review_id,decision=data.get('decision',''),response_note=data.get('note',''),request=request)
         except (ValueError,LookupError) as e:raise HTTPException(403,str(e))

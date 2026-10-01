@@ -1528,7 +1528,7 @@ def test_same_crown_source_is_pending_idempotent_before_flush(
     source_key = "same-crown-source"
     with factory(autoflush=False) as transaction:
         first = contest_module._grant_once(
-            transaction,
+            transaction, earned_at=FINAL_NOW,
             profile_id=profile.id,
             result_id=None,
             source_key=source_key,
@@ -1544,7 +1544,7 @@ def test_same_crown_source_is_pending_idempotent_before_flush(
                 now=FINAL_NOW,
             )
         retry = contest_module._grant_once(
-            transaction,
+            transaction, earned_at=FINAL_NOW,
             profile_id=profile.id,
             result_id=None,
             source_key=source_key,

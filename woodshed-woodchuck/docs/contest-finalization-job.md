@@ -24,7 +24,7 @@ missing definitions fail finalization. Normal contest setup seeds them;
 
 The earlier combined precision/provisioning release required `t0p1q2r3s4t5`.
 The persistent Team release also maps `ContestWeek.team_membership_rules_version`
-and requires `p20team001`. Migrate through that revision **before starting the current web
+and requires `p21team001`. Migrate through that revision **before starting the current web
 or finalizer code**. Pause/drain all finalization
 writers, upgrade both services and every finalization entry point together,
 then resume; old/new finalizers must not overlap. Follow the
@@ -35,6 +35,11 @@ The current September 28, 2026 week retains `legacy_seasonal_v1` membership rule
 and `contest_finalizer_v1` finalization. A separately approved clean later week
 uses `persistent_v1` and `contest_finalizer_persistent_v1`. Finalized legacy weeks
 keep their stored results and snapshots; the new release never retags them.
+Approval can be staged ahead, but authority markers and week rules remain legacy
+until the explicit boundary activation transaction. From the approved Monday,
+current Team operations and finalization fail closed until activation completes.
+Activation freezes the closing legacy roster (including an empty roster) before
+enabling persistent transitions, without finalizing or rescoring that week.
 Older operational evidence below retains its original dates and release context;
 references to seasonal activation do not apply to future operations.
 

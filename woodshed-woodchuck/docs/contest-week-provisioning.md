@@ -14,7 +14,7 @@ Run from `woodshed-woodchuck` with the application environment and an explicit
 `DATABASE_URL` for the intended database. Never paste its value into logs.
 Provisioning also accepts `--database-url`; it has no local-database fallback.
 The deployed persistent-aware code requires exactly one Alembic revision,
-`p20team001`, the required calendar/control columns, the approved membership-rules
+`p21team001`, the required calendar/control columns, the approved membership-rules
 CHECK constraint, and the `persistent_team_control` singleton seeded by migration.
 The calendar guard is separate from historical continuity repair's unchanged
 `d17contest001` approval. Older, unknown, multiple, or incomplete schema states
@@ -101,6 +101,11 @@ reviewed cutover, only newly provisioned weeks beginning on/after
 `rules_from_week_start` receive `persistent_v1`. Matching existing rows keep their
 stored rules, including the open September 28 week; provisioning never retags them.
 A clean existing future week can be explicitly marked only by the cutover plan.
+Staging that plan does not mark any week. Calendar writes remain legacy before
+its boundary and are gated once activation is due. Explicit activation changes
+the approved weeks and current authority together. Provision required weeks
+before approving the staged plan; changing the week inventory afterwards
+requires fresh approval.
 
 Provisioning never creates Teams, copies memberships, rotates join codes, awards
 anything, pauses users, or installs a schedule. No Halloween successor operation

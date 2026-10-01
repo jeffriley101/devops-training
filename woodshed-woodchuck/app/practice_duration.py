@@ -46,3 +46,16 @@ def qualified_practice_clause():
         PracticeChartVerification.status == "approved",
         PracticeChartVerification.responded_at.is_not(None),
     )
+
+
+def team_qualified_practice_clause():
+    """Approved BOOK evidence opted into both contests and Team contests.
+
+    Personal approval alone must never confer Team competition eligibility.
+    Team attribution, date bounds and roster eligibility are applied by callers.
+    """
+    from .models import PracticeChart
+    return qualified_practice_clause() & (
+        PracticeChart.include_contests.is_(True)
+        & PracticeChart.include_team_contests.is_(True)
+    )
