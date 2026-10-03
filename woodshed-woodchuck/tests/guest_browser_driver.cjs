@@ -11,6 +11,8 @@ process.stdin.on('end',async()=>{
  '--autoplay-policy=no-user-gesture-required','--use-fake-device-for-media-stream','--use-fake-ui-for-media-stream',
  '--user-data-dir='+config.profile],{stdio:['ignore','ignore','ignore','pipe','pipe']});
  let seq=0,buffer=''; const pending=new Map();const events=[];const requestURLs=new Map();const requestMetadata=new Map();let intercept=null;
+ const activeRequests=new Map(), completedRequests=[], networkActivity=new Map();
+ const requestKey=m=>`${m.sessionId}:${m.params.requestId}`;
  const recordDiscardMetadata=requestId=>{
    const url=requestURLs.get(requestId),headers=requestMetadata.get(requestId);
    if(url && new URL(url).pathname==='/guest/discard' && headers)fs.writeFileSync(config.output+'/native-discard-network-headers.json',JSON.stringify(headers,null,2));
@@ -24,7 +26,26 @@ process.stdin.on('end',async()=>{
    while((end=buffer.indexOf('\0'))>=0){
      const m=JSON.parse(buffer.slice(0,end));buffer=buffer.slice(end+1);
      if(pending.has(m.id)){const p=pending.get(m.id);pending.delete(m.id);m.error?p.reject(m.error):p.resolve(m.result);}
-     else if(m.method==='Network.requestWillBeSent'){events.push({session:m.sessionId,url:m.params.request.url,method:m.params.request.method});requestURLs.set(m.params.requestId,m.params.request.url);recordDiscardMetadata(m.params.requestId);}
+     else if(m.method==='Network.requestWillBeSent'){
+       const request={session:m.sessionId,url:m.params.request.url,method:m.params.request.method,index:events.length};
+       events.push(request);
+       // Blob workers are local resources and may have no loadingFinished
+       // event. Keep them in the security log, but await only real network I/O.
+       if(['http:','https:'].includes(new URL(request.url).protocol)){
+         activeRequests.set(requestKey(m),request);networkActivity.set(m.sessionId,Date.now());
+       }
+       requestURLs.set(m.params.requestId,m.params.request.url);recordDiscardMetadata(m.params.requestId);
+     }
+     else if(m.method==='Network.responseReceived'){
+       const request=activeRequests.get(requestKey(m));if(request)request.status=m.params.response.status;
+     }
+     else if(m.method==='Network.loadingFinished' || m.method==='Network.loadingFailed'){
+       const request=activeRequests.get(requestKey(m));
+       if(request){
+         completedRequests.push({...request,error:m.params.errorText});
+         activeRequests.delete(requestKey(m));networkActivity.set(m.sessionId,Date.now());
+       }
+     }
      else if(m.method==='Network.requestWillBeSentExtraInfo'){requestMetadata.set(m.params.requestId,Object.fromEntries(Object.entries(m.params.headers).filter(([key])=>['origin','sec-fetch-site','sec-fetch-mode','sec-fetch-dest'].includes(key.toLowerCase()))));recordDiscardMetadata(m.params.requestId);}
      else if(m.method==='Fetch.requestPaused' && intercept)intercept(m);
    }
@@ -37,9 +58,50 @@ process.stdin.on('end',async()=>{
      const r=await send('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true,userGesture:true},sessionId);
      if(r.exceptionDetails)throw new Error(JSON.stringify(r.exceptionDetails));return r.result.value;
    };
-   const until=async(expression)=>{for(let i=0;i<240;i++){if(await evaluate(expression))return;await new Promise(r=>setTimeout(r,50));}throw new Error('Timeout: '+expression);};
-   const navigate=async pathname=>{await send('Page.navigate',{url:config.origin+pathname},sessionId);await until(`document.readyState==='complete' && location.pathname===${JSON.stringify(new URL(config.origin+pathname).pathname)} && !!window.WWSessionBoundary && window.WWSessionBoundary.isCurrent()`);await evaluate('window.WWSessionBoundary.ready');};
+   const until=async(expression)=>{
+     const deadline=Date.now()+12000;
+     while(Date.now()<deadline){
+       // Check readiness and the predicate in one evaluation: navigation can
+       // replace the document between separate protocol commands.
+       try {
+         if(await evaluate(`document.readyState==='complete' && !!document.body && (${expression})`))return;
+       } catch(error) {
+         // Only a destroyed execution context is transient. Predicate errors
+         // in a usable document still fail immediately.
+         if(error.code!==-32000 || !/Cannot find context|Execution context was destroyed/.test(error.message || ''))throw error;
+       }
+       await new Promise(r=>setTimeout(r,50));
+     }
+     throw new Error('Timeout waiting for a complete document and: '+expression);
+   };
+   const navigate=async pathname=>{
+     const result=await send('Page.navigate',{url:config.origin+pathname},sessionId);
+     assert.equal(result.errorText,undefined,`Navigation failed: ${pathname}: ${result.errorText}`);
+     await until(`location.origin===${JSON.stringify(config.origin)} && location.pathname===${JSON.stringify(new URL(config.origin+pathname).pathname)} && !!window.WWSessionBoundary && window.WWSessionBoundary.isCurrent()`);
+     await evaluate('window.WWSessionBoundary.ready');
+   };
    return {sessionId,evaluate,until,navigate};
+ };
+ const settle=async(pages,{since=0,required=[]}={})=>{
+   const sessions=new Set(pages.map(page=>page.sessionId)),started=Date.now(),deadline=started+12000;
+   while(Date.now()<deadline){
+     const outstanding=[...activeRequests.values()].filter(r=>sessions.has(r.session));
+     const completed=completedRequests.filter(r=>sessions.has(r.session) && r.index>=since);
+     const missing=required.filter(path=>!completed.some(r=>new URL(r.url).pathname===path && !r.error && r.status>=200 && r.status<300));
+     // Require actual response completion, including known home initialization,
+     // then a short network-quiet window for follow-up requests. Never just
+     // sleep before taking a database baseline.
+     if(!missing.length && !outstanding.length && [...sessions].every(id=>Date.now()-Math.max(started,networkActivity.get(id) || 0)>=250))return;
+     await new Promise(r=>setTimeout(r,50));
+   }
+   throw new Error('Network did not settle: '+JSON.stringify({required,since,
+     outstanding:[...activeRequests.values()].filter(r=>sessions.has(r.session)),
+     completed:completedRequests.filter(r=>sessions.has(r.session) && r.index>=since)}));
+ };
+ const settledHome=async(page,accountId,since)=>{
+   await page.until(`location.pathname==='/home' && window.WWState?.getState().account.woodchuckId===${JSON.stringify(accountId)} && !document.querySelector('.app-shell').hidden`);
+   assert.equal(await page.evaluate('window.WWSessionBoundary.ready'),true);
+   await settle([page],{since,required:['/teams','/account/login-streak','/xp','/store/inventory','/practice-charts/streak']});
  };
  const snapshot=()=>fetch(config.origin+'/test/snapshot').then(r=>r.json());
  const setupGuest=async g=>{
@@ -60,8 +122,9 @@ process.stdin.on('end',async()=>{
    if(config.scenario==='stale_plunge') {
      const a=await tab(true);await a.navigate('/guest/login');
      const login=async (page,label)=>{
+       const since=events.length;
        await page.evaluate(`document.getElementById('login-woodchuck-id').value='WC-GUEST-${label}';document.getElementById('login-pin').value='2468';document.querySelector('#account-login-form button').click()`);
-       await page.until(`location.pathname==='/home' && window.WWState?.getState().account.woodchuckId==='WC-GUEST-${label}'`);
+       await settledHome(page,'WC-GUEST-'+label,since);
      };
      await login(a,'A');await a.navigate('/plunge-burrow');
      await a.until(`!!window.PlungeBurrowCore && !!window.WoodshedArcadeEconomy`);
@@ -73,14 +136,29 @@ process.stdin.on('end',async()=>{
      await a.until(`!WWSessionBoundary.isCurrent() && oldGame.status==='paused' && document.getElementById('plunge-start').disabled && document.getElementById('plunge-restart').disabled`);
      await b.navigate('/guest/login');await login(b,'B');
      assert.equal(await b.evaluate(`localStorage.getItem('woodshed.plungeBurrow.bestScore')`),null);
-     const before=await snapshot(), requests=events.length;
+     // B's real home initialization (including contest/calendar bootstrap) has
+     // completed. Establish B's visible Plunge state before the security baseline.
+     const plungeStart=events.length;
+     await b.navigate('/plunge-burrow');
+     await settle([a,b],{since:plungeStart,required:['/xp/plunge-best','/arcade/plays/status/plunge-burrow']});
+     const visibleBefore=await b.evaluate(`({best:document.getElementById('plunge-best').textContent,score:document.getElementById('plunge-score').textContent})`);
+     assert.deepEqual(visibleBefore,{best:'0',score:'0'});
+     const before=await snapshot();
      const storageBefore=await storageEvidence(b);
+     const staleStorageBefore=await storageEvidence(a);
+     const requests=events.length;
      // Reproduce even a late callback that bypasses the cancelled animation loop.
-     await a.evaluate(`oldGame.status='running';oldGame.hearts=1;oldGame.trail=[{x:19,y:10},{x:18,y:10},{x:17,y:10}];oldGame.direction='right';realTick.call(oldGame);oldGame.writeBest(999)`);
+     await a.evaluate(`oldGame.status='running';oldGame.score=999;oldGame.hearts=1;oldGame.trail=[{x:19,y:10},{x:18,y:10},{x:17,y:10}];oldGame.direction='right';realTick.call(oldGame);oldGame.writeBest(999)`);
+     await settle([a,b]);
      assert.equal(await a.evaluate(`oldGame.status`),'gameover');
+     assert.equal(await a.evaluate(`!WWSessionBoundary.isCurrent() && document.getElementById('plunge-start').disabled && document.getElementById('plunge-restart').disabled`),true);
      assert.deepEqual(await storageEvidence(b),storageBefore);
+     assert.deepEqual(await storageEvidence(a),staleStorageBefore);
      assert.deepEqual(await snapshot(),before);
      assert.deepEqual(events.slice(requests).filter(e=>e.session===a.sessionId),[]);
+     assert.deepEqual(await b.evaluate(`({best:document.getElementById('plunge-best').textContent,score:document.getElementById('plunge-score').textContent})`),visibleBefore);
+     // Recreate B's game as well: a stale persisted 999 must not be consumed by
+     // a fresh game, even if the already-open UI had stayed at zero.
      await b.navigate('/plunge-burrow');await b.until(`!!window.PlungeBurrowCore`);
      await b.evaluate(`const start=PlungeBurrowCore.PlungeBurrowGame.prototype.start;PlungeBurrowCore.PlungeBurrowGame.prototype.start=function(){window.newBest=this.best;return start.call(this)};document.getElementById('plunge-start').click()`);
      await b.until(`window.newBest!==undefined`);
@@ -119,8 +197,11 @@ process.stdin.on('end',async()=>{
      await g.evaluate(`document.getElementById('guest-discard').click()`);
      await g.until(`document.readyState==='complete' && document.body.dataset.c001Context==='false'`);
      await g.navigate('/guest/login');
+     const loginStart=events.length;
      await g.evaluate(`document.getElementById('login-woodchuck-id').value='WC-GUEST-A';document.getElementById('login-pin').value='2468';document.querySelector('#account-login-form button').click()`);
-     await g.until(`location.pathname==='/home' && !!window.WWState`);
+     // Foreign-origin rejection needs the same stable registered baseline as
+     // stale Plunge; normal /teams bootstrap must finish before comparison.
+     await settledHome(g,'WC-GUEST-A',loginStart);
      const signedCookies=await cookies(),signedBefore=await snapshot();
      await send('Page.navigate',{url:foreign+'/?route='+encodeURIComponent('/account/logout')},g.sessionId);
      await g.until(`location.pathname==='/account/logout' && document.body.innerText.includes('same-origin request is required')`);
