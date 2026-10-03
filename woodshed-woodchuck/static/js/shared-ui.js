@@ -17,9 +17,17 @@
     isForeground: () => !document.hidden,
   });
 
+  const guestPage = Boolean(document.body.dataset.guest);
+  function forgetGuestHistory() {
+    if (!guestPage || !history.state || !("wwSurface" in history.state)) return;
+    const state = {...history.state};
+    delete state.wwSurface;
+    history.replaceState(Object.keys(state).length ? state : null, '', location.href);
+  }
+  forgetGuestHistory();
   const surfaces = new Map();
   let stack = [], invoker = null, bypass = false, historyPending = false;
-  const visible = node => node.isConnected && !node.hidden && !node.classList.contains('hidden') &&
+  const visible = node => node.isConnected && !node.closest('[hidden], .hidden') &&
     (node.tagName !== 'DIALOG' || node.open);
   const fields = node => JSON.stringify(Array.from(node.querySelectorAll('input,select,textarea'))
     .map(el => [el.name || el.id, el.value, el.checked]));
@@ -65,7 +73,7 @@
         invoker = null;
         entry.initial = fields(entry.node);
         stack.push(entry);
-        if (!historyPending) {
+        if (!guestPage && !historyPending) {
           history.pushState({...history.state, wwSurface: entry.node.id}, '', location.href);
           entry.marker = true;
         }
@@ -126,6 +134,7 @@
     }
   }, true);
   window.addEventListener('popstate', () => {
+    if (guestPage) { forgetGuestHistory(); return; }
     if (historyPending) {
       historyPending = false;
       const pending = stack.at(-1);
@@ -143,6 +152,20 @@
     }
     dismissCurrent(true, true);
   });
+  function resetGuestSurfaces() {
+    if (!guestPage) return;
+    forgetGuestHistory();
+    stack = [];
+    for (const entry of surfaces.values()) {
+      entry.marker = false;
+      entry.initial = "";
+      entry.node.classList.add('hidden');
+    }
+  }
+  for (const event of ['ww:guest-reset', 'ww:session-changed', 'pagehide']) {
+    window.addEventListener(event, resetGuestSurfaces);
+  }
+  window.addEventListener('pageshow', forgetGuestHistory);
   function discover() {
     const pairs = {
       'xp-panel': 'xp-panel-close',

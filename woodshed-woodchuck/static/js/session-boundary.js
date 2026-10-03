@@ -5,9 +5,12 @@
   const KEY = "woodshed:session-change:v1";
   const nativeFetch = window.fetch.bind(window);
   let accountId = document.body.dataset.accountId || "";
+  let pageGeneration = document.body.dataset.pageGeneration || "";
   const localGuest = document.body.dataset.guest === "local";
   let stopped = false;
   let changing = false;
+  let guestPageLeaving = false;
+  let guestFormPending = false;
   const scripts = document.getElementById("account-scripts");
   let verifying = Boolean(scripts);
 
@@ -22,6 +25,7 @@
   function stop() {
     if (stopped) return;
     stopped = true;
+    clearDrafts();
     window.dispatchEvent(new CustomEvent("ww:session-changed"));
     const shell = document.querySelector(".app-shell");
     if (shell) shell.hidden = true;
@@ -37,6 +41,9 @@
   }
 
   function isCurrent() {
+    // Pure local tools can work without browser storage. This does not enable
+    // authentication or account requests, which remain prohibited below.
+    if (localGuest && epoch === null) return !stopped && !changing && !verifying;
     if (epoch === null || readEpoch() !== epoch) stop();
     return !stopped && !changing && !verifying;
   }
@@ -49,6 +56,76 @@
     for (const key of ["woodshed:p-book:verifier-draft:v1", "woodshed:practice-timer-started-at"]) {
       try { window.sessionStorage.removeItem(key); } catch (_error) {}
     }
+  }
+  function removeAccountProductCaches() {
+    // Exact product keys only; the session epoch and security cookies survive.
+    for (const key of ["woodshedWoodchuckState.v1", "woodshed.plungeBurrow.bestScore", "woodshedWoodchuckMetronomeBpm"]) {
+      try { window.localStorage.removeItem(key); } catch (_error) {}
+    }
+    try {
+      for (const key of Object.keys(window.localStorage)) {
+        if (key.startsWith("woodshedWoodchuckConflictBackup.")) window.localStorage.removeItem(key);
+      }
+    } catch (_error) {}
+    clearDrafts();
+    try {
+      for (const key of Object.keys(window.sessionStorage)) {
+        if (key.startsWith("woodshed:arcade-start:") ||
+            ["woodshed:world-entry-arrival:v1", "woodshed:arcade-entry:v1"].includes(key)) {
+          window.sessionStorage.removeItem(key);
+        }
+      }
+    } catch (_error) {}
+  }
+  function clearAccountProductCaches() {
+    check();
+    removeAccountProductCaches();
+  }
+  function binding() {
+    if (!isCurrent() || !accountId || !pageGeneration) return null;
+    return {accountId, pageGeneration, epoch};
+  }
+  function matchesBinding(saved) {
+    const current = binding();
+    return Boolean(current && saved && saved.accountId === current.accountId &&
+      saved.pageGeneration === current.pageGeneration && saved.epoch === current.epoch);
+  }
+  function checkGuestForm(form) {
+    const url = new URL(form?.action || "", window.location.href);
+    if (!localGuest || guestPageLeaving || document.hidden || epoch === null ||
+        String(form?.method || "").toUpperCase() !== "POST" ||
+        url.origin !== window.location.origin || url.search || url.hash ||
+        !["/guest/discard", "/guest/secret-symbol"].includes(url.pathname) ||
+        !["", "_self"].includes(form.target || "") || typeof form.submit !== "function") {
+      throw new Error("Reload Guest tools before submitting registration context.");
+    }
+  }
+  async function submitGuestForm(form) {
+    check();
+    checkGuestForm(form);
+    if (!navigator.locks?.request) {
+      throw new Error("Safe registration context changes require a secure browser with Web Locks support.");
+    }
+    if (guestFormPending) throw new Error("Registration context is already being submitted.");
+    const requestedEpoch = epoch;
+    guestFormPending = true;
+    try {
+      // Keep native cookie-changing Guest navigation ordered with account
+      // transitions. The response cookie is applied before this page unloads.
+      return await navigator.locks.request("woodshed-account-transition", function () {
+        check(requestedEpoch);
+        checkGuestForm(form);
+        return new Promise((resolve, reject) => {
+          const release = () => resolve();
+          window.addEventListener("pagehide", release, {once: true});
+          try { form.submit(); }
+          catch (error) {
+            window.removeEventListener("pagehide", release);
+            reject(error);
+          }
+        });
+      });
+    } finally { guestFormPending = false; }
   }
   function guardedResponse(response, expected) {
     // Guard both the network await and the later body await used by real consumers.
@@ -88,7 +165,9 @@
         }
         if (response.ok) {
           accountId = payload?.authenticated === false ? "" : payload?.profile?.woodchuck_id || accountId;
+          pageGeneration = ""; // The next rendered account page supplies the new server marker.
           clearDrafts();
+          if (payload?.authenticated === true || payload?.profile?.woodchuck_id) removeAccountProductCaches();
         }
       } finally {
         // Also invalidate pages initialized while the request was pending. Do
@@ -129,7 +208,10 @@
   };
 
   window.addEventListener("storage", function (event) {
-    if (event.key === KEY || event.key === null) isCurrent();
+    if (event.key === KEY || event.key === null) {
+      if (localGuest && epoch === null) stop();
+      else isCurrent();
+    }
     if (event.key === "woodshedWoodchuckState.v1" && accountId) {
       try {
         const state = JSON.parse(event.newValue);
@@ -140,6 +222,9 @@
   window.addEventListener("pageshow", function (event) {
     if (event.persisted) stop();
     else isCurrent();
+  });
+  window.addEventListener("pagehide", function () {
+    if (localGuest) guestPageLeaving = true;
   });
   async function startAccountPage() {
     if (!scripts) return true; // Local Guest pages make no preflight request.
@@ -200,5 +285,6 @@
   const ready = startAccountPage();
   window.WWSessionBoundary = Object.freeze({
     isCurrent, ready, accountId: () => accountId, epoch: () => epoch,
+    binding, matchesBinding, clearAccountProductCaches, submitGuestForm,
   });
 })();

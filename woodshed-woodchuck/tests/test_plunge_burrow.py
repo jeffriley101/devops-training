@@ -34,7 +34,7 @@ def test_game_route_navigation_and_page_only_script() -> None:
     assert "<title>Plunge Burrow · Woodshed Woodchuck</title>" in response.text
     assert 'href="/arcade">Back to Arcade</a>' in response.text
     assert 'href="/plunge-burrow"' in BOARD
-    assert "/static/js/plunge-burrow.js?v=7" in TEMPLATE
+    assert "/static/js/plunge-burrow.js?v=9" in TEMPLATE
     assert "/static/js/plunge-burrow.js" not in BASE
     route_guard = (ROOT / "static/js/app.js").read_text(encoding="utf-8")
     route_guard = route_guard[

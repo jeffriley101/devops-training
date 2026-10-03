@@ -38,9 +38,10 @@
       this.random = config.random || Math.random;
       this.onChange = config.onChange || function () {};
       this.onEvent = config.onEvent || function () {};
-      this.storage = config.storage || null;
+      this.trackBest = config.trackBest !== false;
+      this.storage = this.trackBest ? config.storage || null : null;
       this.gridSize = config.gridSize || GRID_SIZE;
-      this.best = this.readBest();
+      this.best = this.trackBest ? this.readBest() : 0;
       this.reset();
     }
 
@@ -189,7 +190,7 @@
       this.emit("hit", { type, hearts: this.hearts });
       if (this.hearts === 0) {
         this.status = "gameover";
-        if (this.score > this.best) {
+        if (this.trackBest && this.score > this.best) {
           this.best = this.score;
           this.writeBest(this.best);
         }
@@ -401,6 +402,7 @@
     }
 
     readBest() {
+      if (!this.trackBest) return 0;
       try {
         const value = Number(this.storage && this.storage.getItem(BEST_SCORE_KEY));
         return Number.isInteger(value) && value >= 0 ? value : 0;
@@ -408,6 +410,7 @@
     }
 
     writeBest(value) {
+      if (!this.trackBest) return;
       try { if (this.storage) this.storage.setItem(BEST_SCORE_KEY, String(value)); } catch (_error) {
         // A blocked or full localStorage must never stop the game.
       }
@@ -424,6 +427,8 @@
   root.PlungeBurrowCore = core;
   if (typeof module !== "undefined" && module.exports) module.exports = core;
   if (!root.document) return;
+  // Guest uses a separate adapter with no account requests or score persistence.
+  if (root.document.body?.dataset?.guest === "local") return;
 
   const document = root.document;
   const canvas = document.getElementById("plunge-canvas");
@@ -454,7 +459,32 @@
   let playCompletion = null;
   let startingPlay = false;
 
-  function announce(message) { liveEl.textContent = ""; root.setTimeout(() => { liveEl.textContent = message; }, 0); }
+  const owner = root.WWSessionBoundary?.binding();
+  function ownsSession() {
+    return !destroyed && Boolean(owner && root.WWSessionBoundary?.matchesBinding(owner));
+  }
+  // Only a verified owner can read or write this cache. Legacy unbound scores
+  // are ignored; the server remains the authority for scores and rewards.
+  const ownedStorage = {
+    getItem(key) {
+      if (!ownsSession()) return null;
+      const saved = JSON.parse(root.localStorage.getItem(key) || "null");
+      return saved && root.WWSessionBoundary.matchesBinding(saved.binding) ? saved.value : null;
+    },
+    setItem(key, value) {
+      if (ownsSession()) root.localStorage.setItem(key, JSON.stringify({binding: owner, value}));
+    },
+  };
+  function stopForSession() {
+    destroyed = true;
+    cancelLoop();
+    game.pause();
+    activePlayToken = null;
+    touchStart = null;
+    for (const button of [startButton, pauseButton, restartButton, ...document.querySelectorAll("[data-direction]")]) button.disabled = true;
+  }
+
+  function announce(message) { liveEl.textContent = ""; root.setTimeout(() => { if (ownsSession()) liveEl.textContent = message; }, 0); }
   function playEffect(name) {
     try { if (root.WoodshedAudio) root.WoodshedAudio.play(name); } catch (_error) { /* Supplemental only. */ }
   }
@@ -486,13 +516,13 @@
   }
 
   function syncBestScore(payload) {
-    if (!payload || typeof payload !== "object") return;
+    if (!ownsSession() || !payload || typeof payload !== "object") return;
     if (Number.isInteger(payload.best_score)) bestEl.textContent = String(payload.best_score);
     renderLeaderboard(payload.leaderboard);
   }
 
   function loadBestScore() {
-    if (typeof root.fetch !== "function") return;
+    if (!ownsSession() || typeof root.fetch !== "function") return;
     try {
       const request = root.fetch("/xp/plunge-best", { credentials: "same-origin", cache: "no-store" });
       if (request && typeof request.then === "function") {
@@ -506,14 +536,14 @@
   }
 
   function completePlay(score) {
-    if (playCompletion || !activePlayToken || !root.WoodshedArcadeEconomy) return;
+    if (!ownsSession() || playCompletion || !activePlayToken || !root.WoodshedArcadeEconomy) return;
     playCompletion = root.WoodshedArcadeEconomy.completePlay(activePlayToken, score)
       .then(syncBestScore)
       .catch(function () {});
   }
 
   const game = new PlungeBurrowGame({
-    storage: root.localStorage,
+    storage: ownedStorage,
     onChange: renderState,
     onEvent: function (event, detail) {
       if (event === "dandelion") { reportScoringEvent("dandelion", 1); playEffect("dandelionEarned"); announce(`Dandelion found. Score ${detail.score}.`); }
@@ -553,7 +583,7 @@
   });
 
   function renderState(state) {
-    if (!scoreEl) return;
+    if (!ownsSession() || !scoreEl) return;
     scoreEl.textContent = String(state.score);
     bestEl.textContent = String(state.best);
     heartsEl.textContent = Array.from({ length: state.hearts }, () => "♥").join(" ") || "None";
@@ -658,7 +688,8 @@
 
   function animate(timestamp) {
     frameId = null;
-    if (destroyed || game.status !== "running") return;
+    if (!ownsSession()) { stopForSession(); return; }
+    if (game.status !== "running") return;
     if (!lastFrame) lastFrame = timestamp;
     accumulator += Math.min(timestamp - lastFrame, game.interval * 2);
     lastFrame = timestamp;
@@ -669,22 +700,24 @@
     if (game.status === "running") frameId = root.requestAnimationFrame(animate);
   }
   function ensureLoop() {
-    if (frameId === null && game.status === "running") {
+    if (frameId === null && ownsSession() && game.status === "running") {
       lastFrame = 0; accumulator = 0; frameId = root.requestAnimationFrame(animate);
     }
   }
   function cancelLoop() { if (frameId !== null) root.cancelAnimationFrame(frameId); frameId = null; lastFrame = 0; accumulator = 0; }
-  function chooseDirection(direction) { game.setDirection(direction); canvas.focus({ preventScroll: true }); }
+  function chooseDirection(direction) { if (!ownsSession()) return; game.setDirection(direction); canvas.focus({ preventScroll: true }); }
 
   startButton.addEventListener("click", async function () {
-    if (game.status !== "ready" || startingPlay) return;
+    if (!ownsSession() || game.status !== "ready" || startingPlay) return;
     startingPlay = true;
     startButton.disabled = true;
     try {
       const play = await root.WoodshedArcadeEconomy.startPlay("plunge-burrow");
+      if (!ownsSession()) { stopForSession(); return; }
       activePlayToken = play.play_token;
       playCompletion = null;
     } catch (error) {
+      if (!ownsSession()) { stopForSession(); return; }
       announce(error.message || "That game could not start.");
       startButton.disabled = false;
       startingPlay = false;
@@ -694,10 +727,11 @@
     if (game.start()) { ensureLoop(); canvas.focus({ preventScroll: true }); }
   });
   pauseButton.addEventListener("click", function () {
+    if (!ownsSession()) return;
     if (game.status === "running" && game.pause()) { cancelLoop(); }
     else if (game.resume()) { ensureLoop(); }
   });
-  restartButton.addEventListener("click", function () { cancelLoop(); game.reset(); activePlayToken = null; playCompletion = null; announce("Game reset. Score, pickups, portals, and Band Set cleared. Ready to start."); canvas.focus({ preventScroll: true }); });
+  restartButton.addEventListener("click", function () { if (!ownsSession()) return; cancelLoop(); game.reset(); activePlayToken = null; playCompletion = null; announce("Game reset. Score, pickups, portals, and Band Set cleared. Ready to start."); canvas.focus({ preventScroll: true }); });
   document.querySelectorAll("[data-direction]").forEach((button) => button.addEventListener("click", () => chooseDirection(button.dataset.direction)));
 
   const keyDirections = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right", w: "up", W: "up", a: "left", A: "left", s: "down", S: "down", d: "right", D: "right" };
@@ -720,10 +754,15 @@
     if (document.hidden && game.pause()) { cancelLoop(); }
   });
   root.addEventListener("resize", resizeCanvas);
-  root.addEventListener("pagehide", function () { destroyed = true; cancelLoop(); });
+  root.addEventListener("pagehide", stopForSession);
+  root.addEventListener("ww:session-changed", stopForSession);
+  root.addEventListener("pageshow", function (event) {
+    if (event.persisted || !ownsSession()) stopForSession();
+  });
 
+  if (!ownsSession()) { stopForSession(); return; }
   resizeCanvas();
-  if (root.WoodshedArcadeEconomy) {
+  if (ownsSession() && root.WoodshedArcadeEconomy) {
     root.WoodshedArcadeEconomy.loadStatus("plunge-burrow").catch(function () {});
   }
   loadBestScore();

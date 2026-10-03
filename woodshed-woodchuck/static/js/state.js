@@ -192,10 +192,20 @@
   function getState() {
     const boundary = window.WWSessionBoundary;
     if (boundary && !boundary.isCurrent()) return defaultState();
+    // Anonymous public pages never restore or create a product cache.
+    if (boundary && !boundary.accountId()) return defaultState();
     if (serverBootstrap) {
       const bootstrap = serverBootstrap;
       serverBootstrap = null;
       const restored = migrateToV4(bootstrap.state);
+      if (boundary) {
+        // Legacy saved server state may omit client account fields. The
+        // rendered bootstrap belongs to the account verified before loading
+        // this script; an explicit conflicting identity still fails closed.
+        if (restored.account.woodchuckId && restored.account.woodchuckId !== boundary.accountId()) return defaultState();
+        restored.account.woodchuckId = boundary.accountId();
+        restored.account.authenticated = true;
+      } else if (!restored.account.authenticated || !restored.account.woodchuckId) return defaultState();
       restored.account.serverRevision = Number.isInteger(bootstrap.revision)
         ? bootstrap.revision
         : restored.account.serverRevision;
@@ -206,14 +216,13 @@
     const raw = window.localStorage.getItem(STORAGE_KEY);
 
     if (!raw) {
-      const fresh = defaultState();
-      saveState(fresh, { sync: false });
-      return fresh;
+      return defaultState();
     }
 
     try {
       const parsed = JSON.parse(raw);
       const migrated = migrateToV4(parsed);
+      if (!migrated.account.authenticated || !migrated.account.woodchuckId) return defaultState();
       // Never restore another account from an origin-wide browser cache.
       if (boundary && (migrated.account.woodchuckId !== boundary.accountId() || !boundary.accountId())) {
         return defaultState();
@@ -228,7 +237,15 @@
   }
 
   function saveState(state, options = {}) {
-    if (window.WWSessionBoundary && !window.WWSessionBoundary.isCurrent()) return false;
+    const boundary = window.WWSessionBoundary;
+    if (boundary && !boundary.isCurrent()) return false;
+    if (state?.account?.authenticated !== true || !state.account.woodchuckId) {
+      // Retire pending account responses even when the anonymous state is
+      // deliberately not written to browser storage.
+      accountGeneration += 1;
+      return false;
+    }
+    if (boundary && state.account.woodchuckId !== boundary.accountId()) return false;
     let previous = null;
     try { previous = JSON.parse(window.localStorage.getItem(STORAGE_KEY)); } catch (_error) {}
     if (accountIdentity(previous) !== accountIdentity(state)) accountGeneration += 1;
@@ -241,6 +258,7 @@
         })
       );
     }
+    return true;
   }
 
   function accountRequest() {
@@ -278,6 +296,7 @@
 
   window.WWState = {
     STORAGE_KEY,
+    defaultState,
     getState,
     saveState,
     resetState,

@@ -14,7 +14,10 @@ import pytest
 
 
 SERVER = '''
+import hashlib
+import json
 from sqlalchemy import select, func
+from fastapi.encoders import jsonable_encoder
 from app.main import app
 from app.db import Base, engine, SessionLocal
 from app.models import WoodchuckProfile, WoodchuckState
@@ -22,7 +25,9 @@ from app.security import hash_pin
 from app.age_privacy import declare_age
 Base.metadata.create_all(engine)
 with SessionLocal() as session:
-    for label,credits in [('A',37),('B',83)]:
+    # Account A needs the current 100-credit History entry fee so the existing
+    # delayed-document security checks after that game can actually run.
+    for label,credits in [('A',137),('B',83)]:
         p=WoodchuckProfile(woodchuck_id='WC-GUEST-'+label,display_name='Synthetic '+label,
             pin_hash=hash_pin('2468'),instrument='Flute',level='Beginner',goal='Practice every day')
         session.add(p);session.flush()
@@ -37,7 +42,15 @@ with SessionLocal() as session:
 def snapshot():
     with SessionLocal() as s:
         return {'counts':{t.name:s.scalar(select(func.count()).select_from(t)) for t in Base.metadata.sorted_tables if not t.name.startswith('c001_')},
+                'rows':{t.name:hashlib.sha256(json.dumps(sorted(
+                    json.dumps(jsonable_encoder(dict(r._mapping)),sort_keys=True)
+                    for r in s.execute(select(t))),sort_keys=True).encode()).hexdigest()
+                    for t in Base.metadata.sorted_tables if not t.name.startswith('c001_')},
                 'states':{p.woodchuck_id:s.get(WoodchuckState,p.id).state_json for p in s.scalars(select(WoodchuckProfile))}}
+@app.get('/test/security-snapshot')
+def security_snapshot():
+    with SessionLocal() as s:
+        return {t.name:[dict(r._mapping) for r in s.execute(select(t))] for t in Base.metadata.sorted_tables if t.name.startswith('c001_')}
 @app.get('/test/c001')
 def c001():
     from app.models import TesterEnrollment
@@ -49,7 +62,7 @@ def c001():
 
 
 @pytest.mark.skipif(not shutil.which('node') or not Path('/opt/google/chrome/chrome').exists(), reason='Local Node and Chromium required')
-@pytest.mark.parametrize("scenario", ["boundary", "c001"])
+@pytest.mark.parametrize("scenario", ["boundary", "c001", "native_navigation", "stale_plunge", "foreign_origin", "guest_history"])
 def test_real_guest_tools_sessions_and_old_tabs(tmp_path, scenario):
     source = Path(__file__).resolve().parents[1]
     (tmp_path/'guest_test_app.py').write_text(SERVER)
@@ -60,13 +73,13 @@ def test_real_guest_tools_sessions_and_old_tabs(tmp_path, scenario):
          'DATABASE_URL':'sqlite:///'+str(tmp_path/'guest.db'),
          'SESSION_SECRET':'synthetic-browser-guest-session-secret-long','SESSION_COOKIE_SECURE':'false',
          'LOGIN_RATE_LIMIT_MODE':'off','LOGIN_RATE_LIMIT_REQUIRED':'false',
-         'PYTHONPYCACHEPREFIX':str(tmp_path/'pycache'),
+         'PYTHONDONTWRITEBYTECODE':'1',
          'XDG_CACHE_HOME':str(tmp_path/'cache'),'XDG_CONFIG_HOME':str(tmp_path/'config'),'XDG_DATA_HOME':str(tmp_path/'data')}
     with (tmp_path/'uvicorn.log').open('w') as out:
         server=subprocess.Popen([sys.executable,'-m','uvicorn','guest_test_app:app','--app-dir',str(tmp_path),
             '--host','127.0.0.1','--port',str(port),'--no-proxy-headers','--timeout-graceful-shutdown','2'],cwd=source,env=env,stdout=out,stderr=out)
         try:
-            for _ in range(1000):
+            for _ in range(2400):
                 try:
                     with urlopen(origin+'/guest',timeout=2) as r: assert r.status==200
                     break
@@ -76,11 +89,19 @@ def test_real_guest_tools_sessions_and_old_tabs(tmp_path, scenario):
             else: pytest.fail('Disposable Uvicorn did not start')
             config={'scenario':scenario,'origin':origin,'chrome':'/opt/google/chrome/chrome','profile':str(tmp_path/'chrome'),'output':str(tmp_path)}
             (tmp_path/'browser-command.json').write_text(json.dumps(config,indent=2))
-            result=subprocess.run(['node',str(source/'tests/guest_browser_driver.cjs')],input=json.dumps(config),text=True,capture_output=True,cwd=source,env=env,timeout=110)
+            result=subprocess.run(['node',str(source/'tests/guest_browser_driver.cjs')],input=json.dumps(config),text=True,capture_output=True,cwd=source,env=env,timeout=190)
             (tmp_path/'browser-stdout.txt').write_text(result.stdout)
             (tmp_path/'browser-stderr.txt').write_text(result.stderr)
             assert result.returncode==0,result.stdout+'\n'+result.stderr
             proof=json.loads(result.stdout)
+            if scenario in {'stale_plunge', 'foreign_origin', 'guest_history'}:
+                assert proof[scenario] is True
+                return
+            if scenario == 'native_navigation':
+                assert proof['native_guest_navigation_serializes_login'] is True
+                assert proof['native_discard_source_cleared'] is True
+                assert proof['later_account_cookie_preserved'] is True
+                return
             if scenario == 'c001':
                 assert proof['secret_symbol_c001_registration'] is True
                 return

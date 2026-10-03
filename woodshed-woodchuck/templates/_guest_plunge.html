@@ -1,0 +1,48 @@
+<button id="guest-plunge-open" class="btn" type="button" aria-controls="guest-plunge-panel" aria-expanded="false" disabled>Plunge Burrow</button>
+<section id="guest-plunge-panel" class="card plunge-burrow-page guest-plunge" aria-labelledby="guest-plunge-title" hidden>
+  <header class="plunge-header">
+    <div>
+      <h2 id="guest-plunge-title">Plunge Burrow</h2>
+      <p>Your score lasts for this run. Replay starts at zero.</p>
+    </div>
+    <button id="guest-plunge-close" class="btn btn-secondary" type="button" disabled>Close game</button>
+  </header>
+  <div class="plunge-status" aria-label="Current game status">
+    <p>Score <strong id="guest-plunge-score">0</strong></p>
+    <p>Hearts <strong id="guest-plunge-hearts" aria-label="3 hearts">♥ ♥ ♥</strong></p>
+    <p>Pickups <strong id="guest-plunge-pickups">0</strong></p>
+    <p>Status <strong id="guest-plunge-state">Ready</strong></p>
+  </div>
+  <section class="plunge-band-set" aria-labelledby="guest-plunge-band-title">
+    <div>
+      <h3 id="guest-plunge-band-title">Band Set <span id="guest-plunge-band-progress">0 / 4</span></h3>
+      <p>Collect four different instruments for a +20 score bonus.</p>
+    </div>
+    <ul id="guest-plunge-band-list" aria-label="Instruments in this run"><li class="plunge-band-empty">No instruments yet</li></ul>
+    <strong id="guest-plunge-band-complete" class="plunge-band-complete" hidden>Band Set Complete!</strong>
+  </section>
+  <div class="plunge-layout">
+    <div class="plunge-board-wrap">
+      <canvas id="guest-plunge-canvas" width="600" height="600" tabindex="0" aria-label="Plunge Burrow board. Collect pickups and instruments, use matching portals, and avoid walls, your trail, rocks, and roots."></canvas>
+      <div id="guest-plunge-overlay" class="plunge-overlay" aria-hidden="true">
+        <strong id="guest-plunge-overlay-title">Ready to burrow?</strong>
+        <span id="guest-plunge-overlay-detail">Choose a direction, then press Start.</span>
+      </div>
+    </div>
+    <aside class="plunge-controls" aria-label="Plunge Burrow controls">
+      <div class="plunge-action-row">
+        <button id="guest-plunge-start" class="btn btn-primary" type="button" disabled>Start</button>
+        <button id="guest-plunge-pause" class="btn btn-secondary" type="button" disabled>Pause</button>
+        <button id="guest-plunge-replay" class="btn btn-secondary" type="button" disabled>Replay</button>
+      </div>
+      <div class="plunge-direction-pad" aria-label="Direction controls">
+        <button class="plunge-direction plunge-up" type="button" data-guest-plunge-direction="up" aria-label="Move up" disabled>▲</button>
+        <button class="plunge-direction plunge-left" type="button" data-guest-plunge-direction="left" aria-label="Move left" disabled>◀</button>
+        <button class="plunge-direction plunge-down" type="button" data-guest-plunge-direction="down" aria-label="Move down" disabled>▼</button>
+        <button class="plunge-direction plunge-right" type="button" data-guest-plunge-direction="right" aria-label="Move right" disabled>▶</button>
+      </div>
+      <p>Use arrow keys, WASD, the direction buttons, or swipe on the board.</p>
+    </aside>
+  </div>
+  <p id="guest-plunge-live" class="sr-only" aria-live="polite" aria-atomic="true"></p>
+</section>

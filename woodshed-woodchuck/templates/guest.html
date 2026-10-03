@@ -4,9 +4,9 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Guest exploration · Woodshed Woodchuck</title>
-  <link rel="stylesheet" href="/static/css/styles.css?v=123" />
+  <link rel="stylesheet" href="/static/css/styles.css?v=124" />
 </head>
-<body data-guest="{{ 'local' if not blocked and not signing_in else 'transition' }}" data-account-id="{{ account_id }}" data-page-generation="{{ request.session.get('woodchuck_page_generation', '') if account_id else '' }}" data-authenticated="{{ 'true' if account_id else 'false' }}">
+<body data-guest="{{ 'local' if not blocked and not signing_in else 'transition' }}" data-account-id="{{ account_id }}" data-page-generation="{{ request.session.get('woodchuck_page_generation', '') if account_id else '' }}" data-authenticated="{{ 'true' if account_id else 'false' }}" data-c001-context="{{ 'true' if c001_registration else 'false' }}">
 <div class="app-shell"{% if account_id %} hidden{% endif %}><main class="content-wrap">
 <section class="card">
   <p class="chip">Guest exploration</p>
@@ -29,8 +29,10 @@
   <a class="btn btn-secondary" href="/guest">Back to Guest tools</a>
   {% else %}
   {% if secret_feedback %}<p id="guest-secret-feedback" role="status">{{ secret_feedback }}</p>{% elif c001_symbol_recognized %}<p role="status">C001 Pre-Beta recognized.</p>{% endif %}
-  <p>No account needed. Preferences stay in this browser and can be discarded below. The tuner uses your microphone locally; no audio is uploaded. Browsing still makes ordinary web requests that may appear in operational logs.</p>
-  <form id="guest-setup-form" class="stack-form">
+  <p>No account needed. Your setup, chart and game score last only while this page is open. Reloading or leaving clears them. The tuner processes microphone audio on your device. Browsing makes ordinary web requests that may appear in operational logs.</p>
+  <noscript><p>Enable JavaScript to use these local practice tools.</p></noscript>
+  <form id="guest-setup-form" class="stack-form" method="dialog" autocomplete="off">
+    <fieldset id="guest-setup-fields" class="stack-form" disabled>
     {% for field, label, choices in [('instrument', 'Instrument', instruments), ('level', 'Level', levels), ('goal', 'Practice goal', goals)] %}
     <label for="guest-{{ field }}">{{ label }}</label>
     <select id="guest-{{ field }}" name="{{ field }}" required>
@@ -39,10 +41,11 @@
     </select>
     {% endfor %}
     <button class="btn btn-primary" type="submit">Explore locally</button>
+    </fieldset>
   </form>
   <div id="guest-tools" hidden>
     <h2>Guest SHED · Local practice tools</h2>
-    <p>Use the metronome and tuner. Tempo and setup preferences survive reload; no practice history, scores or rewards are recorded.</p>
+    <p>Try the tuner, metronome, a one-session P-Chart and Plunge Burrow. Share, download or copy your chart when you choose. Guest activity does not transfer to an account.</p>
     <div class="button-row">
       <button id="metronome-open-button" class="btn" type="button" aria-controls="metronome-panel" aria-expanded="false">Metronome</button>
       <button id="shed-secret-button" class="btn" type="button" aria-controls="shed-secret-panel" aria-expanded="false">Secret Symbol</button>
@@ -171,36 +174,76 @@
   </section>
 
 
+  <section class="mentor-card mt-md" aria-labelledby="guest-chart-title">
+    <h2 id="guest-chart-title">Guest P-Chart</h2>
+    <p>Create a chart for this session. Share, Download and Copy send it to a destination you choose.</p>
+    <form id="guest-chart-form" class="stack-form" method="dialog" autocomplete="off">
+      <fieldset id="guest-chart-fields" class="stack-form" disabled>
+        <label for="guest-chart-date">Practice date</label>
+        <input id="guest-chart-date" type="date" required />
+        <label for="guest-chart-instrument">Instrument</label>
+        <select id="guest-chart-instrument" required>
+          <option value="">Choose an instrument</option>
+          {% for instrument in instruments %}<option value="{{ instrument }}">{{ instrument }}</option>{% endfor %}
+        </select>
+        <label for="guest-chart-minutes">Minutes practiced</label>
+        <input id="guest-chart-minutes" type="number" min="1" max="1440" step="1" required />
+        <fieldset>
+          <legend>What did you work on?</legend>
+          <div class="practice-detail-grid">
+            {% for detail in ['Long Tones', 'Arpeggios', 'Etudes', 'Patterns', 'Dynamics', 'Articulations', 'Transcribing', 'Ear Training', 'Tuning', 'Metronome Work', 'Band Class', 'Lessons', 'Rehearsals', 'Concerts', 'Tests', 'Performances', 'Busking', 'Warm-ups', 'Scales', 'Songs', 'Improvisation', 'Auditions', 'Fingerings'] %}
+            <label class="practice-work-option"><input type="checkbox" data-guest-detail value="{{ detail }}" /><span>{{ detail }}</span></label>
+            {% endfor %}
+          </div>
+        </fieldset>
+        <button id="guest-chart-create" class="btn btn-green" type="button">Create P-Chart</button>
+      </fieldset>
+    </form>
+    <p id="guest-chart-feedback" class="body-copy" role="status" aria-live="polite"></p>
+    <pre id="guest-chart-preview" class="body-copy" hidden></pre>
+    <div class="button-row">
+      <button id="guest-chart-share" class="btn" type="button" disabled>Share</button>
+      <button id="guest-chart-download" class="btn" type="button" disabled>Download</button>
+      <button id="guest-chart-copy" class="btn" type="button" disabled>Copy</button>
+    </div>
+  </section>
+  {% include "_guest_plunge.html" %}
   </div>
   <button id="guest-discard" class="btn btn-secondary" type="button">Discard Guest data</button>
   <a class="btn btn-primary" href="/guest/login">Exit Guest and sign in</a>
+  <a class="btn btn-secondary" href="/setup?from=guest" data-guest-account-entry>Create an account</a>
   <a class="btn btn-secondary" href="/">Exit to welcome</a>
   <h2>Account required</h2>
-  <p>Practice timers and saved P-Charts/P-Book, Pristine Practice, Arcade games, contests, rewards, inventory/shop and teams need an account and are not enabled here.</p>
+  <p>Saved practice history, the Practice Book, Pristine Practice, other Arcade games, contests, rewards, inventory/shop and teams need an account.</p>
   {% endif %}
   <p id="guest-feedback" class="body-copy" role="status" aria-live="polite"></p>
   {% if c001_registration %}
   <h2>C001 Pre-Beta</h2>
   <p>You can keep exploring as a Guest, or create a new C001 tester account. Guest exploration still creates no account, enrollment or Full Access.</p>
-  <a class="btn btn-primary" href="/setup">Create a C001 Pre-Beta account</a>
+  <a class="btn btn-primary" href="/setup?from=guest" data-guest-account-entry>Create a C001 Pre-Beta account</a>
   {% else %}
   <p>C001 registration starts from the official C001 entry link or C001 in Secret Symbol in the Guest SHED. Guest exploration does not establish eligibility, create an account or grant Full Access.</p>
   {% endif %}
+  <p class="body-copy"><a href="/privacy">Privacy Policy</a></p>
 </section>
 </main></div>
-<script src="/static/js/shared-ui.js?v=4"></script>
+<script src="/static/js/shared-ui.js?v=5"></script>
 <script src="/static/js/recovery.js?v=1"></script>
 {% if account_id %}<template id="account-scripts">{% else %}
-<script src="/static/js/session-boundary.js?v=5"></script>{% endif %}
+<script src="/static/js/session-boundary.js?v=6"></script>{% endif %}
 {% if signing_in %}
-<script src="/static/js/state.js?v=9"></script>
-<script src="/static/js/account.js?v=r4-17"></script>
+<script src="/static/js/state.js?v=10"></script>
+<script src="/static/js/account.js?v=guest-stateless-1"></script>
 {% elif not blocked %}
+<script src="/static/js/guest.js?v=2"></script>
 <script src="/static/js/tuner.js?v=2"></script>
-<script src="/static/js/app.js?v=c001-93"></script>
+<script src="/static/js/app.js?v=guest-stateless-2"></script>
+<script src="/static/js/guest-chart.js?v=1"></script>
+<script src="/static/js/plunge-burrow.js?v=9"></script>
+<script src="/static/js/guest-plunge.js?v=1"></script>
 {% endif %}
-<script src="/static/js/guest.js?v=1"></script>
+{% if blocked or signing_in %}<script src="/static/js/guest.js?v=2"></script>{% endif %}
 {% if account_id %}</template>
-<script src="/static/js/session-boundary.js?v=5"></script>{% endif %}
+<script src="/static/js/session-boundary.js?v=6"></script>{% endif %}
 </body>
 </html>

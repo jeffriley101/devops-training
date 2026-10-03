@@ -9,9 +9,14 @@
     wireShedSecret();
     wireMetronome();
     wireTuner();
+    window.WWGuestToolsReady = true;
     return;
   }
 
+  function toolIsCurrent() {
+    return (!window.WWSessionBoundary || window.WWSessionBoundary.isCurrent()) &&
+      (!localGuest || window.WWGuest?.isCurrent() === true);
+  }
 
   function playSound(effectName) {
     try {
@@ -332,12 +337,7 @@
         if (!response.ok || (await response.json()).authenticated !== false) {
           throw new Error("Sign out could not be confirmed. Please try again.");
         }
-        try {
-          window.localStorage.removeItem("woodshedWoodchuckState.v1");
-          Object.keys(window.localStorage).filter((key) => key.startsWith("woodshedWoodchuckConflictBackup.")).forEach((key) => window.localStorage.removeItem(key));
-          window.sessionStorage.removeItem("woodshed:p-book:verifier-draft:v1");
-          window.sessionStorage.removeItem("woodshed:practice-timer-started-at");
-        } catch (_storageError) {}
+        window.WWSessionBoundary.clearAccountProductCaches();
         window.location.assign("/");
       } catch (_error) {
         button.disabled = false;
@@ -915,6 +915,7 @@
       trigger.focus();
     }
     trigger.addEventListener("click", function () {
+      if (!toolIsCurrent()) return;
       panel.hidden = false;
       panel.classList.remove("hidden");
       trigger.setAttribute("aria-expanded", "true");
@@ -926,15 +927,18 @@
       event.preventDefault();
       const submit = form.querySelector("button[type='submit']");
       submit.disabled = true;
+      if (localGuest) {
+        if (!toolIsCurrent()) { submit.disabled = false; return; }
+        // Every attempt reaches the server limiter, including invalid symbols.
+        // The native navigation holds the transition lock until pagehide.
+        void window.WWSessionBoundary.submitGuestForm(form).catch(function (error) {
+          feedback.textContent = error.message || "The secret could not be checked. Try again.";
+          submit.disabled = false;
+        });
+        return;
+      }
       const requestAccount = stateApi?.accountRequest();
       try {
-        if (localGuest) {
-          if (!window.WWSessionBoundary.isCurrent()) return;
-          // Every attempt reaches the server limiter, including invalid symbols.
-          // Native navigation preserves Guest's generic fetch prohibition.
-          form.submit();
-          return;
-        }
         const response = await fetch("/account/daily-secret", {
           method: "POST", credentials: "same-origin",
           headers: { "Content-Type": "application/json" },
@@ -1613,6 +1617,7 @@
     }
 
     async function startTuner() {
+      if (!toolIsCurrent() || document.hidden) return;
       if (starting || !panel.hidden) return;
       const currentSession = sessionNumber + 1;
       sessionNumber = currentSession;
@@ -1982,8 +1987,7 @@
       return;
     }
 
-    const BPM_STORAGE_KEY = localGuest
-      ? "woodshed:guest:v1:metronome-bpm" : "woodshedWoodchuckMetronomeBpm";
+    const BPM_STORAGE_KEY = "woodshedWoodchuckMetronomeBpm";
     const AudioContextClass =
       window.AudioContext || window.webkitAudioContext;
 
@@ -2014,6 +2018,7 @@
     }
 
     function saveBpm() {
+      if (localGuest || (window.WWSessionBoundary && !window.WWSessionBoundary.isCurrent())) return;
       try {
         window.localStorage.setItem(BPM_STORAGE_KEY, String(bpm));
       } catch (_error) {
@@ -2022,6 +2027,7 @@
     }
 
     function loadBpm() {
+      if (localGuest) return;
       try {
         const saved = window.localStorage.getItem(BPM_STORAGE_KEY);
 
@@ -2045,6 +2051,7 @@
     }
 
     function setBpm(value) {
+      if (!toolIsCurrent()) return;
       bpm = clampBpm(value);
       renderBpm();
 
@@ -2146,6 +2153,7 @@
     }
 
     async function startMetronome() {
+      if (!toolIsCurrent() || document.hidden) return;
       const startingGeneration = playbackGeneration;
       if (!AudioContextClass) {
         if (status) {
@@ -2167,7 +2175,8 @@
         resumePromise = Promise.resolve(audioContext.resume());
       }
       await resumePromise;
-      if (startingGeneration !== playbackGeneration || document.hidden) {
+      if (startingGeneration !== playbackGeneration || document.hidden ||
+          !toolIsCurrent()) {
         if (audioContext?.state === "running") void audioContext.suspend();
         return;
       }
@@ -2241,6 +2250,7 @@
     }
 
     function registerTap() {
+      if (!toolIsCurrent()) return;
       const now = performance.now();
       const lastTap = tapTimes[tapTimes.length - 1];
 
@@ -2291,6 +2301,7 @@
     renderBpm(!localGuest);
 
     openButton.addEventListener("click", function () {
+      if (!toolIsCurrent()) return;
       panel.classList.remove("hidden");
       openButton.setAttribute("aria-expanded", "true");
 
@@ -2340,12 +2351,19 @@
       document.addEventListener("visibilitychange", function () { if (document.hidden) stopMetronome(); });
       window.addEventListener("pagehide", stopMetronome);
     }
-    window.addEventListener("ww:session-changed", stopMetronome);
-    window.addEventListener("ww:guest-discarded", function () {
+    function resetGuestMetronome() {
       stopMetronome();
       bpm = 120;
+      tapTimes = [];
       renderBpm(false);
-    });
+      if (status) status.textContent = "Stopped at 120 BPM.";
+    }
+    window.addEventListener("ww:session-changed", localGuest ? resetGuestMetronome : stopMetronome);
+    window.addEventListener("ww:guest-discarded", resetGuestMetronome);
+    if (localGuest) {
+      window.addEventListener("pagehide", resetGuestMetronome);
+      window.addEventListener("pageshow", function (event) { if (event.persisted) resetGuestMetronome(); });
+    }
   }
 
   const BACK_TO_SCHOOL_READINESS_CHALLENGES = [
@@ -2417,9 +2435,9 @@
 
     function storedBurrowBest() {
       try {
-        const storedBest = Number(window.localStorage.getItem(
-          "woodshed.plungeBurrow.bestScore"
-        ));
+        const cached = JSON.parse(window.localStorage.getItem("woodshed.plungeBurrow.bestScore") || "null");
+        if (!window.WWSessionBoundary?.matchesBinding(cached?.binding)) return 0;
+        const storedBest = Number(cached.value);
         return Number.isInteger(storedBest) && storedBest > 0 ? storedBest : 0;
       } catch (_error) {
         return 0;
@@ -4482,10 +4500,16 @@
     let currentTeam = null;
     const P_BOOK_DRAFT_KEY = "woodshed:p-book:verifier-draft:v1";
     const P_BOOK_DRAFT_MAX_AGE_MS = 30 * 60 * 1000;
+    const practiceBinding = window.WWSessionBoundary?.binding();
+    function practiceSessionCurrent() {
+      return Boolean(practiceBinding && window.WWSessionBoundary?.matchesBinding(practiceBinding));
+    }
     let restoredDraft = null;
     try {
       const parsed = JSON.parse(window.sessionStorage.getItem(P_BOOK_DRAFT_KEY) || "null");
-      if (parsed && Number.isFinite(parsed.savedAt) && Date.now() - parsed.savedAt <= P_BOOK_DRAFT_MAX_AGE_MS) {
+      if (practiceSessionCurrent() && window.WWSessionBoundary.matchesBinding(parsed?.binding) &&
+          Number.isFinite(parsed.savedAt) && parsed.savedAt <= Date.now() &&
+          Date.now() - parsed.savedAt <= P_BOOK_DRAFT_MAX_AGE_MS) {
         restoredDraft = parsed;
       }
       window.sessionStorage.removeItem(P_BOOK_DRAFT_KEY);
@@ -4494,7 +4518,9 @@
     }
 
     function saveVerifierDraft() {
+      if (!practiceSessionCurrent()) return;
       const safeDraft = {
+        binding: practiceBinding,
         savedAt: Date.now(),
         minutes: minutesEl.value,
         practiceDate: dateEl.value,
@@ -4854,16 +4880,24 @@
     const PRACTICE_TIMER_STORAGE_KEY = "woodshed:practice-timer-started-at";
 
     function persistPracticeTimerStart(startedAt) {
+      if (!practiceSessionCurrent()) return;
       try {
-        window.sessionStorage.setItem(PRACTICE_TIMER_STORAGE_KEY, String(startedAt));
+        window.sessionStorage.setItem(PRACTICE_TIMER_STORAGE_KEY, JSON.stringify({startedAt, binding: practiceBinding}));
       } catch (_storageError) {
         // The timer still works in-page when browser storage is unavailable.
       }
     }
 
     function readPracticeTimerStart() {
+      if (!practiceSessionCurrent()) return 0;
       try {
-        return Number(window.sessionStorage.getItem(PRACTICE_TIMER_STORAGE_KEY));
+        const saved = JSON.parse(window.sessionStorage.getItem(PRACTICE_TIMER_STORAGE_KEY) || "null");
+        if (window.WWSessionBoundary.matchesBinding(saved?.binding) &&
+            Number.isFinite(saved.startedAt) && saved.startedAt > 0 && saved.startedAt <= Date.now()) {
+          return saved.startedAt;
+        }
+        clearPracticeTimerStart();
+        return 0;
       } catch (_storageError) {
         return 0;
       }
@@ -4884,6 +4918,7 @@
     }
 
     function updatePracticeTimerDisplay() {
+      if (!practiceSessionCurrent()) { stopPracticeTimerInterval(); return; }
       if (!timerDisplayEl || !practiceTimerStartedAt) return;
 
       const elapsedSeconds = Math.min(
@@ -4924,6 +4959,7 @@
       }
 
       timerStartBtn.addEventListener("click", function () {
+        if (!practiceSessionCurrent()) return;
         practiceTimerStartedAt = Date.now();
         persistPracticeTimerStart(practiceTimerStartedAt);
         stopPracticeTimerInterval();
@@ -4937,6 +4973,7 @@
       });
 
       timerStopBtn.addEventListener("click", function () {
+        if (!practiceSessionCurrent()) return;
         if (!practiceTimerStartedAt) {
           if (timerFeedbackEl) {
             timerFeedbackEl.textContent = "Start the timer first.";
@@ -4970,6 +5007,7 @@
       });
 
       function restorePracticeTimer() {
+        if (!practiceSessionCurrent()) return;
         const restoredStart = readPracticeTimerStart();
         if (!Number.isFinite(restoredStart) || restoredStart <= 0) return;
 
@@ -4985,6 +5023,10 @@
       restorePracticeTimer();
       window.addEventListener("pageshow", restorePracticeTimer);
       window.addEventListener("pagehide", stopPracticeTimerInterval);
+      window.addEventListener("ww:session-changed", function () {
+        stopPracticeTimerInterval();
+        practiceTimerStartedAt = null;
+      });
     }
 
     function formatDetectedPlayingTime(totalSeconds) {

@@ -78,7 +78,7 @@
     {% endif %}
   </div>
 
-  <script src="/static/js/shared-ui.js?v=4"></script>
+  <script src="/static/js/shared-ui.js?v=5"></script>
   <script src="/static/js/recovery.js?v=1"></script>
   <script id="quest-pool-data" type="application/json">{{ quest_pool | default({}) | tojson }}</script>
   <script id="sax-viking-messages-data" type="application/json">{{ sax_viking_messages | default({}) | tojson }}</script>
@@ -87,8 +87,8 @@
   <script id="account-state-bootstrap" type="application/json">{{ account_state_bootstrap | default(none) | tojson }}</script>
   <script id="authenticated-player-name" type="application/json">{{ (authenticated_profile.display_name if authenticated_profile else none) | tojson }}</script>
   {% if authenticated_profile %}<template id="account-scripts">{% else %}
-  <script src="/static/js/session-boundary.js?v=5"></script>{% endif %}
-  <script src="/static/js/state.js?v=9"></script>
+  <script src="/static/js/session-boundary.js?v=6"></script>{% endif %}
+  <script src="/static/js/state.js?v=10"></script>
   <script src="/static/js/instruments.js?v=3"></script>
   <script src="/static/vendor/tone/Tone.js?v=15.1.22"></script>
   <script src="/static/js/audio.js?v=17"></script>
@@ -96,14 +96,14 @@
   <script src="/static/js/character-reaction.js?v=3"></script>
   <script src="/static/js/woodchuck-motion.js?v=4"></script>
   <script src="/static/js/practice-duration.js?v=1"></script>
-  <script src="/static/js/app.js?v=c001-93"></script>
-  <script src="/static/js/account.js?v=r4-17"></script>
+  <script src="/static/js/app.js?v=guest-stateless-2"></script>
+  <script src="/static/js/account.js?v=guest-stateless-1"></script>
   <script src="/static/js/world-entry.js?v=5"></script>
   {% if woodchuck_appearance %}<script src="/static/js/woodchuck-appearance.js?v=3"></script>{% endif %}
   {% if authenticated_profile and active_nav == "home" %}<script src="/static/js/shed-entry-streak.js?v=1"></script>{% endif %}
   {% block page_scripts %}{% endblock %}
   {% if authenticated_profile %}</template>
-  <script src="/static/js/session-boundary.js?v=5"></script>{% endif %}
+  <script src="/static/js/session-boundary.js?v=6"></script>{% endif %}
 {% if "artwork-room-page" not in (page_class or "") %}<p class="body-copy"><a href="/family/practice">Private practice and director</a> · <a href="/family/parent-access">Parent access</a></p>{% endif %}
 </body>
 </html>

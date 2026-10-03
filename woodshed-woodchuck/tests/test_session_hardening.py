@@ -97,7 +97,7 @@ with SessionLocal() as session:
     declare_age(session, profile.id, 'adult')
     session.add(WoodchuckState(profile_id=profile.id, state_json={}, revision=0))
     session.commit()
-with TestClient(app, base_url="https://woodshed.example.test") as client:
+with TestClient(app, base_url="https://woodshed.example.test", headers={"Origin": "https://woodshed.example.test"}) as client:
     response = client.post("/account/login", data={"woodchuck_id": "WC-OFF-TEST", "pin": "2468"})
     assert response.status_code == 200
     cookie = response.headers["set-cookie"].lower()

@@ -8,9 +8,10 @@ enter C001 in the Secret Symbol.”
 The Guest SHED reuses `wireShedSecret()` and `_shed_secret.html`. Case and
 surrounding spaces are ignored **on the server**. Every attempt submits the
 existing panel as a native POST to `/guest/secret-symbol`, which returns to
-Guest Mode. There is no separate code-entry page. Guest preferences restore
-locally and background fetch remains blocked. Invalid symbols show the existing
-friendly error. Deliberate submissions write short-lived protection counters,
+Guest Mode. There is no separate code-entry page. Guest preferences remain only
+in page memory and clear on reload or navigation. Background fetch remains
+blocked. Invalid symbols show the existing friendly error. Deliberate submissions
+write short-lived protection counters,
 never student activity, accounts, enrollments, access, consent or KWS records.
 
 Both entry paths use `establish_registration_context()`. Secret Symbol and the

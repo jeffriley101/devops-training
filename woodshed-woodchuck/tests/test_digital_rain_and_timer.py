@@ -67,6 +67,10 @@ def test_book_timer_restores_running_state_from_start_timestamp() -> None:
 def test_stopping_or_logging_out_clears_timer_running_state() -> None:
     timer = _section("let practiceTimerStartedAt = null", "function formatEntry(entry)")
     logout = _section("function wireAuthenticatedLogout", "function wireShedDecorations")
-    assert timer.count("clearPracticeTimerStart();") == 2
-    assert 'window.sessionStorage.removeItem("woodshed:practice-timer-started-at")' in logout
+    # Stop, reset and rejected owner bindings all discard the saved timer.
+    assert timer.count("clearPracticeTimerStart();") == 3
+    assert "window.WWSessionBoundary.clearAccountProductCaches();" in logout
+    boundary = (ROOT / "static/js/session-boundary.js").read_text(encoding="utf-8")
+    assert '"woodshed:practice-timer-started-at"' in boundary
+    assert 'window.sessionStorage.removeItem(key)' in boundary
     assert "form.requestSubmit()" not in timer

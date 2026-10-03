@@ -6823,7 +6823,8 @@ select {
   text-align: center;
 }
 
-#plunge-hearts { color: #a72e2e; letter-spacing: 0.08em; }
+#guest-chart-preview { white-space: pre-wrap; overflow-wrap: anywhere; }
+#plunge-hearts, #guest-plunge-hearts { color: #a72e2e; letter-spacing: 0.08em; }
 .plunge-band-set {
   display: grid;
   grid-template-columns: minmax(12rem, 1fr) minmax(0, 2fr) auto;
@@ -6859,10 +6860,10 @@ select {
   touch-action: none;
 }
 
-#plunge-canvas { display: block; width: 100%; height: 100%; outline-offset: -0.3rem; }
-#plunge-canvas:focus-visible { outline: 0.25rem solid #ffd75b; }
-#plunge-canvas.is-hit { filter: sepia(0.35) brightness(1.22); }
-#plunge-canvas.is-portal { filter: brightness(1.16) saturate(1.2); }
+#plunge-canvas, #guest-plunge-canvas { display: block; width: 100%; height: 100%; outline-offset: -0.3rem; }
+#plunge-canvas:focus-visible, #guest-plunge-canvas:focus-visible { outline: 0.25rem solid #ffd75b; }
+#plunge-canvas.is-hit, #guest-plunge-canvas.is-hit { filter: sepia(0.35) brightness(1.22); }
+#plunge-canvas.is-portal, #guest-plunge-canvas.is-portal { filter: brightness(1.16) saturate(1.2); }
 
 .plunge-overlay {
   position: absolute;
@@ -6952,8 +6953,8 @@ select {
 @media (prefers-reduced-motion: reduce) {
   .plunge-direction { transition: none; }
   .plunge-direction:active { transform: none; }
-  #plunge-canvas.is-hit { filter: none; }
-  #plunge-canvas.is-portal { filter: none; }
+  #plunge-canvas.is-hit, #guest-plunge-canvas.is-hit { filter: none; }
+  #plunge-canvas.is-portal, #guest-plunge-canvas.is-portal { filter: none; }
 }
 .account-privacy-page {
   width: min(760px, calc(100% - 2rem));

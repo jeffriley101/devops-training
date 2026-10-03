@@ -304,6 +304,11 @@ def login(
         request.session[SESSION_PROFILE_VERSION] = profile.session_version
         request.session[SESSION_PAGE_GENERATION] = secrets.token_urlsafe(24)
 
+        # C001 is a new-registration source, never activity or existing-account
+        # context. A failed login retains a valid registration claim.
+        from .tester_enrollments import clear_registration_context
+        clear_registration_context(request)
+
         return {
             "authenticated": True,
             "profile": profile_payload(profile),

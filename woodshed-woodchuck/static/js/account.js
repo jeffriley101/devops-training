@@ -168,7 +168,7 @@
       try {
         formData.set(
           "initial_state",
-          JSON.stringify(stateApi.getState())
+          JSON.stringify(stateApi.defaultState())
         );
         const response = await fetch("/account/create", {
           method: "POST",

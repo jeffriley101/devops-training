@@ -111,6 +111,9 @@ app.add_middleware(
     same_site="lax",
     https_only=SESSION_COOKIE_SECURE,
 )
+from .session_origin import SessionOriginProtection
+# Outermost: rejection precedes even session decoding/revocation and abuse IDs.
+app.add_middleware(SessionOriginProtection)
 app.include_router(account_router)
 app.include_router(age_router)
 
@@ -431,6 +434,21 @@ def guest_secret_symbol(request: Request, passcode: str = Form("")):
                 request.session[FLASH_KEY] += " New activation is temporarily unavailable; Guest tools remain available."
         except ValueError as error:
             request.session[FLASH_KEY] = str(error)
+    return RedirectResponse("/guest", 303, headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
+
+
+@app.post("/guest/discard")
+async def discard_guest_context(request: Request):
+    # Only an explicit same-origin, empty form may discard registration context.
+    # Guest chart/game content has no server submission route.
+    if await request.body():
+        raise HTTPException(400, "Guest discard does not accept product data.")
+    with SessionLocal() as session:
+        profile = current_profile(request, session)
+    if profile is not None or set(request.session) - {SESSION_REGISTRATION_CONTEXT, BROWSER_KEY, FLASH_KEY}:
+        raise HTTPException(409, "Clear your current browser session before using Guest tools.")
+    from .tester_enrollments import clear_registration_context
+    clear_registration_context(request)
     return RedirectResponse("/guest", 303, headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
 
 

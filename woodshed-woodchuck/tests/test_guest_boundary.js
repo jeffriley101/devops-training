@@ -49,7 +49,7 @@ function browser({shared = new Map(), account='WC-A', guest='transition', genera
   return {context,window,ids,body,shell,shared,session,requests,alerts,loadedScripts,load:name=>vm.runInContext(source(name),context)};
 }
 
-test('Guest setup, autosave, reload and discard use only the Guest namespace', async()=>{
+test('Guest setup uses memory; reload and discard forget it and retire old Guest storage', async()=>{
   const shared=new Map([['woodshedWoodchuckState.v1','account-saved'],['woodshedWoodchuckMetronomeBpm','88'],['woodshedWoodchuckConflictBackup.keep','saved']]);
   function setup() {
     const b=browser({shared,account:'',guest:'local'});
@@ -59,18 +59,21 @@ test('Guest setup, autosave, reload and discard use only the Guest namespace', a
     }
     form.reset=()=>Object.values(form.elements).forEach(e=>e.value='');
     form.reportValidity=()=>true;
-    b.ids.set('guest-setup-form',form);b.ids.set('guest-feedback',element());b.ids.set('guest-tools',element());b.ids.set('guest-discard',element());
+    b.ids.set('guest-setup-form',form);b.ids.set('guest-setup-fields',element());b.ids.set('guest-feedback',element());b.ids.set('guest-tools',element());b.ids.set('guest-discard',element());
+    b.window.WWTuner={};b.window.WWGuestChart={ready:true};b.window.WWGuestPlunge={ready:true};b.window.WWGuestToolsReady=true;
     b.load('guest.js'); return {...b,form};
   }
   const b=setup();
   for(const f of Object.values(b.form.elements))f.value=f.options[1].value;
   b.form.listeners.submit({preventDefault(){}});
   assert.equal(b.ids.get('guest-tools').hidden,false);
-  assert.deepEqual(JSON.parse(shared.get('woodshed:guest:v1:preferences')),{instrument:'Flute',level:'Beginner',goal:'Daily'});
-  // Arbitrary Guest history is never read by account state or the Guest preference projection.
+  assert.equal(b.window.WWGuest.isCurrent(),true);
+  assert.equal(shared.has('woodshed:guest:v1:preferences'),false);
+  // Historical Guest storage is discarded rather than restored or imported.
   shared.set('woodshed:guest:v1:untrusted-history',JSON.stringify({credits:99999,practiceLog:['guest']}));
-  const reloaded=setup();assert.equal(reloaded.form.elements.instrument.value,'Flute');
-  assert.equal(reloaded.ids.get('guest-tools').hidden,false);
+  const reloaded=setup();assert.equal(reloaded.form.elements.instrument.value,'');
+  assert.equal(reloaded.ids.get('guest-tools').hidden,true);
+  assert.equal(shared.has('woodshed:guest:v1:untrusted-history'),false);
   reloaded.session.set('woodshed:guest:v1:draft','guest');reloaded.session.set('woodshed:p-book:verifier-draft:v1','account draft');
   reloaded.ids.get('guest-discard').listeners.click();
   assert.equal([...shared.keys()].some(k=>k.startsWith('woodshed:guest:')),false);
@@ -97,7 +100,9 @@ test('late network and state consumers in an old tab cannot cross logout and sam
   late.resolve(response({credits:999,revision:9}));await rejected;
   assert.equal(api.stateForResponse(ticket),null);
   a.progress.credits=999;api.saveState(a);
-  assert.equal(JSON.parse(shared.get('woodshedWoodchuckState.v1')).progress.credits,37);
+  // Confirmed authentication clears A's cache; the stale response cannot
+  // recreate it even when the new session belongs to the same account.
+  assert.equal(shared.has('woodshedWoodchuckState.v1'),false);
   assert.equal(old.shell.hidden,true);
   await assert.rejects(old.window.fetch('/teams',{method:'POST'}),/Sign-in changed/);
   assert.equal(old.requests.length,1);
@@ -255,21 +260,25 @@ test('unavailable verification keeps account content closed',async()=>{
 });
 
 test('Guest submits every Secret attempt to server while blocking background fetch', async()=>{
-  const b=browser({account:'',guest:'local'});
-  for(const id of ['shed-secret-button','shed-secret-panel','shed-secret-form','shed-secret-passcode','shed-secret-feedback','shed-secret-close','shed-secret-cancel']) b.ids.set(id,element());
-  const submit=element(); const form=b.ids.get('shed-secret-form');form.querySelector=()=>submit;let submissions=0;form.submit=()=>{submissions++;};
-  b.load('app.js');
-  b.ids.get('shed-secret-button').listeners.click();
-  assert.equal(b.ids.get('shed-secret-panel').hidden,false);
-  b.ids.get('shed-secret-passcode').value='C002';
-  await form.listeners.submit({preventDefault(){}});
-  assert.equal(submissions,1);
-  assert.equal(b.window.location.assigned,undefined);
-  b.ids.get('shed-secret-passcode').value='  c001  ';
-  await form.listeners.submit({preventDefault(){}});
+  let submissions=0, b, form;
+  // Each native navigation returns a fresh Guest document. Its lock remains
+  // held until unload, so a second attempt belongs to the next document.
+  for(const passcode of ['C002','  c001  ']) {
+    b=browser({account:'',guest:'local'});
+    for(const id of ['shed-secret-button','shed-secret-panel','shed-secret-form','shed-secret-passcode','shed-secret-feedback','shed-secret-close','shed-secret-cancel']) b.ids.set(id,element());
+    const submit=element();form=b.ids.get('shed-secret-form');form.querySelector=()=>submit;form.submit=()=>{submissions++;};
+    form.method='post';form.action='/guest/secret-symbol';
+    b.window.WWGuest={isCurrent:()=>true};
+    b.load('app.js');
+    b.ids.get('shed-secret-button').listeners.click();
+    assert.equal(b.ids.get('shed-secret-panel').hidden,false);
+    b.ids.get('shed-secret-passcode').value=passcode;
+    await form.listeners.submit({preventDefault(){}});
+    assert.equal(b.window.location.assigned,undefined);
+    assert.equal(b.requests.length,0);
+    assert.equal(b.shared.size,0);
+  }
   assert.equal(submissions,2);
-  assert.equal(b.requests.length,0);
-  assert.equal(b.shared.size,0);
   // A stale Guest tab cannot begin an entry after another tab signs in.
   b.window.location.assigned=undefined;
   b.shared.set('woodshed:session-change:v1','1');
