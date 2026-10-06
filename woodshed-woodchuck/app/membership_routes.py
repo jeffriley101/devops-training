@@ -181,8 +181,8 @@ async def membership_checkout(request: Request):
     if form.get("new_attempt", "false") not in {"true", "false"}:
         raise HTTPException(400, "Invalid checkout selection.")
     try:
-        url = checkout(SessionLocal, actor, form.get("provider"), form.get("plan_code"),
-                       reference=form.get("checkout_reference"), new_attempt=form.get("new_attempt") == "true")
+        url = await run_in_threadpool(checkout, SessionLocal, actor, form.get("provider"), form.get("plan_code"),
+                                     reference=form.get("checkout_reference"), new_attempt=form.get("new_attempt") == "true")
     except (BillingUnavailable, ValueError) as error:
         raise HTTPException(503 if isinstance(error, BillingUnavailable) else 400, str(error)) from error
     return RedirectResponse(url, 303)
@@ -198,7 +198,10 @@ async def provider_webhook(request: Request, provider: str):
         body = await request.body()
         if len(body) > 256_000:
             raise HTTPException(413, "Event too large.")
-        record, fresh = process_webhook(SessionLocal, provider, body, dict(request.headers), config=config)
+        record, fresh = await run_in_threadpool(process_webhook, SessionLocal, provider, body,
+                                               dict(request.headers), config=config)
+        if record is None:
+            return {"received": True, "ignored": True, "processed": False}
         return {"received": True, "duplicate": not fresh, "processed": record.status == "processed"}
     except BillingUnavailable as error:
         raise HTTPException(503, str(error)) from error
