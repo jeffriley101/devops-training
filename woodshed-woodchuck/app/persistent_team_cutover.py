@@ -22,7 +22,9 @@ from sqlalchemy import MetaData, Table, create_engine, inspect, select, text, up
 from sqlalchemy.pool import NullPool
 
 from . import team_continuity_inventory as inventory
+from . import operator_schema_compatibility as compatibility
 
+# Immutable PTA contract; the installed schema may include the c22 extension.
 REVISION = "p21team001"
 LEGACY = "legacy_seasonal_v1"
 PERSISTENT = "persistent_v1"
@@ -76,8 +78,7 @@ def _ids(values, label):
 
 
 def _schema_guard(connection):
-    if list(connection.scalars(text("SELECT version_num FROM alembic_version"))) != [REVISION]:
-        raise CutoverError("revision_not_approved: require " + REVISION)
+    revision = compatibility.installed_revision(connection, CutoverError)
     inspector = inspect(connection)
     if set(TABLES) - set(inspector.get_table_names()):
         raise CutoverError("required_schema_incomplete")
@@ -139,6 +140,7 @@ def _schema_guard(connection):
                                        ("persistent_team_membership_interval_update", guards.SQLITE_UPDATE)):
             if found.get(trigger_name, "").strip() != expected.strip():
                 raise CutoverError("persistent_interval_guard_missing_or_changed")
+    return revision
 
 
 def _tables(connection):
@@ -176,7 +178,7 @@ def _target(connection, url):
 
 def _build(connection, url, team_ids, membership_ids, rules_from_week_start,
            join_request_ids=(), *, now=None):
-    _schema_guard(connection)
+    revision = _schema_guard(connection)
     moment = _clock(now)
     approved_teams = _ids(team_ids, "teams")
     approved_members = _ids(membership_ids, "memberships")
@@ -282,7 +284,7 @@ def _build(connection, url, team_ids, membership_ids, rules_from_week_start,
     if any(c["status"] != "finalized" for c in rows["director_team_contests"]):
         raise CutoverError("nonfinalized_director_contest_requires_separate_review")
     content = {
-        "revision": REVISION, "target": _target(connection, url),
+        "revision": revision, "target": _target(connection, url),
         "team_ids": approved_teams, "membership_ids": approved_members, "join_request_ids": approved_requests,
         "rules_from_week_start": boundary.isoformat(), "prospective_week_ids": sorted(future_ids),
         "current_legacy_week_id": closing[0]["id"],
@@ -300,6 +302,8 @@ def _build(connection, url, team_ids, membership_ids, rules_from_week_start,
                             "persistent_team_control": "staged_plan,staged_plan_sha256,staged_for,activated_at,rules_from_week_start",
                             "team_week_membership_snapshots": "closing legacy roster only"},
     }
+    if revision != REVISION:
+        content["pta_contract_revision"] = REVISION
     return {"content": content, "plan_sha256": digest(content),
             "metadata": {"generated_at": moment.isoformat()}}, rows, tables
 
@@ -316,7 +320,19 @@ def _approved(plan, expected_sha256):
             or not hmac.compare_digest(digest(plan.get("content")), expected_sha256)
             or plan.get("plan_sha256") != expected_sha256):
         raise CutoverError("approved_plan_hash_mismatch")
-    return plan["content"]
+    content = plan["content"]
+    if (not isinstance(content, dict) or content.get("revision") not in compatibility.SUPPORTED_REVISIONS
+            or content.get("pta_contract_revision", content.get("revision")) != REVISION):
+        raise CutoverError("approved_plan_contract_not_supported")
+    return content
+
+
+def _plan_schema_guard(content, revision, *, staging=False):
+    # A staged p21 approval and receipt survive the reviewed additive extension.
+    # An unstaged approval must still match a fresh plan exactly; never rewrite
+    # its revision/hash/evidence to make an APPLY succeed on another schema.
+    if content["revision"] != revision and (staging or revision != "c22class001"):
+        raise CutoverError("plan_schema_revision_changed: generate_and_review_new_plan_before_apply")
 
 
 def _boundary(day):
@@ -411,6 +427,9 @@ def apply_cutover(url, plan, expected_sha256, *, acknowledgments, confirmation, 
     _acknowledged(acknowledgments, confirmation, CONFIRMATION)
     with _write_connection(url) as connection:
         moment = _clock(now)
+        revision = _schema_guard(connection)
+        _plan_schema_guard(content, revision, staging=True)
+        classroom_before = compatibility.classroom_snapshot(connection, revision)
         fresh, before, tables = _build(connection, url, content["team_ids"], content["membership_ids"],
             content["rules_from_week_start"], content["join_request_ids"], now=moment)
         if not hmac.compare_digest(fresh["plan_sha256"], expected_sha256):
@@ -422,6 +441,7 @@ def apply_cutover(url, plan, expected_sha256, *, acknowledgments, confirmation, 
         after = _snapshot(connection, tables)
         if after != _expected_stage(before, plan, expected_sha256):
             raise CutoverError("unexpected_row_change: transaction_rolled_back")
+        compatibility.assert_classroom_unchanged(connection, revision, classroom_before, CutoverError)
         receipt = {"transaction_state": "committed", "operation": "staged",
             "verification": {"passed": True, "before": _evidence(before), "after": _evidence(after),
                 "approved_plan_sha256": expected_sha256, "effective_at": content["effective_at"],
@@ -525,11 +545,13 @@ def activate_cutover(url, plan, expected_sha256, *, acknowledgments, confirmatio
     _acknowledged(acknowledgments, confirmation, ACTIVATION_CONFIRMATION)
     with _write_connection(url) as connection:
         moment = _clock(now)
-        _schema_guard(connection)
+        revision = _schema_guard(connection)
+        _plan_schema_guard(content, revision)
         if _target(connection, url) != content["target"]:
             raise CutoverError("target_mismatch")
         tables = _tables(connection)
         before = _snapshot(connection, tables)
+        classroom_before = compatibility.classroom_snapshot(connection, revision)
         boundary, closing = _activation_state(before, content, expected_sha256, moment)
         expected = normalized(before)
         _freeze_closing_roster(connection, tables, before, expected, closing, boundary, moment)
@@ -554,6 +576,7 @@ def activate_cutover(url, plan, expected_sha256, *, acknowledgments, confirmatio
         after = _snapshot(connection, tables)
         if after != expected:
             raise CutoverError("unexpected_row_change: transaction_rolled_back")
+        compatibility.assert_classroom_unchanged(connection, revision, classroom_before, CutoverError)
         receipt = {"transaction_state": "committed", "operation": "activated",
             "verification": {"passed": True, "before": _evidence(before), "after": _evidence(after),
                 "historical_attribution_unchanged": True, "new_teams": 0, "new_memberships": 0,
@@ -569,7 +592,8 @@ def verify_cutover(url, plan, expected_sha256, receipt):
             or receipt.get("verification", {}).get("passed") is not True):
         raise CutoverError("approved_activation_receipt_required")
     with inventory.readonly_connection(url) as connection:
-        _schema_guard(connection)
+        revision = _schema_guard(connection)
+        _plan_schema_guard(content, revision)
         if _target(connection, url) != content["target"]:
             raise CutoverError("target_mismatch")
         rows = _snapshot(connection, _tables(connection))

@@ -13,18 +13,29 @@ establish Halloween coverage or that `provision_weeks` created those rows.
 Run from `woodshed-woodchuck` with the application environment and an explicit
 `DATABASE_URL` for the intended database. Never paste its value into logs.
 Provisioning also accepts `--database-url`; it has no local-database fallback.
-The deployed persistent-aware code requires exactly one Alembic revision,
-`p21team001`, the required calendar/control columns, the approved membership-rules
-CHECK constraint, and the `persistent_team_control` singleton seeded by migration.
+The compatible persistent-aware code accepts exactly one installed Alembic
+revision, `p21team001` or `c22class001`, with the required calendar/control columns,
+approved membership-rules and authority CHECK constraints, and the
+`persistent_team_control` singleton seeded by migration. On c22 it additionally
+validates all eight Classroom tables' required column types/nullability, primary
+keys, CHECK and unique constraints, restrictive FKs including composite scopes,
+and indexes including partial predicates. A c22 revision stamp without that
+structure is insufficient. These checks do not enable Classroom or depend on its
+feature flag.
 The calendar guard is separate from historical continuity repair's unchanged
 `d17contest001` approval. Older, unknown, multiple, or incomplete schema states
-refuse before calendar writes. Do not stamp a revision to bypass migration.
+refuse before calendar writes. There is no skip-validation flag; do not stamp a
+revision to bypass migration.
 
-Apply the additive migration before starting this code. Coordinate web/finalizer
+Install at least `p21team001` before starting this code. Coordinate web/finalizer
 and calendar writers as described in [persistent Team cutover](persistent-team-cutover.md).
-Migration leaves the singleton dormant, all existing weeks on `legacy_seasonal_v1`,
-and existing Teams/memberships unchanged. Calendar provisioning never activates
-persistent authority or performs the separately reviewed cutover.
+Before upgrading an already staged p21 database to c22, make compatible operator
+code available, including its activation and verification commands. Older pinned
+operators still refuse c22; a source fix does not update external installations.
+The initial p20/p21 migrations leave the singleton dormant, existing weeks on
+`legacy_seasonal_v1`, and existing Teams/memberships unchanged. The additive c22
+migration preserves the existing dormant, staged or active PTA state. Calendar
+provisioning never activates authority or performs the separately reviewed cutover.
 
 Season records must already match `app/seasons.py`: canonical keys, names, dates,
 and `America/Chicago`. Provisioning does not create or enable Seasons. Resolve
@@ -81,6 +92,9 @@ changes, including Hibernaculum proposals, remain unchanged.
   stored deadlines, timestamps, scoring provenance, fractional/frozen results,
   rewards, crowns and membership snapshots.
   `stored_deadlines_differ` reports custom deadlines; never normalize them.
+- On c22, apply separately compares all eight Classroom tables before and after
+  its writes and rolls back an unexpected change. It creates no Classroom
+  authority, audit, account, cohort or membership records.
 
 Dates/deadlines come from the canonical rules and `contest_week_schedule`, with
 ZoneInfo conversion per week. See [weekly timing](contest-finalization-job.md#weekly-boundary-and-deadlines)
@@ -106,6 +120,14 @@ its boundary and are gated once activation is due. Explicit activation changes
 the approved weeks and current authority together. Provision required weeks
 before approving the staged plan; changing the week inventory afterwards
 requires fresh approval.
+
+An exact p21 plan already staged before the additive c22 upgrade keeps its
+original approval for activation under compatible code if all authority and
+boundary checks pass. An unstaged p21 PTA plan cannot be applied on c22; obtain
+fresh approval of a new c22 plan. Calendar provisioning does not rewrite either
+plan. PTA VERIFY remains an exact activation/receipt comparison: additional weeks
+or other protected state changes can invalidate an old receipt even when cutover
+succeeded. Do not rerun activation to repair such a comparison.
 
 Provisioning never creates Teams, copies memberships, rotates join codes, awards
 anything, pauses users, or installs a schedule. No Halloween successor operation

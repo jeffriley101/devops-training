@@ -159,8 +159,8 @@ def free_paths_without_classroom_queries(engine, monkeypatch, *, staged=False):
 
 @pytest.mark.parametrize("backend", ["sqlite", "postgresql"])
 @pytest.mark.parametrize("pta_state", ["dormant", "staged", "active"])
-def test_populated_upgrade_preserves_free_paths_and_pta_operator_revision_guard(tmp_path, monkeypatch, backend, pta_state):
-    from app.persistent_team_cutover import CutoverError
+def test_populated_upgrade_preserves_free_paths_and_pta_operator_compatibility(tmp_path, monkeypatch, backend, pta_state):
+    from app.persistent_team_cutover import CutoverError, verify_cutover
     url = disposable_url(tmp_path, backend)
     monkeypatch.setenv("DATABASE_URL", url)
     command.upgrade(config(), "p21team001")
@@ -172,7 +172,7 @@ def test_populated_upgrade_preserves_free_paths_and_pta_operator_revision_guard(
         if pta_state == "staged":
             stage(db, approved)
         elif pta_state == "active":
-            apply(db, approved)
+            receipt = apply(db, approved)
         with engine.connect() as connection:
             assert not any(name.startswith("classroom_") for name in inspect(connection).get_table_names())
             before = legacy_snapshot(connection)
@@ -198,12 +198,14 @@ def test_populated_upgrade_preserves_free_paths_and_pta_operator_revision_guard(
             assert compare_metadata(MigrationContext.configure(connection), Base.metadata) == []
             if backend == "sqlite":
                 assert list(connection.execute(text("PRAGMA foreign_key_check"))) == []
-        # These operator tools retain their separately approved p21-only guard.
-        # Runtime/frozen history is preserved; c22 does not authorize a staged
-        # cutover activation or broaden the control tool's revision approval.
-        for operation in (lambda: plan(db), lambda: stage(db, approved), lambda: activate(db, approved)):
-            with pytest.raises(CutoverError, match="revision_not_approved: require p21team001"):
-                operation()
+        # Installation approval is separate from the immutable plan contract.
+        # New c22 plans describe c22; old unstaged plans need fresh review.
+        if pta_state == "active":
+            assert verify_cutover(url, approved, approved["plan_sha256"], receipt)["passed"]
+        else:
+            assert plan(db)["content"]["revision"] == "c22class001"
+            with pytest.raises(CutoverError, match="plan_schema_revision_changed"):
+                stage(db, approved)
         with engine.connect() as connection:
             assert legacy_snapshot(connection) == before
         assert free_paths_without_classroom_queries(engine, monkeypatch, staged=pta_state == "staged") == free_before
@@ -246,6 +248,10 @@ def test_populated_upgrade_preserves_free_paths_and_pta_operator_revision_guard(
             assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "c22class001"
             assert connection.scalar(text("SELECT owner_verifier_id FROM classroom_programs")) == recipient_id
             assert legacy_snapshot(connection) == before
+        if pta_state == "staged":
+            # The original staged approval survives both additive migrations.
+            receipt = activate(db, approved)
+            assert verify_cutover(url, approved, approved["plan_sha256"], receipt)["passed"]
     finally:
         engine.dispose()
 

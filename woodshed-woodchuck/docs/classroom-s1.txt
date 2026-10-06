@@ -134,26 +134,76 @@ schema error, never a legitimate empty roster.
 Migration and preservation
 --------------------------
 The statically verified chain f19arcade001 -> p20team001 -> p21team001 now adds only
-c22class001. No previous migration is modified. Existing PTA operator plan/stage/activation
-commands retain their p21-only revision approval and reject c22 without mutation;
-a separate PTA authorization is required before those operator commands can run
-against a migrated database. Runtime and frozen-history preservation are tested
-separately from that known operator limitation. All new tables begin empty; no
+c22class001. No previous migration is modified. The compatible calendar and PTA
+operators accept exactly one installed revision: p21team001 or c22class001. They
+retain their existing calendar/authority structural checks, including required
+columns, CHECK constraints, singleton state, partial unique indexes, restrictive
+origin-season FKs and exact membership-interval trigger verification where
+applicable. For c22, both also validate all eight Classroom tables: required
+column types/nullability, primary keys, CHECK constraints, FKs (including composite
+scope and RESTRICT), unique constraints and indexes with their partial predicates.
+A missing version row, older/unknown revision, multiple heads, or false/incomplete
+c22 stamp refuses. There is no skip-validation option or dependency on the
+Classroom feature flag. All new tables begin empty; no
 legacy row, owner, enrollment, entitlement, trial, sharing grant, cohort, Team,
 contest attribution, C001/PILOT-D1, or PTA state is inferred or rewritten.
 Downgrade checks every Classroom table first and refuses if any row exists; an
 unused schema can be removed. No used authority/history is silently destroyed.
 
-The existing p21 fixture created current Base metadata and stamped it as p21.
-Its narrow update excludes Classroom tables and permits seeding an already truly
-migrated database. Legacy migration comparisons now compare p21 metadata only.
-All original preservation and security assertions remain. New migration tests use
-actual p21 upgrades with populated synthetic data before applying c22class001.
+Operator compatibility matrix (compatible operator code required):
+
+Command/workflow                     p21team001           c22class001
+ordinary provision_weeks plan/apply  supported            supported
+PTA PLAN                             supported            supported
+PTA APPLY of newly approved plan     supported            supported
+PTA ACTIVATE of exact staged plan    supported            supported
+PTA VERIFY of activation receipt     exact-state check    exact-state check
+historical team_preflight/repair     refused              refused
+team_activate                       retired              retired
+
+Supported does not waive scope, schema, authority, time-boundary, target, hash,
+maintenance/backup/writer/finalizer acknowledgments or explicit confirmation.
+Calendar apply remains insert-only and pending-boundary writes remain gated.
+Historical continuity repair retains its separate d17contest001 restriction;
+this patch does not authorize seasonal copying or revive team_activate.
+
+Installed schema and an approved plan's immutable PTA contract are distinct.
+New c22 plans report revision=c22class001 and pta_contract_revision=p21team001.
+A plan generated and staged on p21 can activate and immediately verify after an
+additive c22 migration using its original file, hash, boundary and stored stage,
+provided approved authority and all other checks still pass. An activation and
+receipt created on p21 can verify after that migration only when every originally
+protected evidence row remains exactly unchanged. Old receipts do not claim to
+cover Classroom tables; separate before/after preservation checks protect those
+tables during compatible operator writes. Unstaged p21 plans presented for APPLY
+on c22 refuse with plan_schema_revision_changed before writes: generate a new c22 plan
+and obtain fresh approval. Never edit an approved file or hash, clear a stage,
+recreate a receipt, or stamp a database to make validation pass.
+
+VERIFY is an exact activation/receipt comparison, not an ongoing health check.
+Later calendar weeks, memberships, practice or reward activity can invalidate
+its evidence; post_activation_state_changed and other existing refusals remain.
+Do not reactivate to repair an old receipt. Empty closing rosters and frozen
+legacy history retain their treatment. Positive compatibility rehearsals use
+actual migrations and synthetic local data, including populated Classroom rows;
+falsified revision stamps are negative tests only.
+
+Operator rollout ordering
+-------------------------
+Compatible operator code must be available before any staged p21 database is
+upgraded to c22. An old pinned binary still rejects c22, including activation and
+VERIFY; merging a source fix does not update external operator installations.
+Coordinate their separately approved rollout before the schema upgrade so the
+due-boundary runtime fence retains a usable activation operator. Do not clear or
+move an approved stage to bypass it. This local compatibility patch does not
+authorize deployment, public enablement, onboarding or restoration.
 
 Deferred contracts
 ------------------
 Open S1 prerequisite: an approved independent identity-proof mechanism for live
 direct adult onboarding. Synthetic provisioning does not satisfy that proof.
+Real Program-provisioning authorization also remains unresolved. Neither this
+compatibility patch nor schema installation supplies those approvals.
 S2: entitlements, trials, packages,
 codes/joining, enrollment/hold/departure workflows and account reconciliation.
 S3: separately approved student capability/reporting/history authorization; no

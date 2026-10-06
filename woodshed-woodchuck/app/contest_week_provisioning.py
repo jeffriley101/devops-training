@@ -12,6 +12,7 @@ from sqlalchemy import inspect, or_, select, text
 from sqlalchemy.orm import Session
 
 from . import team_continuity as domain, team_continuity_repair as repair
+from . import operator_schema_compatibility as compatibility
 from .contests import CENTRAL, aware_utc, contest_week_schedule
 from .team_authority import lock_authority, rules_version_for_start
 from .models import ContestWeek, Season
@@ -41,8 +42,7 @@ def schema_guard(connection):
     tables = set(inspector.get_table_names())
     if "alembic_version" not in tables:
         raise repair.inventory.InventoryError("calendar_schema_required")
-    if list(connection.scalars(text("SELECT version_num FROM alembic_version"))) != [CALENDAR_REVISION]:
-        raise repair.inventory.InventoryError("revision_not_approved: require " + CALENDAR_REVISION)
+    revision = compatibility.installed_revision(connection, repair.inventory.InventoryError)
     for table, expected in required.items():
         if table not in tables:
             raise repair.inventory.InventoryError("required_calendar_schema_incomplete: " + table)
@@ -84,6 +84,7 @@ def schema_guard(connection):
         boundary = date.fromisoformat(boundary)
     if boundary is not None and boundary.weekday() != 0:
         raise repair.inventory.InventoryError("calendar_authority_week_boundary_invalid")
+    return revision
 
 
 def scope(*, seasons=(), source=None, destination=None):
@@ -207,7 +208,7 @@ def provision(url, *, apply=False, seasons=(), source=None, destination=None):
     connect = repair.writer if apply else repair.inventory.readonly_connection
     with connect(url) as connection:
         try:
-            schema_guard(connection)
+            revision = schema_guard(connection)
             with Session(connection, autoflush=False, expire_on_commit=False) as session:
                 if apply:
                     lock_authority(session)
@@ -218,6 +219,7 @@ def provision(url, *, apply=False, seasons=(), source=None, destination=None):
                         # season locks. The per-season unique constraint alone
                         # cannot reject cross-season interval overlaps.
                         connection.execute(text("LOCK TABLE contest_weeks IN SHARE ROW EXCLUSIVE MODE"))
+                classroom_before = compatibility.classroom_snapshot(connection, revision) if apply else None
                 report = build_plan(session, **arguments)
                 if not apply:
                     return report
@@ -245,6 +247,8 @@ def provision(url, *, apply=False, seasons=(), source=None, destination=None):
                         week["action"] = "created"
                 after.update(mode="apply", status="APPLIED" if inserted else "ALREADY_COMPLETE",
                              created=len(inserted), unchanged=report["unchanged"])
+                compatibility.assert_classroom_unchanged(
+                    connection, revision, classroom_before, repair.RepairError)
                 connection.commit()
                 return after
         except BaseException:
