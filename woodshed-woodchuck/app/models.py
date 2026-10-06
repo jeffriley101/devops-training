@@ -23,6 +23,11 @@ from .db import Base
 from .c001_models import AbuseEvent, ActivationControl
 from .age_models import AccountPrivacy
 from .session_revocations import RevokedBrowserSession
+from .classroom_models import (
+    ClassroomProgram, ClassroomRoleGrant, ClassroomClass, ClassroomTeachingAssignment,
+    ClassroomStudentMembership, ClassroomMembershipPeriod, ClassroomOwnershipTransfer,
+    ClassroomAuditEvent,
+)
 from .membership_models import (BillingAccount, Membership, MembershipSeat,
                                 MembershipSeatInvitation, ProviderSubscription,
                                 BillingProviderEvent, MembershipAuditEvent, CheckoutAttempt,

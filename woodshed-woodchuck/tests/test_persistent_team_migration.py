@@ -13,6 +13,16 @@ from app.db import Base
 from tests.test_team_families import disposable_url
 
 
+def compare_p21_metadata(connection):
+    # These tests stop at p21. Keep exact comparison of every release table;
+    # unexpected later tables in the actual database must still be detected.
+    expected = MetaData()
+    for table in Base.metadata.sorted_tables:
+        if not table.name.startswith("classroom_"):
+            table.to_metadata(expected)
+    return compare_metadata(MigrationContext.configure(connection), expected)
+
+
 @pytest.fixture(autouse=True)
 def disposable_sqlite_configuration():
     # Exercise batch migration safety even when the existing connection
@@ -57,7 +67,7 @@ def test_populated_history_upgrade_is_exactly_preserved(tmp_path, monkeypatch, b
         assert historical_snapshot(c) == before
         if backend == "sqlite":
             assert list(c.execute(text("PRAGMA foreign_key_check"))) == []
-        assert compare_metadata(MigrationContext.configure(c), Base.metadata) == []
+        assert compare_p21_metadata(c) == []
     engine.dispose()
 
 
@@ -74,11 +84,11 @@ def test_upgrade_downgrade_reupgrade_no_automatic_promotion(tmp_path, monkeypatc
         assert c.scalar(text("SELECT count(*) FROM teams WHERE is_operating=true")) == 0
         assert c.scalar(text("SELECT count(*) FROM team_memberships WHERE is_persistent=true")) == 0
         assert c.scalar(text("SELECT count(*) FROM contest_weeks WHERE team_membership_rules_version <> 'legacy_seasonal_v1'")) == 0
-        assert compare_metadata(MigrationContext.configure(c), Base.metadata) == []
+        assert compare_p21_metadata(c) == []
     command.downgrade(config, "f19arcade001")
     command.upgrade(config, "p21team001")
     with engine.connect() as c:
-        assert compare_metadata(MigrationContext.configure(c), Base.metadata) == []
+        assert compare_p21_metadata(c) == []
     engine.dispose()
 
 

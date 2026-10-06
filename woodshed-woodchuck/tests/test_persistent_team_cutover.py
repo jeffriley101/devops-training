@@ -22,17 +22,22 @@ BOUNDARY = date(2026, 10, 5)
 BOUNDARY_AT = datetime(2026, 10, 5, 5, tzinfo=timezone.utc)
 
 
-def seed(url):
+def seed(url, *, migrated=False):
     engine = create_engine(url)
     if engine.dialect.name == "sqlite":
         @event.listens_for(engine, "connect")
         def foreign_keys(connection, _):
             connection.execute("PRAGMA foreign_keys=ON")
             connection.execute("PRAGMA synchronous=OFF")  # Disposable fixtures only.
-    Base.metadata.create_all(engine)
-    with engine.begin() as c:
-        c.execute(text("CREATE TABLE alembic_version (version_num VARCHAR(32) PRIMARY KEY NOT NULL)"))
-        c.execute(text("INSERT INTO alembic_version VALUES ('p21team001')"))
+    if not migrated:
+        # This fixture represents p21, including when later models are imported.
+        Base.metadata.create_all(engine, tables=[
+            table for table in Base.metadata.sorted_tables
+            if not table.name.startswith("classroom_")
+        ])
+        with engine.begin() as c:
+            c.execute(text("CREATE TABLE alembic_version (version_num VARCHAR(32) PRIMARY KEY NOT NULL)"))
+            c.execute(text("INSERT INTO alembic_version VALUES ('p21team001')"))
     with Session(engine) as s:
         for sid, key, start, end in ((1, "band-camp-2026", date(2026, 7, 27), date(2026, 9, 13)),
                                     (2, "back-to-school-2026", date(2026, 9, 14), date(2026, 9, 27)),
@@ -69,7 +74,8 @@ def seed(url):
             s.add(m.ContestWeek(id=wid, season_id=sid, week_start=start, week_end=end, status=status,
                 verification_deadline_at=due, finalize_after=due,
                 finalized_at=OLD if status == "finalized" else None))
-        s.add(m.PersistentTeamControl(id=1))
+        if not migrated:
+            s.add(m.PersistentTeamControl(id=1))
         s.add(m.TeamReport(team_id=10, reporter_profile_id=1, category="other", details="WHY CAN'T I LEAVE"))
         s.add(m.Contest(id=1, key="team-weekly-practice", name="Team Practice",
                         metric_type="practice_minutes", subject_type="team"))
