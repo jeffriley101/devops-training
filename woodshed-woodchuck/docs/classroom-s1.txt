@@ -1,0 +1,255 @@
+Classroom R6 S1 implementation note
+=================================
+
+Scope and release posture
+-------------------------
+S1 relationship management remains disabled unless CLASSROOM_S1_ENABLED is exactly
+1. Its narrow live v1 onboarding path allows Woodshed Site Admin to issue a signed,
+expiring Program invitation and the invited adult to accept it even while the S1
+management flag is off. Schema installation alone creates no Program or authority.
+Existing free Director behavior is unchanged; neither onboarding nor enabling the
+flag provides paid entitlement or student reporting.
+
+Woodshed manually approves an exact existing Organization as a Music Program and
+sends the intended founding Owner / Head Director an email invitation. Site Admin
+sign-in and CSRF/origin checks authorize issuance; issuance creates no adult,
+Program, role, relationship, subscription, or session. The signed invitation binds
+its purpose, version, exact Organization ID, normalized invited email, and expiry.
+Opening the emailed link proves control of that mailbox, but GET alone creates
+nothing. A successful POST rechecks the invitation and unprovisioned Organization.
+An existing TrustedVerifier must enter its existing PIN; a new email must provide
+a display name and valid four-digit PIN to create a TrustedVerifier credential.
+The exact authenticated adult becomes canonical Owner and receives the founding
+Head Director grant in the same transaction as the Program and audit evidence.
+Replay after provisioning refuses. Failed email delivery creates no Program
+authority, and deliberate issuance may be retried.
+
+This proof does not establish legal identity, employment, school purchasing or
+billing authority, student-data consent, or parent authorization. No Class code,
+student enrollment, student relationship, trial, payment, entitlement, teaching
+assignment, or reporting capability follows from the invitation. Self-service
+school signup and stronger school verification remain optional later work.
+
+The synthetic local test service remains separately guarded. It requires an
+already credential-authenticated adult explicitly listed in server-side
+CLASSROOM_S1_PROVISIONER_IDS, CLASSROOM_S1_LOCAL_PROVISIONING=1, and an isolated
+/tmp/classroom-s1-*/... SQLite file or a literal loopback PostgreSQL URL with a
+classroom_s1_ database name. Provisioned addresses must use .test or .invalid,
+and Program provisioning verifies those synthetic actor/owner domains. These
+checks contain local provisioning; they do not constitute mailbox proof. No
+operator, account, or Program is seeded
+by the migration or normal startup.
+
+Identity and authentication
+---------------------------
+Adults remain TrustedVerifier IDs; registered students remain WoodchuckProfile IDs.
+The service reuses validate_email, is_valid_pin, hash_pin, and existing
+authenticate_trusted_verifier. Existing email always requires its own credentials;
+an invitation cannot replace its hash/name or claim its account. A unique normalized
+email arbitrates concurrent creation. Accepting with a new email creates only its
+credential, Program ownership, explicit founding Head Director role, and audit:
+no student connection, profile, billing account, subscription, or consent.
+
+AdultAuthentication is internal opaque evidence minted from current credentials,
+bound to its SQLAlchemy Session and outer transaction, with no client actor-ID or
+role adapter. Services recheck its credential hash against the database after
+Program lock waits. A caller must authenticate again after commit/rollback. A
+forged ID, Team Director capability, parent session, or child director emailed-link
+session cannot supply this evidence. The live acceptance path uses the existing
+adult credential rules and does not turn a matching email or display name into
+authentication. Its browser pages and mutation requests require the appropriate
+rate limiting, Origin/CSRF, strict inputs, and no-store handling.
+
+Physical relationships and constraints
+-------------------------------------
+Eight additive tables provide the minimum independently retained records:
+
+* classroom_programs extends Organization by primary key. Its NOT NULL restrictive
+  owner FK is the one canonical Owner. Historical created_by_verifier_id and legacy
+  organization memberships have no authority. owner_version invalidates proposals
+  across successive transfers, including transfer away and back.
+* classroom_role_grants preserves explicit head_director, admin, code_manager, and
+  billing periods and end evidence. Compatible roles and multiple Programs work.
+  Owner is not an independently removable role. Head Director and code-manager
+  records represent responsibility only; code services remain S2. Billing cannot
+  mark payments or activate access. Only Owner grants/revokes Program roles.
+* classroom_classes has a stable ID, Program FK, and display name independent of
+  codes. Owner/Admin can create Classes and assign/end teaching; neither role
+  implies teaching. Other roles see Program metadata and only Classes they teach.
+* classroom_teaching_assignments preserves explicit teaching periods, grant/end
+  actors, and revoked/departed reasons. Teachers can record their own departure.
+  Teaching grants no practice-verification, reporting, or enrollment capability.
+* classroom_student_memberships uniquely anchors (Class, ordinary student ID).
+* classroom_membership_periods preserves active/held segments and departed/changed
+  endings on that anchor. Administrative hold is distinct from departure. There
+  is no runtime insertion/join/import/suspension/reinstatement helper. Tests insert
+  only synthetic relationships to demonstrate multiple Classes and period history.
+* classroom_ownership_transfers stores the exact initiating Owner, recipient,
+  owner version, pending/accepted/cancelled/superseded state, and resolution time.
+* classroom_audit_events stores typed action, actor, target, Program/Class scope,
+  relevant grant/assignment/proposal and old/new Owner references, server timestamp.
+  No free-text payload, credentials, codes, tokens, parent or practice data.
+
+Database constraints enforce referential integrity, non-null canonical Owner,
+allowed roles/states/actions, positive periods, end evidence, unique membership
+anchors, at most one open role/assignment/membership period, and one pending
+transfer per Program. Composite FKs prevent assignment and audit scope substitution.
+All new FKs use RESTRICT: hard deletion cannot silently erase authority/history.
+A future membership service must lock the anchor and reject overlapping historical
+periods; the database's open-period uniqueness is not a general overlap exclusion.
+S1 has no service that writes student membership, so it cannot claim that workflow.
+
+Authority operations and transactions
+------------------------------------
+The caller owns commit/rollback. Every Program authority mutation and its success
+audit share a savepoint. Synthetic-only adult identity creation by itself grants
+no Program authority and does not fabricate a Program-scoped audit or consumer
+billing membership. SQLite explicitly begins a physical transaction before that savepoint,
+so RELEASE cannot accidentally commit before the caller's outer rollback. SQLite
+writes require foreign_keys=ON; the shared application engine is not changed.
+SQLite is sequential local evidence, not a substitute for PostgreSQL row locks.
+
+Management locks the Program first, then scoped Class/relationship/proposal rows.
+Adult existence and credential reads are fresh but take no UPDATE row locks; S1
+authority operations never mutate credentials. This avoids shared adults causing
+cross-Program lock inversions; restrictive FKs retain the identity evidence.
+One outer transaction may mutate only one existing Program. Provisioning locks the
+preexisting Organization before creating its Program. Synthetic provisioning
+requires both an authenticated local provisioner and exact founding adult evidence;
+live invitation acceptance requires a valid approved invitation and exact founding
+adult credential proof. The founding adult becomes Owner and receives an explicit
+Head Director grant only through this deliberate service, never by inference.
+Program, role, audit, and any new adult credential commit together or roll back
+together. PostgreSQL Organization locking serializes competing acceptances.
+
+The live provisioning audit names the authenticated founding adult as actor and
+target. It does not attribute an invitation to a student or invent a
+TrustedVerifier for the Site Admin. The current audit schema has no durable
+per-Program record naming the issuing Site Admin operator. The protected issuance
+route emits sanitized operational success/failure events and request correlation,
+without Program, email, or token data. Woodshed must retain its manual approval
+evidence separately; a later audit refinement may link that approval to a named
+operator and Program.
+
+PostgreSQL writes require READ COMMITTED; stronger snapshot isolation is rejected
+rather than allowing an old role snapshot after a lock wait. All authority checks
+use refreshed Program state and database role predicates following acquisition. Transfer proposals require the current authenticated
+Owner. Acceptance requires the exact recipient's independent credential evidence,
+locks/reloads the Program and proposal, and rechecks owner/version/status/recipient.
+A newer proposal supersedes the older one with an audit event. Pending transfer
+proposals have no token or email mechanism and remain valid only while their owner
+version and pending status are current. Founding Program invitations cannot be
+used to transfer ownership.
+Acceptance atomically replaces the canonical Owner, advances its version, resolves
+the proposal and records old/new Owner audit references. Replays fail; no successful
+audit survives a failed or rolled-back transfer. Independently granted roles remain
+with the outgoing adult; powers derived solely from ownership disappear. Transfer
+never duplicates Classes/memberships or grants teaching/reporting to the recipient.
+
+No S1 adult management operation locks PTA, seasons, or student profiles. Existing
+student anonymization locks PTA authority -> seasons -> profile and is unchanged.
+It retains ordinary profile IDs; no Classroom path reads student data. Future
+student enrollment/deletion integration must preserve that existing cross-system
+lock order and reconcile Classroom restrictions before any live enrollment.
+
+Dashboard boundary
+------------------
+director_sections delegates Connected Students to the unchanged dashboard_metrics
+function and its existing free relationship/age/privacy calculations. my_classes
+returns authorized administrative Program/Class metadata only: no student names,
+counts, notes, charts, practice, games, or exports. Paid capabilities and reporting
+are explicitly not_implemented. require_student_reporting always denies, even for
+Owner/Admin/Teacher and even with a synthetic student membership. Class selection
+requires its exact Program; unauthorized substitution fails. The disabled branch
+performs no Classroom schema query. Missing schema while enabled raises an actual
+schema error, never a legitimate empty roster.
+
+Migration and preservation
+--------------------------
+The statically verified chain f19arcade001 -> p20team001 -> p21team001 now adds only
+c22class001. No previous migration is modified. The compatible calendar and PTA
+operators accept exactly one installed revision: p21team001 or c22class001. They
+retain their existing calendar/authority structural checks, including required
+columns, CHECK constraints, singleton state, partial unique indexes, restrictive
+origin-season FKs and exact membership-interval trigger verification where
+applicable. For c22, both also validate all eight Classroom tables: required
+column types/nullability, primary keys, CHECK constraints, FKs (including composite
+scope and RESTRICT), unique constraints and indexes with their partial predicates.
+A missing version row, older/unknown revision, multiple heads, or false/incomplete
+c22 stamp refuses. There is no skip-validation option or dependency on the
+Classroom feature flag. All new tables begin empty; no
+legacy row, owner, enrollment, entitlement, trial, sharing grant, cohort, Team,
+contest attribution, C001/PILOT-D1, or PTA state is inferred or rewritten.
+Downgrade checks every Classroom table first and refuses if any row exists; an
+unused schema can be removed. No used authority/history is silently destroyed.
+
+Operator compatibility matrix (compatible operator code required):
+
+Command/workflow                     p21team001           c22class001
+ordinary provision_weeks plan/apply  supported            supported
+PTA PLAN                             supported            supported
+PTA APPLY of newly approved plan     supported            supported
+PTA ACTIVATE of exact staged plan    supported            supported
+PTA VERIFY of activation receipt     exact-state check    exact-state check
+historical team_preflight/repair     refused              refused
+team_activate                       retired              retired
+
+Supported does not waive scope, schema, authority, time-boundary, target, hash,
+maintenance/backup/writer/finalizer acknowledgments or explicit confirmation.
+Calendar apply remains insert-only and pending-boundary writes remain gated.
+Historical continuity repair retains its separate d17contest001 restriction;
+this patch does not authorize seasonal copying or revive team_activate.
+
+Installed schema and an approved plan's immutable PTA contract are distinct.
+New c22 plans report revision=c22class001 and pta_contract_revision=p21team001.
+A plan generated and staged on p21 can activate and immediately verify after an
+additive c22 migration using its original file, hash, boundary and stored stage,
+provided approved authority and all other checks still pass. An activation and
+receipt created on p21 can verify after that migration only when every originally
+protected evidence row remains exactly unchanged. Old receipts do not claim to
+cover Classroom tables; separate before/after preservation checks protect those
+tables during compatible operator writes. Unstaged p21 plans presented for APPLY
+on c22 refuse with plan_schema_revision_changed before writes: generate a new c22 plan
+and obtain fresh approval. Never edit an approved file or hash, clear a stage,
+recreate a receipt, or stamp a database to make validation pass.
+
+VERIFY is an exact activation/receipt comparison, not an ongoing health check.
+Later calendar weeks, memberships, practice or reward activity can invalidate
+its evidence; post_activation_state_changed and other existing refusals remain.
+Do not reactivate to repair an old receipt. Empty closing rosters and frozen
+legacy history retain their treatment. Positive compatibility rehearsals use
+actual migrations and synthetic local data, including populated Classroom rows;
+falsified revision stamps are negative tests only.
+
+Operator rollout ordering
+-------------------------
+Compatible operator code must be available before any staged p21 database is
+upgraded to c22. An old pinned binary still rejects c22, including activation and
+VERIFY; merging a source fix does not update external operator installations.
+Coordinate their separately approved rollout before the schema upgrade so the
+due-boundary runtime fence retains a usable activation operator. Do not clear or
+move an approved stage to bypass it. This local compatibility patch does not
+authorize deployment, public enablement or restoration. The separate live v1
+Program invitation mechanism does not authorize paid Classroom capabilities.
+
+Deferred contracts
+------------------
+Live v1 onboarding uses manually approved Site Admin issuance plus emailed mailbox
+proof and adult credentials. The proof deliberately stops short of identity,
+employment, purchasing, and student-data authority. A future self-service or
+school-verification workflow can be considered separately. This local slice does
+not claim deployment or full R6 readiness.
+S2: entitlements, trials, packages,
+codes/joining, enrollment/hold/departure workflows and account reconciliation.
+S3: separately approved student capability/reporting/history authorization; no
+speculative consent scopes or administrative-student projection exist here.
+S4: Guest Classroom context and local Pristine integration; unchanged in S1.
+S5: reconcile restored Owner/role/assignment/membership restrictions and audit
+history with the external recovery process, including separately approved retention
+and deletion handling. These audit rows are not an external restore-replay ledger;
+there are no permanent tombstones, retention buffer, recovery or rollout claims.
+R7: full director workflows, games, reflections, reports, exports, purchasing.
+
+Validation commands, baseline failures/retries and final file hashes are recorded
+outside the patch in the final response's temporary evidence manifest. No database,
+credential, or generated test artifact belongs in the repository patch.

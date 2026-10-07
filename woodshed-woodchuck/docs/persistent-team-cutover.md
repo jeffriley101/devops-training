@@ -17,12 +17,37 @@ Neither migration identifies operating rows, stages a plan, or activates
 membership authority. Current authority remains legacy until the separately
 reviewed boundary operation.
 
+The compatible calendar and PTA operators accept exactly one installed revision,
+`p21team001` or its reviewed additive extension `c22class001`. PLAN, APPLY,
+ACTIVATE and VERIFY all retain structural validation; the installed stamp alone
+does not grant access. Existing required columns, staging/authority checks,
+partial unique indexes, restrictive origin-season foreign keys and exact
+membership-interval trigger checks remain in force. The c22 extension additionally
+requires all eight Classroom tables with their required column types/nullability,
+primary keys, CHECK constraints, restrictive foreign keys (including composite
+scope), unique constraints and indexes with their partial predicates. Older or
+unknown revisions, arbitrary descendants, multiple heads, missing revision rows,
+and incomplete or falsely stamped c22 schemas refuse. There is no bypass flag.
+
+This support is independent of Classroom enablement. `c22class001` installs empty
+disabled relationship tables without selecting PTA authority or changing existing
+rows. Historical `team_preflight`/`team_continuity_repair` keep their separate
+`d17contest001` restriction and refuse p21 and c22; `team_activate` stays retired.
+
+Compatible operator code must be available **before upgrading a staged p21
+database to c22**. An old pinned binary still refuses c22, including ACTIVATE and
+VERIFY, while the due-boundary runtime fence can remain active. A source fix alone
+does not update separately installed operator binaries. Coordinate their approved
+rollout before the schema upgrade; do not clear the stage or move the boundary to
+work around an incompatible operator. This patch does not approve deployment.
+
 Dormant deployment is not behavior-neutral: origin-season deletion is restricted
 for historical rows too; guarded writers take the authority fence; and ordinary
 seasonal Team activation is retired. The lower-level seasonal continuity copy
 service also refuses a database containing the singleton seeded by p20, even
-while persistent authority is disabled. Historical continuity planning remains
-available. The new schema must precede the new runtime.
+while persistent authority is disabled. Read-only historical inventory remains
+available; the repair planner and `team_preflight` retain their restricted schema
+approval. The new schema must precede the new runtime.
 
 `Team.is_operating` has unique partial indexes for Family, normalized name,
 emblem, and public creator. `TeamMembership.is_persistent` distinguishes
@@ -89,6 +114,28 @@ state, protected-table counts/hashes, target identity without credentials,
 planned future-week IDs, and a canonical SHA256. Private chart notes, PIN hashes,
 and cleartext codes are not exported. PLAN uses repeatable-read/read-only
 PostgreSQL or a query-only existing SQLite file; it has no writable fallback.
+
+An installed revision and an immutable plan's PTA contract are separate facts.
+New p21 plans keep their existing format. New c22 plans record
+`content.revision = c22class001` and
+`content.pta_contract_revision = p21team001`; they do not claim that the installed
+schema is p21. The original canonical hash, exact selected IDs, database/schema
+target and authority fingerprint remain the approval. Compatibility does not
+authorize editing the approved file or substituting a fresh hash.
+
+| Approved artifact | Compatible operator behavior after an additive p21 -> c22 migration |
+| --- | --- |
+| Unstaged p21 plan supplied to APPLY | Refuse `plan_schema_revision_changed` before writes; create a new c22 PLAN and obtain fresh approval. |
+| Exact p21 plan already staged on p21 | ACTIVATE and immediate VERIFY retain its original file, hash, boundary and stored stage if approved authority and all existing checks pass. |
+| Activation and receipt already created on p21 | VERIFY accepts the original plan/hash/receipt only if actual activation and every originally protected evidence row remain exactly unchanged. |
+| New c22 plan | PLAN -> APPLY -> ACTIVATE -> VERIFY uses the same exact-ID approval, target, acknowledgments, boundary, locking and rollback requirements as p21. |
+
+Existing receipts retain their original protected-table coverage. They do not
+retroactively attest to Classroom tables installed later. Compatible APPLY and
+ACTIVATE separately snapshot and compare all eight Classroom tables within their
+mutation transactions and roll back an unexpected change; ordinary calendar apply
+does the same. This preservation evidence does not rewrite a plan, stored stage
+or receipt, and operator actions grant no Classroom authority or access.
 
 Boundary revalidation distinguishes approved authority from ordinary new earning
 activity. A change to identity, ownership, moderation, membership,
@@ -261,6 +308,15 @@ authority, week rules, and closing-roster evidence in addition to the receipt;
 a receipt describing an unchanged, inactive database is insufficient. Repeating
 an activated plan cannot reset authority or duplicate roster evidence.
 
+VERIFY is an exact activation/receipt check, not an evergreen health check.
+Additional weeks, membership changes or ordinary practice/reward activity may
+invalidate its exact comparison, including after a c22 migration.
+`post_activation_state_changed: do_not_reapply` and other relevant refusals remain
+valid outcomes; never recreate the old receipt or automatically activate again to
+make verification pass. A schema-only additive upgrade cannot excuse a real
+change to protected rows. Keep separate preservation evidence for new Classroom
+tables rather than claiming that a pre-c22 receipt covered them.
+
 ## Attribution and competition use one authority
 
 Current Team identity, effective membership, join/switch/leave, BOOK/BOARD
@@ -316,6 +372,13 @@ Team operations and deploy a persistent-aware repair/hotfix. Preserve the
 manifest, receipt, and backup for review. There is deliberately no automatic
 destructive rollback command. Historical attribution repair is outside this
 release.
+
+Classroom remains default OFF. Independent approval of new-mailbox ownership
+proof, real Program-provisioning authorization, restoration/retention handling,
+feature enablement and deployment remains outstanding. Local compatibility
+rehearsals do not establish Classroom, all of S1 or Production release readiness;
+codes, trials, enrollment, reporting and Guest Classroom work are outside this
+operator patch.
 
 ## Supplied inventory caveats
 

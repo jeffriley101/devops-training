@@ -1,0 +1,15 @@
+{% extends "membership_base.html" %}
+{% block content %}
+<section class="card">
+  <h1>Music Program invitation</h1>
+  <p>Use the PIN for the Trusted Verifier account at the invited email. If this is your first adult account, enter your name and create a four-digit PIN.</p>
+  <form method="post" class="stack-form">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label for="director-name">Display name (new accounts only)</label>
+    <input id="director-name" name="display_name" type="text" maxlength="100" autocomplete="name">
+    <label for="director-pin">Four-digit PIN</label>
+    <input id="director-pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" minlength="4" maxlength="4" autocomplete="current-password" required>
+    <button class="btn btn-primary" type="submit">Accept invitation</button>
+  </form>
+</section>
+{% endblock %}
