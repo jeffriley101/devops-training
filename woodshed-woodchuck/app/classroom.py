@@ -1,9 +1,9 @@
-"""Disabled-by-default S1 foundation. Internal services; no request/route adapter.
+"""Disabled-by-default S1 foundation and invited Program onboarding services.
 
 Call inside one caller-owned transaction, authenticate in that transaction, and
 commit only after success. Each mutation uses a savepoint so audit failure cannot
 leave a committable partial authority mutation. PostgreSQL is the authority lock
-backend; SQLite is for sequential synthetic rehearsals only.
+backend; SQLite is for sequential rehearsals only.
 """
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -113,10 +113,11 @@ def _synthetic_email(email):
     return normalized
 
 
-def _mutation(function):
+def _mutation(function, *, require_enabled=True):
     @wraps(function)
     def run(session, *args, **kwargs):
-        _require_enabled()
+        if require_enabled:
+            _require_enabled()
         connection = session.connection()
         if connection.dialect.name not in {"sqlite", "postgresql"}:
             raise ClassroomDenied("Unsupported Classroom database backend.")
@@ -140,6 +141,12 @@ def _mutation(function):
             session.flush()
             return result
     return run
+
+
+def _invitation_mutation(function):
+    # This purpose-specific onboarding path must work before S1 capabilities are
+    # enabled. It retains the same transaction and database safety checks.
+    return _mutation(function, require_enabled=False)
 
 
 def _fresh(session, model, *criteria):
@@ -201,6 +208,35 @@ def _name(value, maximum):
     return value.strip()
 
 
+def _lock_organization_for_provision(session, organization_id):
+    if type(organization_id) is not int:
+        raise ClassroomDenied("An exact Organization ID is required.")
+    organization = _fresh(session, Organization, Organization.id == organization_id)
+    if organization is None:
+        raise ClassroomDenied("Organization unavailable.")
+    return organization
+
+
+def _create_program_for_adult(session, *, organization_id, actor_id, owner_id):
+    """Write one Program, founding role, and audits under the Organization lock."""
+    if _fresh(session, ClassroomProgram,
+              ClassroomProgram.organization_id == organization_id) is not None:
+        raise ClassroomDenied("Program already provisioned.")
+    _require_adults(session, actor_id, owner_id)
+    program = ClassroomProgram(organization_id=organization_id, owner_verifier_id=owner_id)
+    session.add(program)
+    session.flush()
+    grant = ClassroomRoleGrant(program_id=organization_id, verifier_id=owner_id,
+                               role="head_director", granted_by_verifier_id=actor_id)
+    session.add(grant)
+    session.flush()
+    _audit(session, organization_id, actor_id, "program_provisioned",
+           target_verifier_id=owner_id, new_owner_id=owner_id)
+    _audit(session, organization_id, actor_id, "role_granted",
+           target_verifier_id=owner_id, role_grant_id=grant.id)
+    return program
+
+
 @_mutation
 def onboard_adult(session, *, actor, email, display_name, pin):
     """Synthetic-only new identity, no login or relationship side effects.
@@ -233,26 +269,69 @@ def provision_program(session, *, actor, organization_id, owner):
     for adult_id in {actor_id, owner_id}:
         _synthetic_email(session.scalar(select(TrustedVerifier.email).where(
             TrustedVerifier.id == adult_id)))
-    organization = _fresh(session, Organization, Organization.id == organization_id)
-    if organization is None:
-        raise ClassroomDenied("Organization unavailable.")
-    _require_adults(session, actor_id, owner_id)
+    _lock_organization_for_provision(session, organization_id)
     _actor(session, actor)
     _actor(session, owner)
-    if session.get(ClassroomProgram, organization_id) is not None:
+    return _create_program_for_adult(session, organization_id=organization_id,
+                                     actor_id=actor_id, owner_id=owner_id)
+
+
+@_invitation_mutation
+def accept_program_invitation(session, *, token, pin, display_name=None):
+    """Accept a signed invitation using this adult's own PIN credentials.
+
+    The route rate-limits attempts; this service independently verifies the
+    invitation and writes authority in one savepoint. The caller owns the outer
+    transaction and must commit only after success. Audit and role grant actor
+    are the accepting adult, never a fabricated Site Admin or student identity.
+    """
+    from .classroom_invitation import parse_program_invitation
+
+    try:
+        invitation = parse_program_invitation(token)
+    except ValueError as error:
+        raise ClassroomDenied("Program invitation unavailable.") from error
+    organization_id = invitation.organization_id
+    email = invitation.email
+    try:
+        valid_email = validate_email(email) if isinstance(email, str) else None
+    except ValueError as error:
+        raise ClassroomDenied("Program invitation unavailable.") from error
+    if type(organization_id) is not int or valid_email is None or valid_email != email:
+        raise ClassroomDenied("Program invitation unavailable.")
+    if not isinstance(pin, str) or not is_valid_pin(pin):
+        raise ClassroomDenied("PIN must contain exactly four digits.")
+
+    _lock_organization_for_provision(session, organization_id)
+    # A competing acceptance may hold this lock until the invitation expires.
+    # Recheck server time at the actual authority decision point.
+    try:
+        current_invitation = parse_program_invitation(token)
+    except ValueError as error:
+        raise ClassroomDenied("Program invitation unavailable.") from error
+    if (current_invitation.organization_id != organization_id
+            or current_invitation.email != email):
+        raise ClassroomDenied("Program invitation unavailable.")
+    if _fresh(session, ClassroomProgram,
+              ClassroomProgram.organization_id == organization_id) is not None:
         raise ClassroomDenied("Program already provisioned.")
-    program = ClassroomProgram(organization_id=organization_id, owner_verifier_id=owner_id)
-    session.add(program)
-    session.flush()
-    grant = ClassroomRoleGrant(program_id=organization_id, verifier_id=owner_id,
-                               role="head_director", granted_by_verifier_id=actor_id)
-    session.add(grant)
-    session.flush()
-    _audit(session, organization_id, actor_id, "program_provisioned",
-           target_verifier_id=owner_id, new_owner_id=owner_id)
-    _audit(session, organization_id, actor_id, "role_granted",
-           target_verifier_id=owner_id, role_grant_id=grant.id)
-    return program
+
+    existing_id = session.scalar(select(TrustedVerifier.id).where(
+        TrustedVerifier.email == email))
+    if existing_id is None:
+        name = _name(display_name, 100)
+        adult = TrustedVerifier(email=email, display_name=name, pin_hash=hash_pin(pin))
+        try:
+            with session.begin_nested():
+                session.add(adult)
+                session.flush()
+        except IntegrityError as error:
+            raise ClassroomDenied("Account creation conflicted; use existing credentials.") from error
+
+    authenticated = authenticate_adult(session, email=email, pin=pin)
+    owner_id = _actor(session, authenticated)
+    return _create_program_for_adult(session, organization_id=organization_id,
+                                     actor_id=owner_id, owner_id=owner_id)
 
 
 @_mutation

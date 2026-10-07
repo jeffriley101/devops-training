@@ -3,44 +3,62 @@ Classroom R6 S1 implementation note
 
 Scope and release posture
 -------------------------
-S1 is an internal relationship foundation, disabled unless CLASSROOM_S1_ENABLED
-is exactly 1. No public routes, navigation, templates, browser sessions, middleware,
-email, payment services, PTA control, or student join operations are added. Schema
-installation does not enable Classroom. Existing free Director behavior never
-imports the service or tests its feature flag. Enabling the flag provides neither
-paid entitlement nor student reporting.
+S1 relationship management remains disabled unless CLASSROOM_S1_ENABLED is exactly
+1. Its narrow live v1 onboarding path allows Woodshed Site Admin to issue a signed,
+expiring Program invitation and the invited adult to accept it even while the S1
+management flag is off. Schema installation alone creates no Program or authority.
+Existing free Director behavior is unchanged; neither onboarding nor enabling the
+flag provides paid entitlement or student reporting.
 
-The current release lacks a generic email-ownership proof mechanism for new
-TrustedVerifier accounts. Direct new-email onboarding is therefore unavailable
-for live users. The implemented onboarding service only creates synthetic local
-identities, requiring an already credential-authenticated adult explicitly listed
-in server-side CLASSROOM_S1_PROVISIONER_IDS, CLASSROOM_S1_LOCAL_PROVISIONING=1,
-and an isolated /tmp/classroom-s1-*/... SQLite file or a literal loopback PostgreSQL
-URL with a classroom_s1_ database name. Provisioned addresses must use .test or
-.invalid, and Program provisioning verifies those synthetic actor/owner domains.
-These checks contain local provisioning;
-they do not constitute identity proof. No operator, account, or Program is seeded
-by the migration or normal startup. Real direct onboarding remains blocked on an
-approved independent proof mechanism, not a new student invitation requirement.
+Woodshed manually approves an exact existing Organization as a Music Program and
+sends the intended founding Owner / Head Director an email invitation. Site Admin
+sign-in and CSRF/origin checks authorize issuance; issuance creates no adult,
+Program, role, relationship, subscription, or session. The signed invitation binds
+its purpose, version, exact Organization ID, normalized invited email, and expiry.
+Opening the emailed link proves control of that mailbox, but GET alone creates
+nothing. A successful POST rechecks the invitation and unprovisioned Organization.
+An existing TrustedVerifier must enter its existing PIN; a new email must provide
+a display name and valid four-digit PIN to create a TrustedVerifier credential.
+The exact authenticated adult becomes canonical Owner and receives the founding
+Head Director grant in the same transaction as the Program and audit evidence.
+Replay after provisioning refuses. Failed email delivery creates no Program
+authority, and deliberate issuance may be retried.
+
+This proof does not establish legal identity, employment, school purchasing or
+billing authority, student-data consent, or parent authorization. No Class code,
+student enrollment, student relationship, trial, payment, entitlement, teaching
+assignment, or reporting capability follows from the invitation. Self-service
+school signup and stronger school verification remain optional later work.
+
+The synthetic local test service remains separately guarded. It requires an
+already credential-authenticated adult explicitly listed in server-side
+CLASSROOM_S1_PROVISIONER_IDS, CLASSROOM_S1_LOCAL_PROVISIONING=1, and an isolated
+/tmp/classroom-s1-*/... SQLite file or a literal loopback PostgreSQL URL with a
+classroom_s1_ database name. Provisioned addresses must use .test or .invalid,
+and Program provisioning verifies those synthetic actor/owner domains. These
+checks contain local provisioning; they do not constitute mailbox proof. No
+operator, account, or Program is seeded
+by the migration or normal startup.
 
 Identity and authentication
 ---------------------------
 Adults remain TrustedVerifier IDs; registered students remain WoodchuckProfile IDs.
 The service reuses validate_email, is_valid_pin, hash_pin, and existing
 authenticate_trusted_verifier. Existing email always requires its own credentials;
-onboarding cannot replace its hash/name or produce a login. A unique normalized
-email arbitrates concurrent creation. Creating a synthetic adult adds only that
-identity: no connection, profile, billing account, role, subscription, or consent.
+an invitation cannot replace its hash/name or claim its account. A unique normalized
+email arbitrates concurrent creation. Accepting with a new email creates only its
+credential, Program ownership, explicit founding Head Director role, and audit:
+no student connection, profile, billing account, subscription, or consent.
 
 AdultAuthentication is internal opaque evidence minted from current credentials,
 bound to its SQLAlchemy Session and outer transaction, with no client actor-ID or
 role adapter. Services recheck its credential hash against the database after
 Program lock waits. A caller must authenticate again after commit/rollback. A
 forged ID, Team Director capability, parent session, or child director emailed-link
-session cannot supply this evidence. No existing browser authentication changes.
-Future HTTP adapters require independent review of authentication, rate limiting,
-Origin/CSRF, strict inputs, feature gating and no-store behavior. Existing Origin
-middleware does not generally cover /trusted-verifiers; this patch adds no route.
+session cannot supply this evidence. The live acceptance path uses the existing
+adult credential rules and does not turn a matching email or display name into
+authentication. Its browser pages and mutation requests require the appropriate
+rate limiting, Origin/CSRF, strict inputs, and no-store handling.
 
 Physical relationships and constraints
 -------------------------------------
@@ -84,8 +102,9 @@ S1 has no service that writes student membership, so it cannot claim that workfl
 Authority operations and transactions
 ------------------------------------
 The caller owns commit/rollback. Every Program authority mutation and its success
-audit share a savepoint. New adult identity creation grants no Program authority
-and does not fabricate a Program-scoped audit or consumer billing membership. SQLite explicitly begins a physical transaction before that savepoint,
+audit share a savepoint. Synthetic-only adult identity creation by itself grants
+no Program authority and does not fabricate a Program-scoped audit or consumer
+billing membership. SQLite explicitly begins a physical transaction before that savepoint,
 so RELEASE cannot accidentally commit before the caller's outer rollback. SQLite
 writes require foreign_keys=ON; the shared application engine is not changed.
 SQLite is sequential local evidence, not a substitute for PostgreSQL row locks.
@@ -94,19 +113,33 @@ Management locks the Program first, then scoped Class/relationship/proposal rows
 Adult existence and credential reads are fresh but take no UPDATE row locks; S1
 authority operations never mutate credentials. This avoids shared adults causing
 cross-Program lock inversions; restrictive FKs retain the identity evidence.
-One outer transaction may mutate only one existing Program. Provisioning locks the preexisting Organization before creating
-its Program; it requires both authenticated local provisioner and exact founding
-adult evidence. The founding adult becomes Owner and receives an explicit Head
-Director grant only through this deliberate service, never by inference.
+One outer transaction may mutate only one existing Program. Provisioning locks the
+preexisting Organization before creating its Program. Synthetic provisioning
+requires both an authenticated local provisioner and exact founding adult evidence;
+live invitation acceptance requires a valid approved invitation and exact founding
+adult credential proof. The founding adult becomes Owner and receives an explicit
+Head Director grant only through this deliberate service, never by inference.
+Program, role, audit, and any new adult credential commit together or roll back
+together. PostgreSQL Organization locking serializes competing acceptances.
+
+The live provisioning audit names the authenticated founding adult as actor and
+target. It does not attribute an invitation to a student or invent a
+TrustedVerifier for the Site Admin. The current audit schema has no durable
+per-Program record naming the issuing Site Admin operator. The protected issuance
+route emits sanitized operational success/failure events and request correlation,
+without Program, email, or token data. Woodshed must retain its manual approval
+evidence separately; a later audit refinement may link that approval to a named
+operator and Program.
 
 PostgreSQL writes require READ COMMITTED; stronger snapshot isolation is rejected
 rather than allowing an old role snapshot after a lock wait. All authority checks
 use refreshed Program state and database role predicates following acquisition. Transfer proposals require the current authenticated
 Owner. Acceptance requires the exact recipient's independent credential evidence,
 locks/reloads the Program and proposal, and rechecks owner/version/status/recipient.
-A newer proposal supersedes the older one with an audit event. Pending proposals
-have no token or email mechanism and remain valid only while their owner version
-and pending status are current; S1 does not invent a timed public invitation flow.
+A newer proposal supersedes the older one with an audit event. Pending transfer
+proposals have no token or email mechanism and remain valid only while their owner
+version and pending status are current. Founding Program invitations cannot be
+used to transfer ownership.
 Acceptance atomically replaces the canonical Owner, advances its version, resolves
 the proposal and records old/new Owner audit references. Replays fail; no successful
 audit survives a failed or rolled-back transfer. Independently granted roles remain
@@ -196,14 +229,16 @@ VERIFY; merging a source fix does not update external operator installations.
 Coordinate their separately approved rollout before the schema upgrade so the
 due-boundary runtime fence retains a usable activation operator. Do not clear or
 move an approved stage to bypass it. This local compatibility patch does not
-authorize deployment, public enablement, onboarding or restoration.
+authorize deployment, public enablement or restoration. The separate live v1
+Program invitation mechanism does not authorize paid Classroom capabilities.
 
 Deferred contracts
 ------------------
-Open S1 prerequisite: an approved independent identity-proof mechanism for live
-direct adult onboarding. Synthetic provisioning does not satisfy that proof.
-Real Program-provisioning authorization also remains unresolved. Neither this
-compatibility patch nor schema installation supplies those approvals.
+Live v1 onboarding uses manually approved Site Admin issuance plus emailed mailbox
+proof and adult credentials. The proof deliberately stops short of identity,
+employment, purchasing, and student-data authority. A future self-service or
+school-verification workflow can be considered separately. This local slice does
+not claim deployment or full R6 readiness.
 S2: entitlements, trials, packages,
 codes/joining, enrollment/hold/departure workflows and account reconciliation.
 S3: separately approved student capability/reporting/history authorization; no

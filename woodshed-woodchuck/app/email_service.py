@@ -75,6 +75,32 @@ def build_message(*, to_email: str, subject: str, plain_text: str, html_body: st
 
 
 class EmailService:
+    def send_program_invitation(self, *, recipient: str, acceptance_url: str) -> DeliveryResult:
+        """Send the private link for a Woodshed-approved founding director."""
+        if self.config is None:
+            return DeliveryResult(False, "not_configured")
+        plain = (
+            "Woodshed Woodchuck\n\n"
+            "Woodshed has invited you to become the founding Head Director of a Music Program.\n"
+            f"Accept the invitation: {acceptance_url}\n\n"
+            "This private link expires in seven days. If you already have a Trusted Verifier "
+            "account, use its existing PIN. Otherwise, create your adult credential when you accept.\n"
+            "Please do not forward this link."
+        )
+        safe_url = html.escape(acceptance_url, quote=True)
+        body = (
+            "<h1>Woodshed Woodchuck</h1>"
+            "<p>Woodshed has invited you to become the founding Head Director of a Music Program.</p>"
+            f'<p><a href="{safe_url}">Accept the invitation</a></p>'
+            "<p>This private link expires in seven days. If you already have a Trusted Verifier "
+            "account, use its existing PIN. Otherwise, create your adult credential when you accept.</p>"
+            "<p>Please do not forward this link.</p>"
+        )
+        return self.send(build_message(
+            to_email=recipient, subject="Your Woodshed Music Program invitation",
+            plain_text=plain, html_body=body, config=self.config,
+        ))
+
     def send_membership_invitation(self, *, recipient: str, acceptance_url: str) -> DeliveryResult:
         if self.config is None:
             return DeliveryResult(False, "not_configured")
