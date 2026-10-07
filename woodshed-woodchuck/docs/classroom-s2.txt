@@ -1,0 +1,204 @@
+Classroom R6 S2 — entitlement, entry codes and registered membership
+==================================================================
+Local implementation only. Enable CLASSROOM_S1_ENABLED=1 and
+CLASSROOM_S2_ENABLED=1 after installing c23class001 with compatible operator code.
+Neither flag provisions or bills anything. S3 reporting/student feature grants,
+S4 Guest Classroom, S5 recovery ledger and R7 dashboards/games remain unavailable.
+
+Boundaries
+----------
+Music Program, Class, Team, testing cohort, Connected Student, consumer membership,
+personal/tester Full Access, Classroom entitlement and student reporting authority
+remain distinct. S2 writes only Classroom records. It never creates Team/PTA or
+Connected Student relationships, consumer seats, cohort provenance, Guest identity,
+verification, XP, contest qualification or personal access. Program A cannot supply
+Program B access. student_has_full_access, ordinary Arcade/Pristine, Insights and
+premium appearance keep their existing definitions. contribution_active is only an
+S2 relationship decision: it is not a reporting, game, verification or privacy grant.
+No protected student roster or historical paid dashboard is exposed.
+
+Entitlement
+-----------
+classroom_s2.entitlement_decision is provider-independent and returns allowed,
+reason, source, entitlement ID and working allowances. It never reads Stripe state.
+The current Owner or an explicitly active Head Director deliberately starts the
+Program's one ordinary trial. Server time starts exactly 14 days; the ending instant
+is excluded. No card, checkout, payment method, payment call or automatic charge.
+A partial unique database index and Program lock prevent a second trial, including
+after expiry, code rotation, Classes, archive/reactivate or ownership transfer.
+
+Only existing Site Admin authentication may approve/change/end an institutional
+arrangement. This does not manufacture an adult verifier. The record stores the
+site-admin credential fingerprint, bounded internal case reference, effective finite
+period, status and explicit allowances. Fingerprints identify the configured admin
+credential; retain the operator's approval record separately. Replacement ends the
+old record and appends a new one, with audits in the same transaction. No public
+billing UI or billing role activation exists. Active institutional terms take
+precedence over an ordinary trial. A remaining valid trial may continue when an
+institutional arrangement ends. Time expiry stops S2 contribution automatically;
+it never deletes Classes, memberships, periods or personal/Connected relationships.
+
+Allowances and locking
+----------------------
+CLASSROOM_ACTIVE_CLASS_LIMIT defaults to 10; CLASSROOM_TEACHING_DIRECTOR_LIMIT
+defaults to 2. These are centrally configurable working defaults copied into each
+trial, not public pricing promises. Explicit institutional allowances are approved
+package records (0 through 10000); changing default environment values does not
+rewrite existing approvals.
+
+Active Classes count whether enrollment is open or closed. Archived/unactivated
+Classes do not count. Codes do not count. Teaching usage is the distinct adults with
+started, open teaching assignments to active Classes in that exact Program. Multiple
+assignments count once; Owner/Admin/Billing alone count zero. Archiving stops that
+Class's teaching contribution, but retains assignments. Reactivation checks both
+Class capacity and the projected union of active teaching adults, preventing an
+archive/reactivate bypass. Ending teaching and archiving remain available while
+expired/over limit. Activating a Class/teacher, opening enrollment, issuing codes,
+joining and reinstating require valid access and reconciled usage. Reducing a package
+never deletes data or chooses surviving Classes. If usage is over either limit, new
+paid operations refuse until an authorized adult reduces usage.
+
+All writers use S1 savepoints inside the caller-owned transaction. PostgreSQL READ
+COMMITTED is required. Lock order is Program -> Class -> scoped relationships.
+Student authorization additionally follows existing consent -> profile ordering;
+S2 takes no PTA or season locks. Stable membership anchors serialize periods; all
+Classroom writers for a Program share its Program lock. Account eligibility and
+server expiry are checked again after account lock waits. Audit failure rolls back
+the corresponding change even if a caller subsequently commits. SQLite needs
+foreign_keys=ON and is sequential test evidence, not concurrency evidence.
+
+Codes
+-----
+Program plus normalized current code identifies one Class. Manual and QR-derived
+text must use the same normalize_code function and POST entry interface. Accepted
+codes are 6–24 ASCII A–Z or 0–9. Only ASCII spaces around the text are trimmed;
+ASCII letters are uppercased. Controls (including tab/newline), non-ASCII characters,
+internal spaces and separators are rejected before case conversion. Raw input is
+bounded to 64 characters. No separate QR interpretation or URL token is accepted.
+
+Preferred codes are supported. Generated codes contain ten cryptographically random
+characters from ABCDEFGHJKLMNPQRSTUVWXYZ23456789; collision retries are bounded at
+eight. Store only a purpose-separated HMAC-SHA256 digest including Program scope,
+derived from the existing session secret. Changing that secret requires fresh code
+issuance. Different Programs may use the same visible text; same-Program current
+collisions refuse/retry. Partial unique indexes protect one current code per Class
+and Program/current digest. Historical generations retain issuance/revocation actor
+and timestamps. Rotation atomically revokes the old generation and creates a new
+one without changing Class IDs or using another Class slot. Preferred rotation to
+the currently active text refuses. Visible codes are returned once to the authorized
+issuer, never stored, included in audit or logged. There is no plaintext recovery.
+
+Class lifecycle
+---------------
+New S2 Classes are active/open. Existing S1 Classes have no S2 state until explicitly
+activated, which rechecks entitlement and both capacities. Active/closed preserves
+membership contribution and Class slot but rejects new code joins. Archive closes
+enrollment, revokes current entry authority, frees the slot and stops contribution;
+relationships and histories remain. Reactivate uses the same Class ID, rechecks both
+capacities, starts closed and requires explicit fresh code issuance plus enrollment
+opening. Holds persist. No lifecycle action grants reporting.
+
+Registered joining and account handoff
+-------------------------------------
+The existing registered WoodchuckProfile and authenticated student session/PIN are
+required. Eligible students with current Program and code auto-join without routine
+director approval. They can join multiple Classes. The same Class/student anchor is
+reused for retries and rejoining, with at most one current period.
+
+S2 does not create pending accounts or alter their parent authorization protocol.
+An already registered account awaiting age/parent authorization may prepare a
+purpose-specific signed entry intent. It binds that account, credential/session
+version, Program, Class, exact code ID/generation and a 30-minute server expiry.
+It contains no parent payload and grants no account eligibility, parent consent,
+reporting or director approval. Preparation authenticates the account but does not
+create membership. The minimal form displays the intent for explicit finish; it
+never mutates existing KWS signatures, C001 tokens or pending-consent records.
+
+Final entry rechecks current code generation, active/open Class, entitlement,
+capacity, account status/age/consent, credential binding and administrative hold.
+Rotated/expired intent refuses. Completed account/parent authorization remains
+independent: enter the current code to join without repeating that authorization.
+Reset credentials/session invalidate old intents. New unregistered/Guest accounts
+must finish the existing account flow and then enter the current Class code.
+
+Membership lifecycle
+--------------------
+ClassroomStudentMembership remains the unique stable Class/student anchor.
+ClassroomMembershipPeriod retains active/held period history. Voluntary leave closes
+an active period with departed reason. A subsequent valid join opens a new period.
+Suspend/remove explicitly closes the period with changed reason and stores a durable
+hold with conduct/admin_removal reason, actor/time and suspended/removed state.
+Code entry cannot clear that hold. Leave cannot clear a legacy S1 held segment.
+Explicit Owner/Admin reinstatement checks current account, active Class, Program
+entitlement and allowances, releases the hold and opens a new period; it grants no
+unrelated permission. Reinstatement may occur while enrollment is closed because it
+is an explicit administrative action, not a code join. The audit preserves every
+hold/release transition even when the current hold row is reused.
+
+The writer rejects overlapping/corrupt historical periods. c23 adds SQLite INSERT/
+UPDATE overlap triggers and a PostgreSQL trigger locking Program/Class/anchor before
+checking all intervals. Existing one-open-period uniqueness remains. Zero-duration
+closure is refused with a retry message rather than inventing future time. Archive
+and expiry stop contribution without rewriting periods or deleting history.
+
+Authority and audit
+-------------------
+Operation                         Owner  Head Director  Admin  Code manager  Billing  Teacher  Student  Site Admin
+Trial start                       yes    yes            no     no            no       no       no       no
+Class/enrollment/teaching manage   yes    no             yes    no            no       no       no       no
+Code issue/rotate                 yes    no             yes    yes           no       no       no       no
+Suspend/remove/reinstate          yes    no             yes    no            no       no       no       no
+Own Class join/leave              no     no             no     no            no       no       yes      no
+Institutional terms               no     no             no     no            no       no       no       yes
+Reporting/student feature grants  no     no             no     no            no       no       no       no
+
+Roles combine only through explicit S1 grants; a teacher can end their own teaching
+via the preserved S1 departure service. Connected Student relationships confer no
+Classroom administration. Every action checks the exact Program and Class scope.
+Adult controls reauthenticate existing verifier credentials and use login limits.
+The minimal interfaces use existing signed/revocable sessions, strict origin and
+CSRF checks, no-store and no-referrer responses. No new universal auth system.
+
+S1 audit retains role/teaching/ownership operations. The separate narrow S2 audit
+retains trial/institutional, Class/enrollment, code and student lifecycle actions,
+exactly one verifier/student/site-admin actor, Program/Class/student/membership and
+relevant entitlement/code references, fixed reasons and timestamps. No raw code,
+PIN, token, parent payload or student practice data. This is not S5 recovery/replay.
+
+Minimal local interfaces
+------------------------
+/classroom/manage: trial, Class lifecycle, enrollment, code, teaching and hold controls.
+/classroom/entry: registered join, optional pending authorization intent, finish, leave.
+/admin/classroom/entitlement: internal Site Admin approval/replacement/end controls.
+These explicit-ID controls prove S2. They are not My Classes, roster reporting,
+analytics, package sales, checkout, games or Guest Classroom.
+
+Migration and operators
+-----------------------
+Single additive head c23class001 follows c22class001. No old migration is rewritten.
+Five S2 tables start empty; no entitlement, code, state or membership is backfilled.
+S1 data is preserved. Upgrade refuses preexisting overlapping membership history.
+Downgrade refuses any used S2 table or existing membership periods, so it cannot
+remove live authority/history or their overlap protection. An unused schema can
+return to c22. Do not downgrade a used S2 database to work around an operator guard.
+
+Compatible calendar/PTA operators support installed p21team001, c22class001 and
+c23class001 only after their exact structural validators pass. c23 additionally
+validates every new column/type/nullability, constraints, indexes and overlap-trigger
+body/enabled state. A c23 stamp alone is insufficient. PTA PLAN records the installed
+revision; the p21 authority contract remains immutable. Previously staged p21/c22
+plans and original activation receipts retain their hashes and verification behavior
+across additive upgrades when all protected evidence remains unchanged. Unstaged
+older APPLY refuses revision drift and requires a newly generated/approved plan.
+Historical repair restrictions, exact receipt checks, due-boundary protections,
+retired commands and no-bypass behavior remain. Roll out compatible operator code
+before any separately authorized schema upgrade; this patch performs no rollout.
+See persistent-team-cutover.md and contest-week-provisioning.md for exact contracts.
+
+Validation evidence
+-------------------
+Synthetic-only SQLite and loopback PostgreSQL tests cover service and HTTP entry,
+migration preservation/downgrade, schema guards, immutable PTA artifacts and actual
+pg_blocking_pids-observed races. Detailed commands, results, retries and failures are
+retained outside the repository in /tmp/classroom-s2-evidence. No Production data,
+secrets, external payment/parent calls, deployment or activation is part of S2 work.

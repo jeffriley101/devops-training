@@ -31,7 +31,7 @@ from tests.test_persistent_team_migration import disposable_sqlite_configuration
 from tests.test_team_families import disposable_url
 
 
-REVISIONS = ("p21team001", "c22class001")
+REVISIONS = ("p21team001", "c22class001", "c23class001")
 CLASSROOM_TABLES = {
     "classroom_programs", "classroom_role_grants", "classroom_classes",
     "classroom_teaching_assignments", "classroom_student_memberships",
@@ -44,12 +44,13 @@ def all_rows(engine):
     """Separate preservation evidence includes every installed application table."""
     with engine.connect() as connection:
         metadata = MetaData()
-        tables = [Table(name, metadata, autoload_with=connection, resolve_fks=False)
-                  for name in inspect(connection).get_table_names()
-                  if name != "alembic_version"]
+        # Batch reflection is fresh on every snapshot, including damaged DDL.
+        # Per-table reflection repeatedly scans the growing PostgreSQL catalogs.
+        metadata.reflect(bind=connection, resolve_fks=False,
+                         only=lambda name, _metadata: name != "alembic_version")
         return {table.name: cutover.normalized([dict(row) for row in connection.execute(
             select(table).order_by(*table.primary_key.columns)).mappings()])
-                for table in tables}
+                for table in metadata.tables.values()}
 
 
 def populate_classroom(engine, identity=None):
@@ -110,11 +111,48 @@ def migrated_db(request, tmp_path, monkeypatch):
 
 
 def install_revision(db, revision):
-    if revision == "c22class001":
-        command.upgrade(config(), revision)
+    if revision in {"c22class001", "c23class001"}:
+        command.upgrade(config(), "c22class001")
         populate_classroom(db[1])
+        if revision == "c23class001":
+            command.upgrade(config(), revision)
+            populate_classroom_s2(db[1])
     with db[1].connect() as connection:
         assert connection.scalar(text("SELECT version_num FROM alembic_version")) == revision
+
+
+
+def populate_classroom_s2(engine):
+    """All five S2 tables contain synthetic preservation evidence."""
+    from app import classroom_models as cm
+    from app.operator_classroom_s2_contract import C23
+    with Session(engine) as session:
+        program = session.scalar(select(m.ClassroomProgram))
+        room = session.scalar(select(m.ClassroomClass))
+        membership = session.scalar(select(m.ClassroomStudentMembership))
+        entitlement = cm.ClassroomEntitlement(program_id=program.organization_id,
+            source="institutional", status="active", starts_at=NOW,
+            ends_at=NOW + timedelta(days=365), class_limit=10, teacher_limit=2,
+            approved_by_admin="synthetic-local-admin", provenance="operator-preservation")
+        code = cm.ClassroomEntryCode(program_id=program.organization_id, class_id=room.id,
+            generation=1, digest="a" * 64, is_current=True,
+            issued_by_verifier_id=program.owner_verifier_id)
+        session.add_all([entitlement, code,
+            cm.ClassroomClassState(program_id=program.organization_id, class_id=room.id,
+                state="active", enrollment_open=True,
+                changed_by_verifier_id=program.owner_verifier_id),
+            cm.ClassroomMembershipHold(membership_id=membership.id, state="suspended",
+                reason="conduct", held_at=NOW - timedelta(days=1), released_at=NOW,
+                held_by_verifier_id=program.owner_verifier_id,
+                released_by_verifier_id=program.owner_verifier_id)])
+        session.flush()
+        session.add(cm.ClassroomS2AuditEvent(program_id=program.organization_id,
+            class_id=room.id, profile_id=membership.profile_id, membership_id=membership.id,
+            actor_verifier_id=program.owner_verifier_id, action="student_reinstated",
+            entitlement_id=entitlement.id, code_id=code.id))
+        session.commit()
+    rows = all_rows(engine)
+    assert all(rows[name] for name in C23)
 
 
 def set_clock(monkeypatch, at):
@@ -148,7 +186,7 @@ def test_migrated_plan_stage_activate_verify_preserves_full_data(
     monkeypatch.setattr(cutover.inventory, "readonly_connection", enforced_readonly)
     approved = plan(db)
     assert approved["content"]["revision"] == revision
-    if revision == "c22class001":
+    if revision != "p21team001":
         assert approved["content"]["pta_contract_revision"] == "p21team001"
     assert cutover.digest(approved["content"]) == approved["plan_sha256"]
     assert all_rows(db[1]) == before

@@ -27,6 +27,19 @@ def config():
     return Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
 
 
+def c22_metadata():
+    """Keep this explicit historical-head test independent of additive S2."""
+    s2_tables = {
+        "classroom_entitlements", "classroom_class_states", "classroom_entry_codes",
+        "classroom_membership_holds", "classroom_s2_audit_events",
+    }
+    expected = MetaData()
+    for table in Base.metadata.sorted_tables:
+        if table.name not in s2_tables:
+            table.to_metadata(expected)
+    return expected
+
+
 def legacy_snapshot(connection):
     """Compare every old table, ID, value and evidence row, not selected counts."""
     from app.persistent_team_cutover import normalized
@@ -85,11 +98,12 @@ def add_identity_and_personal_history(engine):
 
 
 def free_paths_without_classroom_queries(engine, monkeypatch, *, staged=False):
-    from app import main, team_authority, verifier_routes
+    from app import main, session_revocations, team_authority, verifier_routes
     from app.memberships import student_has_full_access
     factory = sessionmaker(engine, expire_on_commit=False)
     monkeypatch.setattr(main, "SessionLocal", factory)
     monkeypatch.setattr(verifier_routes, "SessionLocal", factory)
+    monkeypatch.setattr(session_revocations, "SessionLocal", factory)
     monkeypatch.delenv("CLASSROOM_S1_ENABLED", raising=False)
     statements = []
     instant = NOW
@@ -195,7 +209,7 @@ def test_populated_upgrade_preserves_free_paths_and_pta_operator_compatibility(t
             assert len(classroom_tables) == 8
             for name in classroom_tables:
                 assert connection.scalar(text(f"SELECT count(*) FROM {name}")) == 0
-            assert compare_metadata(MigrationContext.configure(connection), Base.metadata) == []
+            assert compare_metadata(MigrationContext.configure(connection), c22_metadata()) == []
             if backend == "sqlite":
                 assert list(connection.execute(text("PRAGMA foreign_key_check"))) == []
         # Installation approval is separate from the immutable plan contract.
@@ -258,7 +272,8 @@ def test_populated_upgrade_preserves_free_paths_and_pta_operator_compatibility(t
 
 def test_only_additive_classroom_revision_follows_verified_release_chain():
     script = ScriptDirectory.from_config(config())
-    assert script.get_heads() == ["c22class001"]
+    assert script.get_heads() == ["c23class001"]
+    assert script.get_revision("c23class001").down_revision == "c22class001"
     assert script.get_revision("c22class001").down_revision == "p21team001"
     assert script.get_revision("p21team001").down_revision == "p20team001"
     assert script.get_revision("p20team001").down_revision == "f19arcade001"

@@ -124,7 +124,7 @@ def test_existing_login_is_limited_and_keeps_history_balance_and_rewards(age_db,
     assert c.get('/guest').status_code==200
 
 WRITES=[('put','/account/state',{'account':{'woodchuckId':'WC-AGE-A','serverRevision':7},'progress':{'credits':99999}}),
-    ('post','/practice-charts',{'practice_date':str(date.today()),'minutes':10,'note':'synthetic'}),
+    ('post','/practice-charts',{'practice_date':str(date.today()),'minutes':10,'note':'synthetic','submission_key':'synthetic-age-gate'}),
     ('post','/practice-charts/pristine',{'detected_playing_seconds':60,'submission_key':'synthetic-age'}),
     ('post','/arcade/plays',{'game_key':'blue','request_id':uuid4().hex}),
     ('post','/arcade/plays/fake-token/complete',{'score':100}),
@@ -268,7 +268,7 @@ def test_recorded_ineligible_cannot_use_sharing_or_rewards(age_db,band):
     with age_db() as s:declare_age(s,1,band);s.commit()
     c=TestClient(app);login(c);before=counts(age_db)
     assert c.post('/trusted-verifiers/invitations',data={'email':'adult@example.test','role':'verifier'}).status_code==403
-    assert c.post('/practice-charts',json={'practice_date':str(date.today()),'minutes':10,'note':'synthetic'}).status_code==403
+    assert c.post('/practice-charts',json={'practice_date':str(date.today()),'minutes':10,'note':'synthetic','submission_key':'synthetic-age-cleared'}).status_code==403
     assert c.post('/account/login-streak').status_code==403
     assert counts(age_db)==before
 

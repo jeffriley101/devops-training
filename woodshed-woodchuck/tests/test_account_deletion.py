@@ -11,7 +11,7 @@ from sqlalchemy.pool import StaticPool
 
 from tests.team_factory import make_team
 
-from app import account_routes, main as main_module, verifier_routes
+from app import account_routes, main as main_module, session_revocations, verifier_routes
 from app.account_deletion import DELETED_PUBLIC_NAME, anonymize_woodchuck_account
 from app.accounts import create_woodchuck_profile, normalize_woodchuck_id, retired_identifier_hash
 from app.account_routes import SESSION_PROFILE_ID, SESSION_PROFILE_VERSION
@@ -40,6 +40,7 @@ def deletion_db(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(account_routes, "SessionLocal", factory)
     monkeypatch.setattr(main_module, "SessionLocal", factory)
     monkeypatch.setattr(verifier_routes, "SessionLocal", factory)
+    monkeypatch.setattr(session_revocations, "SessionLocal", factory)
     return factory
 
 

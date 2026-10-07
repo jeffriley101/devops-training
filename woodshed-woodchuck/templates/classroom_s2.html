@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="panel">
+<h1>Classroom controls</h1>
+<p>Classroom membership does not grant reports, personal Full Access, or games.</p>
+{% if result %}<dl>{% for key, value in result.items() %}<dt>{{ key }}</dt><dd>{{ value }}</dd>{% endfor %}</dl>{% endif %}
+{% macro common(adult=false) %}
+<input type="hidden" name="csrf" value="{{ csrf }}">
+<label>Music Program ID <input name="program_id" type="number" min="1" required></label>
+{% if adult %}<label>Adult email <input name="email" type="email" autocomplete="username" required></label><label>PIN <input name="pin" type="password" inputmode="numeric" autocomplete="current-password" required></label>{% endif %}
+{% endmacro %}
+{% if mode == 'adult' %}
+<p>The Owner or Head Director may deliberately start the Program’s one 14-day trial. No card or automatic charge. Class records remain after expiry.</p>
+<form action="/classroom/manage/trial" method="post">{{ common(true) }}<button>Start Program trial</button></form>
+<form action="/classroom/manage/create" method="post">{{ common(true) }}<label>Class name <input name="display_name" maxlength="150" required></label><button>Create active Class</button></form>
+{% for action, label in [('archive','Archive Class'),('reactivate','Reactivate Class (closed; issue a fresh code)'),('open','Open enrollment'),('close','Close enrollment'),('code','Issue or rotate code')] %}
+<form action="/classroom/manage/{{ action }}" method="post">{{ common(true) }}<label>Class ID <input name="class_id" type="number" min="1" required></label>
+{% if action == 'code' %}<label>Preferred code (optional; 6–24 ASCII letters or digits) <input name="preferred" maxlength="24" autocomplete="off"></label><p>Copy the issued code now. Rotation invalidates the previous generation.</p>{% endif %}<button>{{ label }}</button></form>
+{% endfor %}
+{% for action in ['suspend','remove','reinstate'] %}
+<form action="/classroom/manage/{{ action }}" method="post">{{ common(true) }}<label>Class ID <input name="class_id" type="number" min="1" required></label><label>Membership ID <input name="membership_id" type="number" min="1" required></label>{% if action != 'reinstate' %}<label>Reason <select name="reason"><option value="conduct">Conduct</option><option value="admin_removal">Administrative removal</option></select></label>{% endif %}<button>{{ action | capitalize }} membership</button></form>
+{% endfor %}
+<form action="/classroom/manage/teach" method="post">{{ common(true) }}<label>Class ID <input name="class_id" type="number" min="1" required></label><label>Teaching adult ID <input name="verifier_id" type="number" min="1" required></label><button>Assign teacher</button></form>
+<form action="/classroom/manage/end-teaching" method="post">{{ common(true) }}<label>Assignment ID <input name="assignment_id" type="number" min="1" required></label><button>End teaching assignment</button></form>
+{% elif mode == 'student' %}
+<p>Join using your registered student account. Existing account and parent authorization remain required.</p>
+{% for action, label in [('join','Join Class'),('prepare','Save entry while completing account authorization')] %}<form action="/classroom/entry/{{ action }}" method="post">{{ common() }}<label>Class code <input name="code" maxlength="64" autocomplete="off" required></label><button>{{ label }}</button></form>{% endfor %}
+<form action="/classroom/entry/finish" method="post">{{ common() }}<label>Saved entry <input name="intent" autocomplete="off" required></label><button>Finish Class entry</button></form>
+<form action="/classroom/entry/leave" method="post">{{ common() }}<label>Class ID <input name="class_id" type="number" min="1" required></label><button>Leave Class</button></form>
+{% elif mode == 'admin' %}
+<p>Internal institutional approval only. Working allowances are not public pricing.</p>
+<form action="/admin/classroom/entitlement" method="post">{{ common() }}
+<label>Effective start (ISO timestamp with UTC offset) <input name="starts_at" required></label>
+<label>Effective end (ISO timestamp with UTC offset) <input name="ends_at" required></label>
+<label>Active Class allowance <input name="class_limit" type="number" min="0" max="10000" required value="10"></label>
+<label>Teaching director allowance <input name="teacher_limit" type="number" min="0" max="10000" required value="2"></label>
+<label>Internal approval reference <input name="provenance" pattern="[A-Za-z0-9_-]{3,80}" required></label>
+<label>Status <select name="status"><option value="active">Approve or replace arrangement</option><option value="ended">End current arrangement</option></select></label>
+<button>Record institutional decision</button></form>
+{% endif %}
+</section>
+{% endblock %}

@@ -1,6 +1,7 @@
 """Verifier and Band Director permissions are per accepted student relationship."""
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
@@ -86,7 +87,7 @@ def test_other_roles_cannot_select_verifier_snapshot(roster_db, role):
     assert [row["id"] for row in connections] == [connection]
     assert connections[0]["role"] == role
 
-@pytest.mark.parametrize("recipient_role", [None, "verifier", "band_director"])
+@pytest.mark.parametrize("recipient_role", [None, "verifier", "band_director", "parent"])
 def test_chart_recipient_enforced_on_post_and_notification(roster_db, monkeypatch, recipient_role):
     student = add_student(roster_db, "Student", role=recipient_role or "verifier")
     monkeypatch.setattr(practice_chart_routes, "SessionLocal", roster_db)
@@ -98,15 +99,20 @@ def test_chart_recipient_enforced_on_post_and_notification(roster_db, monkeypatc
         return DeliveryResult(True, "sent")
     monkeypatch.setattr(EmailService, "send_practice_chart", send)
     client = TestClient(main.app)
-    response = client.post("/practice-charts", json={"minutes": 10, "practice_date": "2026-09-09",
+    response = client.post("/practice-charts", json={"minutes": 10,
+                           "practice_date": datetime.now(ZoneInfo("America/Chicago")).date().isoformat(),
+                           "submission_key": f"relationship-recipient-{recipient_role or 'none'}",
                            "verifier_id": 1 if recipient_role else None})
-    assert response.status_code == (400 if recipient_role == "band_director" else 201)
+    # Existing ordinary director authority permits chart review; an arbitrary
+    # accepted adult relationship still does not become a chart reviewer.
+    authorized = recipient_role in {"verifier", "band_director"}
+    assert response.status_code == (400 if recipient_role == "parent" else 201), response.text
     with roster_db() as session:
         reviews = session.scalars(select(PracticeChartVerification)).all()
-        assert len(reviews) == (1 if recipient_role == "verifier" else 0)
-    assert len(deliveries) == (1 if recipient_role == "verifier" else 0)
-    if recipient_role != "band_director":
-        assert (response.json()["chart"]["verification"] is not None) == (recipient_role == "verifier")
+        assert len(reviews) == (1 if authorized else 0)
+    assert len(deliveries) == (1 if authorized else 0)
+    if recipient_role != "parent":
+        assert (response.json()["chart"]["verification"] is not None) == authorized
 
 @pytest.mark.parametrize("decision", ["approved", "rejected"])
 def test_verifier_review_and_disconnect_revocation(roster_db, decision):

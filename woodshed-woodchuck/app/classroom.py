@@ -370,6 +370,9 @@ def revoke_role(session, *, actor, program_id, grant_id):
 
 @_mutation
 def create_class(session, *, actor, program_id, display_name):
+    from . import classroom_s2
+    if classroom_s2.enabled():
+        return classroom_s2.create_class(session, actor=actor, program_id=program_id, display_name=display_name)
     program = _lock_program(session, program_id)
     actor_id = _authority(session, program, actor, admin=True)
     row = ClassroomClass(program_id=program_id, display_name=_name(display_name, 150))
@@ -398,6 +401,9 @@ def assign_teacher(session, *, actor, program_id, class_id, verifier_id):
             ClassroomTeachingAssignment.verifier_id == verifier_id,
             ClassroomTeachingAssignment.ended_at.is_(None))):
         raise ClassroomDenied("Teaching assignment already exists.")
+    from . import classroom_s2
+    if classroom_s2.enabled():
+        classroom_s2.check_teacher_addition(session, program_id, class_id, verifier_id)
     row = ClassroomTeachingAssignment(program_id=program_id, class_id=class_id,
                                      verifier_id=verifier_id, granted_by_verifier_id=actor_id)
     session.add(row)

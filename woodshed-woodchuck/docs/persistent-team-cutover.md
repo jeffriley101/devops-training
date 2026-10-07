@@ -18,7 +18,7 @@ membership authority. Current authority remains legacy until the separately
 reviewed boundary operation.
 
 The compatible calendar and PTA operators accept exactly one installed revision,
-`p21team001` or its reviewed additive extension `c22class001`. PLAN, APPLY,
+`p21team001`, `c22class001`, or the reviewed additive extension `c23class001`. PLAN, APPLY,
 ACTIVATE and VERIFY all retain structural validation; the installed stamp alone
 does not grant access. Existing required columns, staging/authority checks,
 partial unique indexes, restrictive origin-season foreign keys and exact
@@ -27,15 +27,18 @@ requires all eight Classroom tables with their required column types/nullability
 primary keys, CHECK constraints, restrictive foreign keys (including composite
 scope), unique constraints and indexes with their partial predicates. Older or
 unknown revisions, arbitrary descendants, multiple heads, missing revision rows,
-and incomplete or falsely stamped c22 schemas refuse. There is no bypass flag.
+and incomplete or falsely stamped c22/c23 schemas refuse. C23 also requires the
+five exact S2 tables, approved column defaults and owned serial sequences,
+exact indexes/FK options (including SQLite objects omitted by reflection), and
+enforced membership interval guards. There is no bypass flag.
 
 This support is independent of Classroom enablement. `c22class001` installs empty
 disabled relationship tables without selecting PTA authority or changing existing
 rows. Historical `team_preflight`/`team_continuity_repair` keep their separate
-`d17contest001` restriction and refuse p21 and c22; `team_activate` stays retired.
+`d17contest001` restriction and refuse p21, c22, and c23; `team_activate` stays retired.
 
-Compatible operator code must be available **before upgrading a staged p21
-database to c22**. An old pinned binary still refuses c22, including ACTIVATE and
+Compatible operator code must be available **before upgrading a staged p21/c22
+database to c23**. An old pinned binary still refuses newer revisions, including ACTIVATE and
 VERIFY, while the due-boundary runtime fence can remain active. A source fix alone
 does not update separately installed operator binaries. Coordinate their approved
 rollout before the schema upgrade; do not clear the stage or move the boundary to
@@ -116,26 +119,27 @@ and cleartext codes are not exported. PLAN uses repeatable-read/read-only
 PostgreSQL or a query-only existing SQLite file; it has no writable fallback.
 
 An installed revision and an immutable plan's PTA contract are separate facts.
-New p21 plans keep their existing format. New c22 plans record
-`content.revision = c22class001` and
+New p21 plans keep their existing format. New c22/c23 plans record
+`content.revision` as their actual installed revision and
 `content.pta_contract_revision = p21team001`; they do not claim that the installed
 schema is p21. The original canonical hash, exact selected IDs, database/schema
 target and authority fingerprint remain the approval. Compatibility does not
 authorize editing the approved file or substituting a fresh hash.
 
-| Approved artifact | Compatible operator behavior after an additive p21 -> c22 migration |
+| Approved artifact | Compatible operator behavior after additive p21 -> c22 -> c23 migrations |
 | --- | --- |
-| Unstaged p21 plan supplied to APPLY | Refuse `plan_schema_revision_changed` before writes; create a new c22 PLAN and obtain fresh approval. |
-| Exact p21 plan already staged on p21 | ACTIVATE and immediate VERIFY retain its original file, hash, boundary and stored stage if approved authority and all existing checks pass. |
-| Activation and receipt already created on p21 | VERIFY accepts the original plan/hash/receipt only if actual activation and every originally protected evidence row remain exactly unchanged. |
-| New c22 plan | PLAN -> APPLY -> ACTIVATE -> VERIFY uses the same exact-ID approval, target, acknowledgments, boundary, locking and rollback requirements as p21. |
+| Unstaged plan from an earlier revision supplied to APPLY | Refuse `plan_schema_revision_changed` before writes; create a PLAN on the installed revision and obtain fresh approval. |
+| Exact p21/c22 plan already staged on its original revision | ACTIVATE and immediate VERIFY retain its original file, hash, boundary and stored stage if approved authority and all existing checks pass. |
+| Activation and receipt already created on p21/c22 | VERIFY accepts the original plan/hash/receipt only if actual activation and every originally protected evidence row remain exactly unchanged. |
+| New c22/c23 plan | PLAN -> APPLY -> ACTIVATE -> VERIFY uses the same exact-ID approval, target, acknowledgments, boundary, locking and rollback requirements as p21. |
 
 Existing receipts retain their original protected-table coverage. They do not
 retroactively attest to Classroom tables installed later. Compatible APPLY and
-ACTIVATE separately snapshot and compare all eight Classroom tables within their
+ACTIVATE separately snapshot and compare all installed Classroom tables within their
 mutation transactions and roll back an unexpected change; ordinary calendar apply
 does the same. This preservation evidence does not rewrite a plan, stored stage
-or receipt, and operator actions grant no Classroom authority or access.
+or receipt, and operator actions grant no Classroom authority or access. A newer
+plan cannot be used on an older schema; no downgrade or revision bypass is added.
 
 Boundary revalidation distinguishes approved authority from ordinary new earning
 activity. A change to identity, ownership, moderation, membership,

@@ -7,7 +7,7 @@ silently erase ownership, revocation, or audit evidence.
 from datetime import datetime, timezone
 
 from sqlalchemy import (
-    CheckConstraint, DateTime, ForeignKey, ForeignKeyConstraint, Index, Integer,
+    Boolean, CheckConstraint, DateTime, ForeignKey, ForeignKeyConstraint, Index, Integer,
     String, UniqueConstraint, func, text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
@@ -132,7 +132,7 @@ class ClassroomTeachingAssignment(Base):
 
 
 class ClassroomStudentMembership(Base):
-    """Stable anchor only: no join API, entitlement, consent, or reporting grant."""
+    """Stable Class/student anchor; never entitlement, consent or reporting."""
 
     __tablename__ = "classroom_student_memberships"
     __table_args__ = (
@@ -152,10 +152,10 @@ class ClassroomStudentMembership(Base):
 
 
 class ClassroomMembershipPeriod(Base):
-    """Future enrollment services must lock the anchor and reject all overlaps.
+    """Enrollment writers lock Program/Class/anchor before changing periods.
 
-    A held segment is still a membership; a departed segment has ended. S1 only
-    supplies the structure and never writes membership through a runtime service.
+    c23 additionally enforces non-overlap through database triggers. Explicit
+    holds use ClassroomMembershipHold; closing a period preserves its history.
     """
 
     __tablename__ = "classroom_membership_periods"
@@ -291,3 +291,164 @@ class ClassroomAuditEvent(Base):
     occurred_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_now, server_default=func.now(), nullable=False,
     )
+
+
+class ClassroomEntitlement(Base):
+    """Program-only access; independent of consumer billing and student benefits."""
+
+    __tablename__ = "classroom_entitlements"
+    __table_args__ = (
+        UniqueConstraint("id", "program_id", name="uq_classroom_entitlement_scope"),
+        CheckConstraint("source IN ('trial', 'institutional')", name="ck_classroom_entitlement_source"),
+        CheckConstraint("status IN ('active', 'ended')", name="ck_classroom_entitlement_status"),
+        CheckConstraint("ends_at > starts_at", name="ck_classroom_entitlement_dates"),
+        CheckConstraint("class_limit >= 0 AND teacher_limit >= 0", name="ck_classroom_entitlement_limits"),
+        CheckConstraint("length(trim(provenance)) BETWEEN 1 AND 100", name="ck_classroom_entitlement_provenance"),
+        CheckConstraint(
+            "(source = 'trial' AND approved_by_verifier_id IS NOT NULL AND approved_by_admin IS NULL) OR "
+            "(source = 'institutional' AND approved_by_verifier_id IS NULL AND approved_by_admin IS NOT NULL)",
+            name="ck_classroom_entitlement_approval",
+        ),
+        CheckConstraint(
+            "(status = 'active' AND ended_at IS NULL) OR (status = 'ended' AND ended_at IS NOT NULL)",
+            name="ck_classroom_entitlement_end",
+        ),
+        Index("uq_classroom_entitlement_trial", "program_id", unique=True,
+              sqlite_where=text("source = 'trial'"), postgresql_where=text("source = 'trial'")),
+        Index("ix_classroom_entitlement_program", "program_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    program_id: Mapped[int] = mapped_column(ForeignKey("classroom_programs.organization_id", ondelete="RESTRICT"), nullable=False)
+    source: Mapped[str] = mapped_column(String(20), nullable=False)
+    status: Mapped[str] = mapped_column(String(10), nullable=False)
+    starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    class_limit: Mapped[int] = mapped_column(Integer, nullable=False)
+    teacher_limit: Mapped[int] = mapped_column(Integer, nullable=False)
+    approved_by_verifier_id: Mapped[int | None] = mapped_column(ForeignKey("trusted_verifiers.id", ondelete="RESTRICT"))
+    approved_by_admin: Mapped[str | None] = mapped_column(String(64))
+    provenance: Mapped[str] = mapped_column(String(100), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, server_default=func.now(), nullable=False)
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ClassroomClassState(Base):
+    """Absence is inactive: S1 relationships are never silently activated."""
+
+    __tablename__ = "classroom_class_states"
+    __table_args__ = (
+        ForeignKeyConstraint(["class_id", "program_id"], ["classroom_classes.id", "classroom_classes.program_id"],
+                             ondelete="RESTRICT", name="fk_classroom_state_scope"),
+        CheckConstraint("state IN ('active', 'archived')", name="ck_classroom_class_state"),
+        CheckConstraint("state <> 'archived' OR enrollment_open = false", name="ck_classroom_archived_closed"),
+        Index("ix_classroom_state_program", "program_id"),
+    )
+
+    class_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    program_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    state: Mapped[str] = mapped_column(String(10), nullable=False)
+    enrollment_open: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    changed_by_verifier_id: Mapped[int] = mapped_column(ForeignKey("trusted_verifiers.id", ondelete="RESTRICT"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, server_default=func.now(), nullable=False)
+
+
+class ClassroomEntryCode(Base):
+    """Only keyed digests are retained; visible entry codes are issuance output."""
+
+    __tablename__ = "classroom_entry_codes"
+    __table_args__ = (
+        UniqueConstraint("id", "class_id", "program_id", name="uq_classroom_code_scope"),
+        UniqueConstraint("class_id", "generation", name="uq_classroom_code_generation"),
+        ForeignKeyConstraint(["class_id", "program_id"], ["classroom_classes.id", "classroom_classes.program_id"],
+                             ondelete="RESTRICT", name="fk_classroom_code_scope"),
+        CheckConstraint("generation >= 1", name="ck_classroom_code_generation"),
+        CheckConstraint("length(digest) = 64", name="ck_classroom_code_digest"),
+        CheckConstraint(
+            "(is_current = true AND revoked_at IS NULL AND revoked_by_verifier_id IS NULL) OR "
+            "(is_current = false AND revoked_at IS NOT NULL AND revoked_by_verifier_id IS NOT NULL)",
+            name="ck_classroom_code_revocation",
+        ),
+        Index("uq_classroom_code_current_class", "class_id", unique=True,
+              sqlite_where=text("is_current = true"), postgresql_where=text("is_current = true")),
+        Index("uq_classroom_code_current_digest", "program_id", "digest", unique=True,
+              sqlite_where=text("is_current = true"), postgresql_where=text("is_current = true")),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    program_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    class_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    generation: Mapped[int] = mapped_column(Integer, nullable=False)
+    digest: Mapped[str] = mapped_column(String(64), nullable=False)
+    is_current: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    issued_by_verifier_id: Mapped[int] = mapped_column(ForeignKey("trusted_verifiers.id", ondelete="RESTRICT"), nullable=False)
+    issued_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, server_default=func.now(), nullable=False)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revoked_by_verifier_id: Mapped[int | None] = mapped_column(ForeignKey("trusted_verifiers.id", ondelete="RESTRICT"))
+
+
+class ClassroomMembershipHold(Base):
+    """A released row is retained; the transactional audit retains every transition."""
+
+    __tablename__ = "classroom_membership_holds"
+    __table_args__ = (
+        CheckConstraint("state IN ('suspended', 'removed')", name="ck_classroom_hold_state"),
+        CheckConstraint("reason IN ('conduct', 'admin_removal')", name="ck_classroom_hold_reason"),
+        CheckConstraint(
+            "(released_at IS NULL AND released_by_verifier_id IS NULL) OR "
+            "(released_at IS NOT NULL AND released_by_verifier_id IS NOT NULL AND released_at >= held_at)",
+            name="ck_classroom_hold_release",
+        ),
+    )
+
+    membership_id: Mapped[int] = mapped_column(ForeignKey("classroom_student_memberships.id", ondelete="RESTRICT"), primary_key=True)
+    state: Mapped[str] = mapped_column(String(12), nullable=False)
+    reason: Mapped[str] = mapped_column(String(20), nullable=False)
+    held_by_verifier_id: Mapped[int] = mapped_column(ForeignKey("trusted_verifiers.id", ondelete="RESTRICT"), nullable=False)
+    held_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    released_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    released_by_verifier_id: Mapped[int | None] = mapped_column(ForeignKey("trusted_verifiers.id", ondelete="RESTRICT"))
+
+
+class ClassroomS2AuditEvent(Base):
+    """Minimal S2 lifecycle evidence; never an entitlement or reporting grant."""
+
+    __tablename__ = "classroom_s2_audit_events"
+    __table_args__ = (
+        ForeignKeyConstraint(["class_id", "program_id"], ["classroom_classes.id", "classroom_classes.program_id"],
+                             ondelete="RESTRICT", name="fk_classroom_s2_audit_class"),
+        ForeignKeyConstraint(["entitlement_id", "program_id"], ["classroom_entitlements.id", "classroom_entitlements.program_id"],
+                             ondelete="RESTRICT", name="fk_classroom_s2_audit_entitlement"),
+        ForeignKeyConstraint(["code_id", "class_id", "program_id"],
+                             ["classroom_entry_codes.id", "classroom_entry_codes.class_id", "classroom_entry_codes.program_id"],
+                             ondelete="RESTRICT", name="fk_classroom_s2_audit_code"),
+        CheckConstraint(
+            "(CASE WHEN actor_verifier_id IS NOT NULL THEN 1 ELSE 0 END + "
+            "CASE WHEN actor_profile_id IS NOT NULL THEN 1 ELSE 0 END + "
+            "CASE WHEN actor_admin IS NOT NULL THEN 1 ELSE 0 END) = 1", name="ck_classroom_s2_audit_actor",
+        ),
+        CheckConstraint(
+            "action IN ('trial_started', 'institutional_created', 'institutional_changed', 'institutional_ended', "
+            "'class_activated', 'class_archived', 'class_reactivated', 'enrollment_opened', 'enrollment_closed', "
+            "'code_issued', 'code_rotated', 'code_revoked', 'student_joined', 'student_left', 'student_suspended', "
+            "'student_removed', 'student_reinstated', 'teacher_activated', 'teacher_deactivated')",
+            name="ck_classroom_s2_audit_action",
+        ),
+        Index("ix_classroom_s2_audit_program_time", "program_id", "occurred_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    program_id: Mapped[int] = mapped_column(ForeignKey("classroom_programs.organization_id", ondelete="RESTRICT"), nullable=False)
+    class_id: Mapped[int | None] = mapped_column(Integer)
+    profile_id: Mapped[int | None] = mapped_column(ForeignKey("woodchuck_profiles.id", ondelete="RESTRICT"))
+    membership_id: Mapped[int | None] = mapped_column(ForeignKey("classroom_student_memberships.id", ondelete="RESTRICT"))
+    actor_verifier_id: Mapped[int | None] = mapped_column(ForeignKey("trusted_verifiers.id", ondelete="RESTRICT"))
+    actor_profile_id: Mapped[int | None] = mapped_column(ForeignKey("woodchuck_profiles.id", ondelete="RESTRICT"))
+    actor_admin: Mapped[str | None] = mapped_column(String(64))
+    action: Mapped[str] = mapped_column(String(30), nullable=False)
+    reason: Mapped[str | None] = mapped_column(String(40))
+    entitlement_id: Mapped[int | None] = mapped_column(Integer)
+    code_id: Mapped[int | None] = mapped_column(Integer)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, server_default=func.now(), nullable=False)

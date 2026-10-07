@@ -14,13 +14,17 @@ Run from `woodshed-woodchuck` with the application environment and an explicit
 `DATABASE_URL` for the intended database. Never paste its value into logs.
 Provisioning also accepts `--database-url`; it has no local-database fallback.
 The compatible persistent-aware code accepts exactly one installed Alembic
-revision, `p21team001` or `c22class001`, with the required calendar/control columns,
+revision, `p21team001`, `c22class001`, or `c23class001`, with the required calendar/control columns,
 approved membership-rules and authority CHECK constraints, and the
-`persistent_team_control` singleton seeded by migration. On c22 it additionally
+`persistent_team_control` singleton seeded by migration. On c22/c23 it additionally
 validates all eight Classroom tables' required column types/nullability, primary
 keys, CHECK and unique constraints, restrictive FKs including composite scopes,
 and indexes including partial predicates. A c22 revision stamp without that
-structure is insufficient. These checks do not enable Classroom or depend on its
+structure is insufficient. On c23, the guard also requires the five exact S2
+tables, approved column defaults and owned serial sequences, exact indexes/FK
+options (including SQLite objects omitted by reflection), and the membership
+interval triggers/function, including PostgreSQL enforcement state. Operator transactions preserve all installed S1/S2 Classroom
+rows. These checks do not enable Classroom or depend on its
 feature flag.
 The calendar guard is separate from historical continuity repair's unchanged
 `d17contest001` approval. Older, unknown, multiple, or incomplete schema states
@@ -29,12 +33,12 @@ revision to bypass migration.
 
 Install at least `p21team001` before starting this code. Coordinate web/finalizer
 and calendar writers as described in [persistent Team cutover](persistent-team-cutover.md).
-Before upgrading an already staged p21 database to c22, make compatible operator
+Before upgrading an already staged p21/c22 database to c23, make compatible operator
 code available, including its activation and verification commands. Older pinned
-operators still refuse c22; a source fix does not update external installations.
+operators still refuse newer revisions; a source fix does not update external installations.
 The initial p20/p21 migrations leave the singleton dormant, existing weeks on
 `legacy_seasonal_v1`, and existing Teams/memberships unchanged. The additive c22
-migration preserves the existing dormant, staged or active PTA state. Calendar
+migration and additive c23 migration preserve the existing dormant, staged or active PTA state. Calendar
 provisioning never activates authority or performs the separately reviewed cutover.
 
 Season records must already match `app/seasons.py`: canonical keys, names, dates,

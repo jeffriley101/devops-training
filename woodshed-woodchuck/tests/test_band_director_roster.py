@@ -8,7 +8,8 @@ from sqlalchemy.pool import StaticPool
 
 from tests.team_factory import make_team
 
-from app import main, verifier_routes
+from app import main, session_revocations, verifier_routes
+from app.age_models import AccountPrivacy
 from app.db import Base
 from app.models import (
     PracticeChart, PracticeChartVerification,
@@ -30,6 +31,7 @@ def roster_db(monkeypatch):
     factory = sessionmaker(bind=engine, expire_on_commit=False)
     monkeypatch.setattr(main, "SessionLocal", factory)
     monkeypatch.setattr(verifier_routes, "SessionLocal", factory)
+    monkeypatch.setattr(session_revocations, "SessionLocal", factory)
     with factory() as session:
         session.add_all([
             TrustedVerifier(id=1, email="director@example.com", display_name="Director One",
@@ -52,6 +54,11 @@ def add_student(factory, name, *, role="band_director", status="accepted",
         )
         session.add(student)
         session.flush()
+        # These ordinary relationship fixtures represent age-screened students;
+        # missing age evidence now correctly blocks their account activity.
+        declared = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        session.add(AccountPrivacy(profile_id=student.id, age_band="adult",
+                                   declared_at=declared, public_from=declared))
         if connected:
             session.add(StudentVerifierConnection(
                 profile_id=student.id, verifier_id=verifier_id, role=role, status=status,
