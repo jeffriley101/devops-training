@@ -507,8 +507,11 @@ def _held(session, membership_id):
 
 
 def _periods(session, membership_id):
+    # Writers already hold Program/Class/anchor locks. Replace cached ORM values
+    # so history validation sees every persisted period, including closed ones.
     return list(session.scalars(select(ClassroomMembershipPeriod).where(
-        ClassroomMembershipPeriod.membership_id == membership_id).order_by(ClassroomMembershipPeriod.starts_at)))
+        ClassroomMembershipPeriod.membership_id == membership_id).order_by(ClassroomMembershipPeriod.starts_at)
+        .execution_options(populate_existing=True)))
 
 
 def _validated_periods(session, membership_id):
