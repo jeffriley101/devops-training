@@ -1,4 +1,4 @@
-"""Arcade classification; Classroom authorization is intentionally deferred to R6."""
+"""Arcade classification; Classroom eligibility is independent of playable games."""
 from .age_privacy import require_eligible
 from .memberships import student_has_full_access
 
@@ -17,8 +17,9 @@ PACK_ATTEMPTS = 3
 
 
 def classroom_authorized(session, profile_id):
-    """R6 replaces this with its real relationship/capability lookup, never a client flag."""
-    return False
+    """The five S3 policy keys share an exact registered Classroom source grant."""
+    from .classroom_capabilities import capability_decision
+    return capability_decision(session, profile_id, "note-names").allowed
 
 
 def access_policy(session, profile_id, game_key):

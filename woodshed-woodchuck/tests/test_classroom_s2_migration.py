@@ -33,6 +33,15 @@ S2_TABLES = {model.__tablename__ for model in (
 )}
 
 
+def c23_metadata():
+    """Compare the historical c23 schema independently of additive S3."""
+    expected = MetaData()
+    for table in Base.metadata.sorted_tables:
+        if table.name not in {"classroom_reporting_periods", "classroom_s3_audit_events"}:
+            table.to_metadata(expected)
+    return expected
+
+
 @pytest.fixture(params=["sqlite", "postgresql"])
 def migrated_c22(request, tmp_path, monkeypatch):
     control = None
@@ -130,7 +139,7 @@ def test_populated_c22_preserved_s2_empty_and_reversible_until_used(migrated_c22
         assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "c23class001"
         for name in S2_TABLES:
             assert connection.scalar(text(f"SELECT count(*) FROM {name}")) == 0
-        assert compare_metadata(MigrationContext.configure(connection), Base.metadata) == []
+        assert compare_metadata(MigrationContext.configure(connection), c23_metadata()) == []
         assert connection.scalar(text("SELECT count(*) FROM classroom_membership_periods")) == 0
     command.downgrade(config(), "c22class001")
     assert snapshot(engine) == before
@@ -281,5 +290,5 @@ def test_trial_and_code_database_uniqueness_and_cross_program_reuse(migrated_c22
 
 def test_revision_graph_has_one_additive_s2_head():
     script = ScriptDirectory.from_config(config())
-    assert script.get_heads() == ["c23class001"]
+    assert script.get_heads() == ["c24class001"]
     assert script.get_revision("c23class001").down_revision == "c22class001"

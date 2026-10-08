@@ -28,10 +28,11 @@ def config():
 
 
 def c22_metadata():
-    """Keep this explicit historical-head test independent of additive S2."""
+    """Keep this explicit historical-head test independent of additive S2/S3."""
     s2_tables = {
         "classroom_entitlements", "classroom_class_states", "classroom_entry_codes",
         "classroom_membership_holds", "classroom_s2_audit_events",
+        "classroom_reporting_periods", "classroom_s3_audit_events",
     }
     expected = MetaData()
     for table in Base.metadata.sorted_tables:
@@ -272,7 +273,7 @@ def test_populated_upgrade_preserves_free_paths_and_pta_operator_compatibility(t
 
 def test_only_additive_classroom_revision_follows_verified_release_chain():
     script = ScriptDirectory.from_config(config())
-    assert script.get_heads() == ["c23class001"]
+    assert script.get_heads() == ["c24class001"]
     assert script.get_revision("c23class001").down_revision == "c22class001"
     assert script.get_revision("c22class001").down_revision == "p21team001"
     assert script.get_revision("p21team001").down_revision == "p20team001"

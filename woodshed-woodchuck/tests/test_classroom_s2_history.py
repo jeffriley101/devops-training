@@ -9,9 +9,8 @@ from sqlalchemy.orm import sessionmaker
 from app import classroom, classroom_s2 as service, models as m
 from app.age_privacy import utc
 from app.classroom_models import ClassroomMembershipHold, ClassroomS2AuditEvent
-from app.db import Base
 from test_classroom_s1 import adult_pin_hash
-from test_classroom_s2_migration import NOW, config, migrated_c22
+from test_classroom_s2_migration import NOW, c23_metadata, config, migrated_c22
 from tests.test_persistent_team_migration import disposable_sqlite_configuration
 
 
@@ -55,8 +54,10 @@ def history(session):
 def snapshot(session):
     # Core rows bypass the identity map; include every Classroom column so
     # changes to holds, anchors, periods, authority or success audits are visible.
+    # This fixture deliberately remains at c23. Later additive models may be
+    # loaded, but their tables do not belong to this historical schema yet.
     return {table.name: list(session.execute(select(table).order_by(*table.primary_key.columns)))
-            for table in Base.metadata.sorted_tables if table.name.startswith("classroom_")}
+            for table in c23_metadata().sorted_tables if table.name.startswith("classroom_")}
 
 
 def corrupt_persisted_history(engine, period_id):

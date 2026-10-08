@@ -1,0 +1,217 @@
+Classroom R6 S3 — capabilities and internal reporting boundaries
+===============================================================
+
+Local implementation and review only. No production enablement or migration.
+CLASSROOM_S1_ENABLED=1, CLASSROOM_S2_ENABLED=1 and CLASSROOM_S3_ENABLED=1
+are required for Classroom capability and reporting decisions. Ordinary account
+and personal/tester decisions do not depend on the Classroom flags. Installing
+c24class001 creates no grants, consent, entitlement, relationships or accounts.
+
+Approved surface and explicit limitations
+-----------------------------------------
+The requested field-contract decision was: keep data fields denied; internal
+boundary proof only. Thus the ONLY recognized scope is classroom-boundary-v1,
+with notice classroom-boundary-notice-v1 and operation history_boundary. These
+versions describe an internal authorization proof, not approval to disclose any
+student data. Every nonempty field request, report read, export, verification,
+or unknown operation refuses. No roster, metrics, dashboard, graph, export UI,
+game endpoint or public reporting API is added. The old S1 reporting seam still
+denies because its signature lacks an exact student and approved operation.
+
+classroom_reporting.authorize_reporting returns internal structured evidence.
+chart_history_decision checks a supplied exact chart ID's date and submission
+timestamp, returning a boundary decision without chart data. It queries neither
+notes nor minutes nor verification/reward records. Scoped IDs/reasons and proof
+objects are sensitive internal evidence, never public response payloads. No
+HTTP adapter serializes them. Future approved reads need their own explicit
+versioned field contract and ordinary CSRF/origin/session/no-store protections.
+There is no broad field allow-list to accidentally expand later.
+
+The existing account/parent consent path does NOT approve Class reporting or
+future co-directors. S3 grants deny under-13 and all consent-linked accounts,
+including otherwise eligible accounts with valid account consent. No KWS notice,
+signature, consent framework or free DirectorPermission scope changes. Connecting
+a positive parent-approved Class scope remains a policy/integration blocker.
+Those students retain all separately account-authorized tools and saving.
+
+Seven distinct decisions
+------------------------
+Account eligibility and required parent authorization; Class membership; Program
+entitlement; feature use; personal saving; student/parent reporting authorization;
+and the requesting adult's exact current Class teaching assignment stay separate.
+TrustedVerifier and WoodchuckProfile remain the existing identities. There is no
+universal User model, Full Access mutation, Team/cohort mutation, verification,
+XP/contest credit, finalizer change or BOOK authority change.
+
+classroom_capabilities resolves immutable internal allowed/denied decisions with
+source type, reason and applicable account, membership/period, Class, Program,
+entitlement, personal membership/seat or tester enrollment IDs. The union adds
+only capabilities expressly supplied by each source. Invalid/inactive sources
+retain denial reasons; an unrelated source cannot repair an exact scoped denial.
+The resolver is current feature policy, not a reporting authorization token.
+
+An eligible ordinary account keeps pristine_use and personal_progress_save.
+Personal Full and lifetime tester sources preserve existing Full behavior and
+provide additional reasons for ordinary use/saving. They do not imply a Program
+entitlement, any of the five Classroom games, or reporting. A Classroom source
+requires eligible active account, active exact membership period, no hold,
+active Class and currently valid exact Program entitlement within allowances.
+It grants only the ordinary capabilities and the five Classroom policy keys.
+It never provides Full Access, normal Arcade entry waiver, Practice Insights,
+premium appearance, verification, rewards, XP or contest credit.
+
+Five Classroom policy keys
+--------------------------
+note-names: Note Names
+instrument-fingerings: Instrument Fingerings
+rhythm-hear-pick: Rhythm — Hear & Pick
+key-signatures: Key Signatures
+transposition: Transposition
+
+arcade_access.classroom_authorized now consults the source-aware decision for
+these policies. The playable game allow-list, normal Arcade entry policy and
+always-free policy are unchanged. Policy eligibility does not make an unbuilt
+game playable. Ordinary Guest, personal Full alone and tester Full alone cannot
+supply this Classroom source. S4 Guest Classroom and R7 games remain unavailable.
+
+Pristine and personal saving
+---------------------------
+Ordinary Pristine use and its account-authorized self-reported save path are
+unchanged. No new paywall or reporting lookup enters practice_charts or account
+state saving. Withdrawing reporting, losing one Class, or losing one funding
+source cannot remove another valid source. Reporting service mutations touch only
+the new reporting period and audit tables. Existing Connected Students and free
+director/verifier scopes remain independent and are not consulted for Class proof.
+
+Reporting periods and transactions
+----------------------------------
+c24 adds classroom_reporting_periods and classroom_s3_audit_events. A reporting
+period stores exact Program/Class/student/membership and membership-period IDs,
+student authorizer reference, account age-declaration timestamp, optional existing
+consent reference, entitlement reference, Class activation timestamp, S2 source
+audit watermark, explicit scope/notice versions, start/end, revoker and typed end
+reason, and creation timestamp. The consent reference is reserved evidence, not
+an implemented positive child path. Account identity remains the existing profile.
+
+grant_reporting requires current transaction-bound student credential evidence,
+an eligible non-consent-linked 13+ account, qualifying source and the exact two
+versions passed explicitly. It cannot silently accept another student's ID.
+Duplicate open grants refuse. withdraw_reporting closes only reporting, and is
+idempotent after closure; no paid entitlement or active Class is required to
+withdraw. Current student sign-in is still required. reauthorize_reporting is
+explicit and starts a new period. It preserves previous intervals, closing an
+invalidated open period at its known source interruption where available.
+
+Each successful grant/withdrawal/reauthorization audit records only scope,
+student authorizer, relevant period reference, versions, typed reason and time.
+No parent contact, consent payload, token, PIN, credential hash or practice note
+is logged. Period mutation and audit share S1's savepoint and caller-owned outer
+transaction. Failed audit insertion or outer rollback cannot commit a false grant
+or false success audit. These rows are not an S5 restore/replay ledger.
+
+Restrictive FKs, same-student authorizer checks, exact period audit scope, end
+evidence checks, one-open-period uniqueness and migrated SQLite/PostgreSQL overlap
+triggers protect the additive tables. Used reporting tables prevent downgrade;
+empty tables can be downgraded. c22/c23 migration files are not rewritten.
+On PostgreSQL, direct UPDATE triggers acquire parent locks with NOWAIT: a raw
+writer that already holds a reporting tuple refuses contention instead of
+waiting in reverse lock order against a Program-first service. Supported service
+writers already hold these parent locks. INSERT retains ordered blocking locks.
+
+Current adult authority and history
+----------------------------------
+The requester must supply S1's transaction-bound current adult credentials and
+an active teaching assignment to the exact requested Class. Owner, Admin, Billing,
+Head Director or code_manager alone never suffice. Another Class assignment and
+ownership transfer do not confer this authority. Departure/revocation removes new
+reads. A new co-director's assignment start is part of that adult's lower boundary.
+
+The lower bound intersects current reporting start, membership-period start,
+teacher-assignment start, entitlement start/creation, Class activation and account
+age declaration/public transition evidence. The upper bound includes current
+server time and entitlement expiry. Only the current reporting interval is used:
+reauthorization does not reopen even previously authorized earlier intervals.
+Late submission must pass both occurrence and submission checks. A late-created
+chart cannot turn pre-join or pre-authorization practice into eligible activity.
+
+Membership leave/rejoin or suspension/reinstatement produces a different membership
+period and needs explicit reporting reauthorization. Entitlement replacement,
+expiry/renewal and archive/reactivation also invalidate old proof. Retained S2
+archive/package-change audit IDs detect interruptions even at identical timestamps;
+their watermark is evidence for this boundary, not a recovery ledger. New periods
+start now, never backdated. Enrollment-open/closed and code rotation alone do not
+change an existing reporting period. No Class or Program can authorize another's
+operations. Corrupt overlapping membership/reporting history refuses.
+
+Date precision
+--------------
+PracticeChart.practice_date is interpreted as an America/Chicago calendar day,
+matching existing practice routes/privacy policy. UTC is used for stored instants.
+The entire local day, including DST's 23/25-hour days, must fit the authorized
+interval. An intraday start therefore withholds its ambiguous boundary day.
+The same conservative whole-day check withholds today's records until that local
+day has elapsed. Submission timestamp must separately be inside the interval; it
+never substitutes for occurrence date. No verification or reward time is used.
+
+Composition and unavailable values
+---------------------------------
+deduplicate_history_decisions is internal proof composition only. It requires the
+same live transaction and requesting adult evidence, and reevaluates every Class
+and chart boundary before combining, including after same-transaction withdrawal.
+Stable (Program, student, chart) keys remove overlapping Class duplicates. The
+Program component prevents A's approval rescuing B. Denied/unavailable decisions
+remain unavailable; they are not numeric zeros or totals. Free Connected Student
+results are rejected as inputs, so they cannot widen Class history or double-count
+students with Class visibility. There is no combined free/paid reporting product.
+
+Concurrency
+-----------
+Use PostgreSQL READ COMMITTED. Both boundary reads and writes reuse S1's lock order:
+Program, exact Class, existing consent/account eligibility locks, membership, then
+reporting periods. They do not take Team/PTA/season locks or credential row locks.
+All S1/S2 source writers serialize on the same Program; account operations serialize
+on the existing profile/consent locks. Adult credentials and time-sensitive source
+checks are reread after waits. Locks last until the caller commits or rolls back.
+A read holding the lock completes before a waiting withdrawal; a read waiting for
+withdrawal observes denial. A decision is not reusable permission after transaction
+end, nor does dedup accept a pre-withdrawal decision as present authority.
+No function uses a reporting decision to expose data fields.
+
+Real disposable PostgreSQL tests observe pg_blocking_pids before releasing the
+first transaction. They cover grant/withdraw, duplicate grant, read/withdraw,
+teacher departure, leave/suspension, entitlement change/expiry, archive,
+reauthorization, account state changes, rollback and isolation refusal. SQLite
+tests establish sequential behavior only. Credential rotation/session revocation
+during an observed Program-lock wait also refuses stale adult/student proof.
+ORM-created race fixtures are separate from actual-migration evidence: the
+SQLite/PostgreSQL c24 lifecycle test runs the real grant, withdrawal, reauthorization
+and rollback services against the installed schema and interval guards, including
+withdrawal/regrant at the same instant. Audit-failure tests cover withdrawal and
+replacement after an old interval has already been closed and flushed. A package
+round trip back to the original trial still requires explicit reauthorization.
+
+Operator compatibility
+----------------------
+The sole additive head becomes c24class001 after c23class001. Compatible calendar
+provisioning and PTA operators accept p21/c22/c23/c24 and validate the exact installed
+schema, including c24's frozen columns/checks/FKs/indexes and overlap triggers.
+False stamps, missing objects and altered predicates refuse. No bypass flag exists.
+The compatibility patch is narrow: no PTA authority or finalizer behavior changes.
+
+Already staged plans/receipts retain their original bytes, hashes and contract;
+additive migration does not rewrite them. Unstaged old plans presented to APPLY
+after revision drift still refuse and require a newly generated approved plan.
+Operator writes protect new reporting tables with exact before/after snapshots.
+Historical/retired tools retain their prior restrictions. Compatible operator code
+must be separately rolled out before a separately approved live schema upgrade;
+this local work performs neither. No Production, Stripe or external account access.
+
+Deferred scope and evidence
+---------------------------
+S4 Guest Classroom, S5 restore/reconciliation, and R7 games, dashboards, real data
+reports/exports and polished product UI remain unavailable. LMS/SIS/SSO, district
+administration, checkout, webhooks and public pricing are outside this slice.
+
+Sanitized test logs, exact failures/skips/retries, migration checks, final diff,
+status and file hashes are retained outside the repository. First failures are
+not relabeled as passes; final unique selections exclude overlapping retries.

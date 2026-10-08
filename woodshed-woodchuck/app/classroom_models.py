@@ -452,3 +452,85 @@ class ClassroomS2AuditEvent(Base):
     entitlement_id: Mapped[int | None] = mapped_column(Integer)
     code_id: Mapped[int | None] = mapped_column(Integer)
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, server_default=func.now(), nullable=False)
+
+
+class ClassroomReportingPeriod(Base):
+    """A student's scoped reporting decision, independent of tools and saving.
+
+    Authority snapshots prevent a later source from silently reviving old scope.
+    Account evidence remains subject to current account/child authorization.
+    """
+
+    __tablename__ = "classroom_reporting_periods"
+    __table_args__ = (
+        ForeignKeyConstraint(["class_id", "program_id"],
+            ["classroom_classes.id", "classroom_classes.program_id"],
+            ondelete="RESTRICT", name="fk_classroom_reporting_class"),
+        ForeignKeyConstraint(["entitlement_id", "program_id"],
+            ["classroom_entitlements.id", "classroom_entitlements.program_id"],
+            ondelete="RESTRICT", name="fk_classroom_reporting_entitlement"),
+        UniqueConstraint("id", "program_id", "class_id", "profile_id", name="uq_classroom_reporting_scope"),
+        CheckConstraint("authorizer_profile_id = profile_id", name="ck_classroom_reporting_authorizer"),
+        CheckConstraint("ended_by_profile_id IS NULL OR ended_by_profile_id = profile_id", name="ck_classroom_reporting_revoker"),
+        CheckConstraint(
+            "(ended_at IS NULL AND ended_by_profile_id IS NULL AND ended_reason IS NULL) OR "
+            "(ended_at IS NOT NULL AND ended_at >= starts_at AND ended_by_profile_id IS NOT NULL "
+            "AND ended_reason IS NOT NULL AND ended_reason IN ('withdrawn', 'source_changed'))",
+            name="ck_classroom_reporting_end"),
+        CheckConstraint("length(trim(scope_version)) BETWEEN 1 AND 80", name="ck_classroom_reporting_scope_version"),
+        CheckConstraint("length(trim(notice_version)) BETWEEN 1 AND 80", name="ck_classroom_reporting_notice_version"),
+        Index("uq_classroom_reporting_open", "membership_id", unique=True,
+            sqlite_where=text("ended_at IS NULL"), postgresql_where=text("ended_at IS NULL")),
+        Index("ix_classroom_reporting_student_class", "profile_id", "class_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    program_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    class_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    membership_id: Mapped[int] = mapped_column(ForeignKey("classroom_student_memberships.id", ondelete="RESTRICT"), nullable=False)
+    membership_period_id: Mapped[int] = mapped_column(ForeignKey("classroom_membership_periods.id", ondelete="RESTRICT"), nullable=False)
+    profile_id: Mapped[int] = mapped_column(ForeignKey("woodchuck_profiles.id", ondelete="RESTRICT"), nullable=False)
+    authorizer_profile_id: Mapped[int] = mapped_column(ForeignKey("woodchuck_profiles.id", ondelete="RESTRICT"), nullable=False)
+    account_declared_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    consent_id: Mapped[int | None] = mapped_column(ForeignKey("child_consent_evidence.id", ondelete="RESTRICT"))
+    entitlement_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    class_activation_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    source_audit_id: Mapped[int | None] = mapped_column(ForeignKey("classroom_s2_audit_events.id", ondelete="RESTRICT"))
+    scope_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    notice_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    ended_by_profile_id: Mapped[int | None] = mapped_column(ForeignKey("woodchuck_profiles.id", ondelete="RESTRICT"))
+    ended_reason: Mapped[str | None] = mapped_column(String(30))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, server_default=func.now(), nullable=False)
+
+
+class ClassroomS3AuditEvent(Base):
+    """Minimal reporting evidence; never practice, parent, or consent payloads."""
+
+    __tablename__ = "classroom_s3_audit_events"
+    __table_args__ = (
+        ForeignKeyConstraint(["period_id", "program_id", "class_id", "profile_id"],
+            ["classroom_reporting_periods.id", "classroom_reporting_periods.program_id",
+             "classroom_reporting_periods.class_id", "classroom_reporting_periods.profile_id"],
+            ondelete="RESTRICT", name="fk_classroom_s3_audit_scope"),
+        CheckConstraint("actor_profile_id = profile_id", name="ck_classroom_s3_audit_actor"),
+        CheckConstraint("action IN ('reporting_granted', 'reporting_withdrawn', 'reporting_reauthorized')", name="ck_classroom_s3_audit_action"),
+        CheckConstraint("(action = 'reporting_withdrawn' AND reason IS NOT NULL AND reason IN ('withdrawn', 'source_changed')) OR "
+            "(action <> 'reporting_withdrawn' AND reason IS NULL)", name="ck_classroom_s3_audit_reason"),
+        CheckConstraint("length(trim(scope_version)) BETWEEN 1 AND 80", name="ck_classroom_s3_audit_scope_version"),
+        CheckConstraint("length(trim(notice_version)) BETWEEN 1 AND 80", name="ck_classroom_s3_audit_notice_version"),
+        Index("ix_classroom_s3_audit_program_time", "program_id", "occurred_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    program_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    class_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    profile_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    period_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    actor_profile_id: Mapped[int] = mapped_column(ForeignKey("woodchuck_profiles.id", ondelete="RESTRICT"), nullable=False)
+    action: Mapped[str] = mapped_column(String(30), nullable=False)
+    scope_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    notice_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    reason: Mapped[str | None] = mapped_column(String(30))
+    occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, server_default=func.now(), nullable=False)

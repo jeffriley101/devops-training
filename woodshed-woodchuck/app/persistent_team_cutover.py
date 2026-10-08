@@ -328,12 +328,15 @@ def _approved(plan, expected_sha256):
 
 
 def _plan_schema_guard(content, revision, *, staging=False):
-    # Staged p21/c22 approvals and receipts survive reviewed forward additions.
+    # Staged p21/c22/c23 approvals and receipts survive reviewed additions.
     # An unstaged approval must still match a fresh plan exactly; never rewrite
     # its revision/hash/evidence to make an APPLY succeed on another schema.
     reviewed_extensions = {("p21team001", "c22class001"),
                            ("p21team001", "c23class001"),
-                           ("c22class001", "c23class001")}
+                           ("c22class001", "c23class001"),
+                           ("p21team001", "c24class001"),
+                           ("c22class001", "c24class001"),
+                           ("c23class001", "c24class001")}
     if content["revision"] != revision and (staging or
             (content["revision"], revision) not in reviewed_extensions):
         raise CutoverError("plan_schema_revision_changed: generate_and_review_new_plan_before_apply")
