@@ -316,7 +316,7 @@ def test_programmatic_controls_do_not_save_but_real_edit_saves_once() -> None:
 
     assert ".value =" in prefill
     assert "saveState(" not in prefill
-    assert profile_change.count("stateApi.saveState(next);") == 1
+    assert profile_change.count("stateApi.saveState(next, { sync: false });") == 1
     assert 'form.addEventListener("submit"' in profile_change
 
 

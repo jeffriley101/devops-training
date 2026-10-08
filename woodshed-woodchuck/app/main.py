@@ -185,6 +185,7 @@ def _render(request: Request, template_name: str, *, analytics_event: str | None
         name=template_name,
         context={
             "nav_items": NAV_ITEMS,
+            "reconstructed_student_surface": template_name in {"home.html", "store.html", "p_book.html", "quest.html"},
             "active_nav": context.pop("active_nav", None),
             "sax_viking_welcome": SAX_VIKING_WELCOME,
             "quest_pool": QUEST_POOL,
@@ -601,7 +602,7 @@ def quest(request: Request):
     return _render(
         request, "quest.html", title="board", active_nav="quest",
         page_class="main-app-page", member_since=member_since,
-        board_season=board_season,
+        board_season=board_season, practice_definition=PRACTICE_DEFINITION,
     )
 
 
@@ -764,7 +765,6 @@ def store(request: Request):
         request, "store.html", title="shop", active_nav="store",
         page_class="main-app-page artwork-room-page",
         public_site_url=site_url, public_site_qr=qr_data_uri(site_url),
-        practice_definition=PRACTICE_DEFINITION,
         art_submission_mailto=art_submission_mailto(),
     )
 

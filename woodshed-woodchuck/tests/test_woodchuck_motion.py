@@ -88,15 +88,13 @@ def test_metronome_state_uses_practice_sway_only():
     assert "is-practice-sway" in MOTION_CSS
 
 
-def test_exactly_nine_non_metronome_shed_controls_trigger_success():
+def test_exactly_seven_non_metronome_shed_controls_trigger_success():
     expected = {
-        "woodchuck-name-value",
         "instrument-object",
         "xp-level-control",
         "shed-decorate-button",
         "mum-open-button",
         "shed-team-button",
-        "level-value",
         "tuner-open-button",
         "sound-effects-button",
     }
@@ -156,13 +154,11 @@ def test_motion_script_runs_without_replacing_character_source():
       });
       const attributes = {};
       const controlIds = [
-        "woodchuck-name-value",
         "instrument-object",
         "xp-level-control",
         "shed-decorate-button",
         "mum-open-button",
         "shed-team-button",
-        "level-value",
         "metronome-open-button",
         "tuner-open-button",
         "sound-effects-button",

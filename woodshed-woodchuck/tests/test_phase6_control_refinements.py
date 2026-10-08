@@ -47,20 +47,21 @@ def test_secret_period_is_separate_from_the_ten_artwork_cells() -> None:
 
 
 def test_level_control_is_centered_with_full_accessible_dynamic_label() -> None:
-    css = source("static/css/styles.css")
     javascript = source("static/js/app.js")
     home = source("templates/home.html")
-    assert 'id="level-value"' in home
-    assert 'aria-label="Change student level"' in home
-    assert 'aria-controls="change-level-panel"' in home
-    control_start = home.index('id="level-value"')
+    editor = source("templates/_your_woodchuck.html")
+    assert 'id="level-value"' in editor
+    assert 'id="change-level-form"' in editor
+    assert 'aria-label="Instrument, Appearance and Student Level"' in home
+    assert 'aria-controls="your-woodchuck"' in home
+    control_start = home.index('id="instrument-object"')
     control = home[control_start:home.index("</button>", control_start)]
     assert 'data-scene-cell="R2"' in control
     assert "🏅" not in control
     assert 'class="scene-hotspot"' in control
     assert "`Level: ${profileLevel}. Change level.`" in javascript
     hydrate = javascript[javascript.index("function hydrateHome"):javascript.index("function wireXpPanel")]
-    assert "levelEl.textContent" not in hydrate
+    assert "levelEl.textContent = profileLevel" in hydrate
 
 
 def test_shop_dandelion_count_is_hidden_unboxed_and_uses_shared_hydration() -> None:

@@ -352,12 +352,15 @@
   }
 
   function wireProfileChange({ kind, endpoint, stateKey, payloadKey, triggerId }) {
-    const openButton = document.getElementById(triggerId);
+    const display = document.getElementById(triggerId);
     const panel = document.getElementById(`change-${kind}-panel`);
+    const embedded = panel?.hasAttribute("data-embedded-profile");
+    const openButton = document.getElementById(embedded ? (kind === "name" ? "shed-team-button" : "instrument-object") : triggerId);
     const form = document.getElementById(`change-${kind}-form`);
     const input = form && form.querySelector("input, select");
     const feedback = document.getElementById(`change-${kind}-feedback`);
     if (!openButton || !panel || !form || !input || !feedback) return;
+    let pendingSave = null;
 
     function close() {
       panel.hidden = true;
@@ -365,7 +368,7 @@
       openButton.setAttribute("aria-expanded", "false");
       openButton.focus();
     }
-    openButton.addEventListener("click", function () {
+    function initialize() {
       const currentValue = stateApi.getState().profile[stateKey] || "";
       if (input instanceof HTMLSelectElement && currentValue && !Array.from(input.options).some((option) => option.value === currentValue)) {
         input.prepend(new Option(`${currentValue} (current saved level)`, currentValue));
@@ -373,53 +376,85 @@
       input.value = currentValue;
       feedback.textContent = "";
       feedback.classList.remove("error-text");
-      panel.hidden = false;
-      panel.classList.remove("hidden");
-      openButton.setAttribute("aria-expanded", "true");
-      input.focus();
-    });
+      if (!embedded) {
+        panel.hidden = false;
+        panel.classList.remove("hidden");
+        openButton.setAttribute("aria-expanded", "true");
+        input.focus();
+      }
+    }
+    openButton.addEventListener("click", initialize);
+    if (embedded) {
+      initialize();
+      window.WWSurfaces?.markSaved(form);
+    }
     panel.querySelectorAll("[data-close-profile-panel]").forEach((button) => {
-      button.addEventListener("click", close);
+      button.addEventListener("click", embedded ? () => {
+        const surface = panel.closest("[data-profile-surface]");
+        if (surface instanceof HTMLDialogElement) surface.close();
+        else { surface.hidden = true; surface.classList.add("hidden"); }
+        openButton.setAttribute("aria-expanded", "false");
+      } : close);
     });
     form.addEventListener("submit", async function (event) {
       event.preventDefault();
+      const operation = window.WWAccountSync.beginProfileSave(form);
+      if (!operation) return;
+      const request = stateApi.accountRequest();
+      const submitted = input.value.trim();
       const button = form.querySelector("button[type='submit']");
+      button.classList.remove("is-confirmed-success");
       feedback.classList.remove("error-text");
       feedback.textContent = "Saving…";
-      button.disabled = true;
       try {
-        const response = await fetch(endpoint, {
-          method: "PATCH", credentials: "same-origin",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ [payloadKey]: input.value.trim() }),
-        });
-        if (!response.ok) {
-          throw new Error(await responseMessage(response, `The ${kind} could not be changed.`));
+        await operation.ready();
+        if (!stateApi.stateForResponse(request)) return;
+        // After a successful PATCH and failed state sync, an explicit Save of
+        // the same value finishes synchronization without repeating the PATCH.
+        if (!pendingSave || !stateApi.stateForResponse(pendingSave.request) || pendingSave.value !== submitted) {
+          const response = await fetch(endpoint, {
+            method: "PATCH", credentials: "same-origin",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ [payloadKey]: submitted }),
+          });
+          if (!response.ok) {
+            throw new Error(await responseMessage(response, `The ${kind} could not be changed.`));
+          }
+          const payload = await response.json();
+          const next = stateApi.stateForResponse(request);
+          if (!next) return;
+          next.profile[stateKey] = payload[payloadKey];
+          stateApi.saveState(next, { sync: false });
+          pendingSave = { request, value: payload[payloadKey] };
         }
-        const payload = await response.json();
-        const next = stateApi.getState();
-        next.profile[stateKey] = payload[payloadKey];
-        stateApi.saveState(next);
+        if (!await operation.sync()) {
+          throw new Error(`The ${kind} changed, but the saved Woodshed could not synchronize. Save again to finish.`);
+        }
+        if (!stateApi.stateForResponse(request)) return;
+        const value = pendingSave.value;
+        pendingSave = null;
         feedback.textContent = `${kind === "name" ? "Name" : "Level"} changed successfully.`;
-        window.WWSurfaces?.markSaved(panel);
+        window.WWSurfaces?.markSaved(form);
         button.classList.add("is-confirmed-success");
-        openButton.textContent = kind === "level"
-          ? payload[payloadKey].charAt(0).toUpperCase()
-          : payload[payloadKey];
-        openButton.setAttribute(
+        display.textContent = value;
+        display.setAttribute(
           "aria-label",
           kind === "name"
-            ? `Change Woodchuck name. Current name: ${payload[payloadKey]}`
-            : `Level: ${payload[payloadKey]}. Change level.`
+            ? `Change Woodchuck name. Current name: ${value}`
+            : `Level: ${value}. Change level.`
         );
+        if (embedded && kind === "name") {
+          openButton.setAttribute("aria-label", `Name and Team. ${value}. Team: ${openButton.dataset.teamName || "not selected"}.`);
+        }
         if (kind === "level") {
-          openButton.title = `Level: ${payload[payloadKey]}. Change level.`;
+          display.title = `Level: ${value}. Change level.`;
         }
       } catch (error) {
+        if (!stateApi.stateForResponse(request)) return;
         feedback.classList.add("error-text");
         feedback.textContent = error.message || `The ${kind} could not be changed.`;
       } finally {
-        button.disabled = false;
+        operation.release();
       }
     });
   }
@@ -439,6 +474,8 @@
   let syncTimer = null;
   let syncInProgress = false;
   let pendingSync = false;
+  let activeSync = null;
+  let profileSave = null;
 
   function isPersistentAccount(state) {
     return Boolean(
@@ -585,10 +622,58 @@
 
   function scheduleSync(delay = 500) {
     window.clearTimeout(syncTimer);
+    syncTimer = null;
+    // Appearance commits a state revision itself. A deferred PUT must not
+    // overtake its response, nor the complete Level save lifecycle.
+    if (profileSave) { pendingSync = true; return; }
 
     syncTimer = window.setTimeout(function () {
-      syncStateToServer();
+      syncTimer = null;
+      startSync();
     }, delay);
+  }
+
+  function startSync() {
+    window.clearTimeout(syncTimer);
+    syncTimer = null;
+    if (!activeSync) {
+      activeSync = syncStateToServer().finally(() => { activeSync = null; });
+    }
+    return activeSync;
+  }
+
+  function beginProfileSave(form) {
+    if (profileSave || (window.WWSessionBoundary && !window.WWSessionBoundary.isCurrent())) return null;
+    const surface = form.closest('[data-profile-surface]') || form;
+    if (surface.dataset.busy === 'true') return null;
+    const controls = Array.from(surface.querySelectorAll('input,select,textarea,button[type="submit"]'),
+      node => [node, node.disabled]);
+    const busy = surface.dataset.busy, ariaBusy = form.getAttribute('aria-busy');
+    const owner = {};
+    profileSave = owner;
+    if (syncTimer !== null) pendingSync = true;
+    window.clearTimeout(syncTimer);
+    syncTimer = null;
+    surface.dataset.busy = 'true';
+    form.setAttribute('aria-busy', 'true');
+    controls.forEach(([node]) => { node.disabled = true; });
+    return {
+      async ready() {
+        if (activeSync && !await activeSync) throw new Error('The saved Woodshed could not synchronize. Please try again.');
+        if (pendingSync && !await startSync()) throw new Error('The saved Woodshed could not synchronize. Please try again.');
+      },
+      sync: startSync,
+      release() {
+        if (profileSave !== owner) return;
+        controls.forEach(([node, disabled]) => { node.disabled = disabled; });
+        if (busy === undefined) delete surface.dataset.busy;
+        else surface.dataset.busy = busy;
+        if (ariaBusy === null) form.removeAttribute('aria-busy');
+        else form.setAttribute('aria-busy', ariaBusy);
+        profileSave = null;
+        if (pendingSync) scheduleSync(100);
+      },
+    };
   }
 
   window.addEventListener("ww:state-saved", function (event) {
@@ -603,6 +688,7 @@
   });
 
   window.WWAccountSync = {
-    syncNow: syncStateToServer,
+    syncNow: () => profileSave ? Promise.resolve(false) : startSync(),
+    beginProfileSave,
   };
 })();

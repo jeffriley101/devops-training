@@ -5,6 +5,7 @@
 {% endblock %}
 
 {% block content %}
+<a class="room-return" href="/store">← Back to SHOP</a>
 <p class="notice-card">Tell us when you complete a BOARD activity. Rehearsal, instrument care, and readiness each earn +1 Board Activity Point and +1 dandelion once daily. Today’s Bonus Challenge earns +2 points and +5 dandelions when you click “I Played It.” The server tracks these daily rewards. Trivia earns +1 point and +1 dandelion for a correct answer. These check-ins do not create verified practice minutes.</p>
 <section class="card board-page"{% if board_season.artwork_theme %} data-season-theme="{{ board_season.artwork_theme }}"{% endif %}>
   <a id="plunge-burrow-button" class="board-plunge-button" href="/plunge-burrow" aria-label="Play Plunge Burrow" title="Play Plunge Burrow"><span aria-hidden="true">🕳️</span></a>
@@ -427,6 +428,11 @@
   </div>
 
   <p id="board-feedback" class="board-feedback" aria-live="polite"></p>
+
+  <aside class="board-definition-card" aria-labelledby="practice-definition-title">
+    <h2 id="practice-definition-title">Practice Definition</h2>
+    <p>{{ practice_definition }}</p>
+  </aside>
 
   <section class="board-practice-section bonus-challenge-section" aria-labelledby="bonus-challenge-title">
     <span class="bonus-challenge-screw bonus-challenge-screw-top-left" aria-hidden="true"></span>

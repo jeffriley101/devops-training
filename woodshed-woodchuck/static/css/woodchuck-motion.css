@@ -121,3 +121,9 @@
     will-change: auto;
   }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .woodshed-character-layer.ww-motion-ready .woodshed-character-art.is-tap-wiggle {
+    filter: brightness(1.15) drop-shadow(0 0 3px #fff4d4);
+  }
+}

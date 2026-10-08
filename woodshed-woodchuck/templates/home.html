@@ -9,6 +9,7 @@
   <div class="woodshed-scene artwork-scene shed-artwork-scene" aria-label="Interactive Woodshed room">
     <img class="room-scene-art" src="{{ shed_cabin_background_url }}" width="941" height="1672" alt="The Woodshed room" />
     <div class="woodshed-character-layer" data-presentation-only aria-label="Your Woodchuck">
+      <button class="character-reaction-target" type="button" aria-label="Make your Woodchuck wiggle"></button>
       <img class="character-art woodshed-character-art" data-student-woodchuck src="{{ shed_character_url }}" alt="Your Woodchuck" />
     </div>
     {% if shed_season.artwork_theme == "harvest" %}
@@ -16,10 +17,10 @@
     {% endif %}
     <div id="shed-decoration-layer" class="shed-decoration-layer" aria-label="Placed SHED decorations"></div>
     <div id="woodshed-hotspots" class="scene-hotspots" aria-label="Woodshed room controls">
-      <button id="woodchuck-name-value" class="scene-hotspot" data-scene-cell="L1" type="button" aria-controls="change-name-panel" aria-expanded="false" aria-label="Change Woodchuck name"></button>
-      <button id="shed-team-button" class="scene-hotspot" data-scene-cell="R1" type="button" aria-controls="shed-team-panel" aria-expanded="false" aria-label="Choose a team"><span id="shed-team-emblem" hidden></span></button>
-      <button id="instrument-object" class="scene-hotspot" data-scene-cell="L2" type="button" aria-controls="your-woodchuck" aria-expanded="false" aria-label="Your Woodchuck: instrument, hoodie and hat colors"></button>
-      <button id="level-value" class="scene-hotspot" data-scene-cell="R2" type="button" aria-controls="change-level-panel" aria-expanded="false" aria-label="Change student level"></button>
+      <a class="scene-hotspot" data-scene-cell="L1" href="/store" aria-label="Go to SHOP"><span class="room-destination-label">SHOP →</span></a>
+      <button id="shed-team-button" class="scene-hotspot" data-scene-cell="R1" type="button" aria-controls="shed-team-panel" aria-expanded="false" aria-label="Name and Team"><span class="room-identity-label"><span id="woodchuck-name-value">Your Woodchuck</span><span id="shed-team-emblem" hidden></span></span></button>
+      <a class="scene-hotspot" data-scene-cell="L2" href="/p-book" aria-label="Open BOOK"><span class="room-destination-label">BOOK</span></a>
+      <button id="instrument-object" class="scene-hotspot" data-scene-cell="R2" type="button" aria-controls="your-woodchuck" aria-expanded="false" aria-label="Instrument, Appearance and Student Level"></button>
       <button id="xp-level-control" class="scene-hotspot" data-scene-cell="L3" type="button" aria-controls="xp-panel" aria-expanded="false" aria-label="Open XP and Daily Login Streak"><span id="xp-level-number" hidden>1</span></button>
       <button id="metronome-open-button" class="scene-hotspot" data-scene-cell="R3" type="button" aria-controls="metronome-panel" aria-expanded="false" aria-label="Open metronome"></button>
       <button id="shed-decorate-button" class="scene-hotspot" data-scene-cell="L4" type="button" aria-controls="shed-decorate-panel" aria-expanded="false" aria-label="Open Stickerbook"></button>
@@ -59,11 +60,23 @@
     <p id="xp-panel-status" class="xp-panel-status" role="status" aria-live="polite"></p>
   </section>
 
-  <section id="shed-team-panel" class="mentor-card hidden" hidden aria-labelledby="shed-team-title">
+  <section id="shed-team-panel" class="mentor-card hidden" hidden data-profile-surface aria-labelledby="shed-team-title">
     <div class="xp-panel-head">
-      <h2 id="shed-team-title">Choose Your Team</h2>
-      <button id="shed-team-close" class="xp-panel-close" type="button" aria-label="Close Team panel">×</button>
+      <h2 id="shed-team-title">Name and Team</h2>
+      <button id="shed-team-close" class="xp-panel-close" type="button" aria-label="Close Name and Team panel">×</button>
     </div>
+  <section id="change-name-panel" class="combined-panel-section" data-embedded-profile aria-labelledby="change-name-title">
+    <div class="section-head"><p class="chip">Edit Profile</p><h2 id="change-name-title">Change Name</h2></div>
+    <p>Your public Woodchuck name may be changed once every 24 hours.</p>
+    <form id="change-name-form" class="stack-form">
+      <label for="change-name-input">Public Woodchuck name</label>
+      <input id="change-name-input" name="display_name" maxlength="50" required />
+      <p id="change-name-feedback" class="body-copy" role="status" aria-live="polite"></p>
+      <div class="button-row"><button class="btn btn-primary" type="submit">Save Name</button><button class="btn btn-secondary" type="button" data-close-profile-panel>Close panel</button></div>
+    </form>
+  </section>
+
+    <h2>Choose Your Team</h2>
     <div id="shed-team-current" class="shed-team-current" aria-live="polite">Loading teams…</div>
     <button id="shed-team-leave" class="btn btn-secondary" type="button" hidden>Leave Team</button>
     <details id="shed-team-report-panel" class="shed-team-report" hidden>
@@ -109,27 +122,6 @@
 
   {% include "_shed_secret.html" %}
 
-  <section id="change-name-panel" class="mentor-card change-profile-panel hidden" aria-labelledby="change-name-title" hidden>
-    <div class="section-head"><p class="chip">Edit Profile</p><h2 id="change-name-title">Change Name</h2></div>
-    <p>Your public Woodchuck name may be changed once every 24 hours.</p>
-    <form id="change-name-form" class="stack-form">
-      <label for="change-name-input">Public Woodchuck name</label>
-      <input id="change-name-input" name="display_name" maxlength="50" required />
-      <p id="change-name-feedback" class="body-copy" role="status" aria-live="polite"></p>
-      <div class="button-row"><button class="btn btn-primary" type="submit">Save Name</button><button class="btn btn-secondary" type="button" data-close-profile-panel>Cancel</button></div>
-    </form>
-  </section>
-
-  <section id="change-level-panel" class="mentor-card change-profile-panel hidden" aria-labelledby="change-level-title" hidden>
-    <div class="section-head"><p class="chip">Edit Profile</p><h2 id="change-level-title">Change Level</h2></div>
-    <p>Your level may be changed once every 30 days.</p>
-    <form id="change-level-form" class="stack-form">
-      <label for="change-level-select">Current level</label>
-      <select id="change-level-select" name="level" required>{% for item in levels %}<option value="{{ item }}">{{ item }}</option>{% endfor %}</select>
-      <p id="change-level-feedback" class="body-copy" role="status" aria-live="polite"></p>
-      <div class="button-row"><button class="btn btn-primary" type="submit">Save Level</button><button class="btn btn-secondary" type="button" data-close-profile-panel>Cancel</button></div>
-    </form>
-  </section>
 
   <section
     id="metronome-panel"

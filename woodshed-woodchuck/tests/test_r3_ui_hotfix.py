@@ -40,17 +40,23 @@ def test_practice_doors_and_locked_exercises():
     env = Environment(loader=FileSystemLoader(ROOT / "templates"))
     store = env.get_template("store.html").render()
     doors = re.findall(r'<a class="practice-room-emoji-control practice-room-door".*?</a>', store)
-    assert len(doors) == 4
-    for door, letter, label in zip(doors, "ABCD", [
-        "Skill Building Exercises", "Pristine P-Chart", "Arcade Room", "Spectrogram"
+    assert len(doors) == 3
+    for door, letter, label in zip(doors, "ABC", [
+        "Skill Building Exercises", "Pristine P-Chart", "Arcade Room"
     ]):
         assert f'door-tag">{letter}</span>' in door
         assert f'<strong>{label}</strong>' in door
     assert 'href="/practice/skill-building"' in doors[0]
     assert 'href="/practice/pristine"' in doors[1]
     assert 'href="/arcade"' in doors[2]
-    assert 'href="https://brassspectrogram.netlify.app/"' in doors[3]
-    assert 'target="_blank"' in doors[3] and 'rel="noopener noreferrer"' in doors[3]
+    # The later security contract intentionally disables the external door.
+    disabled = re.search(r'<div class="practice-room-emoji-control practice-room-door".*?</div>', store).group()
+    assert 'role="link" aria-disabled="true"' in disabled
+    assert 'Spectrogram. Temporarily unavailable' in disabled
+    assert 'door-tag">D</span>' in disabled
+    assert '<strong>Spectrogram</strong>' in disabled
+    assert 'href=' not in disabled
+    assert 'brassspectrogram.netlify.app' not in store
     client = TestClient(main.app)
     response = client.get("/practice/skill-building")
     assert response.status_code == 200

@@ -5,6 +5,7 @@ from app.content import LEVEL_OPTIONS
 
 ROOT = Path(__file__).resolve().parents[1]
 HOME = (ROOT / "templates" / "home.html").read_text()
+MUSICIAN = (ROOT / "templates/_your_woodchuck.html").read_text()
 APP = (ROOT / "static" / "js" / "app.js").read_text()
 CSS = (ROOT / "static" / "css" / "styles.css").read_text()
 MAIN = (ROOT / "app" / "main.py").read_text()
@@ -19,9 +20,9 @@ def xp_javascript() -> str:
 def test_shed_controls_use_requested_left_and_right_columns() -> None:
     from test_r4a_artwork import cells, SHED
     controls = cells(HOME)
-    assert {a['data-scene-cell']: a['id'] for _, a in controls} == SHED
+    assert {a['data-scene-cell']: a.get('id') or a.get('href') for _, a in controls} == SHED
     assert HOME.count('id="xp-level-control"') == 1
-    assert HOME.count('id="level-value"') == 1
+    assert MUSICIAN.count('id="level-value"') == 1
     assert 'id="xp-level-number" hidden' in HOME
     assert '⭐' not in HOME[:HOME.index('id="sound-effects-panel"')]
     assert '🏅' not in HOME
@@ -57,30 +58,30 @@ def test_profile_skill_level_editor_remains_separate() -> None:
     home_route = MAIN[home_route_start:home_route_end]
     assert "levels=LEVEL_OPTIONS" in home_route
 
-    select_start = HOME.index("<select id=\"change-level-select\"")
-    select_end = HOME.index("</select>", select_start)
-    profile_level_select = HOME[select_start:select_end]
+    select_start = MUSICIAN.index("<select id=\"change-level-select\"")
+    select_end = MUSICIAN.index("</select>", select_start)
+    profile_level_select = MUSICIAN[select_start:select_end]
     assert "{% for item in levels %}" in profile_level_select
     assert "<option value=\"{{ item }}\">{{ item }}</option>" in profile_level_select
     assert {"Beginner", "Intermediate", "Advanced"}.issubset(LEVEL_OPTIONS)
 
-    profile_control_start = HOME.index("id=\"level-value\"")
+    profile_control_start = HOME.index("id=\"instrument-object\"")
     profile_control_end = HOME.index("</button>", profile_control_start)
     profile_control = HOME[profile_control_start:profile_control_end]
     xp_control_start = HOME.index("id=\"xp-level-control\"")
     xp_control_end = HOME.index("</button>", xp_control_start)
     xp_control = HOME[xp_control_start:xp_control_end]
-    assert "aria-controls=\"change-level-panel\"" in profile_control
+    assert "aria-controls=\"your-woodchuck\"" in profile_control
     assert "aria-controls=\"xp-panel\"" in xp_control
     assert profile_control_start != xp_control_start
-    assert "id=\"change-level-panel\"" in HOME
+    assert "id=\"change-level-panel\"" in MUSICIAN
 
     hydrate_start = APP.index("  function hydrateHome(state) {")
     hydrate_end = APP.index("  function wireXpPanel() {", hydrate_start)
     hydrate = APP[hydrate_start:hydrate_end]
     assert "const levelEl = document.getElementById(\"level-value\");" in hydrate
     assert "const profileLevel = state.profile.level || \"Level not set\";" in hydrate
-    assert "levelEl.textContent" not in hydrate
+    assert "levelEl.textContent = profileLevel" in hydrate
     assert "`Level: ${profileLevel}. Change level.`" in hydrate
     assert "const control = document.getElementById(\"xp-level-control\");" in xp_javascript()
 
@@ -103,9 +104,9 @@ def test_xp_cell_uses_artwork_with_an_accessible_label() -> None:
 
 
 def test_profile_level_cell_remains_separate_from_xp() -> None:
-    control_start = HOME.index('id="level-value"')
+    control_start = HOME.index('id="instrument-object"')
     control = HOME[control_start:HOME.index("</button>", control_start)]
-    assert 'aria-controls="change-level-panel"' in control
+    assert 'aria-controls="your-woodchuck"' in control
     assert 'data-scene-cell="R2"' in control
     assert "🏅" not in control
 

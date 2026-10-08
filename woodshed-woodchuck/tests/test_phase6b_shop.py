@@ -34,15 +34,16 @@ def test_left_controls_preserve_rewards_and_community_actions() -> None:
     markup = shop_markup()
     from test_r4a_artwork import cells
     left = [a for _, a in cells(markup) if a['data-scene-cell'].startswith('L')]
-    assert [a.get('data-shop-panel', a.get('id')) for a in left] == [
-        'dandelion-object', 'crown', 'goat', 'artist', 'practice-room']
+    assert [a.get('data-shop-panel') or a.get('id') or a.get('href') for a in left] == [
+        '/home', 'crown', 'goat', 'contact', 'practice-room']
     assert 'id="credits-value"' in markup
     assert 'data-shop-panel="crown"' in markup
     assert 'data-shop-panel="goat"' in markup
     assert "The GOAT Tracker" in markup
-    assert "{{ practice_definition }}" in markup
+    assert "{{ practice_definition }}" not in markup
+    assert "{{ practice_definition }}" in (ROOT / "templates/quest.html").read_text()
     assert PRACTICE_DEFINITION not in markup
-    assert 'data-shop-panel="share"' in markup
+    assert 'data-shop-panel="contact"' in markup
     assert 'src="{{ public_site_qr }}"' in markup
     assert 'href="{{ public_site_url }}"' in markup
 
@@ -51,15 +52,15 @@ def test_right_controls_and_full_access_link_are_unique() -> None:
     markup = shop_markup()
     from test_r4a_artwork import cells
     right = [a for _, a in cells(markup) if a['data-scene-cell'].startswith('R')]
-    assert [a.get('data-shop-panel', a.get('href')) for a in right] == [
-        'gear', 'little-buddy', 'share', '/membership?as_account=student', 'practice-definition']
+    assert [a.get('data-shop-panel') or a.get('href') or a.get('id') for a in right] == [
+        'gear', 'little-buddy', '/quest', 'dandelion-object', '/membership?as_account=student']
     assert "Spectrogram. Temporarily unavailable" in markup
     assert 'href="/practice/pristine" aria-label="Open Pristine Practice"' in markup
     assert "Clothing Shelf, coming soon" not in markup
     assert "Gear Shelf, coming soon" not in markup
     assert "direct file upload" not in markup
     assert 'href="/membership?as_account=student"' in markup
-    assert markup.count('aria-label="Premium"') == 1
+    assert markup.count('aria-label="Subscription and Pricing"') == 1
 
 
 def test_shop_dialogs_and_keyboard_focus_behavior_are_wired() -> None:
@@ -69,9 +70,9 @@ def test_shop_dialogs_and_keyboard_focus_behavior_are_wired() -> None:
     assert markup.count('class="shop-feature-dialog') == 2
     assert 'aria-labelledby="shop-dialog-title"' in markup
     for label in (
-        "Open Crown Progress", "Open The GOAT Tracker", "Open Practice Definition",
-        "Share Woodshed", "Open Gear Shelf", "Open Little Buddy Shelf",
-        "Open Practice Room", "Open Artist instructions", "Premium",
+        "Open Crown Progress", "Open The GOAT Tracker", "Open BOARD",
+        "Open Contact", "Open Gear Shelf", "Open Little Buddy Shelf",
+        "Open Practice Room", "Subscription and Pricing",
     ):
         assert f'aria-label="{label}' in markup
     assert "dialog.showModal()" in javascript
