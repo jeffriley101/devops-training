@@ -85,7 +85,7 @@
     reset();
     clearObsoleteGuestStorage();
     feedback.textContent = "Guest data discarded.";
-    if (document.body.dataset.c001Context === "true") {
+    if (document.body.dataset.prebetaContext === "true" || document.body.dataset.c001Context === "true") {
       // Discard the signed source claim explicitly, without submitting tool data.
       const discard = document.createElement("form");
       discard.method = "post";

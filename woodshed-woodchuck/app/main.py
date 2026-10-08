@@ -72,11 +72,14 @@ from .login_limits import protection_status
 from .tester_enrollments import (
     C001,
     DIRECTOR1,
+    PUBLIC_PREBETA_COHORTS,
     SESSION_REGISTRATION_CONTEXT,
-    establish_registration_context,
     c001_registration_open,
+    direct_entry_source,
+    establish_registration_context,
     registration_context,
     registration_source,
+    secret_symbol_cohort,
 )
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -391,11 +394,12 @@ def guest_page(request: Request):
         account_id = profile.woodchuck_id if profile is not None else ""
         if profile is not None:
             page_generation(request)
-    # The signed C001 claim is registration context, not authentication. All
+    # The signed Pre-Beta claim is registration context, not authentication. All
     # other account/adult/admin session state still requires explicit logout.
     tester_claim = registration_context(request)
     context_only = set(request.session) <= {SESSION_REGISTRATION_CONTEXT, BROWSER_KEY, FLASH_KEY}
     blocked = bool(profile is not None or (request.session and not context_only))
+    registration_cohort = tester_claim if not blocked else None
     signing_in = request.url.path == "/guest/login" and not blocked
     response = templates.TemplateResponse(
         request=request, name="guest.html",
@@ -403,8 +407,10 @@ def guest_page(request: Request):
                  "account_id": account_id, "instruments": INSTRUMENT_OPTIONS,
                  "levels": LEVEL_OPTIONS, "goals": GOAL_OPTIONS,
                  "secret_feedback": request.session.pop(FLASH_KEY, "") if not blocked else "",
-                 "c001_registration": bool(tester_claim) and not blocked,
-                 "c001_symbol_recognized": registration_source(request) == DIRECTOR1 and not blocked},
+                 "registration_cohort": registration_cohort,
+                 "c001_registration": registration_cohort == C001,
+                 "prebeta_symbol_recognized": bool(registration_cohort) and registration_source(request) == DIRECTOR1,
+                 "c001_symbol_recognized": registration_cohort == C001 and registration_source(request) == DIRECTOR1},
     )
     response.headers["Cache-Control"] = "no-store"
     response.headers["Referrer-Policy"] = "no-referrer"
@@ -423,14 +429,15 @@ def guest_secret_symbol(request: Request, passcode: str = Form("")):
         profile = current_profile(request, session)
     if profile is not None or set(request.session) - {SESSION_REGISTRATION_CONTEXT, BROWSER_KEY, FLASH_KEY}:
         raise HTTPException(409, "Use Secret Symbol from your current account or return to Guest Mode.")
-    if passcode.strip().casefold() != "c001":
+    cohort_key = secret_symbol_cohort(passcode)
+    if cohort_key is None:
         record_outcome("secret_failure", _identity.get(), session_factory=SessionLocal)
         request.session[FLASH_KEY] = "That passcode did not match. Try again."
     else:
         try:
-            establish_registration_context(request, C001, source=DIRECTOR1)
-            request.session[FLASH_KEY] = "C001 Pre-Beta recognized."
-            if not activation_enabled():
+            establish_registration_context(request, cohort_key, source=DIRECTOR1)
+            request.session[FLASH_KEY] = f"{cohort_key} Pre-Beta recognized."
+            if cohort_key == C001 and not activation_enabled():
                 request.session[FLASH_KEY] += " New activation is temporarily unavailable; Guest tools remain available."
         except ValueError as error:
             request.session[FLASH_KEY] = str(error)
@@ -452,14 +459,18 @@ async def discard_guest_context(request: Request):
     return RedirectResponse("/guest", 303, headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
 
 
-@app.get("/prebeta/C001")
-def prebeta_c001(request: Request):
-    """Deliberate, public C001 entry; no account or enrollment is created."""
+@app.get("/prebeta/{cohort_key}")
+def prebeta_entry(request: Request, cohort_key: str):
+    """Deliberate public Pre-Beta entry; no account or enrollment is created."""
+    if cohort_key not in PUBLIC_PREBETA_COHORTS:
+        raise HTTPException(404, "Unknown Pre-Beta cohort.")
     try:
-        # Only these fixed invitation markers select the server-owned source.
-        # Bare entry remains unattributed; arbitrary source values are ignored.
-        source = DIRECTOR1 if request.query_params.get("entry") in {"director1", "secret-symbol"} else None
-        establish_registration_context(request, C001, source=source)
+        # C001 keeps its original bare-link behavior. C002's direct route is
+        # the Director #1 entry and always establishes its fixed source.
+        establish_registration_context(
+            request, cohort_key,
+            source=direct_entry_source(cohort_key, request.query_params.get("entry")),
+        )
     except ValueError as error:
         return templates.TemplateResponse(
             request=request, name="c001_entry.html",
@@ -486,6 +497,7 @@ def c001_display(request: Request):
 
 @app.get("/setup")
 def setup(request: Request):
+    registration_cohort = registration_context(request)
     return _render(
         request,
         "setup.html",
@@ -494,7 +506,8 @@ def setup(request: Request):
         instruments=INSTRUMENT_OPTIONS,
         levels=LEVEL_OPTIONS,
         goals=GOAL_OPTIONS,
-        c001_registration=registration_context(request) is not None,
+        c001_registration=registration_cohort == C001,
+        registration_cohort=registration_cohort,
         active_nav=None,
     )
 

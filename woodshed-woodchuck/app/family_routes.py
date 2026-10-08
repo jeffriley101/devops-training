@@ -96,7 +96,7 @@ def request_page(request:Request):
         p=current_profile(request,s)
         claim=registration_context(request) if p is None else None
         status=student_consent_status(s,p.id) if p else None
-        return page(request,'request',available=service.under13_available(),confirm_account=p.woodchuck_id if p else 'new',kws_label=kws_label(),c001_registration=bool(claim),consent_status=status)
+        return page(request,'request',available=service.under13_available(),confirm_account=p.woodchuck_id if p else 'new',kws_label=kws_label(),registration_cohort=claim,consent_status=status)
 
 @router.post('/family/request')
 async def request_permission(request:Request):
@@ -154,7 +154,9 @@ def activation_page(request:Request,token:str):
         if not r.confirmed_at:raise HTTPException(409,'Confirmation pending.')
         p=current_profile(request,s)
         if r.profile_id!=(p.id if p else None):return page(request,'message',message='Sign in to the originally approved existing account, or sign out if approval was for a new account. Then reopen this link.')
-        return page(request,'activate',confirm_account=p.woodchuck_id if p else 'new',existing=bool(p),cohort_key=r.cohort_key)
+        from .tester_enrollments import LIFETIME_TESTER_COHORTS
+        return page(request,'activate',confirm_account=p.woodchuck_id if p else 'new',existing=bool(p),cohort_key=r.cohort_key,
+                    cohort_lifetime_access=r.cohort_key in LIFETIME_TESTER_COHORTS)
 
 @router.post('/family/activate/{token}')
 async def activate(request:Request,token:str):

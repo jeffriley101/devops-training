@@ -6,7 +6,7 @@
   <title>Guest exploration · Woodshed Woodchuck</title>
   <link rel="stylesheet" href="/static/css/styles.css?v=124" />
 </head>
-<body data-guest="{{ 'local' if not blocked and not signing_in else 'transition' }}" data-account-id="{{ account_id }}" data-page-generation="{{ request.session.get('woodchuck_page_generation', '') if account_id else '' }}" data-authenticated="{{ 'true' if account_id else 'false' }}" data-c001-context="{{ 'true' if c001_registration else 'false' }}">
+<body data-guest="{{ 'local' if not blocked and not signing_in else 'transition' }}" data-account-id="{{ account_id }}" data-page-generation="{{ request.session.get('woodchuck_page_generation', '') if account_id else '' }}" data-authenticated="{{ 'true' if account_id else 'false' }}" data-c001-context="{{ 'true' if c001_registration else 'false' }}" data-prebeta-context="{{ 'true' if registration_cohort else 'false' }}" data-prebeta-cohort="{{ registration_cohort or '' }}">
 <div class="app-shell"{% if account_id %} hidden{% endif %}><main class="content-wrap">
 <section class="card">
   <p class="chip">Guest exploration</p>
@@ -28,7 +28,7 @@
   </form>
   <a class="btn btn-secondary" href="/guest">Back to Guest tools</a>
   {% else %}
-  {% if secret_feedback %}<p id="guest-secret-feedback" role="status">{{ secret_feedback }}</p>{% elif c001_symbol_recognized %}<p role="status">C001 Pre-Beta recognized.</p>{% endif %}
+  {% if secret_feedback %}<p id="guest-secret-feedback" role="status">{{ secret_feedback }}</p>{% elif prebeta_symbol_recognized %}<p role="status">{{ registration_cohort }} Pre-Beta recognized.</p>{% endif %}
   <p>No account needed. Your setup, chart and game score last only while this page is open. Reloading or leaving clears them. The tuner processes microphone audio on your device. Browsing makes ordinary web requests that may appear in operational logs.</p>
   <noscript><p>Enable JavaScript to use these local practice tools.</p></noscript>
   <form id="guest-setup-form" class="stack-form" method="dialog" autocomplete="off">
@@ -217,10 +217,10 @@
   <p>Saved practice history, the Practice Book, Pristine Practice, other Arcade games, contests, rewards, inventory/shop and teams need an account.</p>
   {% endif %}
   <p id="guest-feedback" class="body-copy" role="status" aria-live="polite"></p>
-  {% if c001_registration %}
-  <h2>C001 Pre-Beta</h2>
-  <p>You can keep exploring as a Guest, or create a new C001 tester account. Guest exploration still creates no account, enrollment or Full Access.</p>
-  <a class="btn btn-primary" href="/setup?from=guest" data-guest-account-entry>Create a C001 Pre-Beta account</a>
+  {% if registration_cohort %}
+  <h2>{{ registration_cohort }} Pre-Beta</h2>
+  <p>You can keep exploring as a Guest, or create a new {{ registration_cohort }} tester account. Guest exploration still creates no account, enrollment or Full Access.</p>
+  <a class="btn btn-primary" href="/setup?from=guest" data-guest-account-entry>Create a {{ registration_cohort }} Pre-Beta account</a>
   {% else %}
   <p>C001 registration starts from the official C001 entry link or C001 in Secret Symbol in the Guest SHED. Guest exploration does not establish eligibility, create an account or grant Full Access.</p>
   {% endif %}

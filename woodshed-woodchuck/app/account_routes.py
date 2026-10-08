@@ -221,8 +221,10 @@ def create_account(
             declare_age(session, profile.id, age_band)
             if tester_claim is not None:
                 enroll_tester(session, profile.id, tester_claim, tester_clock(), source=registration_source(request))
-                from .c001_abuse import record_creation
-                record_creation(session, profile.id)
+                from .tester_enrollments import C001
+                if tester_claim == C001:
+                    from .c001_abuse import record_creation
+                    record_creation(session, profile.id)
             authoritative_state = preserve_server_values(submitted_state)
             account = {}
             account.update({
@@ -304,7 +306,7 @@ def login(
         request.session[SESSION_PROFILE_VERSION] = profile.session_version
         request.session[SESSION_PAGE_GENERATION] = secrets.token_urlsafe(24)
 
-        # C001 is a new-registration source, never activity or existing-account
+        # Pre-Beta is a new-registration source, never activity or existing-account
         # context. A failed login retains a valid registration claim.
         from .tester_enrollments import clear_registration_context
         clear_registration_context(request)
@@ -402,13 +404,15 @@ def delete_account(
 
 @router.post("/daily-secret")
 def redeem_daily_secret(request: Request, submitted: DailySecretSubmission):
-    if submitted.passcode.strip().casefold() == "c001":
+    from .tester_enrollments import secret_symbol_cohort
+    cohort_key = secret_symbol_cohort(submitted.passcode)
+    if cohort_key is not None:
         # Existing accounts cannot join via the public new-account entry.
         # Guest uses a native form POST with the shared registration resolver.
         with SessionLocal() as session:
             if current_profile(request, session) is None:
                 raise HTTPException(status_code=401, detail="Student sign-in is required.")
-        return {"recognized": True, "message": "C001 Pre-Beta is for new accounts. Your account has not changed."}
+        return {"recognized": True, "message": f"{cohort_key} Pre-Beta is for new accounts. Your account has not changed."}
     if submitted.passcode.strip().casefold() != "union":
         raise HTTPException(status_code=400, detail="That passcode did not match. Try again.")
     with SessionLocal() as session:

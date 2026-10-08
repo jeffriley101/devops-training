@@ -140,6 +140,39 @@ def test_c001_guest_context_only_comes_from_deliberate_route_and_creates_nothing
         assert (count(session, Enrollment), count(session, WoodchuckProfile)) == before
 
 
+def test_c002_direct_entry_is_director_attributed_guest_context_only(tester_db):
+    client = TestClient(app)
+    with tester_db() as session:
+        before = count(session, Enrollment), count(session, WoodchuckProfile)
+    response = client.get("/prebeta/C002?source=FORGED")
+    assert response.status_code == 200
+    assert testers.registration_context(response.context["request"]) == testers.C002
+    assert testers.registration_source(response.context["request"]) == testers.DIRECTOR1
+    assert 'data-prebeta-context="true"' in response.text
+    assert 'data-prebeta-cohort="C002"' in response.text
+    assert 'data-c001-context="false"' in response.text
+    assert "Create a C002 Pre-Beta account" in response.text
+    setup = client.get("/setup?age=under13")
+    assert "C002 Pre-Beta registration" in setup.text
+    assert "Your C002 claim will stay with the parent request across devices." in setup.text
+    with tester_db() as session:
+        assert (count(session, Enrollment), count(session, WoodchuckProfile)) == before
+
+
+def test_c002_secret_symbol_is_director_attributed_and_creates_no_persistent_rows(tester_db):
+    client = TestClient(app)
+    with tester_db() as session:
+        before = count(session, Enrollment), count(session, WoodchuckProfile)
+    for _ in range(2):
+        response = client.post("/guest/secret-symbol", data={"passcode": " c002 "})
+        assert response.status_code == 200
+        assert "C002 Pre-Beta recognized." in response.text
+        assert testers.registration_context(response.context["request"]) == testers.C002
+        assert testers.registration_source(response.context["request"]) == testers.DIRECTOR1
+    with tester_db() as session:
+        assert (count(session, Enrollment), count(session, WoodchuckProfile)) == before
+
+
 @pytest.mark.parametrize("entry,source", [
     ("/prebeta/C001", None),
     ("/prebeta/C001?entry=secret-symbol", "DIRECTOR1"),
@@ -178,6 +211,59 @@ def test_c001_13plus_creation_is_atomic_full_and_does_not_touch_memberships(test
     with tester_db() as session:
         assert count(session, WoodchuckProfile) == 2
         assert count(session, Enrollment) == 1
+
+
+def test_c002_context_survives_guest_registration_with_lifetime_access_and_distinct_analytics(tester_db):
+    client = TestClient(app)
+    entry = client.get("/prebeta/C002?source=FORGED")
+    assert entry.status_code == 200
+    for path in ("/guest", "/setup", "/guest", "/prebeta/C002", "/prebeta/C002?entry=unknown"):
+        page = client.get(path)
+        assert page.status_code == 200
+        assert testers.registration_context(page.context["request"]) == testers.C002
+        assert testers.registration_source(page.context["request"]) == testers.DIRECTOR1
+
+    failed = client.post("/account/create", data={**account_form("13to17"), "initial_state": "{"})
+    assert failed.status_code == 400
+    assert testers.registration_context(client.get("/guest").context["request"]) == testers.C002
+
+    created = client.post("/account/create", data=account_form("13to17"))
+    assert created.status_code == 200, created.text
+    profile_id = created.json()["profile"]["id"]
+    with tester_db() as session:
+        enrollment = session.scalar(select(Enrollment).where(
+            Enrollment.profile_id == profile_id,
+            Enrollment.cohort_key == testers.C002,
+        ))
+        assert enrollment.source == testers.DIRECTOR1
+        assert testers.utc(enrollment.joined_at) == CLAIMED
+        assert student_has_full_access(session, profile_id)
+        assert student_has_full_access(session, profile_id, at=CLAIMED + timedelta(days=3650))
+        assert count(session, Enrollment) == 1
+        assert count(session, BillingAccount) == count(session, Membership) == 0
+        assert count(session, MembershipSeat) == count(session, ProviderSubscription) == 0
+
+    assert client.post("/account/create", data=account_form()).status_code == 400
+    with tester_db() as session:
+        assert count(session, Enrollment) == count(session, WoodchuckProfile) == 1
+
+    from app.analytics import build_report
+    report = build_report(tester_db, cohort_key=testers.C002)
+    assert report["cohort_key"] == testers.C002
+    assert report["enrolled"] == 1
+    assert [student["source"] for student in report["students"]] == [testers.DIRECTOR1]
+    assert build_report(tester_db, cohort_key=testers.C001)["enrolled"] == 0
+    assert build_report(tester_db, cohort_key=testers.PILOT_D1)["enrolled"] == 0
+
+
+def test_c002_does_not_use_c001_activation_control_or_cap(tester_db, monkeypatch):
+    from app import c001_abuse
+
+    monkeypatch.setattr(c001_abuse, "authorize_activation", lambda *args, **kwargs: pytest.fail("C002 used C001 activation control"))
+    monkeypatch.setenv("C001_ACTIVATION_ENABLED", "false")
+    client = TestClient(app)
+    assert client.get("/prebeta/C002").status_code == 200
+    assert client.post("/account/create", data=account_form("adult")).status_code == 200
 
 
 def test_c001_account_and_enrollment_roll_back_together_on_invalid_state(tester_db):
@@ -222,18 +308,19 @@ def prepare_child_services(monkeypatch):
     monkeypatch.setattr(consent, "send_copy", lambda *args, **kwargs: None)
 
 
-@pytest.mark.parametrize("entry,source", [
-    ("/prebeta/C001", None),
-    ("/prebeta/C001?entry=secret-symbol", "DIRECTOR1"),
-    ("/prebeta/C001?entry=director1", "DIRECTOR1"),
+@pytest.mark.parametrize("entry,cohort,source", [
+    ("/prebeta/C001", "C001", None),
+    ("/prebeta/C001?entry=secret-symbol", "C001", "DIRECTOR1"),
+    ("/prebeta/C001?entry=director1", "C001", "DIRECTOR1"),
+    ("/prebeta/C002", "C002", "DIRECTOR1"),
 ])
-def test_c001_under13_claim_survives_cross_device_activation_and_retry(tester_db, monkeypatch, entry, source):
+def test_prebeta_under13_claim_survives_cross_device_activation_and_retry(tester_db, monkeypatch, entry, cohort, source):
     prepare_child_services(monkeypatch)
     student = TestClient(app)
     student.get(entry)
     assert student.post("/account/create", data=account_form("under13")).status_code == 403
     page = student.get("/family/request")
-    assert "preserve the new account's C001 claim" in page.text
+    assert f"preserve the new account's {cohort} claim" in page.text
     forged = student.post("/family/request", data={
         "csrf": page.context["csrf"],
         "confirm_account": "new",
@@ -254,7 +341,7 @@ def test_c001_under13_claim_survives_cross_device_activation_and_retry(tester_db
     with tester_db() as session:
         pending = session.scalar(select(PendingConsent))
         assert pending.profile_id is None
-        assert pending.cohort_key == testers.C001
+        assert pending.cohort_key == cohort
         assert pending.cohort_source == source
         assert testers.utc(pending.cohort_claimed_at) == CLAIMED
         assert count(session, WoodchuckProfile) == count(session, Enrollment) == 0
@@ -305,7 +392,7 @@ def test_c001_under13_claim_survives_cross_device_activation_and_retry(tester_db
         enrollment = parent_device_session.scalar(select(Enrollment).where(
             Enrollment.profile_id == profile_id,
         ))
-        assert enrollment.cohort_key == testers.C001
+        assert enrollment.cohort_key == cohort
         assert enrollment.source == source
         assert testers.utc(enrollment.joined_at) == activated_at
         assert testers.utc(enrollment.joined_at) != CLAIMED
@@ -417,7 +504,7 @@ def test_secret_entry_existing_account_is_informational_only(tester_db):
 
 def test_invalid_secret_and_forged_attribution_do_not_create_claim(tester_db):
     client = TestClient(app)
-    bad = client.post('/account/daily-secret', json={'passcode': 'C002'})
+    bad = client.post('/account/daily-secret', json={'passcode': 'C003'})
     assert bad.status_code == 400
     assert bad.json()['detail'] == 'That passcode did not match. Try again.'
     guest = client.get('/guest?source=DIRECTOR1&cohort=C001')

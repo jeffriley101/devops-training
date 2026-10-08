@@ -35,7 +35,7 @@ def test_guest_symbols_use_server_limits_without_creating_student_state(tester_d
     client = TestClient(app)
     with tester_db() as s:
         before = {t.name: s.scalar(select(func.count()).select_from(t)) for t in Base.metadata.sorted_tables if not t.name.startswith('c001_')}
-    assert 'did not match' in symbol(client, 'C002').text
+    assert 'did not match' in symbol(client, 'C003').text
     assert testers.registration_context(client.get('/guest').context['request']) is None
     for _ in range(9):
         page = symbol(client, ' c001 ')
