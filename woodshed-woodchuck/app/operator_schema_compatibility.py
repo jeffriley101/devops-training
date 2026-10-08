@@ -1,6 +1,6 @@
 """Narrow installed-schema contract shared by the calendar and PTA operators.
 
-This is the frozen c22 extension contract, independent of live ORM metadata,
+These are frozen c22/c23 extension contracts, independent of live ORM metadata,
 feature flags, and plan/receipt versions. The existing operator-specific p21
 checks remain in their callers. Do not use this for historical seasonal repair.
 """
@@ -8,9 +8,9 @@ from __future__ import annotations
 
 import re
 
-from sqlalchemy import INTEGER, DateTime, Integer, MetaData, String, Table, inspect, select, text
+from sqlalchemy import INTEGER, Boolean, DateTime, Integer, MetaData, String, Table, inspect, select, text
 
-SUPPORTED_REVISIONS = ("p21team001", "c22class001")
+SUPPORTED_REVISIONS = ("p21team001", "c22class001", "c23class001")
 
 # Required c22 columns, keys, relationships, and indexes as installed by the
 # reviewed additive migration. PostgreSQL deparses CHECK expressions differently;
@@ -263,10 +263,14 @@ def installed_revision(connection, error):
     revisions = (list(connection.scalars(text("SELECT version_num FROM alembic_version")))
                  if "alembic_version" in tables else [])
     if len(revisions) != 1 or revisions[0] not in SUPPORTED_REVISIONS:
-        raise error("revision_not_approved: require exactly one of p21team001, c22class001")
+        raise error("revision_not_approved: require exactly one of " + ", ".join(SUPPORTED_REVISIONS))
     revision = revisions[0]
     if revision == "p21team001":
         return revision
+    expected_tables = dict(_C22)
+    if revision == "c23class001":
+        from .operator_classroom_s2_contract import C23
+        expected_tables.update(C23)
     dialect = connection.dialect.name
     if dialect not in {"sqlite", "postgresql"}:
         raise error("classroom_schema_backend_not_supported")
@@ -285,14 +289,16 @@ def installed_revision(connection, error):
               JOIN pg_namespace n ON n.oid=t.relnamespace
               WHERE n.nspname=current_schema() AND t.relname=ANY(:tables)
                 AND (NOT i.indisvalid OR NOT i.indisready))
-        """), {"tables": list(CLASSROOM_TABLES)}):
+        """), {"tables": list(expected_tables)}):
             raise error("classroom_schema_missing_or_changed: constraint_or_index_enforcement")
-    for name, expected in _C22.items():
+    for name, expected in expected_tables.items():
         def refuse(part):
             raise error("classroom_schema_missing_or_changed: " + name + ": " + part)
         if name not in tables:
             refuse("table")
         columns = {c["name"]: c for c in inspector.get_columns(name)}
+        if expected.get("exact") and set(columns) != set(expected["columns"]):
+            refuse("columns")
         # SQLite reflection normalizes INT/affinity aliases to INTEGER. SQLite
         # itself reports the genuine rowid-compatible type as exactly INTEGER.
         sqlite_types = dict(connection.execute(text(
@@ -300,7 +306,7 @@ def installed_revision(connection, error):
         ), {"table": name}).all()) if dialect == "sqlite" else {}
         for column, (kind, length, nullable) in expected["columns"].items():
             actual = columns.get(column)
-            types = {"Integer": Integer, "String": String, "DateTime": DateTime}
+            types = {"Integer": Integer, "String": String, "DateTime": DateTime, "Boolean": Boolean}
             if (actual is None or actual["nullable"] != nullable
                     or not isinstance(actual["type"], types[kind])
                     # SMALLINT/BIGINT inherit Integer; require physical INTEGER.
@@ -309,23 +315,104 @@ def installed_revision(connection, error):
                     or (kind == "String" and actual["type"].length != length)
                     or (kind == "DateTime" and dialect == "postgresql" and not actual["type"].timezone)):
                 refuse("columns")
+            if expected.get("exact"):
+                default_kind = expected["defaults"].get(column)
+                default = actual.get("default")
+                if default_kind == "clock":
+                    allowed_defaults = {"CURRENT_TIMESTAMP"} if dialect == "sqlite" else {"now()"}
+                elif default_kind == "serial" and dialect == "postgresql":
+                    # Migration-created SERIAL defaults must still refer to the
+                    # table's own sequence, not another table or arbitrary SQL.
+                    sequence = name + "_" + column + "_seq"
+                    quoted_schema = '"' + schema.replace('"', '""') + '"'
+                    allowed_defaults = {"nextval('" + ref + "'::regclass)" for ref in (
+                        sequence, schema + "." + sequence, quoted_schema + "." + sequence)}
+                else:
+                    allowed_defaults = {None}
+                if default not in allowed_defaults or actual.get("computed") or actual.get("identity"):
+                    refuse("defaults")
+                if default_kind == "serial" and dialect == "postgresql":
+                    # The rendered name alone cannot establish SERIAL ownership:
+                    # require its default dependency and the sequence's ownership
+                    # dependency to identify this exact table/column/schema.
+                    owns_default_sequence = connection.scalar(text("""
+                        SELECT count(*) = 1
+                        FROM pg_class t
+                        JOIN pg_namespace tn ON tn.oid=t.relnamespace
+                        JOIN pg_attribute a ON a.attrelid=t.oid AND a.attname=:column
+                        JOIN pg_attrdef d ON d.adrelid=t.oid AND d.adnum=a.attnum
+                        JOIN pg_depend dd ON dd.classid='pg_attrdef'::regclass
+                            AND dd.objid=d.oid AND dd.refclassid='pg_class'::regclass
+                        JOIN pg_class s ON s.oid=dd.refobjid AND s.relkind='S'
+                        WHERE tn.nspname=current_schema() AND t.relname=:table
+                            AND s.relnamespace=t.relnamespace AND s.relname=:sequence
+                            AND EXISTS (
+                                SELECT 1 FROM pg_depend owned
+                                WHERE owned.classid='pg_class'::regclass
+                                    AND owned.objid=s.oid AND owned.objsubid=0
+                                    AND owned.refclassid='pg_class'::regclass
+                                    AND owned.refobjid=t.oid AND owned.refobjsubid=a.attnum
+                                    AND owned.deptype='a')
+                    """), {"table": name, "column": column, "sequence": sequence})
+                    if not owns_default_sequence:
+                        refuse("defaults")
         if tuple(inspector.get_pk_constraint(name)["constrained_columns"]) != expected["primary_key"]:
             refuse("primary_key")
         checks = {c["name"]: c["sqltext"] for c in inspector.get_check_constraints(name)}
         expected_checks = expected["pg_checks"] if dialect == "postgresql" else expected["checks"]
+        if expected.get("exact") and set(checks) != set(expected_checks):
+            refuse("checks")
         if any(_sql(checks.get(key, "")) != _sql(sql) for key, sql in expected_checks.items()):
             refuse("checks")
         unique = {c["name"]: tuple(c["column_names"]) for c in inspector.get_unique_constraints(name)}
+        if expected.get("exact") and set(unique) != set(expected["unique"]):
+            refuse("unique")
         if any(unique.get(key) != columns for key, columns in expected["unique"].items()):
             refuse("unique")
+        if expected.get("exact") and dialect == "sqlite":
+            # Reflection collapses otherwise-identical SQLite foreign keys.
+            raw_fk_count = connection.scalar(text(
+                "SELECT count(DISTINCT id) FROM pragma_foreign_key_list(:table, 'main')"
+            ), {"table": name})
+            if raw_fk_count != len(expected["foreign_keys"]):
+                refuse("foreign_keys")
+        reflected_foreign_keys = inspector.get_foreign_keys(name)
+        if expected.get("exact"):
+            if len(reflected_foreign_keys) != len(expected["foreign_keys"]):
+                refuse("foreign_keys")
+            for foreign_key in reflected_foreign_keys:
+                options = foreign_key.get("options", {})
+                if (foreign_key.get("referred_schema") not in {None, schema}
+                        or set(options) - {"ondelete", "onupdate", "match", "deferrable", "initially"}
+                        or (options.get("onupdate") or "NO ACTION").upper() != "NO ACTION"
+                        or (options.get("match") or "SIMPLE").upper() != "SIMPLE"
+                        or options.get("deferrable", False)
+                        or (options.get("initially") or "IMMEDIATE").upper() != "IMMEDIATE"):
+                    refuse("foreign_keys")
         foreign_keys = {(tuple(f["constrained_columns"]), f["referred_table"],
                          tuple(f["referred_columns"]), f.get("options", {}).get("ondelete", "").upper())
-                        for f in inspector.get_foreign_keys(name)
+                        for f in reflected_foreign_keys
                         if f.get("referred_schema") in {None, schema}
                         and not f.get("options", {}).get("deferrable")}
+        if expected.get("exact") and set(expected["foreign_keys"]) != foreign_keys:
+            refuse("foreign_keys")
         if set(expected["foreign_keys"]) - foreign_keys:
             refuse("foreign_keys")
+        if expected.get("exact") and dialect == "sqlite":
+            # SQLAlchemy omits unsupported expression indexes from reflection.
+            # Count all explicit SQLite indexes before checking reflected details.
+            explicit_names = set(connection.scalars(text("""
+                SELECT name FROM sqlite_master
+                WHERE type='index' AND tbl_name=:table AND sql IS NOT NULL
+            """), {"table": name}))
+            if explicit_names != set(expected["indexes"]):
+                refuse("indexes")
         indexes = {i["name"]: i for i in inspector.get_indexes(name)}
+        if expected.get("exact"):
+            explicit_indexes = {key for key, index in indexes.items()
+                                if not index.get("duplicates_constraint")}
+            if explicit_indexes != set(expected["indexes"]):
+                refuse("indexes")
         for key, (columns, unique, predicate) in expected["indexes"].items():
             index = indexes.get(key)
             if index is None or tuple(index["column_names"]) != columns or bool(index["unique"]) != unique:
@@ -339,16 +426,23 @@ def installed_revision(connection, error):
                                for token in re.split(r"('(?:''|[^'])*')", _sql(value)))
             if predicate_shape(actual_predicate) != predicate_shape(predicate):
                 refuse("indexes")
+    if revision == "c23class001":
+        from .operator_classroom_s2_contract import validate_s2_guards
+        validate_s2_guards(connection, error)
     return revision
 
 
 def classroom_snapshot(connection, revision):
     """Separate transactional preservation evidence, never old receipt coverage."""
-    if revision != "c22class001":
+    if revision not in {"c22class001", "c23class001"}:
         return {}
+    names = CLASSROOM_TABLES
+    if revision == "c23class001":
+        from .operator_classroom_s2_contract import C23
+        names += tuple(C23)
     metadata = MetaData()
     tables = [Table(name, metadata, autoload_with=connection, resolve_fks=False)
-              for name in CLASSROOM_TABLES]
+              for name in names]
     return {table.name: [tuple(row) for row in connection.execute(
         select(table).order_by(*table.primary_key.columns))] for table in tables}
 

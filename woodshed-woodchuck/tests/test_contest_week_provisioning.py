@@ -238,6 +238,16 @@ def test_provision_retired_activation_later_source_finalization(tmp_path, backen
     engine = lifecycle.seed(url)
     try:
         with Session(engine) as s:
+            # Reward preservation requires account-eligible synthetic recipients.
+            # The older historical-repair seed deliberately has no age records.
+            from app.age_privacy import declare_age
+            for student in s.scalars(select(m.WoodchuckProfile)):
+                declare_age(s, student.id, "adult", at=lifecycle.BOUNDARY - timedelta(days=30))
+            # Reported minutes alone no longer qualify for contest rewards.
+            # Give this synthetic earning chart its independent BOOK approval.
+            s.get(m.PracticeChart, 53).source = "p-book"
+            s.add(m.PracticeChartVerification(practice_chart_id=53, status="approved",
+                responded_at=lifecycle.BOUNDARY - timedelta(hours=1)))
             s.get(m.Season, 1).name = "Back to School"
             s.get(m.Season, 2).name = "Halloween"
             s.get(m.ContestWeek, 6).practice_scoring_mode = scoring_mode

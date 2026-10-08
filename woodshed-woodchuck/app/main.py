@@ -30,6 +30,7 @@ from .account_routes import (
 )
 from .membership_routes import router as membership_router
 from .classroom_invitation_routes import router as classroom_invitation_router
+from .classroom_s2_routes import router as classroom_s2_router
 from .verifier_routes import (
     current_verifier,
     router as verifier_router,
@@ -126,6 +127,7 @@ async def age_screen_required_response(request, error):
     return JSONResponse({"detail":error.detail,"age_screen_required":True,"next":"/account/age"},403,headers=error.headers)
 app.include_router(membership_router)
 app.include_router(classroom_invitation_router)
+app.include_router(classroom_s2_router)
 app.include_router(verifier_router)
 app.include_router(practice_chart_router)
 app.include_router(contest_router)
