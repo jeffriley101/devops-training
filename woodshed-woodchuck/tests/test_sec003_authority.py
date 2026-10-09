@@ -1,4 +1,4 @@
-"""SEC-003: HTTP assertions cannot become earning or competitive evidence."""
+"""SEC-003: HTTP assertions cannot become earning or approved practice evidence."""
 from datetime import datetime, timedelta, timezone
 import sys
 from uuid import uuid4
@@ -11,6 +11,7 @@ from app import contests, main
 from app.models import (PracticeChart, PracticeChartVerification, CampPointAward,
                         RewardGrant, TrustedVerifier, StudentVerifierConnection)
 from app.practice_charts import respond_to_practice_chart_verification
+from app.practice_duration import qualified_practice_clause
 from app.xp import xp_sources
 from tests.test_arcade_economy import economy_database, signed_client, balance
 
@@ -298,7 +299,8 @@ def test_unverified_legacy_rows_do_not_create_new_public_awards(authority_db):
             session.add(CampPointAward(profile_id=profile.id, activity_type='hours',
                 points_awarded=1, occurred_at=NOW-timedelta(days=index), duplicate_key=f'legacy:{index}'))
         session.commit()
-        assert contests._charts_and_approved_ids(session, week)[0] == []
+        # Open reporting no longer stands in for the independent earning query.
+        assert session.scalars(select(PracticeChart).where(qualified_practice_clause())).all() == []
         assert xp_sources(session, profile_id=profile.id)['board_points'] == 0
         contests._reconcile_crown_categories(session, profile_id=profile.id)
         contests.finalize_contest_week(session, week_start=week.week_start, now=FINAL_NOW)

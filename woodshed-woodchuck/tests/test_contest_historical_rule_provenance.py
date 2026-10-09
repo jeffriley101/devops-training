@@ -195,10 +195,13 @@ def test_old_unverified_practice_cannot_gain_a_current_rules_result(database):
         _old_result(session, week, contest, people[rank - 1], score=score, rank=rank)
     finalized_at = _freeze_old_week(session, week)
 
-    qualified, _approved, _pristine = _charts_and_approved_ids(
+    reports, approved, _pristine = _charts_and_approved_ids(
         session, week, submitted_before=finalized_at,
     )
-    assert {chart.id for chart in qualified} == {chart.id for chart in charts[1:]}
+    # Current reporting includes unverified BOOK charts, but cannot rewrite
+    # finalized history whose original finalizer semantics are unknown.
+    assert {chart.id for chart in reports} == {chart.id for chart in charts}
+    assert approved == {chart.id for chart in charts[1:]}
     assert session.scalar(select(ContestResult).where(
         ContestResult.subject_key == str(people[3].id),
     )) is None

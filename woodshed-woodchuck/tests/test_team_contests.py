@@ -84,17 +84,17 @@ def test_team_practice_cap_average_verified_and_season_formulas() -> None:
     boards = team_leaderboards(session, season=season, contest_week=week)
     weekly_open = boards["team-weekly-practice"]["open"][0]
     weekly_verified = boards["team-weekly-practice"]["verified"][0]
-    assert weekly_open["score"] == 350 and weekly_open["active_member_count"] == 1
+    assert weekly_open["score"] == 454 and weekly_open["active_member_count"] == 2
     assert weekly_open["emblem_key"] == "emoji:goat"
     assert weekly_verified["score"] == 350 and weekly_verified["active_member_count"] == 1
-    assert boards["team-weekly-average-practice"]["open"][0]["score"] == 300
+    assert boards["team-weekly-average-practice"]["open"][0]["score"] == 200
     assert boards["team-weekly-average-practice"]["verified"][0]["score"] == 300
-    assert boards["team-lifetime-practice"]["open"][0]["score"] == 350
+    assert boards["team-lifetime-practice"]["open"][0]["score"] == 1054
     assert boards["team-weekly-practice"]["pristine"] == []
     assert boards["team-weekly-average-practice"]["pristine"] == []
     assert boards["team-practice-rating"]["pristine"] == []
     assert boards["team-practice-rating"]["open"][0]["score"] == (
-        calculate_team_practice_rating([350], eligible_roster=3).rating
+        calculate_team_practice_rating([350, 100], eligible_roster=3).rating
     )
     assert boards["team-practice-rating"]["verified"][0]["score"] == (
         calculate_team_practice_rating([350], eligible_roster=3).rating

@@ -34,9 +34,9 @@ def format_minutes(minutes: float) -> str:
 
 
 def qualified_practice_clause():
-    """Only independently approved BOOK records are earning/contest evidence.
+    """Only independently approved BOOK records are earning evidence.
 
-    Reported duration remains available in private logs. A browser's Pristine
+    Open contest reporting has separate eligibility. A browser's Pristine
     source flag or microphone duration is never an independent verification.
     """
     from sqlalchemy import exists

@@ -31,7 +31,7 @@ then resume; old/new finalizers must not overlap. Follow the
 [precision release procedure](practice-time-precision.md#release-ordering-and-maintenance-compatibility).
 Local compatibility tests do not establish that production has been upgraded.
 
-The current September 28, 2026 week retains `legacy_seasonal_v1` membership rules
+The earlier persistent Team release's September 28, 2026 week retained `legacy_seasonal_v1` membership rules
 and `contest_finalizer_v1` finalization. A separately approved clean later week
 uses `persistent_v1` and `contest_finalizer_persistent_v1`. Finalized legacy weeks
 keep their stored results and snapshots; the new release never retags them.
@@ -40,6 +40,16 @@ until the explicit boundary activation transaction. From the approved Monday,
 current Team operations and finalization fail closed until activation completes.
 Activation freezes the closing legacy roster (including an empty roster) before
 enabling persistent transitions, without finalizing or rescoring that week.
+The Open practice reporting correction uses `contest_finalizer_v2` for new
+legacy-membership finalizations and `contest_finalizer_persistent_v2` for new
+persistent-membership finalizations. Submitted BOOK charts opted into contests
+count once in Open regardless of approval; timely approval adds Verified
+eligibility without removing Open. Weekly and lifetime Team practice also retain
+Team opt-in and immutable attribution. Practice earning qualification, Team
+reward-recipient evidence, reward formulas, and idempotence are unchanged.
+Existing finalized weeks retain their rule tags and all stored artifacts;
+automatic repair refuses v1 history under v2 rules. Upgrade every finalizer
+entry point together so a v1 writer cannot finalize with the old eligibility.
 Older operational evidence below retains its original dates and release context;
 references to seasonal activation do not apply to future operations.
 
