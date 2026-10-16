@@ -58,11 +58,15 @@ def test_public_guest_has_only_local_adapters_and_safe_native_chart_form(guest_d
         "/state.js", "/account.js", "arcade-economy", "p-chart", "analytics", "blue"))
 
 
-def test_discard_removes_only_fixed_source_with_no_database_mutation(guest_db):
+@pytest.mark.parametrize(("entry", "claim"), [
+    ("/prebeta/C001?entry=director1", {"cohort_key": "C001", "source": "DIRECTOR1"}),
+    ("/prebeta/C002", {"cohort_key": "C002", "source": "DIRECTOR1"}),
+])
+def test_discard_removes_only_fixed_source_with_no_database_mutation(guest_db, entry, claim):
     client = TestClient(app)
     before = counts(guest_db)
-    assert client.get("/prebeta/C001?entry=director1").status_code == 200
-    assert session_data(client) == {"tester_registration_context": {"cohort_key": "C001", "source": "DIRECTOR1"}}
+    assert client.get(entry).status_code == 200
+    assert session_data(client) == {"tester_registration_context": claim}
     response = client.post("/guest/discard", headers={"Origin": "http://testserver"})
     assert response.status_code == 200
     assert "tester_registration_context" not in session_data(client)
@@ -226,11 +230,15 @@ def test_absent_origin_cannot_mutate_session_or_initialize_abuse_identity(guest_
         assert not client.cookies
 
 
-def test_public_c001_link_is_explicit_navigation_exception(guest_db):
+@pytest.mark.parametrize(("entry", "claim"), [
+    ("/prebeta/C001?entry=director1", {"cohort_key": "C001", "source": "DIRECTOR1"}),
+    ("/prebeta/C002", {"cohort_key": "C002", "source": "DIRECTOR1"}),
+])
+def test_public_prebeta_link_is_explicit_navigation_exception(guest_db, entry, claim):
     client = TestClient(app)
     bad = {'Sec-Fetch-Site': 'cross-site', 'Sec-Fetch-Mode': 'no-cors', 'Sec-Fetch-Dest': 'image'}
-    assert client.get('/prebeta/C001?entry=director1', headers=bad).status_code == 403
+    assert client.get(entry, headers=bad).status_code == 403
     assert session_data(client) == {}
     good = {**bad, 'Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-Dest': 'document'}
-    assert client.get('/prebeta/C001?entry=director1', headers=good).status_code == 200
-    assert session_data(client)['tester_registration_context'] == {'cohort_key': 'C001', 'source': 'DIRECTOR1'}
+    assert client.get(entry, headers=good).status_code == 200
+    assert session_data(client)['tester_registration_context'] == claim

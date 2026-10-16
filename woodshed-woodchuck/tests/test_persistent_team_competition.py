@@ -87,6 +87,12 @@ def test_finalizer_versions_are_explicit_and_retry_preserves_results(http_db, pe
                 session, now=datetime(2026, 9, 23, 18, tzinfo=timezone.utc))
             practice_date, final_at = date(2026, 9, 23), datetime(2026, 9, 28, 18, tzinfo=timezone.utc)
         approved_chart(session, profile.id, 10, practice_date)
+        session.add(PracticeChart(
+            profile_id=profile.id, team_id=10, practice_date=practice_date,
+            minutes=35, source="p-book", instrument="Trumpet",
+            include_contests=True, include_team_contests=True,
+            created_at=datetime.combine(practice_date, datetime.min.time(), timezone.utc) + timedelta(hours=18),
+        ))
         session.commit()
         contests.finalize_contest_week(session, week_start=week.week_start, now=final_at)
         session.commit()
@@ -94,6 +100,11 @@ def test_finalizer_versions_are_explicit_and_retry_preserves_results(http_db, pe
                     else contests.FINALIZER_RULES_VERSION)
         assert week.finalizer_rules_version == expected
         assert contests.historical_rules_incompatibility(week) is None
+        results = {row.division: row for row in session.scalars(select(ContestResult).join(Contest).where(
+            ContestResult.contest_week_id == week.id, Contest.key == "weekly-points-leaders",
+        ))}
+        assert results["open"].precise_score == 45
+        assert results["verified"].precise_score == 10
         before_results = list(session.execute(select(ContestResult.__table__)).mappings())
         before_snapshots = list(session.execute(select(TeamWeekMembershipSnapshot.__table__)).mappings())
         contests.finalize_contest_week(session, week_start=week.week_start, now=final_at + timedelta(days=8))

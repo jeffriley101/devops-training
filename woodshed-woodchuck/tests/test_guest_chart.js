@@ -5,7 +5,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const {File} = require('node:buffer');
 
-function browser({navigator = {}, deniedStorage = false, c001 = false, toolsReady = true} = {}) {
+function browser({navigator = {}, deniedStorage = false, c001 = false, prebeta = c001, toolsReady = true} = {}) {
   const ids = new Map(), events = new Map();
   const downloads = [], shares = [], copies = [], requests = [], nativeForms = [], guardedForms = [], revoked = [];
   const blobs = new Map();
@@ -53,7 +53,7 @@ function browser({navigator = {}, deniedStorage = false, c001 = false, toolsRead
     detail.checked = false;
   };
   const body = element();
-  body.dataset = {guest: 'local', c001Context: String(c001)};
+  body.dataset = {guest: 'local', c001Context: String(c001), prebetaContext: String(prebeta)};
   const document = {
     body, readyState: 'loading',
     getElementById: id => ids.get(id) || null,
@@ -237,18 +237,20 @@ test('Memory tools work with storage denied, and incomplete tool loading keeps s
   assert.equal(incomplete.ids.get('guest-tools').hidden, true);
 });
 
-test('C001 discard submits only an empty explicit native POST after local reset', async () => {
-  const b = browser({c001: true});
-  await b.build();
-  await b.ids.get('guest-discard').click();
-  assert.equal(b.nativeForms.length, 1);
-  assert.equal(b.guardedForms.length, 1);
-  assert.equal(b.nativeForms[0], b.guardedForms[0]);
-  assert.equal(b.nativeForms[0].method, 'post');
-  assert.equal(b.nativeForms[0].action, '/guest/discard');
-  assert.deepEqual(b.nativeForms[0].children, []);
-  assert.equal(b.ids.get('guest-chart-preview').textContent, '');
-  assert.deepEqual(b.requests, []);
+test('C001 and C002 discard submit only an empty explicit native POST after local reset', async () => {
+  for (const options of [{c001: true}, {prebeta: true}]) {
+    const b = browser(options);
+    await b.build();
+    await b.ids.get('guest-discard').click();
+    assert.equal(b.nativeForms.length, 1);
+    assert.equal(b.guardedForms.length, 1);
+    assert.equal(b.nativeForms[0], b.guardedForms[0]);
+    assert.equal(b.nativeForms[0].method, 'post');
+    assert.equal(b.nativeForms[0].action, '/guest/discard');
+    assert.deepEqual(b.nativeForms[0].children, []);
+    assert.equal(b.ids.get('guest-chart-preview').textContent, '');
+    assert.deepEqual(b.requests, []);
+  }
 });
 
 test('A rejected guarded C001 discard keeps product data cleared and never submits the form', async () => {

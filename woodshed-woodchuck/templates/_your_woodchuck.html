@@ -1,7 +1,7 @@
 {% if woodchuck_appearance %}
-<dialog id="your-woodchuck" class="woodchuck-editor" aria-labelledby="woodchuck-editor-title">
+<dialog id="your-woodchuck" class="woodchuck-editor" data-profile-surface aria-labelledby="woodchuck-editor-title">
   <form id="woodchuck-editor-form">
-    <h2 id="woodchuck-editor-title">Your Woodchuck</h2>
+    <h2 id="woodchuck-editor-title">Instrument and Appearance</h2>
     <label for="woodchuck-instrument">Instrument</label>
     <select id="woodchuck-instrument" name="instrument">{% for item in instruments %}<option value="{{ item }}">{{ item }}</option>{% endfor %}</select>
     <p id="woodchuck-legacy-instrument" hidden></p>
@@ -12,5 +12,16 @@
     <p id="woodchuck-editor-status" role="status" aria-live="polite"></p>
     <div class="button-row"><button type="submit">Save</button><button type="button" data-surface-close>Close</button></div>
   </form>
+  <section id="change-level-panel" class="combined-panel-section" data-embedded-profile aria-labelledby="change-level-title">
+    <div class="section-head"><p class="chip">Edit Profile</p><h2 id="change-level-title">Student Level</h2><p>Current level: <span id="level-value"></span></p></div>
+    <p>Your level may be changed once every 30 days.</p>
+    <form id="change-level-form" class="stack-form">
+      <label for="change-level-select">Current level</label>
+      <select id="change-level-select" name="level" required>{% for item in levels %}<option value="{{ item }}">{{ item }}</option>{% endfor %}</select>
+      <p id="change-level-feedback" class="body-copy" role="status" aria-live="polite"></p>
+      <div class="button-row"><button class="btn btn-primary" type="submit">Save Level</button><button class="btn btn-secondary" type="button" data-close-profile-panel>Close panel</button></div>
+    </form>
+  </section>
+
 </dialog>
 {% endif %}

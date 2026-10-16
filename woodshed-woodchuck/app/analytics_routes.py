@@ -7,7 +7,7 @@ from fastapi.templating import Jinja2Templates
 from .analytics import build_report
 from .db import SessionLocal
 from .site_admin import require_site_admin
-from .tester_enrollments import c001_registration_open
+from .tester_enrollments import C002, c001_registration_open
 
 
 router = APIRouter()
@@ -17,7 +17,7 @@ templates = Jinja2Templates(directory=str(Path(__file__).resolve().parent.parent
 @router.get("/admin/analytics")
 def analytics_page(request: Request, cohort: str | None = None):
     require_site_admin(request)
-    allowed = {None, "PILOT-D1", "C001"}
+    allowed = {None, "PILOT-D1", "C001", C002}
     if cohort not in allowed:
         raise HTTPException(400, "Unknown tester cohort.")
     report = build_report(SessionLocal, cohort_key=cohort)

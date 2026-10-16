@@ -16,8 +16,11 @@ from .models import TesterEnrollment, WoodchuckProfile
 
 PILOT_D1 = "PILOT-D1"
 C001 = "C001"
+C002 = "C002"
 DIRECTOR1 = "DIRECTOR1"
-LIFETIME_TESTER_COHORTS = frozenset({PILOT_D1, C001})
+PUBLIC_PREBETA_COHORTS = frozenset({C001, C002})
+LIFETIME_TESTER_COHORTS = frozenset({PILOT_D1, C001, C002})
+SECRET_SYMBOL_COHORTS = {"c001": C001, "c002": C002}
 SESSION_REGISTRATION_CONTEXT = "tester_registration_context"
 PILOT_D1_DATE = date(2026, 9, 16)
 CENTRAL = ZoneInfo("America/Chicago")
@@ -37,6 +40,24 @@ def normalize_cohort_key(value: str) -> str:
     if not _COHORT_KEY.fullmatch(key):
         raise ValueError("Invalid tester cohort key.")
     return key
+
+
+def public_prebeta_cohort(value: str) -> str:
+    key = normalize_cohort_key(value)
+    if key not in PUBLIC_PREBETA_COHORTS:
+        raise ValueError("This public tester entry is unavailable.")
+    return key
+
+
+def secret_symbol_cohort(value: str) -> str | None:
+    return SECRET_SYMBOL_COHORTS.get(str(value).strip().casefold())
+
+
+def direct_entry_source(cohort_key: str, entry: str | None) -> str | None:
+    key = public_prebeta_cohort(cohort_key)
+    if key == C002 or (key == C001 and entry in {"director1", "secret-symbol"}):
+        return DIRECTOR1
+    return None
 
 
 def enroll_tester(session, profile_id: int, cohort_key: str, joined_at: datetime, *, source: str | None = None, reactivating: bool = False) -> TesterEnrollment:
@@ -59,13 +80,14 @@ def enroll_tester(session, profile_id: int, cohort_key: str, joined_at: datetime
         TesterEnrollment.profile_id == profile_id,
         TesterEnrollment.cohort_key == key,
     ))
-    if key == C001 and (existing is None or reactivating):
+    if key in PUBLIC_PREBETA_COHORTS and (existing is None or reactivating):
         from .age_privacy import eligible
-        from .c001_abuse import authorize_activation
         session.flush()
         if profile.status != "active" or not eligible(session, profile_id):
-            raise ValueError("C001 activation requires an eligible active account.")
-        authorize_activation(session, profile_id, already_enrolled=existing is not None)
+            raise ValueError(f"{key} activation requires an eligible active account.")
+        if key == C001:
+            from .c001_abuse import authorize_activation
+            authorize_activation(session, profile_id, already_enrolled=existing is not None)
     if existing is not None:
         return existing
     row = TesterEnrollment(
@@ -100,17 +122,17 @@ def c001_registration_open() -> bool:
 
 
 def establish_registration_context(request, cohort_key: str, *, source: str | None = None) -> None:
-    key = normalize_cohort_key(cohort_key)
-    if key != C001:
-        raise ValueError("This public tester entry is unavailable.")
+    key = public_prebeta_cohort(cohort_key)
     if source not in (None, DIRECTOR1):
         raise ValueError("Unknown tester entry source.")
+    if key == C002 and source != DIRECTOR1:
+        raise ValueError("C002 entry requires the Director #1 source.")
     existing = registration_context(request)
     if existing == key:
         if source and registration_source(request) is None:
             request.session[SESSION_REGISTRATION_CONTEXT] = {"cohort_key": key, "source": source}
         return
-    if not c001_registration_open():
+    if key == C001 and not c001_registration_open():
         raise ValueError("C001 registration is currently closed. Guest tools remain available.")
     request.session[SESSION_REGISTRATION_CONTEXT] = {"cohort_key": key}
     if source:
@@ -122,11 +144,14 @@ def registration_context(request) -> str | None:
     value = request.session.get(SESSION_REGISTRATION_CONTEXT)
     if not isinstance(value, dict) or set(value) not in ({"cohort_key"}, {"cohort_key", "source"}):
         return None
-    if value.get("cohort_key") != C001:
+    key = value.get("cohort_key")
+    if key not in PUBLIC_PREBETA_COHORTS:
         return None
     if "source" in value and value["source"] != DIRECTOR1:
         return None
-    return C001
+    if key == C002 and value.get("source") != DIRECTOR1:
+        return None
+    return key
 
 
 def registration_source(request) -> str | None:

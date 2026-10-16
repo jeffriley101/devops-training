@@ -270,4 +270,4 @@ def test_decoration_initialization_is_single_and_profile_controls_remain() -> No
     assert "id=\"instrument-object\"" in HOME
     assert "id=\"xp-level-control\"" in HOME
     assert "id=\"shed-team-button\"" in HOME
-    assert "id=\"level-value\"" in HOME
+    assert "id=\"level-value\"" in (ROOT / "templates/_your_woodchuck.html").read_text()

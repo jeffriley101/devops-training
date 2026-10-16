@@ -261,7 +261,7 @@ def create_practice_chart_verification_request(
         if used + seconds > MAX_DETECTED_PLAYING_SECONDS:
             raise ValueError("Practice logs exceed the shared daily/24-hour duration limit.")
     # Submission is a self-report. Only independent review can qualify BOOK
-    # for XP/competition; browser microphone time cannot establish Pristine status.
+    # for XP/practice rewards; browser microphone time cannot establish Pristine status.
     credits_awarded = 0
     resolved_team_id = practice_chart_team_id(session, profile_id=profile.id,
         include_team_contests=include_team_contests, at=now, practice_date=practice_date)

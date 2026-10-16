@@ -7,16 +7,16 @@ from test_world_entry import client, login
 
 ROOT = Path(__file__).resolve().parents[1]
 SHED = {
-    'L1': 'woodchuck-name-value', 'R1': 'shed-team-button',
-    'L2': 'instrument-object', 'R2': 'level-value',
+    'L1': '/store', 'R1': 'shed-team-button',
+    'L2': '/p-book', 'R2': 'instrument-object',
     'L3': 'xp-level-control', 'R3': 'metronome-open-button',
     'L4': 'shed-decorate-button', 'R4': 'tuner-open-button',
     'L5': 'mum-open-button', 'R5': 'sound-effects-button',
 }
 SHOP = {
-    'L1': 'dandelion-object', 'R1': 'gear', 'L2': 'crown', 'R2': 'little-buddy',
-    'L3': 'goat', 'R3': 'share', 'L4': 'artist',
-    'R4': '/membership?as_account=student', 'L5': 'practice-room', 'R5': 'practice-definition',
+    'L1': '/home', 'R1': 'gear', 'L2': 'crown', 'R2': 'little-buddy',
+    'L3': 'goat', 'R3': '/quest', 'L4': 'contact',
+    'R4': 'dandelion-object', 'L5': 'practice-room', 'R5': '/membership?as_account=student',
 }
 
 
@@ -60,7 +60,7 @@ def test_rendered_rooms_have_exact_semantic_cells_and_only_shed_editor(client):
     secret = next(a for _, a in elements if a.get('id') == 'shed-secret-button')
     assert 'data-scene-cell' not in secret
     assert secret['aria-controls'] == 'shed-secret-panel'
-    assert next(a for _, a in cells(home) if a['data-scene-cell'] == 'L2')['aria-controls'] == 'your-woodchuck'
+    assert next(a for _, a in cells(home) if a['data-scene-cell'] == 'R2')['aria-controls'] == 'your-woodchuck'
 
 
 def test_equal_uncropped_scene_contract_and_invisible_controls():

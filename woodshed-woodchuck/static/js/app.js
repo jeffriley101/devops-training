@@ -399,7 +399,7 @@
       }
       instrumentObjectEl.setAttribute(
         "aria-label",
-        `Your Woodchuck. Current instrument: ${instrument}. Customize instrument, hoodie and hat.`
+        `Instrument, Appearance and Student Level. Current instrument: ${instrument}. Customize instrument, hoodie, hat and level.`
       );
       instrumentObjectEl.title = "Your Woodchuck";
     }
@@ -411,6 +411,7 @@
         `Level: ${profileLevel}. Change level.`
       );
       levelEl.title = `Level: ${profileLevel}. Change level.`;
+      levelEl.textContent = profileLevel;
     }
 
 
@@ -1017,7 +1018,8 @@
             : "";
         }
         renderTeamEmblem(emblem, current?.emblem || "");
-        trigger.setAttribute("aria-label", current ? `Team ${current.name}` : "Choose a team");
+        trigger.dataset.teamName = current?.name || "";
+        trigger.setAttribute("aria-label", `Name and Team. ${stateApi.getState().profile.woodchuckName || "Your Woodchuck"}. Team: ${current?.name || "not selected"}.`);
         trigger.title = current ? current.name : "Choose a team";
         status.replaceChildren();
         if (current) {
@@ -1058,7 +1060,8 @@
       if (opening) load();
     });
     document.getElementById("shed-team-close")?.addEventListener("click", () => {
-      window.WWNavigation.dismissCurrent();
+      panel.hidden = true; panel.classList.add("hidden");
+      trigger.setAttribute("aria-expanded", "false");
     });
     leaveButton?.addEventListener("click", async function () {
       leaveButton.disabled = true;
@@ -4195,9 +4198,9 @@
     const panels = Array.from(dialog.querySelectorAll("[data-shop-panel-content]"));
     const titles = {
       crown: "Crown Progress", goat: "The GOAT Tracker",
-      "practice-definition": "Practice Definition", share: "Share Woodshed",
+      contact: "Contact",
       gear: "Gear Shelf", "little-buddy": "Little Buddy Shelf",
-      "practice-room": "Practice Rooms", artist: "Artist",
+      "practice-room": "Practice Rooms",
     };
     const catalogShelfKeys = new Set(["gear", "little-buddy"]);
     const shelfItems = { gear: [], "little-buddy": [] };
@@ -4389,7 +4392,7 @@
         panels.forEach((panel) => { panel.hidden = panel.dataset.shopPanelContent !== key; });
         title.textContent = titles[key] || "Shop feature";
         activator = control;
-        if (key === "share") {
+        if (key === "contact") {
           qrStatus.textContent = "";
           copyPublicAddress(control);
         }

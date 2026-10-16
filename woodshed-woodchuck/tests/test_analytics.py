@@ -273,11 +273,13 @@ def test_admin_analytics_accepts_known_cohort_filters_and_rejects_unknown(db, mo
     all_page = result.get("/admin/analytics")
     pilot_page = result.get("/admin/analytics?cohort=PILOT-D1")
     c001_page = result.get("/admin/analytics?cohort=C001")
-    assert all_page.status_code == pilot_page.status_code == c001_page.status_code == 200
-    assert seen == [None, "PILOT-D1", "C001"]
+    c002_page = result.get("/admin/analytics?cohort=C002")
+    assert all_page.status_code == pilot_page.status_code == c001_page.status_code == c002_page.status_code == 200
+    assert seen == [None, "PILOT-D1", "C001", "C002"]
     assert "All accounts" in pilot_page.text
     assert "PILOT-D1" in pilot_page.text
     assert "C001" in pilot_page.text
+    assert "C002" in pilot_page.text
     assert "Enrolled active testers" in pilot_page.text
     assert "Active on join day" in pilot_page.text
     assert "Returned after join day" in pilot_page.text
@@ -286,6 +288,7 @@ def test_admin_analytics_accepts_known_cohort_filters_and_rejects_unknown(db, mo
     closed = result.get("/admin/analytics?cohort=C001")
     assert "C001 new registration claims: <strong>Closed</strong>" in closed.text
     assert '/prebeta/C001/display' in closed.text
+    assert "C002" in c002_page.text
     assert "Enrolled active testers" not in all_page.text
 
     bad = result.get("/admin/analytics?cohort=NOT-A-COHORT")

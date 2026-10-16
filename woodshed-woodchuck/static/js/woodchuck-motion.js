@@ -2,13 +2,11 @@
   "use strict";
 
   const SUCCESS_CONTROL_IDS = Object.freeze([
-    "woodchuck-name-value",
     "instrument-object",
     "xp-level-control",
     "shed-decorate-button",
     "mum-open-button",
     "shed-team-button",
-    "level-value",
     "tuner-open-button",
     "sound-effects-button",
   ]);
@@ -47,10 +45,12 @@
       }
     });
 
+    let reducedReactionTimer;
     function wiggle() {
-      if (art.classList.contains("is-achievement-hop")) return;
       clearReactionClasses(art);
       restartAnimation(art, "is-tap-wiggle");
+      clearTimeout(reducedReactionTimer);
+      reducedReactionTimer = setTimeout(() => art.classList.remove("is-tap-wiggle"), 450);
     }
 
     function hop() {
@@ -64,6 +64,48 @@
       event.preventDefault();
       wiggle();
     });
+
+    const target = layer.querySelector(".character-reaction-target");
+    const scene = layer.closest?.(".artwork-scene");
+    if (target && scene) {
+      let alphaSource = "", pixels = null, width = 0, height = 0;
+      function hitCharacter(x, y) {
+        if (!art.hasAttribute("data-appearance-ready") || !art.naturalWidth || scene.classList.contains("is-decorating")) return false;
+        if (alphaSource !== art.src) {
+          // Same-origin appearance assets (including generated data URLs) only.
+          // If an asset cannot be sampled, keep room navigation operational.
+          try {
+            const canvas = document.createElement("canvas");
+            const ratio = Math.min(1, 512 / Math.max(art.naturalWidth, art.naturalHeight));
+            width = canvas.width = Math.max(1, Math.round(art.naturalWidth * ratio));
+            height = canvas.height = Math.max(1, Math.round(art.naturalHeight * ratio));
+            const context = canvas.getContext("2d", {willReadFrequently: true});
+            context.drawImage(art, 0, 0, width, height);
+            pixels = context.getImageData(0, 0, width, height).data;
+          } catch (_) { pixels = null; }
+          alphaSource = art.src;
+        }
+        if (!pixels) return false;
+        const rect = art.getBoundingClientRect();
+        const scale = Math.min(rect.width / width, rect.height / height);
+        const left = rect.left + (rect.width - width * scale) / 2;
+        const top = rect.top + (rect.height - height * scale) / 2;
+        const px = Math.floor((x - left) / scale), py = Math.floor((y - top) / scale);
+        return px >= 0 && px < width && py >= 0 && py < height && pixels[(py * width + px) * 4 + 3] > 24;
+      }
+      // The layer itself has pointer-events:none. Only an opaque character
+      // pixel consumes a real pointer click; transparent space reaches its cell.
+      scene.addEventListener("click", event => {
+        if (!event.detail || !hitCharacter(event.clientX, event.clientY)) return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        target.focus({preventScroll: true});
+        wiggle();
+      }, true);
+      target.addEventListener("click", event => {
+        event.preventDefault(); event.stopPropagation(); wiggle();
+      });
+    }
 
     SUCCESS_CONTROL_IDS.forEach(function (controlId) {
       const control = root.document.getElementById(controlId);

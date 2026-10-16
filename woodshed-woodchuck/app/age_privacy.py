@@ -49,10 +49,13 @@ def declare_age(session, profile_id, age_band, *, at=None):
 
 def _reactivate_tester(session, profile_id):
     from .models import TesterEnrollment
-    from .tester_enrollments import C001, enroll_tester
-    row = session.scalar(select(TesterEnrollment).where(TesterEnrollment.profile_id == profile_id, TesterEnrollment.cohort_key == C001))
-    if row:
-        enroll_tester(session, profile_id, C001, row.joined_at, reactivating=True)
+    from .tester_enrollments import PUBLIC_PREBETA_COHORTS, enroll_tester
+    rows = session.scalars(select(TesterEnrollment).where(
+        TesterEnrollment.profile_id == profile_id,
+        TesterEnrollment.cohort_key.in_(PUBLIC_PREBETA_COHORTS),
+    ))
+    for row in rows:
+        enroll_tester(session, profile_id, row.cohort_key, row.joined_at, reactivating=True)
 
 
 def can_publish(session, profile_id, *, at=None):

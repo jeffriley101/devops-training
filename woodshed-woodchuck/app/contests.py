@@ -15,7 +15,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import set_committed_value
 
-from .practice_duration import qualified_practice_clause, team_qualified_practice_clause, chart_seconds
+from .practice_duration import team_qualified_practice_clause, chart_seconds
 from .account_routes import current_profile
 from .economy import lock_state, economy_payload, qualified_camp_point_clause
 from .login_limits import enforce_login_limit
@@ -1019,6 +1019,15 @@ def medal_for_rank(rank: int) -> str | None:
     return {1: "gold", 2: "silver", 3: "bronze"}.get(rank)
 
 
+def _open_practice_clause():
+    """Submitted BOOK reporting, independent of earning/Verified evidence.
+
+    Browser Pristine assertions remain ineligible. Callers retain date,
+    publication, submission-cutoff, and Team attribution boundaries.
+    """
+    return (PracticeChart.source == "p-book") & PracticeChart.include_contests.is_(True)
+
+
 def _charts_and_approved_ids(
     session: Session, contest_week: ContestWeek, *,
     submitted_before: datetime | None = None,
@@ -1026,8 +1035,7 @@ def _charts_and_approved_ids(
     filters = [
         PracticeChart.practice_date >= contest_week.week_start,
         PracticeChart.practice_date < contest_week.week_end,
-        PracticeChart.include_contests.is_(True),
-        qualified_practice_clause(),
+        _open_practice_clause(),
     ]
     if submitted_before is not None:
         filters.append(PracticeChart.created_at <= aware_utc(submitted_before))
@@ -1129,8 +1137,8 @@ PRECISE_PRACTICE_SCORING = "precise_seconds"
 # Bump this whenever a finalizer rule affecting source eligibility, standings,
 # team identity, results, or derived rewards changes. It is written only when
 # this finalizer completes a new week; older weeks have unknown provenance.
-FINALIZER_RULES_VERSION = "contest_finalizer_v1"
-PERSISTENT_FINALIZER_RULES_VERSION = "contest_finalizer_persistent_v1"
+FINALIZER_RULES_VERSION = "contest_finalizer_v2"
+PERSISTENT_FINALIZER_RULES_VERSION = "contest_finalizer_persistent_v2"
 
 
 def finalizer_rules_version(week: ContestWeek) -> str:
@@ -1323,11 +1331,12 @@ def _lifetime_team_practice_scores(
     public_only: bool = False,
     persistent_display: bool | None = None,
 ) -> dict[int, float]:
-    """Aggregate qualifying public Team practice once per persistent family."""
+    """Aggregate Open public Team reports once per persistent family."""
     _practice_scoring_mode(through_week)
     filters = [
         PracticeChart.practice_date < through_week.week_end,
-        team_qualified_practice_clause(),
+        _open_practice_clause(),
+        PracticeChart.include_team_contests.is_(True),
         PracticeChart.team_id.is_not(None),
     ]
     if source_cutoff is not None:
@@ -2189,6 +2198,8 @@ def finalize_contest_week(
     _set_finalization_stage(session, "membership_snapshots")
     snapshots = _snapshot_memberships(session, week)
     snapshot_team_ids = {row.profile_id: row.team_id for row in snapshots}
+    # Open reporting does not relax the independent Team reward-recipient
+    # evidence requirement or the frozen membership authority.
     has_chart = set(session.scalars(select(PracticeChart.profile_id).where(
         PracticeChart.created_at <= source_cutoff,
         team_qualified_practice_clause(),

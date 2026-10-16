@@ -15,6 +15,8 @@ from app.db import Base
 from app.models import WoodchuckProfile
 
 
+from test_world_entry import client, login
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -25,10 +27,11 @@ EXPECTED_LEVELS = [
 ]
 
 
-def test_exact_level_catalog_is_used_by_account_and_profile_ui() -> None:
+def test_exact_level_catalog_is_used_by_account_and_profile_ui(client) -> None:
     assert LEVEL_OPTIONS == EXPECTED_LEVELS
-    setup = TestClient(main.app).get("/setup").text
-    home = TestClient(main.app).get("/home").text
+    setup = client.get("/setup?age=adult").text
+    login(client)
+    home = client.get("/home").text
     for level in EXPECTED_LEVELS:
         assert f'<option value="{level}">{level}</option>' in setup
         assert f'<option value="{level}">{level}</option>' in home
@@ -64,8 +67,7 @@ def test_shed_profile_displays_are_semantic_keyboard_controls() -> None:
     home = (ROOT / "templates/home.html").read_text(encoding="utf-8")
     account_js = (ROOT / "static/js/account.js").read_text(encoding="utf-8")
     for element_id, panel in (
-        ("woodchuck-name-value", "change-name-panel"),
-        ("level-value", "change-level-panel"),
+        ("shed-team-button", "shed-team-panel"),
         ("instrument-object", "your-woodchuck"),
     ):
         start = home.index(f'id="{element_id}"')
@@ -95,7 +97,7 @@ def test_shed_uses_server_member_date_board_clipboard_and_compact_level() -> Non
     assert ">📋<" not in home
     assert ">📔<" not in home
     assert "profileLevel.charAt(0).toUpperCase()" not in app_js
-    assert 'id="level-value"' in home and 'data-scene-cell="R2"' in home
+    assert 'id="level-value"' in (ROOT / "templates/_your_woodchuck.html").read_text() and 'data-scene-cell="R2"' in home
     assert 'Level: ${profileLevel}. Change level.' in app_js
     assert 'kind === "level"' in account_js
 
@@ -122,7 +124,7 @@ def test_practice_room_is_local_expandable_and_has_tool_slots() -> None:
     assert 'href="/arcade" aria-label="Open Arcade Room"' in store
     assert store.count('class="practice-room-emoji-control practice-room-door"') == 4
     assert "Pristine P-Chart — Coming Soon" not in store
-    practice_section = store[store.index('data-shop-panel-content="practice-room"'):store.index('data-shop-panel-content="artist"')]
+    practice_section = store[store.index('data-shop-panel-content="practice-room"'):store.index('</dialog>')]
     assert 'brassspectrogram.netlify.app' not in practice_section
 
 
@@ -131,7 +133,7 @@ def test_donate_moved_once_to_shop_and_qr_is_accessible() -> None:
     store = (ROOT / "templates/store.html").read_text(encoding="utf-8")
     assert "venmo.com/u/jeffriley101" not in home
     assert 'href="/membership?as_account=student"' in store
-    assert 'aria-label="Premium"' in store
+    assert 'aria-label="Subscription and Pricing"' in store
     assert 'alt="QR code for the public Woodshed Woodchuck website at {{ public_site_url }}"' in store
     assert "Open the Woodshed website" not in store
     assert 'data-public-site-url="{{ public_site_url }}"' in store

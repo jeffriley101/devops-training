@@ -35,7 +35,8 @@
     if (entry.node.querySelector('form[aria-busy="true"]') || entry.node.dataset.busy === 'true' ||
         entry.node.querySelector('button[type="submit"]:disabled') ||
         (entry.node.id === 'shop-purchase-confirmation' && document.getElementById('shop-purchase-confirm')?.disabled)) return false;
-    return !entry.node.querySelector('form') || entry.initial === fields(entry.node) || window.confirm('Discard unsaved changes?');
+    return Array.from(entry.node.querySelectorAll('form')).every(form =>
+      entry.initial.get(form) === fields(form)) || window.confirm('Discard unsaved changes?');
   }
   function dismissCurrent(fromHistory = false, approved = false) {
     const entry = stack.at(-1);
@@ -59,7 +60,10 @@
       if (!visible(entry.node)) {
         stack = stack.filter(item => item !== entry);
         roomInert(false);
-        if (entry.opener?.isConnected) entry.opener.focus({preventScroll: true});
+        if (entry.opener?.isConnected) {
+          if (entry.opener.getAttribute('aria-controls') === entry.node.id) entry.opener.setAttribute('aria-expanded', 'false');
+          entry.opener.focus({preventScroll: true});
+        }
         if (entry.marker && history.state?.wwSurface === entry.node.id) {
           historyPending = true; history.back();
         }
@@ -71,7 +75,8 @@
       if (visible(entry.node) && !stack.includes(entry)) {
         entry.opener = invoker || document.activeElement;
         invoker = null;
-        entry.initial = fields(entry.node);
+        if (entry.opener?.getAttribute('aria-controls') === entry.node.id) entry.opener.setAttribute('aria-expanded', 'true');
+        entry.initial = new Map(Array.from(entry.node.querySelectorAll('form'), form => [form, fields(form)]));
         stack.push(entry);
         if (!guestPage && !historyPending) {
           history.pushState({...history.state, wwSurface: entry.node.id}, '', location.href);
@@ -88,7 +93,7 @@
     roomInert(stack.length > 0);
   }
   function register(node, close) {
-    if (!node || surfaces.has(node)) return;
+    if (!node || node.hasAttribute("data-embedded-profile") || surfaces.has(node)) return;
     if (roomPage && node.tagName !== 'DIALOG' && node.id !== 'digital-rain') {
       node.setAttribute('data-room-panel', '');
       node.setAttribute('role', 'dialog');
@@ -158,7 +163,7 @@
     stack = [];
     for (const entry of surfaces.values()) {
       entry.marker = false;
-      entry.initial = "";
+      entry.initial = new Map();
       entry.node.classList.add('hidden');
     }
   }
@@ -190,7 +195,15 @@
   observer.observe(document.body, {subtree: true, childList: true, attributes: true, attributeFilter: ['hidden', 'class', 'open']});
   discover();
   window.WWSurfaces = Object.freeze({register, dismissCurrent,
-    markSaved(node) { const entry = surfaces.get(node); if (entry) entry.initial = fields(node); },
+    // A combined surface can contain independently saved forms. Saving one
+    // must leave the other form's unsaved-change checkpoint intact.
+    markSaved(node) {
+      const entry = Array.from(surfaces.values()).find(item => item.node === node || item.node.contains(node));
+      if (!entry?.initial) return;
+      for (const form of entry.node.querySelectorAll('form')) {
+        if (node === form || node.contains(form)) entry.initial.set(form, fields(form));
+      }
+    },
     current: () => stack.at(-1)?.node || null,
   });
   window.WWNavigation = Object.freeze({dismissCurrent: () => dismissCurrent()});

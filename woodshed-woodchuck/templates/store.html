@@ -5,18 +5,18 @@
   <h1 id="shop-scene-title" class="sr-only">Shop</h1>
   <div class="shop-scene artwork-scene shop-artwork-scene" aria-label="Interactive Shop">
     <img class="room-scene-art shop-viking-art" src="/static/img/shop-viking-valley-fair.png" width="1024" height="1536" alt="Woodshed Shop" />
-    {% if woodchuck_appearance %}<div class="shop-student-character-layer" data-presentation-only><img data-student-woodchuck class="shop-student-character" src="{{ woodchuck_appearance.source }}" alt="Your Woodchuck" /></div>{% endif %}
+    {% if woodchuck_appearance %}<div class="shop-student-character-layer woodshed-character-layer" data-presentation-only><button class="character-reaction-target" type="button" aria-label="Make your Woodchuck wiggle"></button><img data-student-woodchuck class="shop-student-character woodshed-character-art" src="{{ woodchuck_appearance.source }}" alt="Your Woodchuck" /></div>{% endif %}
     <div id="shop-hotspots" class="scene-hotspots" aria-label="Shop room controls">
-      <button id="dandelion-object" class="scene-hotspot" data-scene-cell="L1" type="button" aria-label="Dandelions. Show balance."><span id="credits-value" hidden>0</span></button>
+      <a class="scene-hotspot" data-scene-cell="L1" href="/home" aria-label="Go to SHED"><span class="room-destination-label">← SHED</span></a>
       <button class="scene-hotspot" data-scene-cell="R1" type="button" data-shop-panel="gear" aria-label="Open Gear Shelf"></button>
       <button class="scene-hotspot" data-scene-cell="L2" type="button" data-shop-panel="crown" aria-label="Open Crown Progress"></button>
       <button class="scene-hotspot" data-scene-cell="R2" type="button" data-shop-panel="little-buddy" aria-label="Open Little Buddy Shelf"></button>
       <button class="scene-hotspot" data-scene-cell="L3" type="button" data-shop-panel="goat" aria-label="Open The GOAT Tracker"></button>
-      <button class="scene-hotspot" data-scene-cell="R3" type="button" data-shop-panel="share" data-public-site-url="{{ public_site_url }}" aria-label="Share Woodshed"></button>
-      <button class="scene-hotspot" data-scene-cell="L4" type="button" data-shop-panel="artist" aria-label="Open Artist instructions"></button>
-      <a class="scene-hotspot" data-scene-cell="R4" href="/membership?as_account=student" aria-label="Premium"></a>
+      <a class="scene-hotspot" data-scene-cell="R3" href="/quest" aria-label="Open BOARD"><span class="room-destination-label">BOARD</span></a>
+      <button class="scene-hotspot" data-scene-cell="L4" type="button" data-shop-panel="contact" data-public-site-url="{{ public_site_url }}" aria-label="Open Contact"><span class="room-destination-label">Contact</span></button>
+      <button id="dandelion-object" class="scene-hotspot" data-scene-cell="R4" type="button" aria-label="Dandelions. Show balance."><span class="room-destination-label">Dandelions</span><span id="credits-value" hidden>0</span></button>
       <button class="scene-hotspot" data-scene-cell="L5" type="button" data-shop-panel="practice-room" aria-label="Open Practice Rooms"></button>
-      <button class="scene-hotspot" data-scene-cell="R5" type="button" data-shop-panel="practice-definition" aria-label="Open Practice Definition"></button>
+      <a class="scene-hotspot" data-scene-cell="R5" href="/membership?as_account=student" aria-label="Subscription and Pricing"><span class="room-destination-label">Subscription / Pricing</span></a>
     </div>
   </div>
 
@@ -48,10 +48,10 @@
           <p class="personal-crown-explanation">Duplicate-safe Gold wins in Top Five Minutes Leaders qualify. Silver, Bronze, and instrument participation do not count.</p>
         </div>
       </section>
-      <section data-shop-panel-content="practice-definition" hidden>
-        <p class="shop-practice-definition">{{ practice_definition }}</p>
-      </section>
-      <section data-shop-panel-content="share" hidden>
+      <section data-shop-panel-content="contact" hidden>
+        <p>We’d love to see your artwork of a woodchuck, the Viking Sax, or anything fun! Please ask an adult before emailing your artwork. You can also email us with questions, concerns, comments, or support requests.</p>
+        <p><a class="btn btn-secondary" href="{{ art_submission_mailto }}">Email Woodshed Support</a></p>
+
         <p>Scan this code or use the website link to invite someone to Woodshed Woodchuck.</p>
         <img class="shop-qr-image" src="{{ public_site_qr }}" alt="QR code for the public Woodshed Woodchuck website at {{ public_site_url }}" />
         <p><a href="{{ public_site_url }}">{{ public_site_url }}</a></p>
@@ -84,10 +84,7 @@
           <div class="practice-room-emoji-control practice-room-door" role="link" aria-disabled="true" aria-label="Room D. Spectrogram. Temporarily unavailable"><span class="practice-room-door-tag">D</span><span class="practice-room-door-window" aria-hidden="true">🪊</span><strong>Spectrogram</strong><span>Temporarily unavailable</span></div>
         </div>
       </section>
-      <section data-shop-panel-content="artist" hidden>
-        <p>We’d love to see your artwork of a woodchuck, the Viking Sax, or anything fun! Please ask an adult before emailing your artwork. You can also email us with questions, concerns, comments, or support requests.</p>
-        <p><a class="btn btn-secondary" href="{{ art_submission_mailto }}">Email Woodshed Support</a></p>
-      </section>
+
     </div>
   </dialog>
 

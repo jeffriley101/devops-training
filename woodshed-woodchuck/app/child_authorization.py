@@ -104,10 +104,10 @@ def request_consent(session,*,parent_email,director_email='',director_name='',pr
     if not director:name=''
     now=clock()
     if cohort_key is not None:
-        from .tester_enrollments import C001,normalize_cohort_key
+        from .tester_enrollments import PUBLIC_PREBETA_COHORTS,normalize_cohort_key
         cohort_key=normalize_cohort_key(cohort_key)
-        if cohort_key!=C001 or profile is not None:
-            raise ValueError('Tester enrollment is available only for a new C001 account.')
+        if cohort_key not in PUBLIC_PREBETA_COHORTS or profile is not None:
+            raise ValueError('Tester enrollment is available only for a new Pre-Beta account.')
         cohort_claimed_at=now
     else:
         cohort_claimed_at=None
@@ -180,17 +180,22 @@ def activate(session,token,*,profile,fields):
     e=ConsentEvidence(profile_id=profile.id,parent_email=row.parent_email,activation_hash=hash_invitation_token(token),withdrawal_hash=hash_invitation_token(derived_token(row,'withdraw')),notice_version=row.notice_version,notice_sha256=verification.notice_sha256,approved_at=row.approved_at,confirmed_at=row.confirmed_at)
     session.add(e);session.flush();rule.consent_id=e.id
     session.flush()
-    from .tester_enrollments import enroll_tester, C001
+    from .tester_enrollments import C001, PUBLIC_PREBETA_COHORTS, enroll_tester
     from .models import TesterEnrollment
-    existing_tester=session.scalar(select(TesterEnrollment).where(TesterEnrollment.profile_id==profile.id,TesterEnrollment.cohort_key==C001))
+    existing_testers=list(session.scalars(select(TesterEnrollment).where(
+        TesterEnrollment.profile_id==profile.id,
+        TesterEnrollment.cohort_key.in_(PUBLIC_PREBETA_COHORTS),
+    )))
     if new_profile and row.cohort_key:
-        if not row.cohort_claimed_at:raise ValueError('Incomplete tester cohort claim.')
+        if row.cohort_key not in PUBLIC_PREBETA_COHORTS or not row.cohort_claimed_at:raise ValueError('Incomplete tester cohort claim.')
         # The pending claim is acquisition history; Joined begins at activation.
         enroll_tester(session,profile.id,row.cohort_key,clock(),source=row.cohort_source)
-        from .c001_abuse import record_creation
-        record_creation(session,profile.id)
-    elif existing_tester:
-        enroll_tester(session,profile.id,C001,existing_tester.joined_at,reactivating=True)
+        if row.cohort_key==C001:
+            from .c001_abuse import record_creation
+            record_creation(session,profile.id)
+    elif existing_testers:
+        for existing_tester in existing_testers:
+            enroll_tester(session,profile.id,existing_tester.cohort_key,existing_tester.joined_at,reactivating=True)
     permission=None
     if verification.director_allowed:
         permission=DirectorPermission(profile_id=profile.id,consent_id=e.id,email=row.director_email,director_name=row.director_name,review_allowed=row.review_allowed,authorized_at=clock())

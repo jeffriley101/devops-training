@@ -20,6 +20,7 @@
     <a class="btn {{ 'btn-primary' if not selected_cohort else 'btn-secondary' }}" href="/admin/analytics">All accounts</a>
     <a class="btn {{ 'btn-primary' if selected_cohort == 'PILOT-D1' else 'btn-secondary' }}" href="/admin/analytics?cohort=PILOT-D1">PILOT-D1</a>
     <a class="btn {{ 'btn-primary' if selected_cohort == 'C001' else 'btn-secondary' }}" href="/admin/analytics?cohort=C001">C001</a>
+    <a class="btn {{ 'btn-primary' if selected_cohort == 'C002' else 'btn-secondary' }}" href="/admin/analytics?cohort=C002">C002</a>
   </div>
   {% if selected_cohort %}
   <p><strong>{{ selected_cohort }}</strong> activity is counted only at or after each tester's recorded join time.</p>

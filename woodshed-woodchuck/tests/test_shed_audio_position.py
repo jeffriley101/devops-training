@@ -106,7 +106,7 @@ def test_production_mobile_shed_controls_use_shared_centered_lanes() -> None:
     assert 'stageShedGrid' not in app and 'forceShedPositions' not in app
     panel = layout.split('body.artwork-room-page [data-room-panel] {')[1].split('}')[0]
     assert 'position: fixed' in panel and 'overflow: auto' in panel
-    assert 'width: min(30rem, calc(100% - 1.5rem))' in layout
+    assert 'width: min(30rem, calc(100% - 1.5rem - env(safe-area-inset-left) - env(safe-area-inset-right)))' in layout
 
 
 def test_shed_audio_cell_preserves_settings_behavior_without_emoji() -> None:

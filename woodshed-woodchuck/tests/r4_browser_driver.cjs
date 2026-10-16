@@ -193,7 +193,7 @@ process.stdin.on('end',async()=>{
          const scene=document.querySelector('.artwork-scene'), art=scene.querySelector('.room-scene-art'), grid=scene.querySelector('.scene-hotspots');
          const rect=n=>{const r=n.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height,b:r.bottom}};
          const s=rect(scene);
-         return {scene:s,art:rect(art),grid:rect(grid),ratio:art.naturalWidth/art.naturalHeight,nav:rect(document.querySelector('.main-nav')),
+         return {scene:s,art:rect(art),grid:rect(grid),ratio:art.naturalWidth/art.naturalHeight,nav:{y:innerHeight},primaryNav:!!document.querySelector('.main-nav'),
            overflow:document.documentElement.scrollWidth>innerWidth,bodyOverflow:document.documentElement.scrollHeight>innerHeight,visibleStreak:!!document.getElementById('login-streak-card')?.getClientRects().length,footer:!!document.querySelector('a[href=\"/family/practice\"]'),
            characterPointer:getComputedStyle(scene.querySelector('[data-presentation-only]')).pointerEvents,
            cells:Array.from(grid.children).map(n=>{const r=rect(n),hit=document.elementFromPoint(r.x+r.w*.5,r.y+r.h*.5);return {
@@ -203,7 +203,7 @@ process.stdin.on('end',async()=>{
        assert.equal(proof.overflow,false);assert.equal(proof.characterPointer,'none');
        assert.ok(Math.abs(proof.scene.x+proof.scene.w/2-width/2)<.6);checks++;
        assert.equal(proof.bodyOverflow,false,JSON.stringify({path,width,height,proof}));checks++;
-       assert.equal(proof.footer,false);checks++;
+       assert.equal(proof.footer,false);assert.equal(proof.primaryNav,false);checks+=2;
        assert.equal(proof.visibleStreak,false);checks++;
        assert.ok(Math.abs(proof.scene.h-Math.min(proof.nav.y,width/proof.ratio))<.6);checks++;
        assert.equal(await g.evaluate(`appearanceFrames.some(f=>!f.ready&&f.visible)`),false);checks++;
@@ -276,8 +276,8 @@ process.stdin.on('end',async()=>{
        }
        if (width===390) {
          const actions=path==='/home'
-           ? [['woodchuck-name-value','change-name-panel'],['shed-team-button','shed-team-panel'],['level-value','change-level-panel'],['xp-level-control','xp-panel'],['mum-open-button','mum-panel'],['sound-effects-button','sound-effects-panel'],['shed-secret-button','shed-secret-panel']]
-           : ['crown','little-buddy','goat','share','artist','practice-definition'].map(key=>['[data-shop-panel="'+key+'"]','shop-feature-dialog']);
+           ? [['shed-team-button','shed-team-panel'],['xp-level-control','xp-panel'],['mum-open-button','mum-panel'],['sound-effects-button','sound-effects-panel'],['shed-secret-button','shed-secret-panel']]
+           : ['crown','little-buddy','goat','contact'].map(key=>['[data-shop-panel="'+key+'"]','shop-feature-dialog']);
          for (const [control,panel] of actions) {
            const selector=control.startsWith('[')?control:'#'+control;
            await g.evaluate(`document.querySelector(${JSON.stringify(selector)}).focus();document.querySelector(${JSON.stringify(selector)}).click()`);
@@ -287,7 +287,7 @@ process.stdin.on('end',async()=>{
            fs.writeFileSync(config.output+'/smoke-'+panel+'.png',Buffer.from(panelShot.data,'base64'));
            if (panel==='shed-team-panel') {
              const close=await g.evaluate(`(()=>{const b=document.getElementById('shed-team-close'),r=b.getBoundingClientRect(),p=document.getElementById('shed-team-panel').getBoundingClientRect();return {label:b.getAttribute('aria-label'),text:b.textContent,type:b.type,x:r.x+r.width/2,y:r.y+r.height/2,visible:r.width>0&&r.height>0&&r.top>=p.top&&r.bottom<=innerHeight,upperRight:r.x>p.x+p.width/2&&r.top<p.top+80};})()`);
-             assert.equal(close.label,'Close Team panel');assert.equal(close.text,'×');assert.equal(close.type,'button');
+             assert.equal(close.label,'Close Name and Team panel');assert.equal(close.text,'×');assert.equal(close.type,'button');
              assert.ok(close.visible&&close.upperRight);checks+=4;
              assert.equal(await g.evaluate(`document.getElementById('shed-team-button').dataset.sceneCell`),'R1');checks++;
              // Clicking outside must leave the panel and draft input intact.

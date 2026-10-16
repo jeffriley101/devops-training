@@ -575,6 +575,7 @@ def test_weekly_practice_divisions_and_boundaries(
 
     assert standings["open"] == [
         {"rank": 1, "instrument": "Saxophone", "total_minutes": 100},
+        {"rank": 2, "instrument": "Trumpet", "total_minutes": 50},
     ]
     assert set(standings) == {"open"}
 
@@ -766,12 +767,12 @@ def test_student_points_rankings_and_current_user_position(
         "rank": 6,
         "display_name": "Foxtrot Chuck",
         "emblem_key": None,
-        "total_minutes": 10,
+        "total_minutes": 20,
         "is_current_user": True,
     }
     assert standings["current_user_position"]["open"] == {
         "rank": 6,
-        "total_minutes": 10,
+        "total_minutes": 20,
         "minutes_behind_leader": 50,
         "tied": False,
         "in_top_five": False,
@@ -935,14 +936,15 @@ def test_student_points_use_olympic_ties_and_separate_divisions(
 
     assert [(row["rank"], row["display_name"], row["total_minutes"]) for row in standings["open"]] == [
         (1, "Alpha", 30),
-        (2, "Beta", 15),
+        (1, "Beta", 30),
+        (3, "Gamma", 15),
     ]
     assert [(row["display_name"], row["total_minutes"]) for row in standings["verified"]] == [
         ("Alpha", 30),
         ("Beta", 15),
     ]
-    assert standings["current_user_position"]["open"]["tied"] is False
-    assert standings["current_user_position"]["open"]["minutes_behind_leader"] == 15
+    assert standings["current_user_position"]["open"]["tied"] is True
+    assert standings["current_user_position"]["open"]["minutes_behind_leader"] == 0
     assert standings["current_user_position"]["verified"]["minutes_behind_leader"] == 15
 
 
@@ -1113,7 +1115,13 @@ def test_successful_finalization_medals_rewards_crown_and_idempotence(
     assert [(r.rank, r.medal) for r in point_results] == [
         (1, "gold"), (2, "silver"), (3, "bronze")
     ]
-    assert [result.score for result in point_results] == [20, 10, 5]
+    assert [result.score for result in point_results] == [20, 15, 10]
+    assert [result.profile_id for result in point_results] == [alpha.id, beta.id, gamma.id]
+    verified_results = session.scalars(select(ContestResult).join(Contest).where(
+        Contest.key == "weekly-points-leaders", ContestResult.division == "verified",
+    ).order_by(ContestResult.rank)).all()
+    assert [result.score for result in verified_results] == [20, 10, 5]
+    assert beta.id not in {result.profile_id for result in verified_results}
     assert not any(
         grant.profile_id in {beta.id, gamma.id}
         and grant.source_key.endswith("gold")
@@ -2601,9 +2609,9 @@ def test_open_p_chart_submission_is_idempotent_listed_and_updates_standings(
     )
     points = payload["standings"]["weekly-points-leaders"]
     instruments = payload["standings"]["weekly-practice-by-instrument"]
-    assert points["open"] == []
+    assert points["open"][0]["total_minutes"] == 35
     assert points["verified"] == []
-    assert instruments["open"] == []
+    assert instruments["open"] == [{"rank": 1, "instrument": "Tuba", "total_minutes": 35}]
     assert set(instruments) == {"open"}
 
     profile.instrument = "Flute"
@@ -2621,6 +2629,8 @@ def test_open_p_chart_submission_is_idempotent_listed_and_updates_standings(
         "standings"
     ]["weekly-practice-by-instrument"]
     assert approved_points["verified"][0]["total_minutes"] == 35
+    assert approved_points["open"] == points["open"]
+    assert approved_instruments == instruments
     assert approved_instruments == {
         "open": [{"rank": 1, "instrument": "Tuba", "total_minutes": 35}]
     }

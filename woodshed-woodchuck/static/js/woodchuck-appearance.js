@@ -79,12 +79,12 @@
     const trigger = document.getElementById('instrument-object');
     if (trigger) {
       if (!trigger.dataset.sceneCell) window.WWInstruments?.renderInstrument(trigger, payload.instrument);
-      trigger.setAttribute('aria-label', `Your Woodchuck. Instrument: ${payload.instrument}`);
+      trigger.setAttribute('aria-label', `Instrument, Appearance and Student Level. Instrument: ${payload.instrument}`);
       trigger.setAttribute('aria-controls', 'your-woodchuck');
     }
   }
   void render();
-  // SHOP shares the rendered appearance only; customization belongs to SHED L2.
+  // SHOP shares the rendered appearance only; customization belongs to SHED R2.
   if (!dialog || !form) return;
   function fill() {
     const instrument = form.elements.instrument;
@@ -114,12 +114,16 @@
   dialog.querySelector('[data-surface-close]').addEventListener('click', () => dialog.close());
   form.addEventListener('submit', async event => {
     event.preventDefault(); if (!current() || dialog.dataset.busy === 'true') return;
-    const submitted = Object.fromEntries(new FormData(form)), button = form.querySelector('[type="submit"]');
+    const submitted = Object.fromEntries(new FormData(form));
     if (!submitted.instrument) submitted.instrument = payload.instrument;
+    const operation = window.WWAccountSync.beginProfileSave(form);
+    if (!operation) return;
     const request = window.WWState.accountRequest();
     const recovery = window.WWRecovery?.begin();
-    button.disabled = true; dialog.dataset.busy = 'true'; status.textContent = 'Saving…';
+    status.textContent = 'Saving…';
     try {
+      await operation.ready();
+      if (!window.WWState.stateForResponse(request)) return;
       const response = await fetch('/account/appearance', {method: 'PATCH', credentials: 'same-origin', cache: 'no-store',
         headers: {'Content-Type': 'application/json'}, body: JSON.stringify(submitted)});
       const result = await response.json().catch(() => ({}));
@@ -130,13 +134,16 @@
       state.profile.instrument = result.instrument; state.appearance = result.saved;
       window.WWState.applyEconomy(state, result);
       window.WWState.saveState(state, {sync: false});
-      payload = result; fill(); await render(); window.WWSurfaces?.markSaved(dialog);
+      payload = result; fill(); await render();
+      if (!window.WWState.stateForResponse(request)) return;
+      window.WWSurfaces?.markSaved(form);
       status.textContent = 'Your Woodchuck is saved.';
       window.WWRecovery?.clear(recovery);
     } catch (error) {
+      if (!window.WWState.stateForResponse(request)) return;
       status.textContent = error.message || 'Unable to save. Please retry.';
       if (current()) window.WWRecovery?.failure(error, () => form.requestSubmit(), recovery);
-    } finally { button.disabled = false; dialog.dataset.busy = 'false'; }
+    } finally { operation.release(); }
   });
   // The SHED control and keyboard use the same editor.
   window.WWWoodchuck = Object.freeze({open});

@@ -131,7 +131,7 @@ def test_rapid_confirmation_is_guarded_from_duplicate_purchase() -> None:
 
 
 def test_share_account_panel_remains_single_and_unchanged() -> None:
-    share = STORE[STORE.index("data-shop-panel-content=\"share\""):STORE.index("data-shop-panel-content=\"gear\"")]
+    share = STORE[STORE.index("data-shop-panel-content=\"contact\""):STORE.index("data-shop-panel-content=\"gear\"")]
     assert "shop-qr-image" in share
     assert "{{ public_site_url }}" in share
     assert "shop-share-account-controls" in share

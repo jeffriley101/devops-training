@@ -237,6 +237,8 @@ process.stdin.on('end',async()=>{
      await g.evaluate(`document.getElementById('login-woodchuck-id').value='WC-GUEST-B';document.getElementById('login-pin').value='2468';document.querySelector('#account-login-form button').click()`);
      await g.until(`location.pathname==='/home' && document.readyState==='complete' && window.WWSessionBoundary?.isCurrent() && !!window.WWSurfaces`);
      await g.evaluate(`window.WWSessionBoundary.ready`);
+     // First entry opens XP asynchronously; capture history after that surface settles.
+     await g.until(`WWSurfaces.current()?.id==='xp-panel' && history.state?.wwSurface==='xp-panel'`);
      const registeredSurface=await g.evaluate(`({state:history.state,current:WWSurfaces.current()?.id ?? null})`);
      await g.evaluate(`document.getElementById('metronome-open-button').click()`);
      await g.until(`history.state?.wwSurface==='metronome-panel'`);
@@ -286,7 +288,7 @@ process.stdin.on('end',async()=>{
    const beforeSymbol=await snapshot();
    await setupGuest(g);
    await g.evaluate(`document.getElementById('shed-secret-button').click()`);
-   await g.evaluate(`document.getElementById('shed-secret-passcode').value='C002';document.querySelector('#shed-secret-form button[type=submit]').click()`);
+   await g.evaluate(`document.getElementById('shed-secret-passcode').value='C003';document.querySelector('#shed-secret-form button[type=submit]').click()`);
    await g.until(`document.getElementById('guest-secret-feedback')?.textContent.includes('did not match')`);
    assert.equal(await g.evaluate(`Array.from(document.querySelectorAll('a[href="/setup?from=guest"]')).some(a=>a.textContent.includes('C001'))`),false);
    assert.equal(await g.evaluate(`document.body.dataset.c001Context`),'false');

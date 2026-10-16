@@ -107,10 +107,7 @@ def submit_paid_score(client: TestClient, game_key: str, score: int):
 
 
 def test_practice_room_destinations_are_preserved_as_four_doors() -> None:
-    practice = STORE[
-        STORE.index('data-shop-panel-content="practice-room"'):
-        STORE.index('data-shop-panel-content="artist"')
-    ]
+    practice = STORE[STORE.index('data-shop-panel-content="practice-room"'):].split('</section>', 1)[0]
     assert practice.count('class="practice-room-emoji-control practice-room-door"') == 4
     assert "brassspectrogram.netlify.app" not in practice
     assert 'aria-disabled="true"' in practice

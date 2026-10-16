@@ -24,8 +24,9 @@ def test_rooms_have_no_streak_strip_and_omit_only_room_footer(client):
         assert 'href="/family/practice"' not in markup
         assert 'href="/family/parent-access"' not in markup
         assert 'data-presentation-only' in markup
-    assert 'href="/family/practice"' in client.get('/p-book').text
-    assert 'href="/family/parent-access"' in client.get('/p-book').text
+    assert 'href="/family/practice"' not in client.get('/p-book').text
+    assert 'href="/family/parent-access"' not in client.get('/p-book').text
+    assert 'href="/family/parent-access"' in client.get('/').text
 
 
 def test_editor_offers_only_current_authoritative_catalog(client):

@@ -2,6 +2,8 @@
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
+from .tester_enrollments import PUBLIC_PREBETA_COHORTS
+
 
 def same_origin_mutation(request: Request) -> bool:
     origin = request.headers.get("origin")
@@ -36,9 +38,10 @@ class SessionOriginProtection:
                         {"detail": "A same-origin request is required."}, 403,
                         headers={"Cache-Control": "no-store"},
                     )(scope, receive, send)
-            # C001 invitation GETs intentionally accept public top-level links.
+            # Public Pre-Beta invitation GETs intentionally accept top-level links.
             # A foreign subresource must not silently establish attribution.
-            if path == "/prebeta/C001" and scope["method"] in {"GET", "HEAD"}:
+            cohort_key = path.removeprefix("/prebeta/")
+            if cohort_key in PUBLIC_PREBETA_COHORTS and scope["method"] in {"GET", "HEAD"}:
                 request = Request(scope)
                 site = request.headers.get("sec-fetch-site")
                 if site in {"same-site", "cross-site"} and not (

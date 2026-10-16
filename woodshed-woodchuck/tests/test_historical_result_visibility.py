@@ -14,6 +14,7 @@ from app.models import (
     RewardGrant, Season, WoodchuckProfile, WoodchuckState,
 )
 from app.xp import xp_sources
+from app.practice_duration import qualified_practice_clause
 
 
 PUBLIC_AT = datetime(2026, 9, 21, 2, 45, tzinfo=timezone.utc)
@@ -119,8 +120,8 @@ def test_finalized_instrument_keeps_unreviewed_original_sources_without_new_earn
     assert medal[0]['instrument'] == 'Flute'
     assert medal[0]['score'] == 30.5
     assert hall[0]['medals']['gold'] == 1
-    # Historical display must not relax the separate earning/qualification query.
-    assert contests._charts_and_approved_ids(session, week)[0] == []
+    # Open reporting is separate from earning evidence, including for history.
+    assert session.scalars(select(PracticeChart).where(qualified_practice_clause())).all() == []
     sources = xp_sources(session, profile_id=profile.id)
     assert sources['practice_minutes'] == sources['p_charts'] == 0
 

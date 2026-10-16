@@ -7835,3 +7835,48 @@ select {
 .shop-student-character-layer { position: absolute; z-index: 2; left: 50%; bottom: 12%; width: 38%; height: 52%; transform: translateX(-50%); pointer-events: none; }
 .shop-student-character { width: 100%; height: 100%; object-fit: contain; }
 .practice-room-door[aria-disabled="true"] { opacity: .7; cursor: default; }
+
+/* Phase 1 subordinate destinations retain their existing document workflow. */
+body[data-reconstructed-student-surface]:not(.artwork-room-page) .app-shell {
+  padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right))
+    max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+}
+body[data-reconstructed-student-surface]:not(.artwork-room-page) .sound-effects-controls {
+  bottom: max(.75rem, env(safe-area-inset-bottom));
+}
+.room-return {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: .5rem .75rem;
+  margin: 0 0 .75rem;
+  color: #fff4d4;
+  background: #452c19;
+  border-radius: .4rem;
+}
+.room-return:focus-visible { outline: 3px solid #175eab; outline-offset: 3px; }
+.board-definition-card {
+  position: relative;
+  margin: 1.5rem 0;
+  padding: 1.5rem 1rem 1rem;
+  background: repeating-linear-gradient(#fff5d6 0 1.65rem, #c7d5d2 1.65rem 1.7rem);
+  color: #352719;
+  box-shadow: 0 3px 6px #0005;
+  line-height: 1.7rem;
+}
+.board-definition-card::before {
+  content: "";
+  position: absolute;
+  top: .35rem;
+  left: 50%;
+  width: .65rem;
+  height: .65rem;
+  border-radius: 50%;
+  background: #a73327;
+  box-shadow: 0 2px 2px #0005;
+}
+.board-definition-card h2 { font-size: 1.1rem; }
+
+.room-return { width: fit-content; justify-self: start; }
+.p-book-page .practice-timer-row { flex-wrap: wrap; }
+[data-profile-surface] [hidden] { display: none !important; }
