@@ -10,7 +10,7 @@ from app.age_models import AccountPrivacy
 from app.age_privacy import declare_age, filter_hall_result_rows
 from app.db import Base
 from app.models import (
-    Contest, ContestResult, ContestWeek, CrownProgress, PracticeChart,
+    Contest, ContestResult, ContestWeek, CrownAward, CrownProgress, PracticeChart,
     RewardGrant, Season, WoodchuckProfile, WoodchuckState,
 )
 from app.xp import xp_sources
@@ -95,17 +95,61 @@ def visible(session, week, kind):
     )
 
 
-@pytest.mark.parametrize('offset', [-1, 0, 1])
-def test_finalized_student_visible_when_result_is_saved_before_at_or_after_screening(history, offset):
+@pytest.mark.parametrize('age_band', ['adult', '13to17'])
+@pytest.mark.parametrize('period,offset,restored', [
+    ('before', -1, True),
+    ('before', 0, False),
+    ('before', 1, False),
+    ('spanning', -1, True),
+    ('spanning', 0, False),
+    ('spanning', 1, False),
+])
+def test_legacy_student_restoration_requires_pre_screening_snapshot(history, age_band, period, offset, restored):
     session, week = history
     profile = person(session)
+    session.get(AccountPrivacy, profile.id).age_band = age_band
+    if period == 'before':
+        week.week_start, week.week_end = date(2026, 9, 7), date(2026, 9, 14)
     saved_result(session, week, profile, created_at=PUBLIC_AT + timedelta(seconds=offset))
     session.commit()
     medal, hall = visible(session, week, 'student')
-    assert [row['display_name'] for row in medal] == [profile.display_name]
-    assert [row['display_name'] for row in hall] == [profile.display_name]
-    assert medal[0]['score'] == 30.5
-    assert hall[0]['medals']['gold'] == 1
+    expected = [profile.display_name] if restored else []
+    assert [row['display_name'] for row in medal] == expected
+    assert [row['display_name'] for row in hall] == expected
+    assert contests.contest_results_payload(session, week)['results'] == []
+    if restored:
+        assert medal[0]['score'] == 30.5
+        assert hall[0]['medals']['gold'] == 1
+
+
+@pytest.mark.parametrize('age_band', ['adult', '13to17'])
+@pytest.mark.parametrize('at_boundary', [False, True])
+def test_ordinary_post_screening_results_remain_public(history, age_band, at_boundary):
+    session, week = history
+    week.week_start, week.week_end = date(2026, 9, 28), date(2026, 10, 5)
+    week.finalized_at = datetime(2026, 10, 5, 18, tzinfo=timezone.utc)
+    public_at = datetime(2026, 9, 28, 5, tzinfo=timezone.utc) if at_boundary else PUBLIC_AT
+    profile = person(session, public_at=public_at)
+    session.get(AccountPrivacy, profile.id).age_band = age_band
+    saved_result(session, week, profile, created_at=public_at if at_boundary else week.finalized_at)
+    session.commit()
+    medal, hall = visible(session, week, 'student')
+    raw = contests.contest_results_payload(session, week)['results']
+    for rows in (medal, hall, raw):
+        assert [row['display_name'] for row in rows] == [profile.display_name]
+
+
+def test_legacy_restoration_requires_known_snapshot_creation(history):
+    from types import SimpleNamespace
+    session, week = history
+    profile = person(session)
+    result, contest = saved_result(session, week, profile, created_at=PUBLIC_AT-timedelta(seconds=1))
+    session.commit()
+    # A malformed input row must not get the helper's timestamp-less crown check.
+    row = SimpleNamespace(**{column.name: getattr(result, column.name)
+                             for column in ContestResult.__table__.columns})
+    row.created_at = None
+    assert filter_hall_result_rows(session, [(row, contest)]) == []
 
 
 @pytest.mark.parametrize('source', ['p-book', 'pristine'])
@@ -127,7 +171,7 @@ def test_finalized_instrument_keeps_unreviewed_original_sources_without_new_earn
 
 
 @pytest.mark.parametrize('kind', ['student', 'instrument'])
-@pytest.mark.parametrize('privacy', ['missing', 'unknown', 'under13', 'unpublished', 'consent', 'deleted'])
+@pytest.mark.parametrize('privacy', ['missing', 'unknown', 'under13', 'unpublished', 'consent', 'deleted', 'inactive'])
 def test_private_or_ineligible_history_is_not_restored(history, kind, privacy):
     session, week = history
     profile = person(session)
@@ -142,11 +186,17 @@ def test_private_or_ineligible_history_is_not_restored(history, kind, privacy):
     elif privacy == 'consent':
         # Missing/revoked consent evidence must never qualify for legacy restoration.
         rule.consent_id = 123
-    else:
+    elif privacy == 'deleted':
         profile.status = 'deleted'
     if kind == 'instrument':
         reported_chart(session, profile)
-    saved_result(session, week, profile, kind=kind)
+    saved_result(session, week, profile, kind=kind, created_at=PUBLIC_AT-timedelta(seconds=1))
+    if privacy == 'inactive':
+        # Keep this regression identity; the supported inactive-account
+        # lifecycle is deletion/anonymization, not a third status value.
+        from app.account_deletion import anonymize_woodchuck_account
+        anonymize_woodchuck_account(session, profile=profile, now=FINAL_AT)
+        assert profile.status == 'deleted' and profile.deleted_at is not None
     session.commit()
     assert visible(session, week, kind) == ([], [])
 
@@ -166,7 +216,7 @@ def test_unreviewed_private_contributor_cannot_be_dropped_from_instrument_privac
 def test_legacy_student_exception_requires_completed_finalization(history, status):
     session, week = history
     profile = person(session)
-    row = saved_result(session, week, profile)
+    row = saved_result(session, week, profile, created_at=PUBLIC_AT-timedelta(seconds=1))
     week.status = 'open' if status == 'open' else 'finalized'
     week.finalized_at = None
     session.commit()
@@ -178,13 +228,18 @@ def test_repeated_historical_reads_do_not_write_or_grant_rewards(history):
     profile = person(session)
     contributor = person(session, 2, public_at=PRACTICED_AT - timedelta(days=30))
     reported_chart(session, contributor)
-    saved_result(session, week, profile)
+    saved_result(session, week, profile, created_at=PUBLIC_AT-timedelta(seconds=1))
+    later_profile = person(session, 3)
+    later_profile.display_name = 'Later private snapshot'
+    saved_result(session, week, later_profile)
     saved_result(session, week, contributor, kind='instrument')
     session.add_all([
         WoodchuckState(profile_id=profile.id, state_json={'progress': {'credits': 17}}, revision=3),
         RewardGrant(profile_id=profile.id, source_key='original-award',
                     reward_type='dandelion', amount=7),
         CrownProgress(profile_id=profile.id, category_key='weekly-points-leaders', qualifying_wins=2),
+        CrownAward(profile_id=profile.id, category_key='weekly-points-leaders',
+                   source_key='original-crown', earned_at=PUBLIC_AT-timedelta(days=1)),
     ])
     session.commit()
 
@@ -202,6 +257,13 @@ def test_repeated_historical_reads_do_not_write_or_grant_rewards(history):
             for kind in ('student', 'instrument'):
                 medal, hall = visible(session, week, kind)
                 assert medal and hall
+                assert later_profile.display_name not in repr((medal, hall))
+                if kind == 'student':
+                    assert hall[0]['crown']['qualifying_wins'] == 2
+                    assert hall[0]['crown']['earned_count'] == 1
+                    assert hall[0]['crown']['earned'] is True
+            assert not any(row['subject_type'] == 'student' for row in
+                           contests.contest_results_payload(session, week)['results'])
         assert not session.new and not session.dirty and not session.deleted
         session.commit()
     finally:

@@ -228,7 +228,9 @@ def filter_result_rows(session, rows):
         team_result_safe(row)]
 
 
-def hall_history_allowed(session, profile_id, *, created_at=None, period_start=None):
+def hall_history_allowed(session, profile_id, *, created_at=None):
+    # Without a timestamp this checks account eligibility for durable crowns.
+    # Result restoration additionally requires an authoritative snapshot time.
     from .models import WoodchuckProfile
     profile = session.get(WoodchuckProfile, profile_id)
     rule = session.get(AccountPrivacy, profile_id, populate_existing=True)
@@ -238,8 +240,7 @@ def hall_history_allowed(session, profile_id, *, created_at=None, period_start=N
         and rule.age_band in ('13to17', 'adult')
         and not rule.consent_id
         and rule.public_from is not None
-        and (created_at is None or utc(created_at) < utc(rule.public_from)
-             or period_start is not None and utc(period_start) < utc(rule.public_from))
+        and (created_at is None or utc(created_at) < utc(rule.public_from))
     )
 
 
@@ -248,8 +249,9 @@ def filter_hall_result_rows(session, rows):
 
     Keep the ordinary historical privacy filter everywhere else. A student result
     rejected only because it predates the new age-screen publication boundary may
-    reappear once the active account currently declares 13+ or adult. The
-    contest period may predate screening even when the result was saved later.
+    reappear once the active account currently declares 13+ or adult, only if
+    the snapshot was created strictly before screening. An earlier contest
+    period cannot qualify a snapshot created at or after screening.
     Unscreened, unknown, under-13 and consent-linked accounts remain excluded.
     Team rows follow the public Team identity policy; instruments retain their
     conservative activity privacy filter. Neither uses this student exception.
@@ -265,13 +267,12 @@ def filter_hall_result_rows(session, rows):
         if result.subject_type != 'student' or result.profile_id is None:
             continue
         from .models import ContestWeek
-        from zoneinfo import ZoneInfo
         week = session.get(ContestWeek, result.contest_week_id)
         if week is None or week.status != 'finalized' or week.finalized_at is None:
             continue
-        period_start = datetime.combine(week.week_start, time.min, ZoneInfo('America/Chicago'))
-        if not hall_history_allowed(session, result.profile_id,
-                                    created_at=result.created_at, period_start=period_start):
+        if result.created_at is None or not hall_history_allowed(
+            session, result.profile_id, created_at=result.created_at
+        ):
             continue
         output.append(row)
     return output

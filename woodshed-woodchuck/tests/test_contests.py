@@ -1846,9 +1846,11 @@ def test_prior_finalized_band_camp_week_results_remain_browsable(
     assert payload["results"][0]["display_name"] == "Prior Winner"
 
 
-def test_age_verified_historical_student_results_restore_to_medal_board_and_hall(
+@pytest.mark.parametrize('snapshot_offset', [-1, 0, 1])
+def test_historical_student_restoration_requires_snapshot_before_screening(
     database: tuple[Session, sessionmaker[Session]],
     monkeypatch: pytest.MonkeyPatch,
+    snapshot_offset: int,
 ) -> None:
     session, factory = database
     from app.age_models import AccountPrivacy
@@ -1857,7 +1859,7 @@ def test_age_verified_historical_student_results_restore_to_medal_board_and_hall
     jeff = add_student(session, woodchuck_id="WC-JEFF", instrument="Flute")
     dawn = add_student(session, woodchuck_id="WC-DAWN", instrument="Flute")
 
-    # Model the production state: contest week activity predates age screening.
+    # An earlier contest week cannot substitute for a pre-screening snapshot.
     public_at = datetime(2026, 9, 21, 2, 45, tzinfo=timezone.utc)
     for profile, age_band in ((bucky, "adult"), (jeff, "adult"), (dawn, "under13")):
         rule = session.get(AccountPrivacy, profile.id)
@@ -1896,7 +1898,7 @@ def test_age_verified_historical_student_results_restore_to_medal_board_and_hall
     session.add(week)
     session.flush()
 
-    result_created = datetime(2026, 9, 21, 17, 10, 23, tzinfo=timezone.utc)
+    result_created = public_at + timedelta(seconds=snapshot_offset)
     session.add_all([
         ContestResult(
             contest_week_id=week.id, contest_id=contest.id, division="open",
@@ -1924,11 +1926,13 @@ def test_age_verified_historical_student_results_restore_to_medal_board_and_hall
         week.week_start, request_with_session(jeff.id)
     )
     medal_names = {row["display_name"] for row in medal["results"]}
-    assert medal_names == {"Bucky", "Jeff"}
+    expected = {"Bucky", "Jeff"} if snapshot_offset < 0 else set()
+    assert medal_names == expected
 
     hall = hall_of_champions_payload(session)
     hall_names = {row["display_name"] for row in hall["students"]}
-    assert hall_names == {"Bucky", "Jeff"}
+    assert hall_names == expected
+    assert contest_results_payload(session, week)["results"] == []
 
 
 def test_hall_aggregates_students_instruments_divisions_and_prior_seasons(
