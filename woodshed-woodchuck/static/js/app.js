@@ -1080,7 +1080,21 @@
       const response = await fetch("/teams", {method: "POST", credentials: "same-origin", headers: {"Content-Type": "application/json"}, body: JSON.stringify({
         name: document.getElementById("shed-team-name").value, emblem_key: emblemChoice.value,
       })});
-      const payload = await response.json(); feedback.textContent = response.ok ? "Team created and selected." : payload.detail;
+      const payload = await response.json();
+      const fallback = "Your Team could not be created. Check the name and emblem and try again.";
+      const detail = payload.detail;
+      const errors = Array.isArray(detail) ? detail.map((error) => {
+        if (!error || typeof error.msg !== "string") return "";
+        const field = Array.isArray(error.loc) ? error.loc[error.loc.length - 1] : null;
+        if (error.type === "string_too_short" && error.input === "") {
+          if (field === "name") return "Enter a Team name.";
+          if (field === "emblem_key") return "Choose a Team emblem.";
+        }
+        const label = field === "name" ? "Team name" : field === "emblem_key" ? "Team emblem" : "";
+        return label ? `${label}: ${error.msg}` : error.msg;
+      }).filter(Boolean) : [];
+      feedback.textContent = response.ok ? "Team created and selected."
+        : errors.length ? errors.join(" ") : typeof detail === "string" && detail.trim() ? detail : fallback;
       if (response.ok) await load();
     });
     document.getElementById("shed-private-team-request")?.addEventListener("click", async function () {
