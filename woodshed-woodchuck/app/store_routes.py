@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from .account_routes import current_profile
 from .db import SessionLocal
 from .economy import lock_state
+from .session_origin import same_origin_mutation
 from .store_catalog import catalog_payload
 from .store_inventory import (
     InsufficientDandelionsError,
@@ -172,6 +173,12 @@ def claim_mum_snack(request: Request, submitted: MumSnackSubmission):
 
 @router.post("/purchases", status_code=201)
 def create_store_purchase(request: Request, submitted: StorePurchaseSubmission):
+    if not same_origin_mutation(request):
+        raise HTTPException(
+            status_code=403,
+            detail="A same-origin request is required.",
+            headers={"Cache-Control": "no-store"},
+        )
     with SessionLocal() as session:
         profile = current_profile(request, session)
         if profile is None:
