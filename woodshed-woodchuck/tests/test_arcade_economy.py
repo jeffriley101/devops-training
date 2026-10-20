@@ -150,7 +150,7 @@ def test_insufficient_balance_rejects_start_without_negative_balance(
     economy_database,
 ) -> None:
     client, profile = signed_client(economy_database, "EMPTY", credits=0)
-    response = client.post("/arcade/plays", json={'request_id': uuid4().hex, 'game_key': "thirds"})
+    response = client.post("/arcade/plays", json={'request_id': uuid4().hex, 'game_key': "dressed-to-the-nines"})
     assert response.status_code == 409
     assert "100 Dandelions" in response.json()["detail"]
     assert balance(economy_database, profile.id) == 0

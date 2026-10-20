@@ -142,7 +142,7 @@ process.stdin.on('end', async () => {
       clip:{x:0,y:0,width:config.width,height:metrics.cssContentSize.height,scale:1}}, sessionId);
     require('node:fs').writeFileSync(config.artScreenshot, Buffer.from(shot.data,'base64'));
     const room = await evaluate(`({free:document.querySelector('[data-arcade-price=blue]').textContent,
-      normal:document.querySelector('[data-arcade-price=thirds]').textContent,
+      normal:document.querySelector('[data-arcade-price=dressed-to-the-nines]').textContent,
       standingsAbove:Array.from(document.querySelectorAll('.arcade-leaderboard')).every(board => {
         const link=board.parentElement.querySelector('.arcade-cabinet-link');
         return !link.contains(board) && board.getBoundingClientRect().bottom <= link.getBoundingClientRect().top;

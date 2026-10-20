@@ -2,9 +2,9 @@
 from .age_privacy import require_eligible
 from .memberships import student_has_full_access
 
-ALWAYS_FREE = frozenset({'plunge-burrow', 'blue'})
+ALWAYS_FREE = frozenset({'plunge-burrow', 'blue', 'thirds'})
 NORMAL = frozenset({'radio-tuner', 'wheel-of-woodchuck', 'scale-keyboard',
-                    'thirds', 'dressed-to-the-nines', 'interval-basic-training', 'history-mystery'})
+                    'dressed-to-the-nines', 'interval-basic-training', 'history-mystery'})
 CLASSROOM = {
     'note-names': 'Note Names',
     'instrument-fingerings': 'Instrument Fingerings',

@@ -5,12 +5,12 @@ import hashlib
 import json
 
 from fastapi import HTTPException
-from sqlalchemy import and_, or_, select, update
+from sqlalchemy import and_, func, or_, select, update
 
 from .age_privacy import require_eligible
 from .content import GOAL_OPTIONS
 from .feature_access import require_feature
-from .models import PracticeChart, WoodchuckProfile
+from .models import ArcadePlaySession, PracticeChart, WoodchuckProfile
 from .weekly import CENTRAL, utc_instant, weekly_credit
 from .weekly_models import WeeklyInstrumentPlan, WeeklyPlan
 
@@ -138,6 +138,35 @@ def plan_payload(plan):
                         "thirds": plan.thirds_target}}
 
 
+def thirds_progress(session, profile_id, plan, *, now=None):
+    """Best sealed round for this issued plan; no aggregate best or client claim."""
+    if plan.profile_id != profile_id:
+        raise HTTPException(404, "Weekly plan unavailable.")
+    start = _midnight(plan.week_start)
+    end = _midnight(plan.week_start + timedelta(days=7))
+    issued = plan.issued_at
+    if issued.tzinfo is None:  # SQLite returns persisted UTC without an offset.
+        issued = issued.replace(tzinfo=timezone.utc)
+    best = session.scalar(select(func.max(ArcadePlaySession.authoritative_score)).where(
+        ArcadePlaySession.profile_id == profile_id,
+        ArcadePlaySession.game_key == "thirds",
+        ArcadePlaySession.authoritative_score.is_not(None),
+        ArcadePlaySession.completed_at.is_not(None),
+        ArcadePlaySession.started_at > utc_instant(issued),
+        ArcadePlaySession.started_at >= start,
+        ArcadePlaySession.started_at < end,
+        ArcadePlaySession.completed_at >= start,
+        ArcadePlaySession.completed_at < end,
+        ArcadePlaySession.completed_at >= ArcadePlaySession.started_at,
+        ArcadePlaySession.completed_at <= utc_instant(now),
+    ))
+    qualified = best is not None and best >= plan.thirds_target
+    return {"target": plan.thirds_target, "qualified": qualified,
+            "authoritative_score": best,
+            "completion_status": ("qualified" if qualified else
+                                  "not_completed" if best is None else "completed_below_target")}
+
+
 def current_plan_payload(session, profile, plan, *, now=None):
     result = {"plan": plan_payload(plan), "progress": current_general_progress(
         session, profile.id, now=now, week_start=plan.week_start if plan else None)}
@@ -149,6 +178,7 @@ def current_plan_payload(session, profile, plan, *, now=None):
         if rows:
             result["plan"]["instruments"] = [instrument_payload(plan, row) for row in rows]
         result["start_context"] = start_context(profile, plan)
+        result["tasks"] = {"thirds": thirds_progress(session, profile.id, plan, now=now)}
     return result
 
 

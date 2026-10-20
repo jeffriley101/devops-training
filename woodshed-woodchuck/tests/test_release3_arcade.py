@@ -55,7 +55,7 @@ def count(s, model):
     return s.scalar(select(func.count()).select_from(model))
 
 
-def start(db, game='thirds', key=None, pid=1, now=None):
+def start(db, game='dressed-to-the-nines', key=None, pid=1, now=None):
     with db() as s:
         result = arcade.start_arcade_play(s, profile_id=pid, game_key=game, request_id=key or uuid4().hex, now=now)
         s.commit()
@@ -74,7 +74,7 @@ def complete(db, play, score=0, now=None):
 
 def test_exact_three_attempts_no_expiry_reload_retry_and_exhaustion(db):
     with db() as s:
-        status = arcade.arcade_play_status(s, profile_id=1, game_key='thirds')
+        status = arcade.arcade_play_status(s, profile_id=1, game_key='dressed-to-the-nines')
         assert status['balance'] == 100 and status['attempts_remaining'] == 0
         assert count(s, ArcadeAttemptPack) == count(s, ArcadePlaySession) == 0
     key = uuid4().hex
@@ -94,7 +94,7 @@ def test_exact_three_attempts_no_expiry_reload_retry_and_exhaustion(db):
     with db() as s:
         assert count(s, ArcadeAttemptPack) == 1 and count(s, ArcadePlaySession) == 3
         assert s.scalar(select(ArcadeAttemptPack)).attempts_used == 3
-        assert arcade.remaining_attempts(s, 1, 'thirds') == 0
+        assert arcade.remaining_attempts(s, 1, 'dressed-to-the-nines') == 0
         assert s.get(WoodchuckState, 1).state_json['progress']['credits'] == 0
 
 
@@ -139,11 +139,11 @@ def test_real_full_entitlement_free_normal_games_but_not_classroom(db, kind):
     for _ in range(4):
         run = start(db); assert run.play.entry_cost == 0
         complete(db, run.play)
-    for game in access.NORMAL - {'thirds'}:
+    for game in access.NORMAL - {'dressed-to-the-nines'}:
         assert start(db, game).play.entry_cost == 0
     with db() as s:
         assert count(s, ArcadeAttemptPack) == 0
-        assert access.access_policy(s, 1, 'thirds')['free_reason'] == 'full_access'
+        assert access.access_policy(s, 1, 'dressed-to-the-nines')['free_reason'] == 'full_access'
         for key in access.CLASSROOM:
             assert access.access_policy(s, 1, key)['allowed'] is False
         s.get(AccountPrivacy, 1).age_band = 'under13'; s.commit()
@@ -295,4 +295,4 @@ def test_concurrent_tabs_and_duplicate_completions(db):
         assert count(s, ArcadeAttemptPack) == count(s, ArcadePlaySession) == 1
         assert count(s, ArcadeHighScore) == 1
         assert s.get(WoodchuckState, 1).state_json['progress']['credits'] == 0
-        assert arcade.remaining_attempts(s, 1, 'thirds') == 2
+        assert arcade.remaining_attempts(s, 1, 'dressed-to-the-nines') == 2

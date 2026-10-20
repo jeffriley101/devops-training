@@ -80,7 +80,7 @@ def test_two_slots_retry_frozen_specs_and_exploration(runtime,monkeypatch):
     monkeypatch.setattr(homework,'homework_spec',forbidden)
     result=c.get(PATH).json();assert result['start_context']==context
     assert result['plan']['instruments']==[a,b] and result['plan']['targets']==issued['plan']['targets']
-    assert result['plan']['issued_game_mode']=='Challenge' and 'tasks' not in result
+    assert result['plan']['issued_game_mode']=='Challenge' and set(result['tasks']) == {'thirds'}
     assert start(c,context).json()['assignment']==b and rows(engine)==before
     other=client();after_login=rows(engine)
     assert start(other).json()['assignment']==b and rows(engine)==after_login
