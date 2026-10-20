@@ -11,10 +11,22 @@
     state.profile = { ...(state.profile || {}), game_mode: mode };
     state._weekly_preferences = { ...(state._weekly_preferences || {}), game_mode: mode };
   }
-  function setServerGameMode(state, value) {
+  function setServerGameMode(state, value, revision) {
+    const identity = accountIdentity(state);
+    // Order mode projections independently of the content revision retained
+    // during conflict recovery. This is an in-memory response watermark only;
+    // it is never persisted or used to authorize/save a preference.
+    if (Number.isInteger(revision) && serverGameMode?.identity === identity &&
+        Number.isInteger(serverGameMode.revision) && revision < serverGameMode.revision) return false;
     const mode = ["Beginner", "Challenge", "Performance"].includes(value) ? value : null;
-    serverGameMode = { identity: accountIdentity(state), mode };
+    serverGameMode = { identity, mode, revision: Number.isInteger(revision) ? revision :
+      undefined };
     projectGameMode(state);
+    return true;
+  }
+
+  function gameModeAtRevision(state, revision) {
+    return serverGameMode?.identity === accountIdentity(state) && serverGameMode.revision === revision;
   }
 
   function accountIdentity(state) {
@@ -223,7 +235,7 @@
       restored.account.serverRevision = Number.isInteger(bootstrap.revision)
         ? bootstrap.revision
         : restored.account.serverRevision;
-      setServerGameMode(restored, bootstrap.game_mode);
+      setServerGameMode(restored, bootstrap.game_mode, bootstrap.revision);
       saveState(restored, { sync: false });
       return restored;
     }
@@ -318,6 +330,7 @@
     resetState,
     applyEconomy,
     setServerGameMode,
+    gameModeAtRevision,
     accountRequest,
     stateForResponse,
     localDateKey,

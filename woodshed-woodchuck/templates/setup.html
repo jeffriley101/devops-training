@@ -48,13 +48,13 @@
           {% endfor %}
         </select>
 
-        <label for="level">Level</label>
-        <select id="level" name="level" required>
-          <option value="">Choose your level</option>
-          {% for item in levels %}
-          <option value="{{ item }}">{{ item }}</option>
-          {% endfor %}
+        <input type="hidden" name="level" value="Beginner" />
+        <label for="setup-game-mode">Game Mode</label>
+        <select id="setup-game-mode" name="game_mode" required>
+          <option value="">Choose a Game Mode</option>
+          {% for mode in game_modes %}<option value="{{ mode }}">{{ mode }}</option>{% endfor %}
         </select>
+        <p>You can change Game Mode later in your profile.</p>
 
         <label for="goal">Practice goal</label>
         <select id="goal" name="goal" required>

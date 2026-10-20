@@ -40,7 +40,7 @@
   });
 
   if (!form || !tools || !setupFields) return;
-  const fields = ["instrument", "level", "goal"];
+  const fields = ["instrument", "game_mode", "goal"];
   const choices = Object.fromEntries(fields.map(field => [field,
     new Set(Array.from(form.elements[field].options).map(option => option.value).filter(Boolean))]));
 

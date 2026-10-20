@@ -80,6 +80,8 @@
     {% endif %}
   </div>
 
+  {% if game_mode_entry or (selected_age is defined and selected_age in ("13to17", "adult")) %}{% include "_game_mode_entry.html" %}{% endif %}
+
   <script src="/static/js/shared-ui.js?v=6"></script>
   <script src="/static/js/recovery.js?v=1"></script>
   {% if active_nav != "quest" %}
@@ -91,7 +93,7 @@
   <script id="account-state-bootstrap" type="application/json">{{ account_state_bootstrap | default(none) | tojson }}</script>
   <script id="authenticated-player-name" type="application/json">{{ (authenticated_profile.display_name if authenticated_profile else none) | tojson }}</script>
   {% if authenticated_profile %}<template id="account-scripts">{% else %}
-  <script src="/static/js/session-boundary.js?v=6"></script>{% endif %}
+  <script src="/static/js/session-boundary.js?v=wl2-04"></script>{% endif %}
   <script src="/static/js/state.js?v=10"></script>
   <script src="/static/js/instruments.js?v=3"></script>
   <script src="/static/vendor/tone/Tone.js?v=15.1.22"></script>
@@ -101,13 +103,14 @@
   <script src="/static/js/woodchuck-motion.js?v=5"></script>
   <script src="/static/js/practice-duration.js?v=1"></script>
   <script src="/static/js/app.js?v=overhaul-phase1-1"></script>
-  <script src="/static/js/account.js?v=overhaul-phase1-2"></script>
+  <script src="/static/js/account.js?v=wl2-04"></script>
   <script src="/static/js/world-entry.js?v=5"></script>
   {% if woodchuck_appearance %}<script src="/static/js/woodchuck-appearance.js?v=5"></script>{% endif %}
   {% if authenticated_profile and active_nav == "home" %}<script src="/static/js/shed-entry-streak.js?v=1"></script>{% endif %}
+  {% if game_mode_entry or (selected_age is defined and selected_age in ("13to17", "adult")) %}<script src="/static/js/game-mode-entry.js?v=1"></script>{% endif %}
   {% block page_scripts %}{% endblock %}
   {% if authenticated_profile %}</template>
-  <script src="/static/js/session-boundary.js?v=6"></script>{% endif %}
+  <script src="/static/js/session-boundary.js?v=wl2-04"></script>{% endif %}
 {% if not reconstructed_student_surface and "artwork-room-page" not in (page_class or "") %}<p class="body-copy"><a href="/family/practice">Private practice and director</a> · <a href="/family/parent-access">Parent access</a></p>{% endif %}
 </body>
 </html>

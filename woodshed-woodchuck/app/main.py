@@ -159,6 +159,7 @@ def _render(request: Request, template_name: str, *, analytics_event: str | None
     account_state_bootstrap = None
     authenticated_profile = None
     woodchuck_appearance = None
+    game_mode_entry = False
     with SessionLocal() as session:
         profile = current_profile(request, session)
         if profile is not None:
@@ -176,6 +177,12 @@ def _render(request: Request, template_name: str, *, analytics_event: str | None
                     session, profile_id=profile.id
                 ),
             }
+            # Student entry presentation only; authorization remains server-side.
+            adult_context = any(request.session.get(key) for key in (
+                "trusted_verifier_id", "site_admin_fingerprint", "contest_admin_token_fingerprint",
+                "child_parent_consent", "child_director_permission"))
+            game_mode_entry = (template_name == "home.html" and not adult_context
+                               and not authenticated_profile["band_director"])
             saved_state = session.get(WoodchuckState, profile.id)
             if template_name in {"home.html", "store.html"}:
                 from .appearance import appearance_payload
@@ -191,6 +198,7 @@ def _render(request: Request, template_name: str, *, analytics_event: str | None
         name=template_name,
         context={
             "game_modes": GAME_MODES,
+            "game_mode_entry": game_mode_entry,
             "nav_items": NAV_ITEMS,
             "reconstructed_student_surface": template_name in {"home.html", "store.html", "p_book.html", "quest.html"},
             "active_nav": context.pop("active_nav", None),
@@ -413,7 +421,7 @@ def guest_page(request: Request):
         request=request, name="guest.html",
         context={"blocked": blocked, "signing_in": signing_in,
                  "account_id": account_id, "instruments": INSTRUMENT_OPTIONS,
-                 "levels": LEVEL_OPTIONS, "goals": GOAL_OPTIONS,
+                 "game_modes": GAME_MODES, "goals": GOAL_OPTIONS,
                  "secret_feedback": request.session.pop(FLASH_KEY, "") if not blocked else "",
                  "registration_cohort": registration_cohort,
                  "c001_registration": registration_cohort == C001,

@@ -72,7 +72,6 @@
 
     const nameEl = form.querySelector("#woodchuck-name");
     const instrumentEl = form.querySelector("#instrument");
-    const levelEl = form.querySelector("#level");
     const goalEl = form.querySelector("#goal");
 
     if (nameEl && state.profile.woodchuckName) {
@@ -81,10 +80,6 @@
 
     if (instrumentEl && state.profile.instrument) {
       instrumentEl.value = state.profile.instrument;
-    }
-
-    if (levelEl && state.profile.level) {
-      levelEl.value = state.profile.level;
     }
 
     if (goalEl && state.profile.goal) {
@@ -125,9 +120,7 @@
       const instrument = String(
         formData.get("instrument") || ""
       ).trim();
-      const level = String(
-        formData.get("level") || ""
-      ).trim();
+      const gameMode = String(formData.get("game_mode") || "").trim();
       const goal = String(
         formData.get("goal") || ""
       ).trim();
@@ -143,8 +136,8 @@
         return;
       }
 
-      if (!level) {
-        errorEl.textContent = "Please choose a level.";
+      if (!Array.from(form.elements.game_mode.options).some(option => option.value && option.value === gameMode)) {
+        errorEl.textContent = "Please choose a Game Mode.";
         return;
       }
 
@@ -199,7 +192,7 @@
             ? payload.revision
             : 0,
         };
-        stateApi.setServerGameMode(state, profile.game_mode);
+        stateApi.setServerGameMode(state, profile.game_mode, payload.revision);
         stateApi.saveState(state, { sync: false });
 
         accountIdEl.textContent = profile.woodchuck_id;
@@ -208,6 +201,9 @@
         }
         successPanel.hidden = false;
         form.hidden = true;
+        form.classList.add("hidden");
+
+        void window.WWGameModeEntry?.start({choice: gameMode, created: true});
 
         successPanel.scrollIntoView({
           behavior: "smooth",
@@ -331,7 +327,7 @@
 
         applyAccountProfile(restoredState, profile);
         if (Object.prototype.hasOwnProperty.call(statePayload.state?._weekly_preferences || {}, "game_mode")) {
-          stateApi.setServerGameMode(restoredState, statePayload.state._weekly_preferences.game_mode);
+          stateApi.setServerGameMode(restoredState, statePayload.state._weekly_preferences.game_mode, statePayload.revision);
         }
 
         if (Number.isInteger(statePayload.revision)) {
@@ -464,16 +460,16 @@
     });
   }
 
-  function wireGameMode() {
+  function wireGameMode(config = {}) {
     // Retain embedded surface/focus IDs from the combined profile panel.
-    const form = document.getElementById("change-level-form");
-    const panel = document.getElementById("change-level-panel");
-    const input = document.getElementById("change-level-select");
-    const display = document.getElementById("level-value");
-    const opener = document.getElementById("instrument-object");
-    const feedback = document.getElementById("change-level-feedback");
-    if (!form || !panel || !input || !display || !opener || !feedback) return;
-    const modes = ["Beginner", "Challenge", "Performance"];
+    const form = config.form || document.getElementById("change-level-form");
+    const panel = config.panel || document.getElementById("change-level-panel");
+    const input = config.input || document.getElementById("change-level-select");
+    const display = config.display || document.getElementById("level-value");
+    const opener = config.opener === undefined ? document.getElementById("instrument-object") : config.opener;
+    const feedback = config.feedback || document.getElementById("change-level-feedback");
+    if (!form || !panel || !input || !display || !feedback) return;
+    const modes = Array.from(input.options, option => option.value).filter(Boolean);
     function showSaved(state) {
       const mode = state.profile.game_mode || "Not selected";
       display.textContent = mode;
@@ -488,7 +484,7 @@
       feedback.textContent = "";
       feedback.classList.remove("error-text");
     }
-    opener.addEventListener("click", initialize);
+    opener?.addEventListener("click", initialize);
     panel.querySelectorAll("[data-close-profile-panel]").forEach(button => {
       button.addEventListener("click", () => panel.closest("dialog").close());
     });
@@ -506,9 +502,12 @@
           !Object.prototype.hasOwnProperty.call(payload.state?._weekly_preferences || {}, "game_mode")) {
         throw new Error("Reload to confirm the latest saved Game Mode.");
       }
-      stateApi.setServerGameMode(next, payload.state._weekly_preferences.game_mode);
-      stateApi.applyEconomy(next, {revision: payload.revision, credits: payload.state?.progress?.credits});
-      next.account.serverRevision = payload.revision;
+      if (!stateApi.setServerGameMode(next, payload.state._weekly_preferences.game_mode, payload.revision)) {
+        throw new Error("A newer Game Mode response was already received. Reload or try again.");
+      }
+      // Recovery confirms mode only. Do not certify stale unrelated local
+      // fields with this newer revision: ordinary sync must use its existing
+      // conflict backup/full-state recovery before adopting that revision.
       stateApi.saveState(next, {sync: false});
       showSaved(next);
       return next;
@@ -532,6 +531,10 @@
       try {
         await operation.ready();
         if (!stateApi.stateForResponse(request)) return;
+        const beforeSave = stateApi.getState();
+        const baseRevision = beforeSave.account.serverRevision || 0;
+        const baseMode = beforeSave.profile.game_mode;
+        const modeConfirmedAtBase = stateApi.gameModeAtRevision(beforeSave, baseRevision);
         started = true;
         const response = await fetch("/account/profile/game-mode", {
           method: "PATCH", credentials: "same-origin", cache: "no-store",
@@ -548,8 +551,19 @@
           next = await restore(request, payload.revision);
           if (!next) return;
         } else {
-          stateApi.setServerGameMode(next, payload.game_mode);
-          next.account.serverRevision = payload.revision;
+          if (!stateApi.setServerGameMode(next, payload.game_mode, payload.revision)) {
+            throw new Error("Game Mode changed while saving. Reload or try again to confirm it.");
+          }
+          // Only a mode confirmed at the base content revision qualifies.
+          // A partial economy/read response cannot supply that confirmation.
+          // A changed mode at exactly the next revision can only be a mode
+          // commit (the sole writer changes no unrelated state). An idempotent
+          // response does NOT prove our request advanced the revision. A gap
+          // or same-mode retry keeps the old content revision for recovery.
+          if (modeConfirmedAtBase && submitted !== baseMode && payload.revision === baseRevision + 1 &&
+              next.account.serverRevision === baseRevision) {
+            next.account.serverRevision = payload.revision;
+          }
           stateApi.saveState(next, {sync: false});
           showSaved(next);
         }
@@ -557,6 +571,7 @@
         feedback.textContent = "Game Mode saved successfully.";
         button.classList.add("is-confirmed-success");
         window.WWSurfaces?.markSaved(form);
+        form.dispatchEvent(new CustomEvent("ww:game-mode-saved"));
       } catch (error) {
         if (!stateApi.stateForResponse(request)) return;
         feedback.classList.add("error-text");
@@ -570,6 +585,7 @@
               feedback.classList.remove("error-text");
               feedback.textContent = "Game Mode is saved. The interrupted response has been recovered.";
               window.WWSurfaces?.markSaved(form);
+              form.dispatchEvent(new CustomEvent("ww:game-mode-saved"));
             } else {
               feedback.textContent += " Your saved Game Mode is unchanged. You can try again.";
             }
@@ -579,8 +595,10 @@
         }
       } finally { operation.release(); }
     });
+    return initialize;
   }
 
+  window.WWGameMode = Object.freeze({wire: wireGameMode});
   wireCreateAccount();
   wireLogin();
 
@@ -642,7 +660,9 @@
     }
     if (payload.state.account?.woodchuckId !== latest.account.woodchuckId) return;
 
-    stateApi.setServerGameMode(payload.state, payload.state._weekly_preferences?.game_mode);
+    if (!stateApi.setServerGameMode(payload.state, payload.state._weekly_preferences?.game_mode, payload.revision)) {
+      throw new Error("A newer saved Game Mode was received. Reload or try again to recover the full Woodshed.");
+    }
     stateApi.saveState(payload.state, { sync: false });
 
     const restoredState = stateApi.getState();

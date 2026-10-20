@@ -59,7 +59,7 @@
   }
   function removeAccountProductCaches() {
     // Exact product keys only; the session epoch and security cookies survive.
-    for (const key of ["woodshedWoodchuckState.v1", "woodshed.plungeBurrow.bestScore", "woodshedWoodchuckMetronomeBpm"]) {
+    for (const key of ["woodshedWoodchuckState.v1", "woodshed.plungeBurrow.bestScore", "woodshedWoodchuckMetronomeBpm", "woodshed:game-mode-entry:session:v1"]) {
       try { window.localStorage.removeItem(key); } catch (_error) {}
     }
     try {

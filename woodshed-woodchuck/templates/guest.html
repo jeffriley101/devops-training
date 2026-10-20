@@ -33,7 +33,7 @@
   <noscript><p>Enable JavaScript to use these local practice tools.</p></noscript>
   <form id="guest-setup-form" class="stack-form" method="dialog" autocomplete="off">
     <fieldset id="guest-setup-fields" class="stack-form" disabled>
-    {% for field, label, choices in [('instrument', 'Instrument', instruments), ('level', 'Level', levels), ('goal', 'Practice goal', goals)] %}
+    {% for field, label, choices in [('instrument', 'Instrument', instruments), ('game_mode', 'Game Mode', game_modes), ('goal', 'Practice goal', goals)] %}
     <label for="guest-{{ field }}">{{ label }}</label>
     <select id="guest-{{ field }}" name="{{ field }}" required>
       <option value="">Choose {{ label | lower }}</option>
@@ -230,20 +230,20 @@
 <script src="/static/js/shared-ui.js?v=5"></script>
 <script src="/static/js/recovery.js?v=1"></script>
 {% if account_id %}<template id="account-scripts">{% else %}
-<script src="/static/js/session-boundary.js?v=6"></script>{% endif %}
+<script src="/static/js/session-boundary.js?v=wl2-04"></script>{% endif %}
 {% if signing_in %}
 <script src="/static/js/state.js?v=10"></script>
-<script src="/static/js/account.js?v=guest-stateless-1"></script>
+<script src="/static/js/account.js?v=wl2-04"></script>
 {% elif not blocked %}
-<script src="/static/js/guest.js?v=2"></script>
+<script src="/static/js/guest.js?v=wl2-04"></script>
 <script src="/static/js/tuner.js?v=2"></script>
 <script src="/static/js/app.js?v=guest-stateless-2"></script>
 <script src="/static/js/guest-chart.js?v=1"></script>
 <script src="/static/js/plunge-burrow.js?v=9"></script>
 <script src="/static/js/guest-plunge.js?v=1"></script>
 {% endif %}
-{% if blocked or signing_in %}<script src="/static/js/guest.js?v=2"></script>{% endif %}
+{% if blocked or signing_in %}<script src="/static/js/guest.js?v=wl2-04"></script>{% endif %}
 {% if account_id %}</template>
-<script src="/static/js/session-boundary.js?v=6"></script>{% endif %}
+<script src="/static/js/session-boundary.js?v=wl2-04"></script>{% endif %}
 </body>
 </html>
