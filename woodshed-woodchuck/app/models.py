@@ -20,6 +20,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .db import Base
+from .game_modes import GAME_MODE_CHECK
 from .c001_models import AbuseEvent, ActivationControl
 from .age_models import AccountPrivacy
 from .session_revocations import RevokedBrowserSession
@@ -45,6 +46,7 @@ SEASON_TIMEZONE = "America/Chicago"
 class WoodchuckProfile(Base):
     __tablename__ = "woodchuck_profiles"
     __table_args__ = (
+        CheckConstraint(GAME_MODE_CHECK, name="ck_woodchuck_profile_game_mode"),
         CheckConstraint(
             "status IN ('active', 'deleted')", name="ck_woodchuck_profile_status"
         ),
@@ -68,6 +70,7 @@ class WoodchuckProfile(Base):
 
     instrument: Mapped[str] = mapped_column(String(50), nullable=False)
     first_choice_instrument: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    game_mode: Mapped[str | None] = mapped_column(String(20), nullable=True)
     level: Mapped[str] = mapped_column(String(50), nullable=False)
     goal: Mapped[str] = mapped_column(String(100), nullable=False)
     status: Mapped[str] = mapped_column(

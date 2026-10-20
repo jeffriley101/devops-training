@@ -190,13 +190,15 @@ def insert_play(engine, **changes):
 
 def test_one_additive_head_follows_c24():
     script = ScriptDirectory.from_config(config())
-    assert script.get_heads() == [NEW]
+    assert script.get_heads() == ["w25weekly002"]
+    assert script.get_revision("w25weekly002").down_revision == NEW
     assert script.get_revision(NEW).down_revision == OLD
-    assert len(list(script.walk_revisions())) == 63
+    assert len(list(script.walk_revisions())) == 64
 
 
 def test_empty_database_upgrade(db):
-    command.upgrade(config(), "head")
+    # This regression targets the historical foundation revision itself.
+    command.upgrade(config(), NEW)
     assert revision(db) == NEW
     with db.connect() as c:
         assert c.scalar(text("SELECT count(*) FROM weekly_wheel_plays")) == 0
@@ -230,16 +232,21 @@ def test_legacy_first_choice_is_null_without_grants_or_activation(db):
     profile(db, 1)
     before = rows(db, old_only=True)
     command.upgrade(config(), NEW)
-    with Session(db) as s:
-        account = s.get(m.WoodchuckProfile, 1)
+    with db.connect() as c:
+        # Select only columns present at this historical revision; later model
+        # additions must not turn this foundation regression into an ORM error.
+        account = c.execute(select(m.WoodchuckProfile.first_choice_instrument,
+            m.WoodchuckProfile.instrument, m.WoodchuckProfile.status,
+            m.WoodchuckProfile.session_version).where(m.WoodchuckProfile.id == 1)).one()
         assert account.first_choice_instrument is None and account.instrument == "Trumpet"
         assert account.status == "active" and account.session_version == 0
     with db.begin() as c:
         c.execute(text("UPDATE woodchuck_profiles SET first_choice_instrument='Flute' WHERE id=1"))
     assert rows(db, old_only=True) == before
     profile(db, 2)
-    with Session(db) as s:
-        assert s.get(m.WoodchuckProfile, 2).first_choice_instrument is None
+    with db.connect() as c:
+        assert c.scalar(select(m.WoodchuckProfile.first_choice_instrument).where(
+            m.WoodchuckProfile.id == 2)) is None
     with db.connect() as c:
         assert c.scalar(text("SELECT count(*) FROM reward_grants")) == 0
         assert c.scalar(text("SELECT activated_at FROM persistent_team_control")) is None
@@ -275,7 +282,8 @@ def test_wheel_request_slot_ordinal_and_foreign_key_constraints(db):
 
 
 def test_metadata_matches_actual_new_schema(db):
-    command.upgrade(config(), NEW)
+    # Full current-model parity requires the current head, not an older schema.
+    command.upgrade(config(), "head")
     with db.connect() as c:
         assert compare_metadata(MigrationContext.configure(c, opts={"compare_type": True}), Base.metadata) == []
         inspector = inspect(c)

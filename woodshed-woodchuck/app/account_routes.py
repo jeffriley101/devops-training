@@ -26,6 +26,7 @@ from .accounts import (
 )
 from .instruments import INSTRUMENTS_BY_LABEL, shed_artwork_url, shed_character_url
 from .content import LEVEL_OPTIONS
+from .game_modes import mode_state, normalize_game_mode, set_game_mode
 from .db import SessionLocal
 from .economy import lock_state, preserve_server_values
 from .login_limits import enforce_login_limit
@@ -74,6 +75,10 @@ class LevelUpdate(BaseModel):
     level: str
 
 
+class GameModeUpdate(BaseModel):
+    game_mode: str
+
+
 class DailySecretSubmission(BaseModel):
     passcode: str
 
@@ -102,6 +107,7 @@ def profile_payload(profile: WoodchuckProfile) -> dict[str, object]:
         "woodchuck_id": profile.woodchuck_id,
         "display_name": profile.display_name,
         "instrument": profile.instrument,
+        "game_mode": profile.game_mode,
         "level": profile.level,
         "goal": profile.goal,
         # This is the authoritative server-side account/profile creation time.
@@ -244,6 +250,7 @@ def create_account(
                 "createdAt": profile.created_at.isoformat(),
             })
             authoritative_state["profile"] = browser_profile
+            authoritative_state = mode_state(profile, authoritative_state)
             state_row = WoodchuckState(
                 profile_id=profile.id,
                 state_json=authoritative_state,
@@ -573,6 +580,41 @@ def change_profile_level(request: Request, submitted: LevelUpdate):
 
 
 
+@router.patch("/profile/game-mode")
+def change_profile_game_mode(request: Request, submitted: GameModeUpdate):
+    # Existing /account Origin middleware applies before session authentication.
+    try:
+        value = normalize_game_mode(submitted.game_mode)
+    except ValueError as error:
+        raise HTTPException(400, str(error)) from error
+    with SessionLocal() as session:
+        profile = current_profile(request, session)
+        if profile is None:
+            raise HTTPException(401, "Student sign-in is required.")
+        # Reuse profile -> state locking and refresh after any wait. Never commit
+        # the profile separately from its compatibility JSON and revision.
+        state = lock_state(session, profile.id)
+        session.refresh(profile)
+        if current_profile(request, session) is None:
+            raise HTTPException(401, "Student sign-in is required.")
+        from .session_revocations import NONCE, RevokedBrowserSession, digest
+        nonce = request.session.get(NONCE)
+        if not isinstance(nonce, str) or session.get(RevokedBrowserSession, digest(nonce)):
+            # A logout/account switch may have retired credentials while waiting.
+            request.scope["ww.suppress_session_cookie"] = True
+            raise HTTPException(401, "Sign-in changed. Reload this page.")
+        changed = profile.game_mode != value
+        set_game_mode(profile, value)
+        projected = mode_state(profile, state.state_json)
+        if changed or projected != state.state_json:
+            state.state_json = projected
+            state.revision += 1
+        response = {"updated": True, "game_mode": profile.game_mode,
+                    "woodchuck_id": profile.woodchuck_id, "revision": state.revision}
+        session.commit()
+        return JSONResponse(response, headers={"Cache-Control": "no-store"})
+
+
 @router.get("/state")
 def load_account_state(request: Request):
     with SessionLocal() as session:
@@ -588,7 +630,7 @@ def load_account_state(request: Request):
 
         return JSONResponse({
             "authenticated": True,
-            "state": saved_state.state_json if saved_state else None,
+            "state": mode_state(profile, saved_state.state_json) if saved_state else None,
             "revision": saved_state.revision if saved_state else 0,
         }, headers={"Cache-Control": "no-store"})
 
@@ -678,6 +720,7 @@ def save_account_state(
             }
         )
         normalized_state["profile"] = browser_profile
+        normalized_state = mode_state(profile, normalized_state)
 
         if saved_state is None:
             saved_state = WoodchuckState(
