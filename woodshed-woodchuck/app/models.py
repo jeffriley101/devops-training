@@ -23,6 +23,7 @@ from .db import Base
 from .c001_models import AbuseEvent, ActivationControl
 from .age_models import AccountPrivacy
 from .session_revocations import RevokedBrowserSession
+from .weekly_models import WeeklyWheelPlay
 from .classroom_models import (
     ClassroomProgram, ClassroomRoleGrant, ClassroomClass, ClassroomTeachingAssignment,
     ClassroomStudentMembership, ClassroomMembershipPeriod, ClassroomOwnershipTransfer,
@@ -66,6 +67,7 @@ class WoodchuckProfile(Base):
     pin_hash: Mapped[str] = mapped_column(String(255), nullable=False)
 
     instrument: Mapped[str] = mapped_column(String(50), nullable=False)
+    first_choice_instrument: Mapped[str | None] = mapped_column(String(50), nullable=True)
     level: Mapped[str] = mapped_column(String(50), nullable=False)
     goal: Mapped[str] = mapped_column(String(100), nullable=False)
     status: Mapped[str] = mapped_column(
