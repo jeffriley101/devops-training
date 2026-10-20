@@ -37,6 +37,7 @@
       createdAt: profile.created_at,
     };
 
+    stateApi.setServerGameMode(state, profile.game_mode);
     return state;
   }
 
@@ -198,6 +199,7 @@
             ? payload.revision
             : 0,
         };
+        stateApi.setServerGameMode(state, profile.game_mode);
         stateApi.saveState(state, { sync: false });
 
         accountIdEl.textContent = profile.woodchuck_id;
@@ -328,6 +330,9 @@
         }
 
         applyAccountProfile(restoredState, profile);
+        if (Object.prototype.hasOwnProperty.call(statePayload.state?._weekly_preferences || {}, "game_mode")) {
+          stateApi.setServerGameMode(restoredState, statePayload.state._weekly_preferences.game_mode);
+        }
 
         if (Number.isInteger(statePayload.revision)) {
           restoredState.account.serverRevision =
@@ -459,11 +464,128 @@
     });
   }
 
+  function wireGameMode() {
+    // Retain embedded surface/focus IDs from the combined profile panel.
+    const form = document.getElementById("change-level-form");
+    const panel = document.getElementById("change-level-panel");
+    const input = document.getElementById("change-level-select");
+    const display = document.getElementById("level-value");
+    const opener = document.getElementById("instrument-object");
+    const feedback = document.getElementById("change-level-feedback");
+    if (!form || !panel || !input || !display || !opener || !feedback) return;
+    const modes = ["Beginner", "Challenge", "Performance"];
+    function showSaved(state) {
+      const mode = state.profile.game_mode || "Not selected";
+      display.textContent = mode;
+      display.setAttribute("aria-label", `Game Mode: ${mode}. Change Game Mode.`);
+      display.title = `Game Mode: ${mode}. Change Game Mode.`;
+    }
+    function initialize() {
+      if (form.getAttribute("aria-busy") === "true") return;
+      const state = stateApi.getState();
+      input.value = state.profile.game_mode || "";
+      showSaved(state);
+      feedback.textContent = "";
+      feedback.classList.remove("error-text");
+    }
+    opener.addEventListener("click", initialize);
+    panel.querySelectorAll("[data-close-profile-panel]").forEach(button => {
+      button.addEventListener("click", () => panel.closest("dialog").close());
+    });
+    initialize();
+    window.WWSurfaces?.markSaved(form);
+
+    async function restore(request, minimumRevision = 0) {
+      const response = await fetch("/account/state", {credentials: "same-origin", cache: "no-store"});
+      if (!response.ok) throw new Error("Reload or try again to confirm the saved Game Mode.");
+      const payload = await response.json();
+      const next = stateApi.stateForResponse(request);
+      if (!next) return null;
+      if (!Number.isInteger(payload.revision) || payload.revision < Math.max(minimumRevision, next.account.serverRevision || 0) ||
+          (payload.state?.account?.woodchuckId && payload.state.account.woodchuckId !== next.account.woodchuckId) ||
+          !Object.prototype.hasOwnProperty.call(payload.state?._weekly_preferences || {}, "game_mode")) {
+        throw new Error("Reload to confirm the latest saved Game Mode.");
+      }
+      stateApi.setServerGameMode(next, payload.state._weekly_preferences.game_mode);
+      stateApi.applyEconomy(next, {revision: payload.revision, credits: payload.state?.progress?.credits});
+      next.account.serverRevision = payload.revision;
+      stateApi.saveState(next, {sync: false});
+      showSaved(next);
+      return next;
+    }
+    form.addEventListener("submit", async event => {
+      event.preventDefault();
+      const submitted = input.value.trim();
+      if (!modes.includes(submitted)) {
+        feedback.classList.add("error-text");
+        feedback.textContent = "Choose Beginner, Challenge or Performance.";
+        return;
+      }
+      const operation = window.WWAccountSync.beginProfileSave(form);
+      if (!operation) return;
+      const request = stateApi.accountRequest();
+      const button = form.querySelector('button[type="submit"]');
+      feedback.classList.remove("error-text");
+      button.classList.remove("is-confirmed-success");
+      feedback.textContent = "Saving…";
+      let started = false;
+      try {
+        await operation.ready();
+        if (!stateApi.stateForResponse(request)) return;
+        started = true;
+        const response = await fetch("/account/profile/game-mode", {
+          method: "PATCH", credentials: "same-origin", cache: "no-store",
+          headers: {"Content-Type": "application/json"}, body: JSON.stringify({game_mode: submitted}),
+        });
+        if (!response.ok) throw new Error(await responseMessage(response, "Game Mode could not be saved. Try again."));
+        const payload = await response.json();
+        let next = stateApi.stateForResponse(request);
+        if (!next) return;
+        if (payload.woodchuck_id !== next.account.woodchuckId || !modes.includes(payload.game_mode) || !Number.isInteger(payload.revision)) {
+          throw new Error("The save response could not be confirmed. Try again.");
+        }
+        if (payload.revision < (next.account.serverRevision || 0)) {
+          next = await restore(request, payload.revision);
+          if (!next) return;
+        } else {
+          stateApi.setServerGameMode(next, payload.game_mode);
+          next.account.serverRevision = payload.revision;
+          stateApi.saveState(next, {sync: false});
+          showSaved(next);
+        }
+        input.value = next.profile.game_mode || "";
+        feedback.textContent = "Game Mode saved successfully.";
+        button.classList.add("is-confirmed-success");
+        window.WWSurfaces?.markSaved(form);
+      } catch (error) {
+        if (!stateApi.stateForResponse(request)) return;
+        feedback.classList.add("error-text");
+        feedback.textContent = error.message || "Game Mode could not be saved. Try again.";
+        if (started) {
+          try {
+            const recovered = await restore(request);
+            if (!recovered) return;
+            if (recovered.profile.game_mode === submitted) {
+              input.value = submitted;
+              feedback.classList.remove("error-text");
+              feedback.textContent = "Game Mode is saved. The interrupted response has been recovered.";
+              window.WWSurfaces?.markSaved(form);
+            } else {
+              feedback.textContent += " Your saved Game Mode is unchanged. You can try again.";
+            }
+          } catch (_) {
+            if (stateApi.stateForResponse(request)) feedback.textContent += " Reload or try again to confirm the saved value.";
+          }
+        }
+      } finally { operation.release(); }
+    });
+  }
+
   wireCreateAccount();
   wireLogin();
 
   wireProfileChange({ kind: "name", endpoint: "/account/profile/name", stateKey: "woodchuckName", payloadKey: "display_name", triggerId: "woodchuck-name-value" });
-  wireProfileChange({ kind: "level", endpoint: "/account/profile/level", stateKey: "level", payloadKey: "level", triggerId: "level-value" });
+  wireGameMode();
 })();
 
 (function () {
@@ -520,6 +642,7 @@
     }
     if (payload.state.account?.woodchuckId !== latest.account.woodchuckId) return;
 
+    stateApi.setServerGameMode(payload.state, payload.state._weekly_preferences?.game_mode);
     stateApi.saveState(payload.state, { sync: false });
 
     const restoredState = stateApi.getState();

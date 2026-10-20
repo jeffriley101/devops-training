@@ -79,7 +79,7 @@
     const trigger = document.getElementById('instrument-object');
     if (trigger) {
       if (!trigger.dataset.sceneCell) window.WWInstruments?.renderInstrument(trigger, payload.instrument);
-      trigger.setAttribute('aria-label', `Instrument, Appearance and Student Level. Instrument: ${payload.instrument}`);
+      trigger.setAttribute('aria-label', `Instrument, Appearance and Game Mode. Instrument: ${payload.instrument}`);
       trigger.setAttribute('aria-controls', 'your-woodchuck');
     }
   }

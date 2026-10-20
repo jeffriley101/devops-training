@@ -2,6 +2,20 @@
   const STORAGE_KEY = "woodshedWoodchuckState.v1";
   let serverBootstrap = null;
   let accountGeneration = 0;
+  let serverGameMode = null;
+
+  // Account responses and rendered bootstrap supply this projection. Browser
+  // JSON and historical Level never select the authoritative Game Mode.
+  function projectGameMode(state) {
+    const mode = serverGameMode?.identity === accountIdentity(state) ? serverGameMode.mode : null;
+    state.profile = { ...(state.profile || {}), game_mode: mode };
+    state._weekly_preferences = { ...(state._weekly_preferences || {}), game_mode: mode };
+  }
+  function setServerGameMode(state, value) {
+    const mode = ["Beginner", "Challenge", "Performance"].includes(value) ? value : null;
+    serverGameMode = { identity: accountIdentity(state), mode };
+    projectGameMode(state);
+  }
 
   function accountIdentity(state) {
     return JSON.stringify([state?.account?.woodchuckId || "", state?.account?.authenticated === true]);
@@ -209,6 +223,7 @@
       restored.account.serverRevision = Number.isInteger(bootstrap.revision)
         ? bootstrap.revision
         : restored.account.serverRevision;
+      setServerGameMode(restored, bootstrap.game_mode);
       saveState(restored, { sync: false });
       return restored;
     }
@@ -246,6 +261,7 @@
       return false;
     }
     if (boundary && state.account.woodchuckId !== boundary.accountId()) return false;
+    projectGameMode(state);
     let previous = null;
     try { previous = JSON.parse(window.localStorage.getItem(STORAGE_KEY)); } catch (_error) {}
     if (accountIdentity(previous) !== accountIdentity(state)) accountGeneration += 1;
@@ -301,6 +317,7 @@
     saveState,
     resetState,
     applyEconomy,
+    setServerGameMode,
     accountRequest,
     stateForResponse,
     localDateKey,

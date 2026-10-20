@@ -399,18 +399,18 @@
       }
       instrumentObjectEl.setAttribute(
         "aria-label",
-        `Instrument, Appearance and Student Level. Current instrument: ${instrument}. Customize instrument, hoodie, hat and level.`
+        `Instrument, Appearance and Game Mode. Current instrument: ${instrument}. Customize instrument, hoodie, hat and Game Mode.`
       );
       instrumentObjectEl.title = "Your Woodchuck";
     }
 
     if (levelEl) {
-      const profileLevel = state.profile.level || "Level not set";
+      const profileLevel = state.profile.game_mode || "Not selected";
       levelEl.setAttribute(
         "aria-label",
-        `Level: ${profileLevel}. Change level.`
+        `Game Mode: ${profileLevel}. Change Game Mode.`
       );
-      levelEl.title = `Level: ${profileLevel}. Change level.`;
+      levelEl.title = `Game Mode: ${profileLevel}. Change Game Mode.`;
       levelEl.textContent = profileLevel;
     }
 

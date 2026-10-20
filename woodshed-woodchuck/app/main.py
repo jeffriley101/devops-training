@@ -23,6 +23,7 @@ from fastapi.templating import Jinja2Templates
 from .session_revocations import RevocableSessionMiddleware as SessionMiddleware
 
 from .practice_duration import format_minutes
+from .game_modes import GAME_MODES, mode_state
 from .account_routes import (
     current_profile,
     page_generation,
@@ -180,7 +181,8 @@ def _render(request: Request, template_name: str, *, analytics_event: str | None
                 from .appearance import appearance_payload
                 woodchuck_appearance = appearance_payload(session, profile, saved_state)
             account_state_bootstrap = {
-                "state": saved_state.state_json if saved_state else None,
+                "state": mode_state(profile, saved_state.state_json) if saved_state else None,
+                "game_mode": profile.game_mode,
                 "revision": saved_state.revision if saved_state else 0,
             }
 
@@ -188,6 +190,7 @@ def _render(request: Request, template_name: str, *, analytics_event: str | None
         request=request,
         name=template_name,
         context={
+            "game_modes": GAME_MODES,
             "nav_items": NAV_ITEMS,
             "reconstructed_student_surface": template_name in {"home.html", "store.html", "p_book.html", "quest.html"},
             "active_nav": context.pop("active_nav", None),
