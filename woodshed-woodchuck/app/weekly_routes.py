@@ -1,7 +1,7 @@
-"""Authenticated saved-plan foundation; no assignment or reward operations."""
+"""Authenticated saved plans and explicit assignments; no completion or rewards."""
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, StrictStr, field_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictStr, field_validator
 from sqlalchemy.exc import IntegrityError, OperationalError
 
 from .account_routes import current_profile
@@ -47,30 +47,36 @@ def _authorized(request, session, *, refresh=False):
     return profile
 
 
-def _action(request, focus=None):
+def _action(request, focus=None, *, start=False, context=None):
     if request.query_params:
         raise HTTPException(422, "Weekly plans do not accept query selectors.")
     for attempt in range(3):
         with SessionLocal() as session:
             try:
                 profile = _authorized(request, session)
-                if focus is None:
+                if start:
+                    result = {"assignment": plans.start_current_instrument(
+                        session, profile, context,
+                        authorize=lambda locked: _authorized(request, locked, refresh=True))}
+                elif focus is None:
                     instant = utc_instant()
                     plan = plans.load_current_plan(session, profile.id, now=instant)
                 else:
                     plan = plans.issue_current_plan(session, profile, focus)
                     instant = utc_instant()
                 profile = _authorized(request, session, refresh=True)
-                result = plans.current_plan_payload(session, profile, plan, now=instant)
+                if not start:
+                    result = plans.current_plan_payload(session, profile, plan, now=instant)
                 response = JSONResponse(result, headers={"Cache-Control": "no-store"})
                 # GET only reads and closes its transaction. No implicit issuance,
                 # state creation, grants, account mutation or revision increment.
-                if focus is not None:
+                if start or focus is not None:
                     session.commit()
                 return response
             except IntegrityError as error:
                 session.rollback()
-                if focus is None or not plans.is_plan_unique_race(error, session.get_bind().dialect.name):
+                recognized = (plans.is_instrument_unique_race if start else plans.is_plan_unique_race)
+                if (not start and focus is None) or not recognized(error, session.get_bind().dialect.name):
                     raise
                 if attempt == 2:
                     raise HTTPException(503, "Please retry this weekly plan request.",
@@ -97,3 +103,16 @@ def issue_plan(request: Request, submitted: PlanSubmission):
         raise HTTPException(403, "A same-origin request is required.",
                             headers={"Cache-Control": "no-store"})
     return _action(request, submitted.focus)
+
+
+class InstrumentStartSubmission(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    start_context: StrictStr | None = Field(default=None, max_length=100)
+
+
+@router.post("/plan/instruments/current/start")
+def start_instrument(request: Request, submitted: InstrumentStartSubmission):
+    if not same_origin_mutation(request):
+        raise HTTPException(403, "A same-origin request is required.",
+                            headers={"Cache-Control": "no-store"})
+    return _action(request, start=True, context=submitted.start_context)

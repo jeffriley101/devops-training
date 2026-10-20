@@ -1,6 +1,8 @@
 """Issued account/week contracts. Reads project practice; nothing settles rewards."""
 from datetime import date, datetime, time, timedelta, timezone
 import sqlite3
+import hashlib
+import json
 
 from fastapi import HTTPException
 from sqlalchemy import and_, or_, select, update
@@ -10,7 +12,7 @@ from .content import GOAL_OPTIONS
 from .feature_access import require_feature
 from .models import PracticeChart, WoodchuckProfile
 from .weekly import CENTRAL, utc_instant, weekly_credit
-from .weekly_models import WeeklyPlan
+from .weekly_models import WeeklyInstrumentPlan, WeeklyPlan
 
 
 GENERATOR_VERSION = "weekly_plan_v1"
@@ -137,9 +139,17 @@ def plan_payload(plan):
 
 
 def current_plan_payload(session, profile, plan, *, now=None):
-    # Foundation projection only: no slot allocation, Homework or Caper imports.
-    return {"plan": plan_payload(plan), "progress": current_general_progress(
+    result = {"plan": plan_payload(plan), "progress": current_general_progress(
         session, profile.id, now=now, week_start=plan.week_start if plan else None)}
+    if plan is not None:
+        rows = session.scalars(select(WeeklyInstrumentPlan).where(
+            WeeklyInstrumentPlan.plan_id == plan.id).order_by(WeeklyInstrumentPlan.slot_no)).all()
+        # Preserve the B2a empty-assignment contract. Once started, assignments
+        # come exclusively from saved rows; a read never invokes the catalog.
+        if rows:
+            result["plan"]["instruments"] = [instrument_payload(plan, row) for row in rows]
+        result["start_context"] = start_context(profile, plan)
+    return result
 
 
 def is_plan_unique_race(error, dialect):
@@ -152,4 +162,82 @@ def is_plan_unique_race(error, dialect):
         return (getattr(original, "sqlstate", None) == "23505"
                 and getattr(getattr(original, "diag", None), "constraint_name", None)
                 == "uq_weekly_plan_profile_week")
+    return False
+
+
+def start_context(profile, plan):
+    """Optimistic precondition, not a credential. Mode/preference are deliberately absent."""
+    if plan is None:
+        return None
+    from .weekly_homework import weekly_instrument
+    try:
+        instrument = weekly_instrument(profile.instrument)
+    except ValueError:
+        return None
+    values = [profile.id, profile.woodchuck_id, plan.id, plan.week_start.isoformat(), instrument]
+    return "weekly-start-v1:" + hashlib.sha256(json.dumps(values, separators=(",", ":")).encode()).hexdigest()
+
+
+def instrument_payload(plan, assignment):
+    started = assignment.started_at
+    if started.tzinfo is None:
+        started = started.replace(tzinfo=timezone.utc)
+    return {"slot_no": assignment.slot_no, "instrument": assignment.instrument,
+            "started_at": started.astimezone(timezone.utc).isoformat(),
+            "task_ref": f"weekly-plan:{plan.id}:slot:{assignment.slot_no}:homework",
+            "homework_reward_ref": f"clover-caper:{plan.week_start.isoformat()}:jar:3",
+            "homework": assignment.homework_spec,
+            "completion_status": "verification-unavailable"}
+
+
+def start_current_instrument(session, profile, context, *, now=None, authorize=None):
+    """Caller commits the complete allocation. There is no completion/reward operation."""
+    profile = _lock_profile(session, profile)
+    # Current browser-nonce/account checks run after the profile lock wait,
+    # before any allocation or generation. Caller rechecks again before commit.
+    if authorize is not None:
+        profile = authorize(session)
+    instant = utc_instant(now)
+    plan = load_current_plan(session, profile.id, now=instant)
+    if plan is None:
+        if context is not None:
+            raise HTTPException(409, "The weekly plan changed. Refresh before starting work.")
+        raise HTTPException(404, "Issue this week's plan before starting instrument work.")
+    from .weekly_homework import homework_spec, weekly_instrument
+    try:
+        instrument = weekly_instrument(profile.instrument)
+    except ValueError as error:
+        raise HTTPException(409, "Choose a supported active instrument before starting work.") from error
+    if context is None:
+        raise HTTPException(422, "Echo the current start_context before starting work.")
+    if context != start_context(profile, plan):
+        raise HTTPException(409, "The active instrument or weekly plan changed. Refresh before starting work.")
+    rows = session.scalars(select(WeeklyInstrumentPlan).where(
+        WeeklyInstrumentPlan.plan_id == plan.id).order_by(WeeklyInstrumentPlan.slot_no).with_for_update()).all()
+    for row in rows:
+        if row.instrument == instrument:
+            return instrument_payload(plan, row)
+    if len(rows) >= 2:
+        raise HTTPException(409, "Both weekly instrument slots are saved. You can still explore this instrument.")
+    slot = next(number for number in (1, 2) if number not in {row.slot_no for row in rows})
+    row = WeeklyInstrumentPlan(plan_id=plan.id, slot_no=slot, instrument=instrument,
+                              started_at=instant, homework_spec=homework_spec(plan, instrument))
+    session.add(row)
+    session.flush()
+    return instrument_payload(plan, row)
+
+
+def is_instrument_unique_race(error, dialect):
+    """Only this table's instrument UNIQUE or slot PK can justify allocation retry."""
+    original = error.orig
+    if dialect == "sqlite":
+        return (getattr(original, "sqlite_errorcode", None) in
+                (sqlite3.SQLITE_CONSTRAINT_UNIQUE, sqlite3.SQLITE_CONSTRAINT_PRIMARYKEY)
+                and str(original) in (
+                    "UNIQUE constraint failed: weekly_instrument_plans.plan_id, weekly_instrument_plans.instrument",
+                    "UNIQUE constraint failed: weekly_instrument_plans.plan_id, weekly_instrument_plans.slot_no"))
+    if dialect == "postgresql":
+        return (getattr(original, "sqlstate", None) == "23505" and
+                getattr(getattr(original, "diag", None), "constraint_name", None) in
+                ("uq_weekly_plan_instrument", "weekly_instrument_plans_pkey"))
     return False
