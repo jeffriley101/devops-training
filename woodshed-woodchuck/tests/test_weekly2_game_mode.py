@@ -21,7 +21,7 @@ from app import models as m
 from app.age_models import AccountPrivacy
 from app.age_privacy import declare_age
 from app.db import Base
-from app.game_modes import GAME_MODES, mode_state, normalize_game_mode
+from app.game_modes import GAME_MODES, bootstrap_game_mode, mode_state, normalize_game_mode
 from app.security import hash_pin
 from tests.test_weekly2_foundation_migration import (
     db, config, revision, rows, profile, seed_history, schema_contract, NOW,
@@ -61,6 +61,9 @@ def test_fresh_schema_parity_and_constraints(db):
         assert cols["game_mode"]["nullable"] and cols["game_mode"]["default"] is None
         assert str(cols["game_mode"]["type"]) == "VARCHAR(20)"
         assert any(x["name"] == "ck_woodchuck_profile_game_mode" for x in inspect(c).get_check_constraints("woodchuck_profiles"))
+        from app.operator_schema_compatibility import installed_revision
+        with pytest.raises(RuntimeError, match="revision_not_approved"):
+            installed_revision(c, RuntimeError)
     profile(db, 1)
     for value in ["Beginner", "Challenge", "Performance", None]:
         with db.begin() as c:
@@ -72,16 +75,23 @@ def test_fresh_schema_parity_and_constraints(db):
         assert rows(db) == before
 
 
-def test_populated_upgrade_conservative_backfill_preserves_all_history(db):
+def test_bootstrap_never_infers_game_mode():
+    for level in ["Beginner", "Intermediate", "Advanced", None, "Challenge"]:
+        for state in [None, {}, *({"_weekly_preferences": {"game_mode": mode}} for mode in GAME_MODES)]:
+            assert bootstrap_game_mode(level, state) is None
+
+
+def test_populated_upgrade_requires_explicit_selection_preserves_all_history(db):
     command.upgrade(config(), OLD)
     seed_history(db)
-    cases = [("Intermediate", {"_weekly_preferences": {"game_mode": "Challenge"}}, "Challenge"),
-             ("Advanced", {"_weekly_preferences": {"game_mode": "Performance"}}, "Performance"),
-             ("Intermediate", {"_weekly_preferences": {"game_mode": "Beginner"}}, "Beginner"),
+    cases = [("Intermediate", {"_weekly_preferences": {"game_mode": "Challenge"}}, None),
+             ("Advanced", {"_weekly_preferences": {"game_mode": "Performance"}}, None),
+             ("Intermediate", {"_weekly_preferences": {"game_mode": "Beginner"}}, None),
              ("Advanced", {"_weekly_preferences": {"game_mode": "Performance "}}, None),
              ("Intermediate", json.dumps({"_weekly_preferences": {"game_mode": "Performance"}}), None),
              ("Intermediate", {"_weekly_preferences": {"game_mode": []}}, None),
-             ("Beginner", {}, "Beginner"), ("Advanced", {}, None)]
+             ("Beginner", {}, None), ("Intermediate", {}, None), ("Advanced", {}, None),
+             ("Beginner", {"_weekly_preferences": {"game_mode": "Performance"}}, None)]
     for ident, (level, state, expected) in enumerate(cases, 2):
         profile(db, ident)
         with Session(db) as s:
@@ -92,7 +102,7 @@ def test_populated_upgrade_conservative_backfill_preserves_all_history(db):
     command.upgrade(config(), NEW)
     assert revision(db) == NEW and without_mode(rows(db)) == before
     with Session(db) as s:
-        assert s.get(m.WoodchuckProfile, 1).game_mode == "Beginner"
+        assert s.get(m.WoodchuckProfile, 1).game_mode is None
         for ident, (_, _, expected) in enumerate(cases, 2):
             assert s.get(m.WoodchuckProfile, ident).game_mode == expected
     after = rows(db)
@@ -166,6 +176,9 @@ def test_valid_invalid_idempotent_saves_and_level_compatibility(runtime):
         before = rows(db)
         assert c.patch(PATH, json={"game_mode": mode}).status_code == 200
         assert rows(db) == before
+        # Re-running the current upgrade must never clear an explicit choice.
+        command.upgrade(config(), NEW)
+        assert rows(db) == before and saved(factory)[0] == mode
     for invalid in ["", "beginner", "Advanced", None, True, 7, {}, []]:
         before = rows(db)
         assert c.patch(PATH, json={"game_mode": invalid}).status_code in (400, 422)

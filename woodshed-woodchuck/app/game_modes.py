@@ -18,17 +18,8 @@ def normalize_game_mode(value: object) -> GameMode:
 
 
 def bootstrap_game_mode(legacy_level: object, saved_state: object = None) -> GameMode | None:
-    """Conservative compatibility only; never use this for current mode reads.
-
-    A migration must use its own frozen equivalent, not import runtime code.
-    Persisted selections require exact strings; other musician Levels do not
-    imply Challenge or Performance.
-    """
-    preferences = saved_state.get("_weekly_preferences") if isinstance(saved_state, dict) else None
-    mode = preferences.get("game_mode") if isinstance(preferences, dict) else None
-    if isinstance(mode, str) and mode in GAME_MODES:
-        return mode
-    return "Beginner" if legacy_level == "Beginner" else None
+    """Legacy-compatible signature; only an explicit save may select a mode."""
+    return None
 
 
 def set_game_mode(profile, value: object) -> None:
