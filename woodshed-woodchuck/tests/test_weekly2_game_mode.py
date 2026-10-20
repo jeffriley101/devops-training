@@ -40,10 +40,11 @@ def without_mode(data):
 
 def test_linear_ancestry_and_catalog():
     script = ScriptDirectory.from_config(config())
-    assert script.get_heads() == [NEW]
+    assert script.get_heads() == ["w25weekly003"]
+    assert script.get_revision("w25weekly003").down_revision == NEW
     assert script.get_revision(NEW).down_revision == OLD
     assert script.get_revision(OLD).down_revision == "c24class001"
-    assert len(list(script.walk_revisions())) == 64
+    assert len(list(script.walk_revisions())) == 65
     assert GAME_MODES == ("Beginner", "Challenge", "Performance")
     for mode in GAME_MODES:
         assert normalize_game_mode(" " + mode + " ") == mode
@@ -54,7 +55,7 @@ def test_linear_ancestry_and_catalog():
 
 def test_fresh_schema_parity_and_constraints(db):
     command.upgrade(config(), "head")
-    assert revision(db) == NEW
+    assert revision(db) == "w25weekly003"
     with db.connect() as c:
         assert compare_metadata(MigrationContext.configure(c, opts={"compare_type": True}), Base.metadata) == []
         cols = {x["name"]: x for x in inspect(c).get_columns("woodchuck_profiles")}

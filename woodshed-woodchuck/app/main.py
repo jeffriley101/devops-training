@@ -49,6 +49,7 @@ from .store_routes import router as store_router
 from .arcade_routes import router as arcade_router
 from .analytics import observe_response
 from .analytics_routes import router as analytics_router
+from .weekly_routes import router as weekly_router
 from .db import SessionLocal
 from .content import (
     ART_SUBMISSION_EMAIL,
@@ -142,6 +143,7 @@ app.include_router(xp_router)
 app.include_router(store_router)
 app.include_router(arcade_router)
 app.include_router(analytics_router)
+app.include_router(weekly_router)
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 templates.env.filters["practice_duration"] = format_minutes

@@ -190,10 +190,11 @@ def insert_play(engine, **changes):
 
 def test_one_additive_head_follows_c24():
     script = ScriptDirectory.from_config(config())
-    assert script.get_heads() == ["w25weekly002"]
+    assert script.get_heads() == ["w25weekly003"]
+    assert script.get_revision("w25weekly003").down_revision == "w25weekly002"
     assert script.get_revision("w25weekly002").down_revision == NEW
     assert script.get_revision(NEW).down_revision == OLD
-    assert len(list(script.walk_revisions())) == 64
+    assert len(list(script.walk_revisions())) == 65
 
 
 def test_empty_database_upgrade(db):
