@@ -178,12 +178,9 @@ def current_plan_payload(session, profile, plan, *, now=None):
         if rows:
             result["plan"]["instruments"] = [instrument_payload(plan, row) for row in rows]
         result["start_context"] = start_context(profile, plan)
-        from .weekly_tasks import homework_progress, board_progress
-        result["tasks"] = {
-            "homework": homework_progress(session, profile.id, plan, now=now),
-            "board": board_progress(session, profile.id, plan, now=now),
-            "thirds": thirds_progress(session, profile.id, plan, now=now),
-        }
+        from .weekly_caper import task_states, clue_state
+        result["tasks"] = task_states(session, profile.id, plan, now=now)
+        result["clue"] = clue_state(session, plan)
     return result
 
 

@@ -23,6 +23,23 @@ def _bounds(plan, profile_id):
     return end_date, datetime.combine(end_date, time.min, CENTRAL).astimezone(timezone.utc)
 
 
+def general_task_progress(session, profile_id, plan, *, now=None):
+    """Jar evidence ends at source-week close; ordinary history credit is unchanged."""
+    from .weekly_plans import _week_charts
+    _, end = _bounds(plan, profile_id)
+    instant = utc_instant(now)
+    charts = _week_charts(session, profile_id, plan.week_start, min(instant, end),
+                          exclusive=instant >= end)
+    credit = weekly_credit(charts, week_start=plan.week_start, now=instant)
+    return {
+        "logging": {"progress": credit["logging_days"], "target": plan.logging_days_target,
+                    "qualified": credit["logging_days"] >= plan.logging_days_target},
+        "practice_minutes": {"progress": credit["practice_seconds"],
+                             "target": plan.practice_minutes_target * 60, "unit": "seconds",
+                             "qualified": credit["practice_seconds"] >= plan.practice_minutes_target * 60},
+    }
+
+
 def homework_assignment_progress(session, profile_id, plan, assignment, *, now=None):
     end_date, end = _bounds(plan, profile_id)
     if assignment.plan_id != plan.id:

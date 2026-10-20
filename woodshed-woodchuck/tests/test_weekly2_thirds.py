@@ -36,7 +36,7 @@ def protected_rows(factory):
 
 @pytest.fixture
 def arcade_factory(db, monkeypatch):
-    command.upgrade(config(), 'w25weekly003')
+    command.upgrade(config(), 'head')
     from app.main import app
     factory = sessionmaker(db, expire_on_commit=False, autoflush=False)
     factory.engine = db
@@ -312,7 +312,7 @@ def test_real_route_score_weekly_status_personal_best_and_continued_play(plan_db
         assert [(r["display_name"], r["score"]) for r in result["leaderboard"]] == [("Synthetic 1", 5)]
         status = client.get("/weekly/plan").json()
         assert status["tasks"]["thirds"] == {"target": 3, "qualified": True,
-            "authoritative_score": 5, "completion_status": "qualified"}
+            "authoritative_score": 5, "completion_status": "qualified", "claimed": False, "claimable": True, "claimed_at": None}
         assert protected_rows(plan_db) == before
         sealed = all_rows(plan_db)
         assert client.post(f"/arcade/plays/{token}/complete", json={"score": 5}).json()["already_completed"]
@@ -325,7 +325,7 @@ def test_real_route_score_weekly_status_personal_best_and_continued_play(plan_db
         after = client.get("/weekly/plan").json()
         assert after["plan"] == status["plan"]
         assert after["tasks"]["thirds"] == {"target": 3, "qualified": True,
-            "authoritative_score": 12, "completion_status": "qualified"}
+            "authoritative_score": 12, "completion_status": "qualified", "claimed": False, "claimable": True, "claimed_at": None}
         assert protected_rows(plan_db) == before
         untouched = all_rows(plan_db)
         assert client.get("/weekly/plan").json() == after
@@ -472,7 +472,7 @@ def test_repeated_qualification_preserves_populated_history(arcade_factory, monk
         for _ in range(3):
             payload = plans.current_plan_payload(session, p, saved, now=NOW+timedelta(minutes=2))
             assert payload['tasks']['thirds'] == {'target':7, 'qualified':True,
-                'authoritative_score':7, 'completion_status':'qualified'}
+                'authoritative_score':7, 'completion_status':'qualified','claimed':False,'claimable':True,'claimed_at':None}
             assert 'completion_status' not in payload['plan']['instruments'][0]
             assert payload['tasks']['homework']['qualified'] is False
         session.commit()

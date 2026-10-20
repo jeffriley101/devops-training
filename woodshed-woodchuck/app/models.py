@@ -24,7 +24,7 @@ from .game_modes import GAME_MODE_CHECK
 from .c001_models import AbuseEvent, ActivationControl
 from .age_models import AccountPrivacy
 from .session_revocations import RevokedBrowserSession
-from .weekly_models import WeeklyWheelPlay, WeeklyPlan, WeeklyInstrumentPlan
+from .weekly_models import WeeklyWheelPlay, WeeklyPlan, WeeklyInstrumentPlan, WeeklyTaskClaim
 from .classroom_models import (
     ClassroomProgram, ClassroomRoleGrant, ClassroomClass, ClassroomTeachingAssignment,
     ClassroomStudentMembership, ClassroomMembershipPeriod, ClassroomOwnershipTransfer,

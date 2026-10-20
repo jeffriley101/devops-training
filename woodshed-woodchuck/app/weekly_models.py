@@ -1,7 +1,7 @@
 """Durable Weekly storage; issuance never settles rewards."""
 from datetime import date, datetime
 
-from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Integer, JSON, String, UniqueConstraint
+from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Integer, JSON, PrimaryKeyConstraint, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, validates
 
 from .db import Base
@@ -79,3 +79,15 @@ class WeeklyInstrumentPlan(Base):
     instrument: Mapped[str] = mapped_column(String(50))
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     homework_spec: Mapped[dict] = mapped_column(JSON(none_as_null=True))
+
+
+class WeeklyTaskClaim(Base):
+    """Only the two non-currency Caper acknowledgements; jars use RewardGrant."""
+    __tablename__ = "weekly_task_claims"
+    __table_args__ = (
+        PrimaryKeyConstraint("plan_id", "lane", name="pk_weekly_task_claim"),
+        CheckConstraint("lane IN ('board', 'thirds')", name="ck_weekly_task_claim_lane"),
+    )
+    plan_id: Mapped[int] = mapped_column(ForeignKey("weekly_plans.id", ondelete="CASCADE"))
+    lane: Mapped[str] = mapped_column(String(10))
+    claimed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

@@ -57,9 +57,11 @@ def old_rows(engine):
 
 def test_ancestry_catalog_and_disabled_gate():
     script = ScriptDirectory.from_config(config())
-    assert script.get_heads() == [NEW] and script.get_revision(NEW).down_revision == OLD
+    assert script.get_heads() == ["w25weekly004"]
+    assert script.get_revision("w25weekly004").down_revision == NEW
+    assert script.get_revision(NEW).down_revision == OLD
     assert script.get_revision(OLD).down_revision == 'w25weekly001'
-    assert len(list(script.walk_revisions())) == 65
+    assert len(list(script.walk_revisions())) == 66
     from app.content import GOAL_OPTIONS
     assert tuple(GOAL_OPTIONS) == FOCI
     assert plans.TARGETS == {'Beginner': (3,30,10,3), 'Challenge': (4,60,15,7), 'Performance': (5,90,20,15)}
@@ -79,7 +81,7 @@ def test_populated_upgrade_history_parity_and_empty_roundtrip(db):
     assert {k:v for k,v in current.items() if k not in ('weekly_plans','weekly_instrument_plans')} == structure[0]
     assert triggers == structure[1]
     with db.connect() as c:
-        assert compare_metadata(MigrationContext.configure(c, opts={'compare_type':True}), Base.metadata) == []
+        assert compare_metadata(MigrationContext.configure(c, opts={'compare_type':True, 'include_object': lambda obj, name, type_, reflected, compare_to: not (type_ == 'table' and name == 'weekly_task_claims')}), Base.metadata) == []
         assert c.scalar(text('SELECT count(*) FROM weekly_plans')) == 0
         assert c.scalar(text('SELECT count(*) FROM weekly_instrument_plans')) == 0
         from app.operator_schema_compatibility import installed_revision
@@ -103,10 +105,11 @@ def test_populated_upgrade_history_parity_and_empty_roundtrip(db):
 
 
 def test_fresh_schema_constraints_cascades_and_used_downgrade(db):
-    command.upgrade(config(), 'head')
+    # Historical saved-plan revision remains independently testable.
+    command.upgrade(config(), NEW)
     assert revision(db) == NEW
     with db.connect() as c:
-        assert compare_metadata(MigrationContext.configure(c, opts={'compare_type':True}), Base.metadata) == []
+        assert compare_metadata(MigrationContext.configure(c, opts={'compare_type':True, 'include_object': lambda obj, name, type_, reflected, compare_to: not (type_ == 'table' and name == 'weekly_task_claims')}), Base.metadata) == []
     profile(db, 1)
     invalids=[{'focus':'Practice'},{'issued_game_mode':'Advanced'},{'logging_days_target':99},
               {'practice_minutes_target':None},{'generator_version':' '},
@@ -148,7 +151,7 @@ def test_fresh_schema_constraints_cascades_and_used_downgrade(db):
 
 @pytest.fixture
 def runtime(db,monkeypatch):
-    command.upgrade(config(), NEW)
+    command.upgrade(config(), "head")
     from app.main import app
     factory=sessionmaker(db,expire_on_commit=False,autoflush=False)
     for name,module in list(sys.modules.items()):
@@ -193,8 +196,8 @@ def test_readonly_null_gate_and_no_extra_routes(runtime,monkeypatch):
     assert c.get(PATH).json()=={'plan':None,'progress':{'practice_seconds':0,'practice_days':0,'logging_days':0}}
     assert c.post(PATH,json={'focus':FOCI[0]}).status_code==409
     assert rows(db)==before
-    for p in ['/weekly/wheel','/weekly/claims']:
-        assert c.post(p,json={}).status_code==404
+    assert c.post('/weekly/wheel',json={}).status_code==404
+    assert c.post('/weekly/claims',json={}).status_code==405
     assert c.post('/weekly/plan/instruments/current/start',json={}).status_code==404
     monkeypatch.setitem(FEATURES,'weekly_plans',Feature(False,'open'))
     assert c.get(PATH).status_code==403 and c.post(PATH,json={'focus':FOCI[0]}).status_code==403

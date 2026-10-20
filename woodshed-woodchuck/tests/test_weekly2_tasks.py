@@ -221,11 +221,11 @@ def test_real_board_two_dates_once_five_dandelions_and_zero_activity(task_db):
         assert duplicate.status_code == 200
         assert duplicate.json()["created"] is False and duplicate.json()["dandelions_awarded"] == 0
         assert rows(task_db) == saved
-        assert client.get("/weekly/plan").json()["tasks"]["board"] == {"target": 2, "completed": 1, "qualified": False}
+        assert client.get("/weekly/plan").json()["tasks"]["board"] == {"target": 2, "completed": 1, "qualified": False, "claimed": False, "claimable": False, "claimed_at": None}
         task_db.clock[0] += timedelta(days=1)
         second = client.post(ROUTE, json=current(client))
         assert second.status_code == 200 and second.json()["credits"] == 34
-        assert client.get("/weekly/plan").json()["tasks"]["board"] == {"target": 2, "completed": 2, "qualified": True}
+        assert client.get("/weekly/plan").json()["tasks"]["board"] == {"target": 2, "completed": 2, "qualified": True, "claimed": False, "claimable": True, "claimed_at": None}
         task_db.clock[0] += timedelta(days=1)
         assert client.post(ROUTE, json=current(client)).json()["credits"] == 39
     assert board(task_db, plan) == {"target": 2, "completed": 2, "qualified": True}
@@ -333,6 +333,10 @@ def test_tasks_payload_is_private_read_only_and_no_plan_fabricates_nothing(task_
             "board": {"target": 2, "completed": 0, "qualified": False},
             "thirds": {"target": 7, "qualified": False, "authoritative_score": None,
                        "completion_status": "not_completed"}}
+        expected.update(logging={"progress": 1, "target": 4, "qualified": False},
+                        practice_minutes={"progress": 540, "target": 3600, "unit": "seconds", "qualified": False})
+        for value in expected.values():
+            value.update(claimed=False, claimable=value["qualified"], claimed_at=None)
         for _ in range(2):
             response = client.get("/weekly/plan")
             assert response.status_code == 200
@@ -789,8 +793,8 @@ def test_all_task_reads_preserve_populated_history(arcade_factory,monkeypatch):
         for _ in range(3):
             result=plans.current_plan_payload(session,p,saved,now=NOW+timedelta(minutes=2))
             assert result['tasks']['homework']['qualified'] is True
-            assert result['tasks']['board']=={'target':2,'completed':1,'qualified':False}
-            assert set(result['tasks'])=={'thirds','homework','board'}
+            assert result['tasks']['board']=={'target':2,'completed':1,'qualified':False,'claimed':False,'claimable':False,'claimed_at':None}
+            assert set(result['tasks'])=={'logging','practice_minutes','thirds','homework','board'}
             assert_student_safe(result)
             assert 'PRIVATE' not in json.dumps(result)
         session.commit()
