@@ -64,7 +64,7 @@
     window.dispatchEvent(new CustomEvent("ww:guest-reset"));
     window.dispatchEvent(new CustomEvent("ww:guest-discarded"));
   }
-  window.WWGuest = Object.freeze({isCurrent, reset});
+  window.WWGuest = Object.freeze({isCurrent, reset, getGameMode: () => isCurrent() ? preferences.game_mode : null});
 
   function explore(event) {
     event?.preventDefault();

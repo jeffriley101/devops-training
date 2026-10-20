@@ -3,12 +3,14 @@
 
   const NOTE_NAMES = ["C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B"];
 
-  function classifyCents(cents) {
+  function classifyCents(cents, settings = {}) {
     const value = Number(cents);
+    const target = Number.isFinite(settings.targetWindow) && settings.targetWindow > 0 && settings.targetWindow <= 20
+      ? settings.targetWindow : 2;
     if (!Number.isFinite(value)) return "NEUTRAL";
     if (value < -20) return "VERY FLAT";
-    if (value <= -2) return "FLAT";
-    if (value < 2) return "PRISTINE";
+    if (value <= -target) return "FLAT";
+    if (value < target) return "PRISTINE";
     if (value <= 20) return "SHARP";
     return "VERY SHARP";
   }

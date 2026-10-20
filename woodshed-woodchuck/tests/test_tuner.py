@@ -78,8 +78,8 @@ def test_tuner_is_full_screen_minimal_and_uses_locked_state_colors():
     assert ".tuner-state-very-flat,\n.tuner-state-very-sharp" in CSS
     assert ".tuner-state-good" not in CSS
     assert "background: #1769d2" in CSS[CSS.index(".tuner-state-pristine"):]
-    assert "/static/js/tuner.js?v=2" in BASE
-    assert BASE.index("/static/js/tuner.js?v=2") < BASE.index("/static/js/app.js?v=")
+    assert "/static/js/tuner.js?v=wl2-05" in BASE
+    assert BASE.index("/static/js/tuner.js?v=wl2-05") < BASE.index("/static/js/app.js?v=")
 
 
 def test_tuner_requests_microphone_smooths_results_and_releases_resources():
@@ -88,8 +88,11 @@ def test_tuner_requests_microphone_smooths_results_and_releases_resources():
     assert "createMediaStreamSource" in tuner_code
     assert "createAnalyser" in tuner_code
     assert "getFloatTimeDomainData" in tuner_code
-    assert "frequencyHistory.length > 5" in tuner_code
-    assert "candidateFrames < 2" in tuner_code
+    assert "frequencyHistory.length > toolSettings.history" in tuner_code
+    presets = (ROOT / "static/js/practice-tools.js").read_text()
+    assert "targetWindow: 5, history: 7, stableFrames: 3" in presets
+    assert "targetWindow: 2, history: 5, stableFrames: 2" in presets
+    assert "candidateFrames < toolSettings.stableFrames" in tuner_code
     assert "mediaSource.connect(analyser)" in tuner_code
     assert "connect(audioContext.destination)" not in tuner_code
     assert "window.cancelAnimationFrame(animationFrame)" in tuner_code

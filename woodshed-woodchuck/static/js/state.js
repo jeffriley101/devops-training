@@ -13,6 +13,7 @@
   }
   function setServerGameMode(state, value, revision) {
     const identity = accountIdentity(state);
+    const previous = serverGameMode;
     // Order mode projections independently of the content revision retained
     // during conflict recovery. This is an in-memory response watermark only;
     // it is never persisted or used to authorize/save a preference.
@@ -22,6 +23,11 @@
     serverGameMode = { identity, mode, revision: Number.isInteger(revision) ? revision :
       undefined };
     projectGameMode(state);
+    if (previous?.identity !== identity || previous?.mode !== mode) {
+      // Notify consumers after the caller has stored its accepted projection.
+      // Listeners re-read the existing authority, never event preference data.
+      queueMicrotask(() => window.dispatchEvent(new CustomEvent('ww:game-mode-projected')));
+    }
     return true;
   }
 

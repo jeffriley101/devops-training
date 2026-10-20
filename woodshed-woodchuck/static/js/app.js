@@ -1605,8 +1605,9 @@
       }
 
       silenceFrames = 0;
+      const toolSettings = window.WWPracticeTools?.currentTuner() || {history: 5, stableFrames: 2};
       frequencyHistory.push(frequency);
-      if (frequencyHistory.length > 5) frequencyHistory.shift();
+      while (frequencyHistory.length > toolSettings.history) frequencyHistory.shift();
       const smoothedFrequency = tuner.median(frequencyHistory);
       const note = tuner.frequencyToNote(smoothedFrequency);
       if (!note) {
@@ -1614,7 +1615,7 @@
         return;
       }
 
-      const nextState = tuner.classifyCents(note.cents);
+      const nextState = tuner.classifyCents(note.cents, toolSettings);
       if (nextState !== stableState) {
         if (nextState === candidateState) {
           candidateFrames += 1;
@@ -1622,7 +1623,7 @@
           candidateState = nextState;
           candidateFrames = 1;
         }
-        if (candidateFrames < 2) return;
+        if (candidateFrames < toolSettings.stableFrames) return;
         stableState = nextState;
         candidateState = null;
         candidateFrames = 0;
@@ -1756,6 +1757,11 @@
 
     window.addEventListener("ww:session-changed", function () { stopTuner(false); });
     window.addEventListener("ww:guest-discarded", function () { stopTuner(false); });
+    window.addEventListener("woodshed:mode", function () {
+      if (panel.hidden) renderNeutral("READY");
+      else if (analyser && microphoneTrack?.readyState === "live") renderNeutral("LISTENING");
+      // Keep permission/start/disconnection errors honest when no input is live.
+    });
     openButton.addEventListener("click", startTuner);
     closeButton.addEventListener("click", function () { stopTuner(true); });
     document.addEventListener("keydown", function (event) {
@@ -2004,6 +2010,45 @@
       return;
     }
 
+    const toolPresets = window.WWPracticeTools;
+    const modeControls = document.getElementById("metronome-mode-controls");
+    const subdivisionControl = document.getElementById("metronome-subdivision");
+    const meterControl = document.getElementById("metronome-meter");
+    const soundControl = document.getElementById("metronome-sound");
+    const volumeControl = document.getElementById("metronome-volume");
+    let beatTick = 0;
+    let guestVolume = 0.35;
+    function currentSettings() {
+      return toolPresets?.advanced() ? toolPresets.currentMetronome() : {subdivision: 1, beats: 4, sound: "Click"};
+    }
+    function renderToolControls() {
+      if (modeControls) modeControls.hidden = !toolPresets?.advanced();
+      const label = document.getElementById('practice-tools-mode');
+      if (label) label.textContent = toolPresets?.getMode() || 'Not selected';
+      const settings = currentSettings();
+      if (subdivisionControl) subdivisionControl.value = String(settings.subdivision);
+      if (meterControl) meterControl.value = String(settings.beats);
+      if (soundControl) soundControl.value = settings.sound;
+    }
+    [subdivisionControl, meterControl, soundControl].forEach(control => control?.addEventListener("change", () => {
+      if (!toolIsCurrent()) return;
+      stopMetronome();
+      toolPresets.saveMetronome({subdivision: subdivisionControl.value, beats: meterControl.value, sound: soundControl.value});
+      renderToolControls();
+    }));
+    if (volumeControl) {
+      volumeControl.value = String(window.WoodshedAudio?.getVolume() ?? 0.35);
+      volumeControl.addEventListener("input", () => {
+        if (!toolIsCurrent()) return;
+        const value = Number(volumeControl.value);
+        if (!Number.isFinite(value)) return;
+        if (localGuest) guestVolume = Math.min(1, Math.max(0, value));
+        else window.WoodshedAudio?.setVolume(value);
+      });
+    }
+    window.addEventListener("woodshed:mode", () => { stopMetronome(); renderToolControls(); });
+    renderToolControls();
+
     const BPM_STORAGE_KEY = "woodshedWoodchuckMetronomeBpm";
     const AudioContextClass =
       window.AudioContext || window.webkitAudioContext;
@@ -2115,23 +2160,27 @@
       }, delay);
     }
 
-    function playClick(scheduledTime) {
+    function playClick(scheduledTime, tick = 0, settings = currentSettings()) {
       if (!audioContext) return;
+      const beat = toolPresets?.tickSettings(tick, settings) || {onBeat: true, accent: false};
 
       const sound = window.WoodshedAudio;
       const enabled = !sound || typeof sound.isEnabled !== "function" || sound.isEnabled();
       const volume = sound && typeof sound.getVolume === "function"
-        ? sound.getVolume() : 0.35;
-      const peakGain = Math.min(0.6, Math.max(0, Number(volume) || 0) * 0.6);
+        ? sound.getVolume() : guestVolume;
+      const emphasis = !toolPresets?.advanced() ? 1 : !beat.onBeat ? 0.35 : beat.accent ? 1 : 0.65;
+      const peakGain = Math.min(0.6, Math.max(0, Number(volume) || 0) * 0.6 * emphasis);
       if (!enabled || peakGain <= 0) {
-        showBeat(scheduledTime);
+        if (beat.onBeat) showBeat(scheduledTime);
         return;
       }
 
       const oscillator = audioContext.createOscillator();
       const gain = audioContext.createGain();
-      oscillator.type = "sine";
-      oscillator.frequency.setValueAtTime(850, scheduledTime);
+      oscillator.type = settings.sound === "Snap" ? "triangle" : "sine";
+      const frequency = settings.sound === "Clave" ? 2500 : settings.sound === "Snap" ? 1600 : 850;
+      const duration = settings.sound === "Clave" ? 0.025 : settings.sound === "Snap" ? 0.014 : 0.055;
+      oscillator.frequency.setValueAtTime(frequency, scheduledTime);
 
       gain.gain.setValueAtTime(0.0001, scheduledTime);
       gain.gain.exponentialRampToValueAtTime(
@@ -2140,7 +2189,7 @@
       );
       gain.gain.exponentialRampToValueAtTime(
         0.0001,
-        scheduledTime + 0.055
+        scheduledTime + duration
       );
 
       oscillator.connect(gain);
@@ -2153,7 +2202,7 @@
       oscillator.start(scheduledTime);
       oscillator.stop(scheduledTime + 0.06);
 
-      showBeat(scheduledTime);
+      if (beat.onBeat) showBeat(scheduledTime);
     }
 
     function scheduler() {
@@ -2163,9 +2212,10 @@
         nextBeatTime <
         audioContext.currentTime + 0.1
       ) {
-        playClick(nextBeatTime);
-
-        nextBeatTime += 60 / bpm;
+        const settings = currentSettings();
+        playClick(nextBeatTime, beatTick, settings);
+        beatTick = (beatTick + 1) % (settings.beats * settings.subdivision);
+        nextBeatTime += 60 / bpm / settings.subdivision;
       }
     }
 
@@ -2202,6 +2252,7 @@
         window.clearInterval(schedulerTimer);
       }
       isRunning = true;
+      beatTick = 0;
       setPracticeSway(true);
       nextBeatTime = audioContext.currentTime + 0.05;
 
@@ -2371,6 +2422,8 @@
     function resetGuestMetronome() {
       stopMetronome();
       bpm = 120;
+      guestVolume = 0.35;
+      if (localGuest && volumeControl) volumeControl.value = String(guestVolume);
       tapTimes = [];
       renderBpm(false);
       if (status) status.textContent = "Stopped at 120 BPM.";
