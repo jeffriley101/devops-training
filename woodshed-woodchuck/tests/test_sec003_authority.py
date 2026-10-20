@@ -204,25 +204,25 @@ def test_plunge_arbitrary_amounts_cannot_persist(authority_db, points):
 
 
 @pytest.mark.parametrize('legacy', [False, True])
-def test_bonus_self_attestation_is_fixed_and_legacy_alias_stays_closed(authority_db, legacy):
+def test_bonus_self_attestation_and_compatibility_alias_are_once_only(authority_db, legacy):
     from app.models import QuestCompletion
     client, profile = signed_client(authority_db, 'BONUS')
     before = balance(authority_db, profile.id)
     challenge = client.get('/contests/bonus-challenge/current').json()['challenge']
-    payload = {'activity_date':today()}
+    payload = {'activity_date':challenge['activity_date'], 'challenge_instance':challenge['instance_key']}
+    route = '/contests/quest/completions' if legacy else '/contests/bonus-challenge/progress'
     if legacy:
-        route = '/contests/quest/completions'
-        payload.update(quest_id=challenge['challenge_id'], minutes=10, logged_minutes=1440)
-    else:
-        route = '/contests/bonus-challenge/progress'
-        payload['challenge_instance'] = challenge['instance_key']
-    for _ in range(3):
+        payload.update(quest_id=challenge['challenge_id'], minutes=challenge['target_minutes'],
+                       logged_minutes=challenge['target_minutes'])
+    for index in range(3):
         response = client.post(route, json=payload)
-        assert response.status_code == (409 if legacy else 200), response.text
+        assert response.status_code == 200, response.text
+        assert response.json()['created'] is (index == 0)
+        assert client.post(route,json={**payload,'challenge_instance':'invented'}).status_code == 409
     with authority_db() as session:
-        assert session.scalar(select(func.count()).select_from(QuestCompletion)) == 0
-        assert session.scalar(select(func.count()).select_from(CampPointAward)) == (0 if legacy else 1)
-    assert balance(authority_db, profile.id) == before + (0 if legacy else 5)
+        assert session.scalar(select(func.count()).select_from(QuestCompletion)) == 1
+        assert session.scalar(select(func.count()).select_from(CampPointAward)) == 0
+    assert balance(authority_db, profile.id) == before + 5
 
 
 def test_bonus_assignment_ignores_browser_daily_state(authority_db):
@@ -506,13 +506,14 @@ def test_pristine_retries_changed_payload_and_malformed_ids(authority_db):
 @pytest.mark.parametrize('legacy', [False, True])
 def test_bonus_invalid_assignments_dates_and_durations_never_complete(authority_db, legacy):
     from app.models import QuestCompletion
-    client, profile = signed_client(authority_db, 'BONUS-INVALID')
+    client, profile = signed_client(authority_db, 'BADBONUS')
     challenge = client.get('/contests/bonus-challenge/current').json()['challenge']
     route = '/contests/quest/completions' if legacy else '/contests/bonus-challenge/progress'
     field = 'quest_id' if legacy else 'challenge_instance'
     payload = {'activity_date':today(), field:challenge['challenge_id' if legacy else 'instance_key']}
     if legacy:
-        payload.update(minutes=10, logged_minutes=10)
+        payload.update(minutes=challenge['target_minutes'], logged_minutes=challenge['target_minutes'],
+                       challenge_instance=challenge['instance_key'])
     before = balance(authority_db, profile.id)
     changes = [{field:value} for value in ('invented', '', 'x' * 201, None)]
     changes += [{'activity_date':value} for value in ('1900-01-01', 'malformed')]

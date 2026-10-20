@@ -1407,7 +1407,7 @@
         next.quest.completed = payload.completed === true;
         stateApi.applyEconomy(next, payload);
         const rewardMessage = payload.created === true
-          ? `Challenge complete: +5 dandelions and +2 Board Activity Points. Total: ${payload.credits} dandelions.`
+          ? "Challenge complete: +5 Dandelions."
           : payload.completed === true
             ? "Challenge already completed. No additional reward was added."
             : `${pickMessage("supportive", dateKey)} (${payload.logged_minutes}/${payload.target_minutes} minutes)`;

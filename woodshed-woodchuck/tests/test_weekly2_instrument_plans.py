@@ -69,7 +69,7 @@ def test_two_slots_retry_frozen_specs_and_exploration(runtime,monkeypatch):
     assert protected(engine)==before
     assert a['task_ref']!=b['task_ref']
     assert a['homework_reward_ref']==b['homework_reward_ref']=='clover-caper:2026-10-12:jar:3'
-    assert a['completion_status']==b['completion_status']=='verification-unavailable'
+    assert 'completion_status' not in a and 'completion_status' not in b
     for instrument in ['Violin','Guitar']:
         change(c,instrument);before=rows(engine)
         assert start(c).status_code==409 and rows(engine)==before
@@ -80,7 +80,7 @@ def test_two_slots_retry_frozen_specs_and_exploration(runtime,monkeypatch):
     monkeypatch.setattr(homework,'homework_spec',forbidden)
     result=c.get(PATH).json();assert result['start_context']==context
     assert result['plan']['instruments']==[a,b] and result['plan']['targets']==issued['plan']['targets']
-    assert result['plan']['issued_game_mode']=='Challenge' and set(result['tasks']) == {'thirds'}
+    assert result['plan']['issued_game_mode']=='Challenge' and set(result['tasks']) == {'thirds','homework','board'}
     assert start(c,context).json()['assignment']==b and rows(engine)==before
     other=client();after_login=rows(engine)
     assert start(other).json()['assignment']==b and rows(engine)==after_login
@@ -130,7 +130,7 @@ def test_saved_examples_all_modes_and_foci(runtime,mode,record_property):
         assert a['homework']['presentation']=={'Beginner':'numbered-steps','Challenge':'repetition-metronome','Performance':'continuous-attempt'}[mode]
         blocks=a['homework']['suggested_blocks'];assert blocks['count']*blocks['minutes_each']==r.json()['plan']['targets']['homework_minutes']
         assert c.get(PATH).json()['plan']['instruments']==[a]
-        assert a['completion_status']=='verification-unavailable'
+        assert 'completion_status' not in a
         assert all(secret not in json.dumps(a) for secret in ['recent_results','Practice Rating','PRIVATE'])
         examples.append({'mode':mode,'focus':focus,'assignment':a})
         choose(c,mode)
@@ -224,7 +224,7 @@ def test_populated_history_and_reward_records_unchanged(db,monkeypatch):
     with Session(db) as s:
         p=s.get(m.WoodchuckProfile,1);plan=plans.load_current_plan(s,1,now=NOW)
         a=plans.start_current_instrument(s,p,plans.start_context(p,plan),now=NOW);s.commit()
-    assert a['completion_status']=='verification-unavailable' and protected(db)==before
+    assert 'completion_status' not in a and protected(db)==before
     assert len(rows(db)['weekly_instrument_plans'])==1
 
 

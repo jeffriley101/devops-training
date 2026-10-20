@@ -473,6 +473,7 @@ def test_repeated_qualification_preserves_populated_history(arcade_factory, monk
             payload = plans.current_plan_payload(session, p, saved, now=NOW+timedelta(minutes=2))
             assert payload['tasks']['thirds'] == {'target':7, 'qualified':True,
                 'authoritative_score':7, 'completion_status':'qualified'}
-            assert payload['plan']['instruments'][0]['completion_status'] == 'verification-unavailable'
+            assert 'completion_status' not in payload['plan']['instruments'][0]
+            assert payload['tasks']['homework']['qualified'] is False
         session.commit()
     assert rows(f.engine) == before

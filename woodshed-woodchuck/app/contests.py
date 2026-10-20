@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictStr, field_validator
-from sqlalchemy import func, or_, select, true
+from sqlalchemy import func, or_, select, true, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import set_committed_value
@@ -177,11 +177,12 @@ class TriviaAnswerSubmission(BaseModel):
     selected_answer_id: str
 
 
-class QuestCompletionSubmission(BaseModel):
+class QuestCompletionSubmission(BoardSelfAttestationDay):
     model_config = ConfigDict(extra="forbid")
 
     activity_date: date
     quest_id: str = Field(min_length=1, max_length=100)
+    challenge_instance: StrictStr = Field(min_length=1, max_length=200)
     minutes: StrictInt = Field(ge=1, le=1440)
     logged_minutes: StrictInt = Field(ge=1, le=1440)
     note: str = Field(default="", max_length=500)
@@ -189,6 +190,8 @@ class QuestCompletionSubmission(BaseModel):
 
 class BonusChallengeProgressSubmission(BoardSelfAttestationDay):
     challenge_instance: StrictStr = Field(min_length=1, max_length=200)
+    minutes: StrictInt | None = Field(default=None, ge=1, le=1440)
+    note: str = Field(default="", max_length=500)
 
 
 TRIVIA_QUESTIONS = (
@@ -3073,6 +3076,9 @@ def resolve_current_bonus_challenge(
         qualified_camp_point_clause(),
         CampPointAward.profile_id == profile.id,
         CampPointAward.duplicate_key == _bonus_daily_key(central_date),
+    )) is not None or session.scalar(select(QuestCompletion.id).where(
+        QuestCompletion.profile_id == profile.id,
+        QuestCompletion.activity_date == central_date,
     )) is not None
     return {
         "instance_key": instance_key,
@@ -3112,7 +3118,7 @@ def quest_completion_payload(
     return {
         "created": created,
         "reward_created": reward_created,
-        "camp_point_created": created and camp_point is not None,
+        "camp_point_created": False,
         "crown_newly_earned": False,
         "credits": credits,
         "streak": streak,
@@ -3154,13 +3160,13 @@ def bonus_challenge_progress_payload(
         "progress_recorded": True,
         "completed": completed,
         "reward_created": created,
-        "camp_point_created": created,
+        "camp_point_created": False,
         "activity_date": activity_date.isoformat(),
         "challenge_id": challenge_id,
         "target_minutes": target_minutes,
         "logged_minutes": logged_minutes,
         "dandelions_awarded": 5 if created else 0,
-        "camp_points_awarded": 2 if created else 0,
+        "camp_points_awarded": 0,
         "credits": credits,
         "revision": state.revision if state is not None else 0,
         **student_camp_point_totals(session, profile_id=profile_id, now=now),
@@ -3188,101 +3194,145 @@ def current_bonus_challenge(request: Request) -> dict[str, object]:
         }
 
 
-def require_earned_bonus(session, *, profile, activity_date, challenge_instance, now):
-    """Validate the current assignment for the deliberate I Played It event."""
+def _authorized_bonus(request, session, *, refresh=False):
+    profile = current_profile(request, session)
+    if profile is not None and refresh:
+        session.refresh(profile)
+        profile = current_profile(request, session)
+    if profile is None:
+        raise HTTPException(401, "Student sign-in is required.")
+    from .session_revocations import NONCE, RevokedBrowserSession, digest
+    nonce = request.session.get(NONCE)
+    if not isinstance(nonce, str) or session.get(
+        RevokedBrowserSession, digest(nonce), populate_existing=True
+    ):
+        request.scope["ww.suppress_session_cookie"] = True
+        raise HTTPException(401, "Sign-in changed. Reload this page.")
+    return profile
+
+
+BONUS_REWARD_CATEGORY = "board-bonus-v1:"
+
+
+def require_earned_bonus(session, *, profile, activity_date, challenge_instance, now, quest_id=None):
+    """Validate the current server assignment before inspecting a duplicate receipt."""
     resolved = resolve_current_bonus_challenge(session, profile=profile, now=now)
     if resolved is None or activity_date != resolved["activity_date"]:
         raise HTTPException(400, "Choose today's Bonus Challenge.")
-    if challenge_instance != resolved["instance_key"]:
+    if ((challenge_instance != resolved["instance_key"])
+        or (quest_id is not None and quest_id != resolved["challenge_id"])):
         raise HTTPException(409, "This Bonus Challenge changed. Refresh BOARD and try again.")
     return resolved
 
 
-def _record_bonus_self_attestation(session, profile, resolved, now):
-    now = authority_write_time(session, at=now)
-    resolved = require_earned_bonus(session, profile=profile,
-        activity_date=resolved["activity_date"], challenge_instance=resolved["instance_key"], now=now)
-    daily_key = _bonus_daily_key(resolved["activity_date"])
-    source_key = _bonus_reward_key(resolved)
-    existing = session.scalar(select(CampPointAward).where(
-        CampPointAward.profile_id == profile.id,
-        CampPointAward.duplicate_key == daily_key,
-    ))
-    if existing is not None:
-        grant = session.scalar(select(RewardGrant.id).where(
-            RewardGrant.profile_id == profile.id,
-            RewardGrant.source_key == source_key,
-            RewardGrant.reward_type == "dandelion",
-        ))
-        if grant is None:
-            raise HTTPException(409, "Today's Bonus Challenge was already completed. Try again tomorrow.")
-        return False
-    session.add(CampPointAward(
-        profile_id=profile.id, activity_type="quest", points_awarded=2,
-        occurred_at=now, created_at=now, duplicate_key=daily_key,
-        team_id=_active_team_id_for_event(session, profile.id, now),
-    ))
-    # This unique daily insert wins eligibility before any balance mutation.
-    session.flush()
-    if not _grant_once(session, earned_at=now, profile_id=profile.id, result_id=None,
-                       source_key=source_key, reward_type="dandelion",
-                       category_key="bonus-challenge", amount=5):
-        raise HTTPException(409, "Today's Bonus Challenge reward was already recorded.")
-    _add_dandelion(session, profile.id, 5)
-    # Completion lives in the v2 award ledger. QuestCompletion requires positive
-    # minutes; a self-attestation must not fabricate minutes to satisfy it.
-    return True
+def _complete_bonus(request, submitted, *, legacy=False):
+    """One profile-first transaction for the existing I Played It action and alias.
+
+    The grant category records the canonical instrument and this approved writer's
+    provenance. Historical completions/grants are neither relabelled nor rewarded.
+    """
+    from .session_origin import same_origin_mutation
+    if not same_origin_mutation(request):
+        raise HTTPException(403, "A same-origin request is required.")
+    if request.query_params:
+        raise HTTPException(422, "Bonus Challenge does not accept query selectors.")
+    with SessionLocal() as session:
+        profile = _authorized_bonus(request, session)
+        if profile is None:
+            raise HTTPException(401, "Student sign-in is required.")
+        profile_id = profile.id
+        # Keep the shared Team admission fence, then the profile -> state order.
+        lock_authority(session)
+        if session.get_bind().dialect.name == "sqlite":
+            session.execute(update(WoodchuckProfile).where(WoodchuckProfile.id == profile_id).values(
+                id=WoodchuckProfile.id, updated_at=WoodchuckProfile.updated_at))
+        session.scalar(select(WoodchuckProfile).where(WoodchuckProfile.id == profile_id)
+                       .with_for_update().execution_options(populate_existing=True))
+        # Recheck status, session version, age/consent and rendered-account identity
+        # after waiting for the writer lock, before any reward/state mutation.
+        profile = _authorized_bonus(request, session, refresh=True)
+        state = lock_state(session, profile.id)
+        now = authority_write_time(session, clock=lambda: datetime.now(timezone.utc))
+        resolved = require_earned_bonus(session, profile=profile,
+            activity_date=submitted.activity_date, challenge_instance=submitted.challenge_instance,
+            quest_id=submitted.quest_id if legacy else None, now=now)
+        target = resolved["target_minutes"]
+        # Optional/legacy duration assertions never create chart credit or increase
+        # the server assignment. The button itself needs no duration claim.
+        if ((submitted.minutes is not None and submitted.minutes != target)
+                or (legacy and submitted.logged_minutes != target)):
+            raise HTTPException(400, "Use the current Bonus Challenge assignment.")
+        source_key = f"bonus-challenge:{submitted.activity_date.isoformat()}:{resolved['challenge_id']}"
+        category = BONUS_REWARD_CATEGORY + canonical_instrument_key(profile.instrument)
+        completion = session.scalar(select(QuestCompletion).where(
+            QuestCompletion.profile_id == profile.id,
+            QuestCompletion.activity_date == submitted.activity_date))
+        # Historical v2 check-ins used an Activity row rather than a completion.
+        # A used day is never upgraded or paid again under the new provenance.
+        historical = session.scalar(select(CampPointAward.id).where(
+            CampPointAward.profile_id == profile.id,
+            CampPointAward.duplicate_key == _bonus_daily_key(submitted.activity_date)))
+        if historical is not None:
+            raise HTTPException(409, "Today's Bonus Challenge was already completed.")
+        created = completion is None
+        if completion is not None:
+            receipt = session.scalar(select(RewardGrant).where(
+                RewardGrant.profile_id == profile.id, RewardGrant.source_key == source_key,
+                RewardGrant.reward_type == "dandelion", RewardGrant.amount == 5,
+                RewardGrant.category_key == category,
+                RewardGrant.created_at == completion.completed_at))
+            if (completion.quest_id != resolved["challenge_id"] or completion.reward_amount != 5
+                    or receipt is None):
+                raise HTTPException(409, "Today's Bonus Challenge was already used for another assignment.")
+        else:
+            prior_grant = session.scalar(select(RewardGrant.id).where(
+                RewardGrant.profile_id == profile.id,
+                RewardGrant.reward_type == "dandelion",
+                or_(RewardGrant.source_key.startswith(f"bonus-challenge:{submitted.activity_date.isoformat()}:"),
+                    RewardGrant.source_key.startswith(_bonus_daily_key(submitted.activity_date) + ":"))))
+            if prior_grant is not None:
+                raise HTTPException(409, "Today's Bonus Challenge reward was already used.")
+            completion = QuestCompletion(profile_id=profile.id, activity_date=submitted.activity_date,
+                quest_id=resolved["challenge_id"], logged_minutes=target, reward_amount=5,
+                completed_at=now, created_at=now)
+            session.add(completion)
+            session.flush()
+            if not _grant_once(session, profile_id=profile.id, result_id=None,
+                               source_key=source_key, reward_type="dandelion", amount=5,
+                               category_key=category, earned_at=now):
+                raise HTTPException(409, "Today's Bonus Challenge reward was already used.")
+            _add_dandelion(session, profile.id, 5)
+            payload = deepcopy(state.state_json or {})
+            payload["daily"] = {**(payload.get("daily") or {}),
+                "dateKey": submitted.activity_date.isoformat(), "questId": resolved["challenge_id"],
+                "questText": resolved["task"], "targetMinutes": target, "loggedMinutes": target,
+                "completed": True, "completedAt": utc_iso(now)}
+            payload["quest"] = {**(payload.get("quest") or {}), "completed": True}
+            state.state_json = payload
+        session.flush()
+        if legacy:
+            response = quest_completion_payload(session, completion=completion,
+                created=created, reward_created=created, now=now)
+        else:
+            response = bonus_challenge_progress_payload(session, profile_id=profile.id,
+                activity_date=completion.activity_date, challenge_id=completion.quest_id,
+                target_minutes=target, logged_minutes=completion.logged_minutes,
+                completed=True, created=created, now=now)
+        # Construct the response first; any SQL/response/commit failure rolls back
+        # completion, receipt and balance together. No Activity writer is invoked.
+        _authorized_bonus(request, session, refresh=True)
+        session.commit()
+        return response
 
 
 @router.post("/bonus-challenge/progress")
 def record_bonus_challenge_progress(request: Request, submitted: BonusChallengeProgressSubmission):
-    with SessionLocal() as session:
-        profile = current_profile(request, session)
-        if profile is None:
-            raise HTTPException(401, "Student sign-in is required.")
-        lock_authority(session)
-        now = authority_write_time(session, clock=lambda: datetime.now(timezone.utc))
-        profile = _refresh_earning_profile(session, request, profile)
-        lock_state(session, profile.id)
-        # The profile may have changed while this request waited for its lock.
-        session.refresh(profile)
-        resolved = require_earned_bonus(
-            session, profile=profile, activity_date=submitted.activity_date,
-            challenge_instance=submitted.challenge_instance, now=now,
-        )
-        try:
-            created = _record_bonus_self_attestation(session, profile, resolved, now)
-            session.flush()
-        except IntegrityError:
-            # A concurrent daily insert committed the entire award transaction.
-            session.rollback()
-            lock_authority(session)
-            now = authority_write_time(session, clock=lambda: datetime.now(timezone.utc))
-            profile = _refresh_earning_profile(session, request, profile)
-            lock_state(session, profile.id)
-            resolved = require_earned_bonus(
-                session, profile=profile, activity_date=submitted.activity_date,
-                challenge_instance=submitted.challenge_instance, now=now,
-            )
-            if not resolved["completed"]:
-                raise HTTPException(500, "Bonus Challenge could not be saved. Please try again.")
-            created = _record_bonus_self_attestation(session, profile, resolved, now)
-        payload = bonus_challenge_progress_payload(
-            session, profile_id=profile.id, activity_date=resolved["activity_date"],
-            challenge_id=resolved["challenge_id"], target_minutes=resolved["target_minutes"],
-            logged_minutes=0, completed=True, created=created, now=now,
-        )
-        session.commit()
-        return payload
+    return _complete_bonus(request, submitted)
 
 
 @router.post("/quest/completions")
 def complete_quest(request: Request, submitted: QuestCompletionSubmission):
-    with SessionLocal() as session:
-        profile = current_profile(request, session)
-        if profile is None:
-            raise HTTPException(401, "Student sign-in is required.")
-        raise HTTPException(409, "Use today's Bonus Challenge on BOARD and click I Played It.")
+    return _complete_bonus(request, submitted, legacy=True)
 
 
 @router.get("/current")

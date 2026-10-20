@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
@@ -39,6 +40,9 @@ def quest_database(tmp_path, monkeypatch):
     local_session = sessionmaker(bind=engine, expire_on_commit=False)
     monkeypatch.setattr(account_routes, "SessionLocal", local_session)
     monkeypatch.setattr(contests, "SessionLocal", local_session)
+    for name, module in list(sys.modules.items()):
+        if name.startswith('app.') and hasattr(module, 'SessionLocal'):
+            monkeypatch.setattr(module, 'SessionLocal', local_session)
     yield local_session
     Base.metadata.drop_all(engine)
     engine.dispose()
@@ -58,6 +62,7 @@ def create_student(
     }
     response = client.post("/account/create", data={
         "display_name": "Quest Tester",
+        "age_band": "13to17",
         "pin": "2468",
         "instrument": instrument,
         "level": "Beginner",
@@ -75,13 +80,17 @@ def create_student(
     return profile_id
 
 
-def completion_payload() -> dict[str, object]:
+def completion_payload(client: TestClient) -> dict[str, object]:
+    response = client.get('/contests/bonus-challenge/current')
+    assert response.status_code == 200
+    challenge = response.json()['challenge']
     return {
-        "activity_date": datetime.now(CENTRAL).date().isoformat(),
-        "quest_id": "flute-trill",
-        "minutes": 10,
-        "logged_minutes": 10,
-        "note": "Long tones and a clean trill",
+        'activity_date': challenge['activity_date'],
+        'quest_id': challenge['challenge_id'],
+        'challenge_instance': challenge['instance_key'],
+        'minutes': challenge['target_minutes'],
+        'logged_minutes': challenge['target_minutes'],
+        'note': 'Synthetic self-attestation; not verified practice',
     }
 
 
@@ -157,7 +166,7 @@ def test_fallback_instances_are_canonical_and_instrument_specific(
         assert completed.status_code == 200
         assert completed.json()["completed"] is True
         assert completed.json()["dandelions_awarded"] == 5
-        assert completed.json()["camp_points_awarded"] == 2
+        assert completed.json()["camp_points_awarded"] == 0
     with TestClient(app) as banjo:
         create_student(banjo, instrument="Banjo")
         banjo_current = banjo.get("/contests/bonus-challenge/current").json()["challenge"]
@@ -176,39 +185,40 @@ def test_full_completion_route_persists_reward_once_and_returns_authority(
             assert bonus_reward_count(session) == 0
             assert session.scalar(select(func.count()).select_from(CampPointAward)) == 0
 
-        first = client.post("/contests/quest/completions", json=completion_payload())
+        submitted = completion_payload(client)
+        first = client.post("/contests/quest/completions", json=submitted)
         assert first.status_code == 200
         payload = first.json()
         assert payload["created"] is True
         assert payload["reward_created"] is True
-        assert payload["camp_point_created"] is True
+        assert payload["camp_point_created"] is False
         assert payload["completion"]["reward_amount"] == 5
         assert payload["credits"] == 13
-        assert payload["camp_points_this_week"] == 2
-        assert payload["camp_points_season"] == 2
+        assert payload["camp_points_this_week"] == 0
+        assert payload["camp_points_season"] == 0
 
         with quest_database() as session:
             assert session.scalar(select(func.count()).select_from(QuestCompletion)) == 1
             assert bonus_reward_count(session) == 1
-            assert session.scalar(select(func.count()).select_from(CampPointAward)) == 1
+            assert session.scalar(select(func.count()).select_from(CampPointAward)) == 0
             assert session.scalar(select(func.count()).select_from(CrownProgress)) == 0
             completion = session.scalar(select(QuestCompletion))
             grant = session.scalar(select(RewardGrant).where(
                 RewardGrant.source_key.like("bonus-challenge:%")
             ))
             state = session.get(WoodchuckState, profile_id)
-            assert (completion.quest_id, completion.reward_amount) == ("flute-trill", 5)
+            assert (completion.quest_id, completion.reward_amount) == (submitted['quest_id'], 5)
             assert (grant.source_key, grant.reward_type, grant.amount) == (
-                f"bonus-challenge:{completion.activity_date.isoformat()}:flute-trill", "dandelion", 5,
+                f"bonus-challenge:{completion.activity_date.isoformat()}:{submitted['quest_id']}", "dandelion", 5,
             )
-            award = session.scalar(select(CampPointAward))
-            assert (award.points_awarded, award.team_id) == (2, None)
+            assert session.scalar(select(CampPointAward)) is None
             assert state.state_json["daily"]["completed"] is True
-            assert state.state_json["daily"]["loggedMinutes"] == 10
+            assert state.state_json["daily"]["loggedMinutes"] == submitted["logged_minutes"]
             assert state.state_json["progress"]["credits"] == 13
-            assert state.state_json["practiceLog"][0]["source"] == "quest"
+            assert state.state_json['practiceLog'] == []
+            assert session.scalar(select(func.count()).select_from(PracticeChart)) == 0
 
-        duplicate = client.post("/contests/quest/completions", json=completion_payload())
+        duplicate = client.post("/contests/quest/completions", json=completion_payload(client))
         assert duplicate.status_code == 200
         assert duplicate.json()["created"] is False
         assert duplicate.json()["reward_created"] is False
@@ -225,7 +235,7 @@ def test_full_completion_route_persists_reward_once_and_returns_authority(
 def test_server_grants_nothing_before_configured_threshold(quest_database) -> None:
     with TestClient(app) as client:
         create_student(client, credits=4)
-        submitted = completion_payload()
+        submitted = completion_payload(client)
         submitted["minutes"] = 4
         submitted["logged_minutes"] = 4
         response = client.post("/contests/quest/completions", json=submitted)
@@ -254,11 +264,11 @@ def test_bonus_progress_endpoint_persists_increment_then_rewards_threshold(
         assert first.json()["logged_minutes"] == target_minutes
         assert first.json()["completed"] is True
         assert first.json()["dandelions_awarded"] == 5
-        assert first.json()["camp_points_awarded"] == 2
+        assert first.json()["camp_points_awarded"] == 0
         with quest_database() as session:
             assert session.scalar(select(func.count()).select_from(QuestCompletion)) == 1
             assert bonus_reward_count(session) == 1
-            assert session.scalar(select(func.count()).select_from(CampPointAward)) == 1
+            assert session.scalar(select(func.count()).select_from(CampPointAward)) == 0
             assert session.scalar(select(func.count()).select_from(PracticeChart)) == 0
         refreshed = client.get("/account/state").json()["state"]
         assert refreshed["daily"]["loggedMinutes"] == target_minutes
@@ -274,10 +284,9 @@ def test_bonus_progress_endpoint_persists_increment_then_rewards_threshold(
         with quest_database() as session:
             assert session.scalar(select(func.count()).select_from(QuestCompletion)) == 1
             assert bonus_reward_count(session) == 1
-            assert session.scalar(select(func.count()).select_from(CampPointAward)) == 1
+            assert session.scalar(select(func.count()).select_from(CampPointAward)) == 0
             assert session.scalar(select(func.count()).select_from(PracticeChart)) == 0
-            award = session.scalar(select(CampPointAward))
-            assert award.points_awarded == 2 and award.team_id is None
+            assert session.scalar(select(CampPointAward)) is None
 
 
 def test_piano_keyboard_get_and_post_share_canonical_challenge(
@@ -307,7 +316,7 @@ def test_piano_keyboard_get_and_post_share_canonical_challenge(
         assert completed.status_code == 200
         assert completed.json()["completed"] is True
         assert completed.json()["dandelions_awarded"] == 5
-        assert completed.json()["camp_points_awarded"] == 2
+        assert completed.json()["camp_points_awarded"] == 0
         refreshed = client.get("/contests/bonus-challenge/current").json()["challenge"]
         assert refreshed["instance_key"] == current["instance_key"]
         assert refreshed["completed"] is True
@@ -337,10 +346,8 @@ def test_piano_keyboard_get_and_post_share_canonical_challenge(
         assert duplicate.json()["camp_points_awarded"] == 0
         with quest_database() as session:
             assert session.scalar(select(func.count()).select_from(PracticeChart)) == 0
-            award = session.scalar(select(CampPointAward).where(
-                CampPointAward.profile_id == profile_id
-            ))
-            assert award is not None and award.team_id is None
+            assert session.scalar(select(CampPointAward).where(
+                CampPointAward.profile_id == profile_id)) is None
             assert session.get(WoodchuckState, profile_id).state_json["practiceLog"] == []
 
 
@@ -410,10 +417,12 @@ def test_multiple_tabs_are_idempotent(quest_database) -> None:
         session_cookie = first_client.cookies.get("session")
         assert session_cookie
 
+        submitted = completion_payload(first_client)
+
         def submit_once():
             with TestClient(app) as tab:
                 tab.cookies.set("session", session_cookie)
-                return tab.post("/contests/quest/completions", json=completion_payload())
+                return tab.post("/contests/quest/completions", json=submitted)
 
         with ThreadPoolExecutor(max_workers=2) as pool:
             responses = list(pool.map(lambda _index: submit_once(), range(2)))
@@ -424,7 +433,7 @@ def test_multiple_tabs_are_idempotent(quest_database) -> None:
             assert bonus_reward_count(session) == 1
             state = session.scalar(select(WoodchuckState))
             assert state.state_json["progress"]["credits"] == 6
-            assert session.scalar(select(func.count()).select_from(CampPointAward)) == 1
+            assert session.scalar(select(func.count()).select_from(CampPointAward)) == 0
 
 
 def test_failed_reward_insert_rolls_back_completion_and_state(quest_database) -> None:
@@ -439,7 +448,7 @@ def test_failed_reward_insert_rolls_back_completion_and_state(quest_database) ->
             failed_client = TestClient(app, raise_server_exceptions=False)
             failed_client.cookies.set("session", client.cookies.get("session"))
             response = failed_client.post(
-                "/contests/quest/completions", json=completion_payload()
+                "/contests/quest/completions", json=completion_payload(client)
             )
             assert response.status_code == 500
         finally:

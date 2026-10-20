@@ -178,7 +178,12 @@ def current_plan_payload(session, profile, plan, *, now=None):
         if rows:
             result["plan"]["instruments"] = [instrument_payload(plan, row) for row in rows]
         result["start_context"] = start_context(profile, plan)
-        result["tasks"] = {"thirds": thirds_progress(session, profile.id, plan, now=now)}
+        from .weekly_tasks import homework_progress, board_progress
+        result["tasks"] = {
+            "homework": homework_progress(session, profile.id, plan, now=now),
+            "board": board_progress(session, profile.id, plan, now=now),
+            "thirds": thirds_progress(session, profile.id, plan, now=now),
+        }
     return result
 
 
@@ -216,8 +221,7 @@ def instrument_payload(plan, assignment):
             "started_at": started.astimezone(timezone.utc).isoformat(),
             "task_ref": f"weekly-plan:{plan.id}:slot:{assignment.slot_no}:homework",
             "homework_reward_ref": f"clover-caper:{plan.week_start.isoformat()}:jar:3",
-            "homework": assignment.homework_spec,
-            "completion_status": "verification-unavailable"}
+            "homework": assignment.homework_spec}
 
 
 def start_current_instrument(session, profile, context, *, now=None, authorize=None):
