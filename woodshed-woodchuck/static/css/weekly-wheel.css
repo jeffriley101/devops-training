@@ -1,0 +1,10 @@
+#weekly-wheel-view { max-width: 42rem; margin-inline: auto; overflow-wrap: anywhere; }
+#weekly-wheel-view [hidden] { display: none; }
+#weekly-wheel-view button { min-height: 44px; margin: .35rem; white-space: normal; }
+#weekly-wheel-view button:focus-visible, #weekly-wheel-open:focus-visible { outline: 3px solid #246b9e; outline-offset: 3px; }
+.weekly-prize-wheel-wrap { position: relative; width: min(240px, 65vw); margin: 1rem auto; }
+.weekly-prize-wheel-wrap::after { content: '▼'; position: absolute; top: -.8rem; left: calc(50% - .5rem); color: #161616; font-size: 1.5rem; }
+.weekly-prize-wheel { aspect-ratio: 1; border: 4px solid #50371e; border-radius: 50%; }
+.weekly-wheel-odds { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: .3rem 1.5rem; padding-left: 1.3rem; }
+.weekly-wheel-result { font-size: 1.2rem; }
+@media (prefers-reduced-motion: reduce) { .weekly-prize-wheel { animation: none !important; transition: none !important; } }

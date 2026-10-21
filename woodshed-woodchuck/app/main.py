@@ -164,6 +164,7 @@ def _render(request: Request, template_name: str, *, analytics_event: str | None
     game_mode_entry = False
     weekly_plans_allowed = False
     weekly_pantry_allowed = False
+    weekly_wheel_allowed = False
     with SessionLocal() as session:
         profile = current_profile(request, session)
         if profile is not None:
@@ -193,6 +194,7 @@ def _render(request: Request, template_name: str, *, analytics_event: str | None
                     weekly_plans_allowed = can_use_feature(session, profile.id, "weekly_plans")
                 if template_name == "store.html":
                     weekly_pantry_allowed = can_use_feature(session, profile.id, "weekly_pantry")
+                    weekly_wheel_allowed = can_use_feature(session, profile.id, "weekly_wheel")
             saved_state = session.get(WoodchuckState, profile.id)
             if template_name in {"home.html", "store.html"}:
                 from .appearance import appearance_payload
@@ -211,6 +213,7 @@ def _render(request: Request, template_name: str, *, analytics_event: str | None
             "game_mode_entry": game_mode_entry,
             "weekly_plans_allowed": weekly_plans_allowed,
             "weekly_pantry_allowed": weekly_pantry_allowed,
+            "weekly_wheel_allowed": weekly_wheel_allowed,
             "nav_items": NAV_ITEMS,
             "reconstructed_student_surface": template_name in {"home.html", "store.html", "p_book.html", "quest.html"},
             "active_nav": context.pop("active_nav", None),
