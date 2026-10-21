@@ -16,6 +16,7 @@ class Feature:
 
 FEATURES: dict[str, Feature] = {
     "weekly_plans": Feature(False, "open"),
+    "weekly_pantry": Feature(False, "open"),
     "practice_insights": Feature(True, "full"),
     **{key: Feature(False, "full") for key in (
         "advanced_practice_analytics", "practice_history_tools",

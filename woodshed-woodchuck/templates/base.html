@@ -12,6 +12,7 @@
   {% endif %}
   {% if "artwork-room-page" in (page_class or "") %}<link rel="stylesheet" href="/static/css/scene-hotspots.css?v=5" />{% endif %}
   {% if weekly_plans_allowed %}<link rel="stylesheet" href="/static/css/weekly-caper.css?v=wl2-11" />{% endif %}
+  {% if weekly_pantry_allowed %}<link rel="stylesheet" href="/static/css/weekly-pantry.css?v=wl2-12a" />{% endif %}
   {% block dashboard_styles %}{% endblock %}
 
   <!-- Woodshed app icons -->
@@ -103,13 +104,14 @@
   <script src="/static/js/character-reaction.js?v=3"></script>
   <script src="/static/js/woodchuck-motion.js?v=5"></script>
   <script src="/static/js/practice-duration.js?v=1"></script>
-  <script src="/static/js/app.js?v=wl2-11"></script>
+  <script src="/static/js/app.js?v=wl2-12a"></script>
   <script src="/static/js/account.js?v=wl2-04"></script>
   <script src="/static/js/world-entry.js?v=5"></script>
   {% if woodchuck_appearance %}<script src="/static/js/woodchuck-appearance.js?v=5"></script>{% endif %}
   {% if authenticated_profile and active_nav == "home" %}<script src="/static/js/shed-entry-streak.js?v=1"></script>{% endif %}
   {% if game_mode_entry or (selected_age is defined and selected_age in ("13to17", "adult")) %}<script src="/static/js/game-mode-entry.js?v=1"></script>{% endif %}
   {% if weekly_plans_allowed %}<script src="/static/js/weekly-caper.js?v=wl2-11"></script>{% endif %}
+  {% if weekly_pantry_allowed %}<script src="/static/js/weekly-pantry.js?v=wl2-12a"></script>{% endif %}
   {% block page_scripts %}{% endblock %}
   {% if authenticated_profile %}</template>
   <script src="/static/js/session-boundary.js?v=wl2-04"></script>{% endif %}

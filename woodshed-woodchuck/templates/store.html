@@ -14,11 +14,13 @@
       <button class="scene-hotspot" data-scene-cell="L3" type="button" data-shop-panel="goat" aria-label="Open The GOAT Tracker"></button>
       <a class="scene-hotspot" data-scene-cell="R3" href="/quest" aria-label="Open BOARD"><span class="room-destination-label">BOARD</span></a>
       <button class="scene-hotspot" data-scene-cell="L4" type="button" data-shop-panel="contact" data-public-site-url="{{ public_site_url }}" aria-label="Open Contact"><span class="room-destination-label">Contact</span></button>
-      <button id="dandelion-object" class="scene-hotspot" data-scene-cell="R4" type="button" aria-label="Dandelions. Show balance."><span class="room-destination-label">Dandelions</span><span id="credits-value" hidden>0</span></button>
+      <button id="dandelion-object" class="scene-hotspot" data-scene-cell="R4" type="button" {% if weekly_pantry_allowed %}data-weekly-pantry="true" aria-controls="weekly-pantry" aria-expanded="false"{% endif %} aria-label="Dandelions. Show balance."><span class="room-destination-label">Dandelions</span><span id="credits-value" hidden>0</span></button>
       <button class="scene-hotspot" data-scene-cell="L5" type="button" data-shop-panel="practice-room" aria-label="Open Practice Rooms"></button>
       <a class="scene-hotspot" data-scene-cell="R5" href="/membership?as_account=student" aria-label="Subscription and Pricing"><span class="room-destination-label">Subscription / Pricing</span></a>
     </div>
   </div>
+
+  {% if weekly_pantry_allowed %}{% include "_weekly_pantry.html" %}{% endif %}
 
   <dialog id="shop-feature-dialog" class="shop-feature-dialog" aria-labelledby="shop-dialog-title">
     <div class="shop-dialog-head">

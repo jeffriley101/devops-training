@@ -4233,6 +4233,10 @@
     );
 
     function revealBalance() {
+      if (control.dataset.weeklyPantry === "true") {
+        window.WWWeeklyPantry?.open();
+        return;
+      }
       document.querySelector(".shop-dandelion-balance-burst")?.remove();
 
       const burst = document.createElement("div");

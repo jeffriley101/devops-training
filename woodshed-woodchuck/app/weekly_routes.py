@@ -27,7 +27,7 @@ class PlanSubmission(BaseModel):
         return value
 
 
-def _authorized(request, session, *, refresh=False):
+def _authorized(request, session, *, refresh=False, feature="weekly_plans"):
     profile = current_profile(request, session)
     if profile is not None and refresh:
         session.refresh(profile)
@@ -43,7 +43,7 @@ def _authorized(request, session, *, refresh=False):
     ):
         request.scope["ww.suppress_session_cookie"] = True
         raise HTTPException(401, "Sign-in changed. Reload this page.")
-    require_feature(session, profile.id, "weekly_plans")
+    require_feature(session, profile.id, feature)
     return profile
 
 
@@ -191,3 +191,34 @@ def claim_weekly_clover(request: Request, submitted: CloverClaimSubmission):
     from .weekly_caper import claim_clover
     return _claims_action(request, lambda session, profile, authorize:
         claim_clover(session, profile, submitted.request_key, authorize=authorize), write=True)
+
+
+@router.get("/pantry")
+def load_pantry(request: Request):
+    """Owner-scoped statistics and signed ledger balances; never settlement."""
+    if request.query_params:
+        raise HTTPException(422, "Pantry does not accept account selectors.")
+    with SessionLocal() as session:
+        profile = _authorized(request, session, feature="weekly_pantry")
+        from .feature_access import can_use_feature
+        from .models import WoodchuckState
+        from .weekly_rewards import wallet
+        from .economy import economy_payload
+        instant = utc_instant()
+        start = plans._week_start(instant)
+        targets = None
+        # Independent gates: an enabled Pantry can show progress without querying
+        # saved-plan storage when plan issuance is unavailable.
+        if can_use_feature(session, profile.id, "weekly_plans"):
+            plan = plans.load_current_plan(session, profile.id, now=instant)
+            if plan is not None:
+                targets = {"logging_days": plan.logging_days_target,
+                           "practice_seconds": plan.practice_minutes_target * 60}
+        state = session.get(WoodchuckState, profile.id)
+        result = {"context": {"week_start": start.isoformat()},
+                  "progress": plans.current_general_progress(session, profile.id, now=instant),
+                  "targets": targets, "wallet": wallet(session, profile.id),
+                  "credits": economy_payload(state)["credits"] if state else 0}
+        _authorized(request, session, refresh=True, feature="weekly_pantry")
+        # No commit, state hydration, claim, grant, finalization or repair.
+        return JSONResponse(result, headers={"Cache-Control": "no-store"})
