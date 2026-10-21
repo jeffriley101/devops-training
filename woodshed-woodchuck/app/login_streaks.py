@@ -253,6 +253,7 @@ def apply_daily_login(
     *,
     profile_id: int,
     now: datetime | None = None,
+    streak_authorize=None,
 ) -> dict[str, object]:
     from .age_privacy import require_eligible
     require_eligible(session,profile_id)
@@ -273,6 +274,9 @@ def apply_daily_login(
     )
     if locked_profile_id is None:
         raise ValueError("That Woodchuck profile is unavailable.")
+
+    from .weekly_rewards import award_first_practice_streak
+    award_first_practice_streak(session, profile_id, now=instant, authorize=streak_authorize)
 
     streak = _pending_row(session, LoginStreak, profile_id=profile_id)
     if streak is None:

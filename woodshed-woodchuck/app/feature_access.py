@@ -19,6 +19,7 @@ FEATURES: dict[str, Feature] = {
     "weekly_pantry": Feature(False, "open"),
     "weekly_wheel": Feature(False, "open"),
     "weekly_monday_bonus": Feature(False, "open"),
+    "weekly_pants": Feature(False, "open"),  # Historical first-practice-streak gate.
     "practice_insights": Feature(True, "full"),
     **{key: Feature(False, "full") for key in (
         "advanced_practice_analytics", "practice_history_tools",

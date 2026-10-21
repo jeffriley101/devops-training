@@ -88,6 +88,7 @@ def create_practice_chart_verification_request(
     ordinary_email_preset_id: int | None = None,
     detected_playing_seconds: int | None = None,
     award_dandelions: bool = False,
+    streak_authorize=None,
 ) -> CreatedPracticeChartRequest:
     from .age_privacy import require_eligible, ordinary_director_connection
     from .child_authorization import protected_child, permitted_director
@@ -193,6 +194,8 @@ def create_practice_chart_verification_request(
     lock_state(session, profile.id)
     session.refresh(profile)
     require_eligible(session, profile.id)
+    if streak_authorize is not None:
+        streak_authorize(session)
     # Consent/privacy can change while waiting for the profile lock. Recheck
     # restrictions before creating evidence; never upgrade the supplied flags.
     if protected_child(session, profile.id):
@@ -297,6 +300,10 @@ def create_practice_chart_verification_request(
             )
             session.add(verification)
 
+        from .weekly_rewards import award_first_practice_streak
+        award_first_practice_streak(session, profile.id, authorize=streak_authorize)
+        if streak_authorize is not None:
+            streak_authorize(session)
         session.commit()
         session.refresh(chart)
         if verification is not None:
@@ -351,6 +358,7 @@ def create_pristine_practice_chart(
     include_team_contests: bool = True,
     team_id: int | None = None,
     practice_date: date,
+    streak_authorize=None,
 ) -> CreatedPracticeChartRequest:
     """Persist a private, unverified browser microphone activity log."""
     return create_practice_chart_verification_request(
@@ -368,6 +376,7 @@ def create_pristine_practice_chart(
         include_team_contests=include_team_contests,
         team_id=team_id,
         detected_playing_seconds=detected_playing_seconds,
+        streak_authorize=streak_authorize,
     )
 
 

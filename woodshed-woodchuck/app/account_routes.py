@@ -32,6 +32,7 @@ from .economy import lock_state, preserve_server_values
 from .login_limits import enforce_login_limit
 from .models import RewardGrant, WoodchuckProfile, WoodchuckState
 from .login_streaks import apply_daily_login
+from .weekly_rewards import streak_request_authorizer
 from .account_deletion import (
     DeletionCredentialsError,
     DeletionRateLimited,
@@ -87,16 +88,20 @@ SECRET_REWARD_TIMEZONE = ZoneInfo("America/Chicago")
 SECRET_REWARD_AMOUNT = 20
 
 
-def _record_login_streak(session: Session, *, profile_id: int) -> dict[str, object]:
+def _record_login_streak(session: Session, *, profile_id: int, streak_authorize=None) -> dict[str, object]:
     try:
-        payload = apply_daily_login(session, profile_id=profile_id)
+        payload = apply_daily_login(session, profile_id=profile_id, streak_authorize=streak_authorize)
+        if streak_authorize is not None:
+            streak_authorize(session)
         session.commit()
         return payload
     except IntegrityError:
         # A simultaneous device may have won the dated grant uniqueness race.
         # The first transaction is atomic; retrying reads its completed result.
         session.rollback()
-        payload = apply_daily_login(session, profile_id=profile_id)
+        payload = apply_daily_login(session, profile_id=profile_id, streak_authorize=streak_authorize)
+        if streak_authorize is not None:
+            streak_authorize(session)
         session.commit()
         return payload
 
@@ -307,7 +312,8 @@ def login(
 
         from .age_privacy import eligible
         age_screen_required = not eligible(session, profile.id)
-        login_streak = None if age_screen_required else _record_login_streak(session, profile_id=profile.id)
+        login_streak = None if age_screen_required else _record_login_streak(session, profile_id=profile.id,
+            streak_authorize=streak_request_authorizer(request, profile, credential_login=True))
 
         request.session[SESSION_PROFILE_ID] = profile.id
         request.session[SESSION_PROFILE_VERSION] = profile.session_version
@@ -332,7 +338,8 @@ def record_login_streak(request: Request):
         profile = current_profile(request, session)
         if profile is None:
             raise HTTPException(status_code=401, detail="Student sign-in is required.")
-        return _record_login_streak(session, profile_id=profile.id)
+        return _record_login_streak(session, profile_id=profile.id,
+            streak_authorize=streak_request_authorizer(request, profile))
 
 
 @router.get("/me")

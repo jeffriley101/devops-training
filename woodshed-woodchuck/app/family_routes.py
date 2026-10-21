@@ -194,13 +194,14 @@ def practice(request:Request):
 async def save_chart(request:Request):
     data=await form(request,{'practice_date','minutes','note','submission_key','request_review'})
     from .practice_charts import create_practice_chart_verification_request
+    from .weekly_rewards import streak_request_authorizer
     with SessionLocal() as s:
         p=student(s,request,activity=True);vid=None
         if data.get('request_review')=='yes':
             permission=next((r for r in s.scalars(select(DirectorPermission).where(DirectorPermission.profile_id==p.id)) if service.permission_valid(s,r,require_connection=True) and r.review_allowed),None)
             if not permission:raise HTTPException(403,'No connected director with chart-review permission.')
             vid=s.get(StudentVerifierConnection,permission.connection_id).verifier_id
-        try:create_practice_chart_verification_request(s,profile=p,verifier_id=vid,practice_date=date.fromisoformat(data.get('practice_date','')),minutes=int(data.get('minutes','')),note=data.get('note',''),submission_key=data.get('submission_key'),include_contests=False,include_team_contests=False,award_dandelions=True)
+        try:create_practice_chart_verification_request(s,profile=p,streak_authorize=streak_request_authorizer(request,p),verifier_id=vid,practice_date=date.fromisoformat(data.get('practice_date','')),minutes=int(data.get('minutes','')),note=data.get('note',''),submission_key=data.get('submission_key'),include_contests=False,include_team_contests=False,award_dandelions=True)
         except ValueError as e:raise HTTPException(409,str(e))
     return RedirectResponse('/family/practice',303)
 

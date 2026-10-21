@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from .weekly_rewards import streak_request_authorizer
+
 from datetime import date, datetime, timedelta
 import logging
 from datetime import timezone
@@ -385,6 +387,7 @@ def create_student_practice_chart(
             created = create_practice_chart_verification_request(
                 session,
                 profile=profile,
+                streak_authorize=streak_request_authorizer(request, profile),
                 verifier_id=submitted.verifier_id,
                 practice_date=submitted.practice_date,
                 minutes=submitted.minutes,
@@ -487,6 +490,7 @@ def create_student_pristine_practice_chart(
                 session,
                 profile=profile,
                 detected_playing_seconds=submitted.detected_playing_seconds,
+                streak_authorize=streak_request_authorizer(request, profile),
                 submission_key=submitted.submission_key,
                 include_contests=submitted.include_contests,
                 include_team_contests=submitted.include_team_contests,
