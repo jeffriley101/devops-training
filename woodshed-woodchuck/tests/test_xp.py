@@ -239,6 +239,7 @@ def test_client_account_state_cannot_change_xp(xp_database) -> None:
         "board_points": 0,
         "p_charts": 0,
         "plunge_points": 0,
+        "reward_xp": 0,
     }
 
 
@@ -307,6 +308,7 @@ def test_xp_endpoint_requires_authentication_and_returns_calculated_payload(
             "board_points": 0,
             "p_charts": 0,
             "plunge_points": 0,
+            "reward_xp": 0,
         },
     }
 

@@ -196,7 +196,7 @@ def test_readonly_null_gate_and_no_extra_routes(runtime,monkeypatch):
     assert c.get(PATH).json()=={'plan':None,'progress':{'practice_seconds':0,'practice_days':0,'logging_days':0}}
     assert c.post(PATH,json={'focus':FOCI[0]}).status_code==409
     assert rows(db)==before
-    assert c.post('/weekly/wheel',json={}).status_code==404
+    assert c.post('/weekly/wheel',json={}).status_code==405  # Status is GET-only.
     assert c.post('/weekly/claims',json={}).status_code==405
     assert c.post('/weekly/plan/instruments/current/start',json={}).status_code==404
     monkeypatch.setitem(FEATURES,'weekly_plans',Feature(False,'open'))

@@ -52,6 +52,7 @@ CROWN_NAMES = {
     "weekly-login-streak": "Weekly Streak Crown",
 }
 PLACEABLE_REWARD_TYPES = {
+    "ufo": {"name": "UFO", "emoji": "🛸"},
     "trophy": {"name": "Trophy", "emoji": "🏆"},
     "goat": {"name": "GOAT Reward", "emoji": "🐐"},
 }

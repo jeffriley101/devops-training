@@ -222,3 +222,84 @@ def load_pantry(request: Request):
         _authorized(request, session, refresh=True, feature="weekly_pantry")
         # No commit, state hydration, claim, grant, finalization or repair.
         return JSONResponse(result, headers={"Cache-Control": "no-store"})
+
+
+class WheelStartSubmission(ClaimSubmission):
+    request_key: StrictStr = Field(min_length=1, max_length=64)
+
+    @field_validator("request_key")
+    @classmethod
+    def nonblank_key(cls, value):
+        if not value.strip():
+            raise ValueError("A durable Wheel request key is required.")
+        return value
+
+
+class WheelRotationSubmission(ClaimSubmission):
+    rotation: int = Field(strict=True, ge=1, le=2147483647)
+
+
+def _wheel_action(request, *, request_key=None, play_id=None, rotation=None):
+    write = request_key is not None or rotation is not None
+    if write and not same_origin_mutation(request):
+        raise HTTPException(403, "A same-origin request is required.",
+                            headers={"Cache-Control": "no-store"})
+    if request.query_params:
+        raise HTTPException(422, "Wheel requests do not accept query selectors.")
+    for attempt in range(3):
+        with SessionLocal() as session:
+            try:
+                profile = _authorized(request, session, feature="weekly_wheel")
+                from . import weekly_wheel as wheel
+                authorize = lambda locked: _authorized(request, locked, refresh=True, feature="weekly_wheel")
+                play = None
+                if request_key is not None:
+                    play = wheel.fund_play(session, profile, request_key, authorize=authorize)
+                elif rotation is not None:
+                    play = wheel.continue_play(session, profile, play_id, rotation, authorize=authorize)
+                elif play_id is not None:
+                    play = wheel.owned_play(session, profile.id, play_id)
+                authorize(session)
+                result = wheel.status_payload(session, profile.id, play=play)
+                response = JSONResponse(result, headers={"Cache-Control": "no-store"})
+                if write:
+                    authorize(session)
+                    session.commit()
+                return response
+            except IntegrityError as error:
+                session.rollback()
+                from .weekly_wheel import is_wheel_unique_race
+                if not write or not is_wheel_unique_race(error, session.get_bind().dialect.name):
+                    raise
+                if attempt == 2:
+                    raise HTTPException(503, "Retry the same saved Wheel action.",
+                                        headers={"Retry-After": "1"}) from error
+            except OperationalError as error:
+                session.rollback()
+                if not write or session.get_bind().dialect.name != "sqlite" or not any(
+                    message in str(error.orig).lower() for message in ("locked", "busy")
+                ):
+                    raise
+                if attempt == 2:
+                    raise HTTPException(503, "Retry the same saved Wheel action.",
+                                        headers={"Retry-After": "1"}) from error
+
+
+@router.get("/wheel")
+def load_wheel(request: Request):
+    return _wheel_action(request)
+
+
+@router.get("/wheel/plays/{play_id}")
+def recover_wheel(request: Request, play_id: str):
+    return _wheel_action(request, play_id=play_id)
+
+
+@router.post("/wheel/plays")
+def fund_wheel(request: Request, submitted: WheelStartSubmission):
+    return _wheel_action(request, request_key=submitted.request_key)
+
+
+@router.post("/wheel/plays/{play_id}/rotations")
+def rotate_wheel(request: Request, play_id: str, submitted: WheelRotationSubmission):
+    return _wheel_action(request, play_id=play_id, rotation=submitted.rotation)

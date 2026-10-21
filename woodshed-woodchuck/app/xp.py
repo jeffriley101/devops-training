@@ -14,6 +14,7 @@ from .models import (
     CampPointAward,
     PlungePointAward,
     PracticeChart,
+    RewardGrant,
     WoodchuckProfile,
 )
 
@@ -203,6 +204,9 @@ def xp_sources(session: Session, *, profile_id: int) -> dict[str, float | int]:
         "board_points": int(board_points),
         "p_charts": int(p_charts),
         "plunge_points": plunge_xp(session, profile_id=profile_id),
+        "reward_xp": int(session.scalar(select(func.coalesce(func.sum(RewardGrant.amount), 0)).where(
+            RewardGrant.profile_id == profile_id, RewardGrant.reward_type == "xp",
+        )) or 0),
     }
 
 
