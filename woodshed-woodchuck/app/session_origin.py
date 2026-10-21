@@ -30,7 +30,13 @@ class SessionOriginProtection:
             # KWS provider callbacks retain their existing signature validation;
             # they are not browser forms and do not authenticate browser sessions.
             webhook = path in {"/family/kws/test/webhook", "/family/kws/production/webhook"}
-            protected = (path.startswith(("/account/", "/guest/", "/family/"))
+            # Chart creation and verification mutations need the same browser
+            # boundary even when every optional Weekly reward is disabled.
+            chart_mutation = (path == "/practice-charts"
+                              or path.startswith(("/practice-charts/",
+                                                  "/trusted-verifiers/practice-charts/")))
+            protected = (chart_mutation
+                         or path.startswith(("/account/", "/guest/", "/family/"))
                          or path in {"/setup", "/admin/age/correct"}) and not webhook
             if scope["method"] not in {"GET", "HEAD", "OPTIONS"} and protected:
                 if not same_origin_mutation(Request(scope)):
