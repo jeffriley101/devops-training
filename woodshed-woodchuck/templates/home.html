@@ -272,6 +272,9 @@
     </div>
 
     <div id="mum-care-content" class="mum-care-content">
+    {% if weekly_newsletter_allowed %}
+    <button id="weekly-newsletter-open" class="btn btn-primary" type="button" aria-controls="weekly-newsletter-view" aria-expanded="false">Monday Newsletter</button>
+    {% endif %}
     {% if weekly_plans_allowed %}
     <button id="weekly-caper-open" class="btn btn-primary" type="button" aria-controls="weekly-caper-view" aria-expanded="false">Clover Caper</button>
     {% endif %}
@@ -336,6 +339,7 @@
     </button>
     </div>
     {% if weekly_plans_allowed %}{% include "_weekly_caper.html" %}{% endif %}
+  {% if weekly_newsletter_allowed %}{% include "_weekly_newsletter.html" %}{% endif %}
   </section>
 
 </section>

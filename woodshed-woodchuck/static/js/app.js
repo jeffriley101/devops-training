@@ -1880,6 +1880,7 @@
     let mumReadyTimer = null;
     const cancelReady = () => { window.clearTimeout(mumReadyTimer); mumReadyTimer = null; };
     panel.addEventListener("woodshed:caper-opened", () => { cancelReady(); hideSnackChooser(); });
+    panel.addEventListener("woodshed:newsletter-opened", () => { cancelReady(); hideSnackChooser(); });
 
     const name = state.profile.woodchuckName || "musician";
     const dailyGreetings = [
