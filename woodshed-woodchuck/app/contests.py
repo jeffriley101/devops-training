@@ -1140,8 +1140,11 @@ PRECISE_PRACTICE_SCORING = "precise_seconds"
 # Bump this whenever a finalizer rule affecting source eligibility, standings,
 # team identity, results, or derived rewards changes. It is written only when
 # this finalizer completes a new week; older weeks have unknown provenance.
-FINALIZER_RULES_VERSION = "contest_finalizer_v2"
-PERSISTENT_FINALIZER_RULES_VERSION = "contest_finalizer_persistent_v2"
+# v3 combines the current BOOK/Open and membership rules with receipt-qualified
+# Wheel Activity. Neither the old BOOK v2 nor the original Weekly Wheel v2
+# establishes these combined semantics; historical labels are never rewritten.
+FINALIZER_RULES_VERSION = "contest_finalizer_v3"
+PERSISTENT_FINALIZER_RULES_VERSION = "contest_finalizer_persistent_v3"
 
 
 def finalizer_rules_version(week: ContestWeek) -> str:
@@ -1299,13 +1302,13 @@ def _weekly_team_activity_point_scores(
     source_cutoff: datetime | None = None,
     public_only: bool = False,
 ) -> dict[int, int]:
-    """Return normal weekly BOARD points using immutable team attribution."""
+    """Return qualified ordinary Activity using immutable team attribution."""
     start_at, end_at = _week_utc_bounds(contest_week)
     filters = [
         CampPointAward.team_id.is_not(None),
         CampPointAward.occurred_at >= start_at,
         CampPointAward.occurred_at < end_at,
-        CampPointAward.activity_type.in_(CAMP_POINT_ACTIVITIES),
+        CampPointAward.activity_type.in_((*CAMP_POINT_ACTIVITIES, "wheel-prize")),
     ]
     if source_cutoff is not None:
         filters.append(CampPointAward.created_at <= aware_utc(source_cutoff))

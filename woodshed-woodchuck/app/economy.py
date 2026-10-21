@@ -1,7 +1,7 @@
 """The existing state row holds the balance; only server actions may change it."""
 from copy import deepcopy
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import JSON, String, and_, case, cast, func, literal, or_, select
 
 from .models import WoodchuckProfile, WoodchuckState
 
@@ -71,10 +71,47 @@ def economy_payload(state):
             "state_revision": state.revision}
 
 
+def _qualified_wheel_activity_clause():
+    """Admit the saved terminal Activity rotation and its exact prize receipt.
+
+    A source label alone is not authority. Match owner, rotation identity,
+    amount and earning timestamps without issuing or repairing any reward.
+    Guard malformed/non-array legacy JSON before using array operations.
+    """
+    from .models import CampPointAward, RewardGrant
+    from .weekly_models import WeeklyWheelPlay
+    outcomes = case(
+        (cast(WeeklyWheelPlay.outcomes, String).like("[%"), WeeklyWheelPlay.outcomes),
+        else_=literal([], type_=JSON),
+    )
+    count = func.json_array_length(outcomes)
+    last = case((count > 0, count - 1), else_=0)
+    source = literal("weekly-wheel:") + WeeklyWheelPlay.id + ":" + cast(count, String)
+    receipt = select(RewardGrant.id).join(
+        WeeklyWheelPlay, WeeklyWheelPlay.profile_id == RewardGrant.profile_id,
+    ).where(
+        RewardGrant.profile_id == CampPointAward.profile_id,
+        RewardGrant.source_key == CampPointAward.duplicate_key,
+        RewardGrant.source_key == source,
+        RewardGrant.reward_type == "activity", RewardGrant.amount == 14,
+        RewardGrant.contest_result_id.is_(None), RewardGrant.category_key.is_(None),
+        RewardGrant.created_at == CampPointAward.occurred_at,
+        CampPointAward.created_at == CampPointAward.occurred_at,
+        WeeklyWheelPlay.completed_at == CampPointAward.occurred_at,
+        WeeklyWheelPlay.funded_at <= WeeklyWheelPlay.completed_at,
+        # Both supported databases accept an integer index for ->>. SQLAlchemy's
+        # SQLite JSON accessor treats a computed index as an unformatted path.
+        count > 0, outcomes.op("->>", return_type=String)(last) == "activity",
+    ).correlate(CampPointAward).exists()
+    return and_(CampPointAward.activity_type == "wheel-prize",
+                CampPointAward.points_awarded == 14, receipt)
+
+
 def qualified_camp_point_clause():
-    """Keep legacy check-ins excluded; qualify only new server-issued v2 keys."""
+    """Preserve BOARD provenance and admit only receipted Wheel Activity."""
     from .models import CampPointAward
     return or_(
+        _qualified_wheel_activity_clause(),
         CampPointAward.activity_type.in_(("trivia", "contest-placement", "placement")),
         *(
             and_(

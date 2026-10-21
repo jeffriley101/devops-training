@@ -53,6 +53,33 @@ entry point together so a v1 writer cannot finalize with the old eligibility.
 Older operational evidence below retains its original dates and release context;
 references to seasonal activation do not apply to future operations.
 
+The Weekly Loop 2 Wheel Activity eligibility correction uses new
+`contest_finalizer_v3` and `contest_finalizer_persistent_v3` identities. These
+combine the current submitted BOOK/Open, Verified, competition-scope and frozen
+membership rules with exactly 14 ordinary Activity points from a saved terminal
+Wheel Activity rotation and its matching owner/source/amount/timestamp receipt.
+An arbitrary `wheel-prize` label is insufficient. No Wheel writer or activation
+is introduced by this eligibility correction, and BOARD remains +5 Dandelions
+with zero Activity. Existing Activity, practice and reward formulas are retained.
+
+Only matching v3 history with the corresponding membership rules can use the
+existing missing-artifact repair. All other cutoff, definition, scoring-mode and
+snapshot checks still apply. Unknown provenance requires manual review. Old v1
+and v2 labels are never rewritten or treated as equivalent: the earlier Weekly
+reference's Wheel v2 and this foundation's BOOK v2 had different semantics.
+Audit/dry-run/apply report `historical_rules_incompatible` for those old labels;
+direct repair returns 409 before reconstruction. Ordinary repeat finalization
+continues to skip finalized weeks and preserves their artifacts.
+
+This intentionally makes automatic missing-result repair of existing BOOK v2
+and persistent-Team v2 history unavailable in the new writer. There is no
+version-specific historical scorer in this implementation; inferring the correct
+v2 semantics from its label or surviving rows is unsafe. Preserve old results,
+rewards and labels and use explicit manual review instead. No historical backfill,
+automatic repair, schedule change or operational compatibility approval follows.
+Deploying mixed v2/v3 finalizer writers is not approved; this remains local source
+work until operational review authorizes a consistent release.
+
 The operational service name `woodshed-contest-finalizer` appears in the existing
 runbooks. No tracked Render Blueprint, cron expression or scheduler startup
 establishes its service type, live command, cadence or alert destination. The

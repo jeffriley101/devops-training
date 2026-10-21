@@ -216,7 +216,7 @@ def test_future_finalization_matches_live_open_and_is_idempotent(competition):
     assert results["weekly-practice-by-instrument", "open"].precise_score == instruments["open"][0]["total_minutes"]
     for key in ("team-weekly-practice", "team-weekly-average-practice", "team-lifetime-practice"):
         assert results[key, "open"].precise_score == teams[key]["open"][0]["score"]
-    assert week.finalizer_rules_version == "contest_finalizer_v2"
+    assert week.finalizer_rules_version == "contest_finalizer_v3"
     assert pending.credits_awarded == 0
     before = snapshot(session)
     for repair in (False, True):
@@ -248,7 +248,7 @@ def test_pre_fix_finalized_history_cannot_be_recomputed(competition, membership_
     session.commit()
     before = snapshot(session)
     assert contests.finalizer_rules_version(week) == (
-        "contest_finalizer_v2" if membership_rules == LEGACY_RULES else "contest_finalizer_persistent_v2"
+        "contest_finalizer_v3" if membership_rules == LEGACY_RULES else "contest_finalizer_persistent_v3"
     )
     contests.finalize_contest_week(session, week_start=week.week_start, now=FINAL_NOW + timedelta(days=1))
     session.commit()
