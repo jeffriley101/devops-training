@@ -1877,6 +1877,10 @@
 
     if (!openButton || !panel || !messageEl) return;
 
+    let mumReadyTimer = null;
+    const cancelReady = () => { window.clearTimeout(mumReadyTimer); mumReadyTimer = null; };
+    panel.addEventListener("woodshed:caper-opened", () => { cancelReady(); hideSnackChooser(); });
+
     const name = state.profile.woodchuckName || "musician";
     const dailyGreetings = [
       `Sit for a moment, ${name}. Have you eaten and had some water?`,
@@ -1898,6 +1902,8 @@
     }
 
     function closeMumPanel() {
+      cancelReady();
+      panel.dispatchEvent(new CustomEvent("woodshed:mum-closed"));
       hideSnackChooser();
       panel.classList.add("hidden");
       openButton.setAttribute("aria-expanded", "false");
@@ -1905,6 +1911,8 @@
     }
 
     openButton.addEventListener("click", function () {
+      cancelReady();
+      panel.dispatchEvent(new CustomEvent("woodshed:mum-opened"));
       messageEl.textContent = dailyGreetings[getDayIndex(new Date()) % dailyGreetings.length];
       hideSnackChooser();
       panel.classList.remove("hidden");
@@ -1960,7 +1968,8 @@
     if (readyButton) {
       readyButton.addEventListener("click", function () {
         messageEl.textContent = "Good. Take what you need with you, and do not rush the first note.";
-        window.setTimeout(closeMumPanel, 900);
+        cancelReady();
+        mumReadyTimer = window.setTimeout(closeMumPanel, 900);
       });
     }
     panel.addEventListener("keydown", function (event) {

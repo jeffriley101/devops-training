@@ -162,6 +162,7 @@ def _render(request: Request, template_name: str, *, analytics_event: str | None
     authenticated_profile = None
     woodchuck_appearance = None
     game_mode_entry = False
+    weekly_plans_allowed = False
     with SessionLocal() as session:
         profile = current_profile(request, session)
         if profile is not None:
@@ -185,6 +186,9 @@ def _render(request: Request, template_name: str, *, analytics_event: str | None
                 "child_parent_consent", "child_director_permission"))
             game_mode_entry = (template_name == "home.html" and not adult_context
                                and not authenticated_profile["band_director"])
+            if template_name == "home.html":
+                from .feature_access import can_use_feature
+                weekly_plans_allowed = can_use_feature(session, profile.id, "weekly_plans")
             saved_state = session.get(WoodchuckState, profile.id)
             if template_name in {"home.html", "store.html"}:
                 from .appearance import appearance_payload
@@ -201,6 +205,7 @@ def _render(request: Request, template_name: str, *, analytics_event: str | None
         context={
             "game_modes": GAME_MODES,
             "game_mode_entry": game_mode_entry,
+            "weekly_plans_allowed": weekly_plans_allowed,
             "nav_items": NAV_ITEMS,
             "reconstructed_student_surface": template_name in {"home.html", "store.html", "p_book.html", "quest.html"},
             "active_nav": context.pop("active_nav", None),

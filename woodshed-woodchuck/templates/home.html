@@ -253,7 +253,7 @@
     <div class="mum-panel-head">
       <div>
         <p class="chip">Mum's Corner</p>
-        <h2 id="mum-title">Take care of the musician</h2>
+        <h2 id="mum-title" tabindex="-1">Take care of the musician</h2>
       </div>
 
       <button
@@ -271,6 +271,10 @@
       <img class="mum-corner-art" src="/static/img/characters/mum-corner.png" alt="" />
     </div>
 
+    <div id="mum-care-content" class="mum-care-content">
+    {% if weekly_plans_allowed %}
+    <button id="weekly-caper-open" class="btn btn-primary" type="button" aria-controls="weekly-caper-view" aria-expanded="false">Clover Caper</button>
+    {% endif %}
     <p id="mum-message" class="mum-message" aria-live="polite">
       Sit for a moment. Have you eaten, had water, and packed everything for camp?
     </p>
@@ -330,6 +334,8 @@
     >
       I'm ready to practice
     </button>
+    </div>
+    {% if weekly_plans_allowed %}{% include "_weekly_caper.html" %}{% endif %}
   </section>
 
 </section>

@@ -1,0 +1,42 @@
+/* The existing Mum dialog owns focus, history, scrolling and safe-area bounds. */
+.mum-care-content, .weekly-caper { display: grid; gap: 1rem; min-width: 0; }
+#mum-panel [hidden] { display: none !important; }
+.weekly-caper-toolbar { display: flex; flex-wrap: wrap; gap: .75rem; justify-content: space-between; }
+#weekly-caper-open, .weekly-caper button, .weekly-caper select, #mum-close-button { min-height: 44px; min-width: 44px; }
+.weekly-caper button { white-space: normal; }
+.weekly-caper button:focus-visible, .weekly-caper summary:focus-visible, #weekly-caper-open:focus-visible {
+  outline: 3px solid #315c35; outline-offset: 3px;
+}
+#weekly-caper-content { display: grid; gap: 1rem; min-width: 0; overflow-wrap: anywhere; }
+#weekly-caper-status { margin: 0; }
+.weekly-caper-tasks { display: grid; grid-template-columns: 1fr; gap: .8rem; }
+.weekly-caper-task, .weekly-caper-instrument, .weekly-caper-clues, .weekly-caper-history > details {
+  padding: 1rem; border: 1px solid #907650; border-radius: .8rem; background: #fff8e8;
+}
+.weekly-caper-task h3 { margin-top: 0; }
+.weekly-caper-task small { display: block; margin-top: .65rem; }
+.weekly-caper details { margin-top: .75rem; }
+.weekly-caper summary { cursor: pointer; min-height: 44px; padding: .5rem 0; }
+.weekly-caper-task ol { padding-left: 1.4rem; }
+.weekly-caper-art { display: inline-grid; place-items: center; }
+.weekly-caper-art img { width: 100%; height: auto; object-fit: contain; }
+.weekly-caper-art-clue { width: 2.5rem; vertical-align: middle; }
+.weekly-caper-art-placeholder { padding: .5rem; border: 2px dashed #776747; border-radius: .5rem; }
+#weekly-caper-content.weekly-caper-celebration {
+  min-height: min(65dvh, 32rem); justify-items: center; align-content: center; text-align: center;
+  padding: 1rem; border-radius: 1rem; background: radial-gradient(ellipse, #fffef4, #dce9cd);
+}
+.weekly-caper-clover {
+  display: grid; justify-items: center; gap: 1rem; width: min(100%, 20rem); padding: 1rem;
+  color: #283a24; background: #fffdf2; border: 2px solid #6b834e; border-radius: 2rem;
+  box-shadow: 0 0 2rem #f7edaa; cursor: pointer; font: inherit;
+}
+.weekly-caper-art-clover { width: min(100%, 16rem); min-height: 12rem; }
+.weekly-caper-clover:focus-visible { outline: 4px solid #315c35; outline-offset: 5px; }
+@media (max-width: 520px) {
+  .weekly-caper-task > button, #weekly-caper-open { width: 100%; }
+  .weekly-caper-task, .weekly-caper-instrument { padding: .8rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .weekly-caper *, .weekly-caper *::before, .weekly-caper *::after { animation: none !important; transition: none !important; }
+}
