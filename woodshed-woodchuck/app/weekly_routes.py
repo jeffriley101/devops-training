@@ -14,6 +14,25 @@ from . import weekly_plans as plans
 router = APIRouter(prefix="/weekly", tags=["weekly"])
 
 
+@router.get("/newsletter")
+def load_newsletter(request: Request):
+    """An owned read projection, never an opening/reward or publication writer."""
+    cache = {"Cache-Control": "private, no-store"}
+    try:
+        if request.query_params:
+            raise HTTPException(422, "Newsletter does not accept selectors.")
+        with SessionLocal() as session:
+            profile = _authorized(request, session, feature="weekly_newsletter")
+            from .weekly_newsletter import newsletter_payload
+            with session.no_autoflush:
+                result = newsletter_payload(session, profile, now=utc_instant())
+            _authorized(request, session, refresh=True, feature="weekly_newsletter")
+            return JSONResponse(result, headers=cache)
+    except HTTPException as error:
+        error.headers = {**(error.headers or {}), **cache}
+        raise
+
+
 class PlanSubmission(BaseModel):
     model_config = ConfigDict(extra="forbid")
     focus: StrictStr

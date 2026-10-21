@@ -15,6 +15,7 @@ class Feature:
 
 
 FEATURES: dict[str, Feature] = {
+    "weekly_newsletter": Feature(False, "open"),
     "weekly_plans": Feature(False, "open"),
     "weekly_pantry": Feature(False, "open"),
     "weekly_wheel": Feature(False, "open"),
