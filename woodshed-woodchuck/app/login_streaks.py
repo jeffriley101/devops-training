@@ -22,6 +22,89 @@ LOGIN_STREAK_CROWN_CATEGORY = "weekly-login-streak"
 LOGIN_STREAK_CROWN_INTERVAL = 7
 
 
+def qualifying_opening(request) -> bool:
+    """The accepted HTML-navigation classification, not proof of attention."""
+    if request.method != "GET" or request.url.path not in ("/home", "/store", "/family/practice"):
+        return False
+    for name, expected in (("sec-fetch-mode", "navigate"), ("sec-fetch-dest", "document")):
+        value = request.headers.get(name)
+        if value is not None and value.strip().lower() != expected:
+            return False
+    return not any("prefetch" in request.headers.get(name, "").lower()
+                   for name in ("purpose", "sec-purpose"))
+
+
+def authorize_monday_opening(session, request, profile_id):
+    """Recheck the existing student authority after waits and before commit."""
+    from fastapi import HTTPException
+    from .account_routes import current_profile
+    from .age_privacy import require_eligible
+    from .feature_access import require_feature
+    from .session_revocations import NONCE, RevokedBrowserSession, digest
+    profile = session.get(WoodchuckProfile, profile_id, populate_existing=True)
+    current = current_profile(request, session)
+    nonce = request.session.get(NONCE)
+    if (profile is None or current is None or current.id != profile_id
+            or not isinstance(nonce, str) or not nonce
+            or session.get(RevokedBrowserSession, digest(nonce), populate_existing=True)):
+        request.scope["ww.suppress_session_cookie"] = True
+        raise HTTPException(401, "Sign-in changed. Reload this page.")
+    require_eligible(session, profile_id)
+    require_feature(session, profile_id, "weekly_monday_bonus")
+
+
+def monday_bonus_week(instant: datetime) -> date | None:
+    """Current Chicago week, released Monday 13:30; never a missed week."""
+    local = instant.astimezone(LOGIN_STREAK_TIMEZONE)
+    if local.weekday() == 0 and (local.hour, local.minute) < (13, 30):
+        return None
+    return local.date() - timedelta(days=local.weekday())
+
+
+def stage_monday_opening(session, request, profile, *, now=None) -> int:
+    """Stage the dated +75 with the page transaction; login alone never calls it.
+
+    The caller must construct a successful page, reauthorize and commit together.
+    A dated receipt is authoritative even if its currency has already been spent.
+    """
+    from sqlalchemy import update
+    from .feature_access import can_use_feature
+    from .teams import has_band_director_capability
+    from .weekly import utc_instant
+    from .weekly_rewards import grant
+    from .contests import _add_dandelion
+    if profile is None or not qualifying_opening(request):
+        return 0
+    if any(request.session.get(key) for key in (
+        "trusted_verifier_id", "site_admin_fingerprint", "contest_admin_token_fingerprint",
+        "child_parent_consent", "child_director_permission")):
+        return 0
+    if not can_use_feature(session, profile.id, "weekly_monday_bonus"):
+        return 0
+    instant = utc_instant(now)
+    if monday_bonus_week(instant) is None:
+        return 0
+    profile_id = profile.id
+    # SQLite ignores FOR UPDATE; reserve the writer before any receipt/balance decision.
+    if session.get_bind().dialect.name == "sqlite":
+        session.execute(update(WoodchuckProfile).where(WoodchuckProfile.id == profile_id).values(
+            id=WoodchuckProfile.id, updated_at=WoodchuckProfile.updated_at))
+    session.scalar(select(WoodchuckProfile).where(WoodchuckProfile.id == profile_id)
+                   .with_for_update().execution_options(populate_existing=True))
+    authorize_monday_opening(session, request, profile_id)
+    if has_band_director_capability(session, profile_id=profile_id):
+        return 0
+    # Resolve the current release window again after the wait; never backfill.
+    instant = utc_instant(now)
+    day = monday_bonus_week(instant)
+    if day is None:
+        return 0
+    if not grant(session, profile_id, f"weekly-monday:{day}", "dandelion", 75, now=instant):
+        return 0
+    _add_dandelion(session, profile_id, 75)
+    return 75
+
+
 def central_login_date(now: datetime | None = None) -> date:
     instant = now or datetime.now(timezone.utc)
     if instant.tzinfo is None:

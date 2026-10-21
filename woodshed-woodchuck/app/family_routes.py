@@ -183,7 +183,12 @@ def practice(request:Request):
         data={'charts':charts(s,p.id),'woodchuck_id':p.woodchuck_id,'metrics':metrics(s,p),'director':None}
         if permission:data['director']={'name':permission.director_name,'connected':service.permission_valid(s,permission,require_connection=True),'can_review':permission.review_allowed,'connection_id':permission.connection_id}
         if request.url.path.endswith('/data'):return data
-        return page(request,'practice',**data,submission_key=secrets.token_urlsafe(20))
+        response = page(request,'practice',**data,submission_key=secrets.token_urlsafe(20))
+        from .login_streaks import stage_monday_opening, authorize_monday_opening
+        if stage_monday_opening(s, request, p):
+            authorize_monday_opening(s, request, p.id)
+            s.commit()
+        return response
 
 @router.post('/family/practice')
 async def save_chart(request:Request):

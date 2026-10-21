@@ -165,8 +165,10 @@ def _render(request: Request, template_name: str, *, analytics_event: str | None
     weekly_plans_allowed = False
     weekly_pantry_allowed = False
     weekly_wheel_allowed = False
+    from .login_streaks import stage_monday_opening, authorize_monday_opening
     with SessionLocal() as session:
         profile = current_profile(request, session)
+        monday_awarded = stage_monday_opening(session, request, profile)
         if profile is not None:
             page_generation(request)
             authenticated_profile = {
@@ -205,28 +207,31 @@ def _render(request: Request, template_name: str, *, analytics_event: str | None
                 "revision": saved_state.revision if saved_state else 0,
             }
 
-    response = templates.TemplateResponse(
-        request=request,
-        name=template_name,
-        context={
-            "game_modes": GAME_MODES,
-            "game_mode_entry": game_mode_entry,
-            "weekly_plans_allowed": weekly_plans_allowed,
-            "weekly_pantry_allowed": weekly_pantry_allowed,
-            "weekly_wheel_allowed": weekly_wheel_allowed,
-            "nav_items": NAV_ITEMS,
-            "reconstructed_student_surface": template_name in {"home.html", "store.html", "p_book.html", "quest.html"},
-            "active_nav": context.pop("active_nav", None),
-            "sax_viking_welcome": SAX_VIKING_WELCOME,
-            "quest_pool": QUEST_POOL,
-            "sax_viking_messages": SAX_VIKING_MESSAGES,
-            "instrument_definitions": instrument_definition_payloads(),
-            "account_state_bootstrap": account_state_bootstrap,
-            "authenticated_profile": authenticated_profile,
-            "woodchuck_appearance": woodchuck_appearance,
-            **context,
-        },
-    )
+        response = templates.TemplateResponse(
+            request=request,
+            name=template_name,
+            context={
+                "game_modes": GAME_MODES,
+                "game_mode_entry": game_mode_entry,
+                "weekly_plans_allowed": weekly_plans_allowed,
+                "weekly_pantry_allowed": weekly_pantry_allowed,
+                "weekly_wheel_allowed": weekly_wheel_allowed,
+                "nav_items": NAV_ITEMS,
+                "reconstructed_student_surface": template_name in {"home.html", "store.html", "p_book.html", "quest.html"},
+                "active_nav": context.pop("active_nav", None),
+                "sax_viking_welcome": SAX_VIKING_WELCOME,
+                "quest_pool": QUEST_POOL,
+                "sax_viking_messages": SAX_VIKING_MESSAGES,
+                "instrument_definitions": instrument_definition_payloads(),
+                "account_state_bootstrap": account_state_bootstrap,
+                "authenticated_profile": authenticated_profile,
+                "woodchuck_appearance": woodchuck_appearance,
+                **context,
+            },
+        )
+        if monday_awarded:
+            authorize_monday_opening(session, request, profile.id)
+            session.commit()
     response.headers["Cache-Control"] = "no-store"
     if analytics_event is not None:
         return observe_response(
