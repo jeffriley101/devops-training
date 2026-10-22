@@ -16,6 +16,7 @@ from . import child_authorization as service,parent_access
 from .child_models import ConsentEvidence,DirectorPermission,PendingConsent
 from .models import WoodchuckProfile,PracticeChart,PracticeChartVerification,StudentVerifierConnection,TrustedVerifier
 from .team_authority import lock_authority
+from .practice_rating_access import adult_rating_allowed, rating_metrics_projection
 class FamilyPageRoute(PrivateRoute):
     """Render page validation errors without changing JSON data endpoints."""
     def get_route_handler(self):
@@ -282,8 +283,10 @@ def director_view(request:Request):
         p=s.get(WoodchuckProfile,permission.profile_id);c=s.get(StudentVerifierConnection,permission.connection_id)
         reviews=s.execute(select(PracticeChartVerification.id,PracticeChartVerification.practice_chart_id,PracticeChartVerification.status).join(PracticeChart).where(PracticeChart.profile_id==p.id,PracticeChartVerification.verifier_id==c.verifier_id)).all()
         from .trusted_verifier_dashboard import private_student_metrics
-        basic=private_student_metrics(s,profile_id=p.id,include_team_context=False)
-        data={'name':p.display_name,'instrument':p.instrument,'charts':charts(s,p.id),'metrics':{key:basic[key] for key in ('weekly','lifetime','rating','trend','practice_streak')},'can_review':permission.review_allowed,'reviews':[dict(r._mapping) for r in reviews]}
+        basic=rating_metrics_projection(
+            private_student_metrics(s,profile_id=p.id,include_team_context=False),
+            allowed=adult_rating_allowed(s,p.id,verifier_id=c.verifier_id))
+        data={'name':p.display_name,'instrument':p.instrument,'charts':charts(s,p.id),'metrics':{key:basic[key] for key in ('weekly','lifetime','rating','trend','practice_streak') if key in basic},'can_review':permission.review_allowed,'reviews':[dict(r._mapping) for r in reviews]}
         if request.url.path.endswith('/data'):return data
         return page(request,'director',**data)
 
@@ -335,7 +338,7 @@ def parent_view(request:Request):
             if request.url.path.endswith('/data'):raise
             response=page(request,'parent-access',available=service.under13_available());response.status_code=403;return response
         permissions=[{'id':r.id,'name':r.director_name,'email':r.email,'review_allowed':r.review_allowed} for r in s.scalars(select(DirectorPermission).where(DirectorPermission.consent_id==evidence.id,DirectorPermission.revoked_at.is_(None)))]
-        data={'name':p.display_name,'metrics':metrics(s,p),'can_confirm_age':rule.age_band=='under13','permissions':permissions,'age_wording':parent_access.AGE_WORDING,'age_version':parent_access.AGE_WORDING_VERSION}
+        data={'name':p.display_name,'metrics':rating_metrics_projection(metrics(s,p),allowed=adult_rating_allowed(s,p.id,guardian=True)),'can_confirm_age':rule.age_band=='under13','permissions':permissions,'age_wording':parent_access.AGE_WORDING,'age_version':parent_access.AGE_WORDING_VERSION}
         if request.url.path.endswith('/data'):return data
         return page(request,'parent',**data)
 

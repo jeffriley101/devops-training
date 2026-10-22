@@ -347,6 +347,8 @@ def trusted_verifier_dashboard_page(request: Request, connection_id: int | None 
         try:
             snapshot = verifier_dashboard_snapshot(session, verifier_id=verifier.id,
                                                    connection_id=connection_id)
+            from .practice_rating_access import verifier_rating_projection
+            snapshot = verifier_rating_projection(session, verifier.id, snapshot)
         except ValueError as error:
             raise HTTPException(status_code=404, detail=str(error),
                                 headers={"Cache-Control": "no-store"}) from error
@@ -366,7 +368,10 @@ def band_director_dashboard_page(request: Request, week: date | None = None):
         if verifier is None:
             return RedirectResponse(url="/trusted-verifiers/login", status_code=303)
         try:
-            metrics = dashboard_metrics(session, verifier_id=verifier.id, selected_week=week)
+            from .practice_rating_access import adult_rating_allowed
+            metrics = dashboard_metrics(session, verifier_id=verifier.id, selected_week=week,
+                rating_access=lambda profile_id: adult_rating_allowed(
+                    session, profile_id, verifier_id=verifier.id))
         except ValueError as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
         if request.url.path.endswith("/dashboard.csv"):

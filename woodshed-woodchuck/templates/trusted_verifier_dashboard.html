@@ -28,6 +28,7 @@
 
     <p id="verifier-review-notice" class="verifier-review-notice" aria-live="polite" hidden><a href="#verifier-reviews"></a></p>
 
+    {% if student.rating is defined %}
     <section class="verifier-rating-card" aria-labelledby="verifier-rating-heading">
       <h3 id="verifier-rating-heading">Practice Rating</h3>
       <div class="verifier-rating">
@@ -39,6 +40,7 @@
       </div>
       <p class="verifier-muted">Based on the most recently completed week</p>
     </section>
+    {% endif %}
 
     <section class="verifier-panel" aria-labelledby="verifier-week-heading">
       <h3 id="verifier-week-heading">This Week</h3>

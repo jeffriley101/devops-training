@@ -20,7 +20,8 @@ from .student_practice_metrics import (
 
 
 def dashboard_metrics(session: Session, *, verifier_id: int,
-                      selected_week: date | None = None, today: date | None = None) -> dict:
+                      selected_week: date | None = None, today: date | None = None,
+                      rating_access=None) -> dict:
     today = today or datetime.now(CENTRAL).date()
     current_week = week_start(today)
     roster = band_director_students(session, verifier_id=verifier_id)
@@ -56,6 +57,7 @@ def dashboard_metrics(session: Session, *, verifier_id: int,
             teams[profile_id] = {"name": name, "emblem": emblem}
 
     students = []
+    all_ratings_allowed = True
     program_week_sums = [0.0] * 5
     for student in roster:
         profile_id = student["profile_id"]
@@ -64,6 +66,11 @@ def dashboard_metrics(session: Session, *, verifier_id: int,
         snapshot = student_practice_snapshot(history, approved, today=today, selected_week=selected_week)
         for index, score in enumerate(snapshot.pop("rating_week_values")):
             program_week_sums[index] += score
+        if rating_access is not None:
+            from .practice_rating_access import rating_metrics_projection
+            allowed = rating_access(profile_id)
+            all_ratings_allowed = all_ratings_allowed and allowed
+            snapshot = rating_metrics_projection(snapshot, allowed=allowed)
         students.append({"display_name": student["display_name"],
                          "instrument": student["instrument"], "level": student["level"], **snapshot,
                          "team": teams.get(profile_id)})
@@ -75,8 +82,10 @@ def dashboard_metrics(session: Session, *, verifier_id: int,
     program_baseline = sum(program_weeks[1:]) / 4
     return {
         "students": students,
-        "program_rating": program_weeks[0],
-        "program_trend": trend(program_weeks[0] - program_baseline),
+        # A full-roster aggregate can disclose an unauthorized student's rating.
+        **({"program_rating": program_weeks[0],
+            "program_trend": trend(program_weeks[0] - program_baseline)}
+           if all_ratings_allowed else {}),
         "weeks": weeks, "selected_week": selected_week,
         "week_end": selected_week + timedelta(days=6),
         "previous_week": selected_week - WEEK if selected_week > earliest else None,
@@ -108,8 +117,8 @@ def dashboard_csv(metrics: dict) -> str:
             *map(text_cell, (student["display_name"], student["instrument"], student["level"],
                             student["team"]["name"] if student["team"] else "No team")),
             metrics["selected_week"].isoformat(), metrics["week_end"].isoformat(),
-            format(student["weekly"]["total"], ".15g"), student["weekly"]["days"], student["rating"],
-            student["trend"]["label"], format(student["weekly"]["verified"], ".15g"), format(student["weekly"]["pristine"], ".15g"),
+            format(student["weekly"]["total"], ".15g"), student["weekly"]["days"], student.get("rating", ""),
+            student["trend"]["label"] if "trend" in student else "", format(student["weekly"]["verified"], ".15g"), format(student["weekly"]["pristine"], ".15g"),
             *[student[period][f"{kind}_seconds"] for period in ("weekly", "lifetime")
               for kind in ("total", "verified", "pristine")],
         ])

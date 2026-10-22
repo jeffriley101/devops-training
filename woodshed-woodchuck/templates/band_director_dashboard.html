@@ -11,6 +11,7 @@
     <a href="/membership?as_account=adult">Membership</a>
   {% endcall %}
   <header class="bd-heading">
+    {% if program_rating is defined %}
     <p id="program-rating-label">PROGRAM RATING</p>
     <div class="bd-rating-row">
       <div class="bd-rating" aria-labelledby="program-rating-label">
@@ -18,6 +19,7 @@
       </div>
       {{ arrow(program_trend) }}
     </div>
+    {% endif %}
     <form class="bd-week" action="/band-director/dashboard" method="get">
       <label for="bd-week">Week</label>
       <div class="bd-week-controls">
@@ -71,8 +73,10 @@
         {% for student in students %}
         <tr>
           <th scope="row" data-sort-value="{{ student.display_name }}">{{ student.display_name }}</th>
+          {% if student.rating is defined %}
           <td data-sort-value="{{ student.rating }}">{{ '%.1f' | format(student.rating) }}</td>
           <td data-sort-value="{{ student.trend.delta }}">{{ arrow(student.trend) }}</td>
+          {% else %}<td>Unavailable</td><td>Unavailable</td>{% endif %}
           {% for value in [student.weekly.total, student.weekly.verified, student.weekly.pristine, student.lifetime.total, student.lifetime.verified, student.lifetime.pristine, student.weekly.charts, student.lifetime.charts] %}
           <td data-sort-value="{{ value }}">{{ value | practice_duration if loop.index <= 6 else value }}</td>
           {% endfor %}

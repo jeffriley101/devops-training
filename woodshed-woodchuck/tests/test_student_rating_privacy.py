@@ -183,10 +183,11 @@ def test_authorized_child_mixed_parent_and_withdrawal(privacy_db,captured,record
     parent=child.get('/family/parent/data');assert parent.status_code==200
     adult=director.get('/family/director/data');assert adult.status_code==200
     with f() as s:raw=family.metrics(s,s.get(WoodchuckProfile,pid))
-    assert parent.json()['metrics']['rating']==raw['rating']
-    assert parent.json()['metrics']['trend']==raw['trend']
-    assert adult.json()['metrics']['rating']==raw['rating']
-    assert adult.json()['metrics']['trend']==raw['trend']
+    # Phase 1 adult policy: native consent is not a paid rating entitlement,
+    # and a legacy named director is not Classroom reporting authority.
+    safe(parent.json()['metrics']);safe(adult.json()['metrics'])
+    assert parent.json()['metrics']['lifetime']==jsonable_encoder(raw['lifetime'])
+    assert adult.json()['metrics']['lifetime']==jsonable_encoder(raw['lifetime'])
     assert rows(f.engine)==before
     assert post(child,'/family/parent/withdraw',{'withdraw':'yes'},page='/family/parent').status_code==200
     before=rows(f.engine);cookie=child.cookies.get('session')
@@ -195,10 +196,10 @@ def test_authorized_child_mixed_parent_and_withdrawal(privacy_db,captured,record
     if after!=before:assert_only_session_retirement(before,after,cookie)
     assert director.get('/family/director/data').status_code==403
     record_property('native_consent_and_mixed_parent_redaction',True)
-    record_property('existing_parent_director_rating_behavior_unchanged',True)
+    record_property('parent_director_progress_retained_rating_withheld',True)
 
 
-def test_existing_verifier_numeric_view_unchanged(privacy_db):
+def test_existing_verifier_progress_retained_without_rating(privacy_db):
     f=privacy_db
     with f.begin() as s:
         s.add(StudentVerifierConnection(profile_id=1,verifier_id=1,role='verifier',status='accepted'))
@@ -208,8 +209,8 @@ def test_existing_verifier_numeric_view_unchanged(privacy_db):
         before=rows(f.engine);page=adult.get('/trusted-verifiers/dashboard')
         assert page.status_code==200
         with f() as s:raw=family.metrics(s,s.get(WoodchuckProfile,1))
-        assert page.context['student']['rating']==raw['rating']
-        assert page.context['student']['trend']==raw['trend']
-        assert 'verifier-rating-card' in page.text
+        safe(page.context['student'])
+        assert page.context['student']['lifetime']==raw['lifetime']
+        assert 'verifier-rating-card' not in page.text
         assert adult.get(PATH).status_code==401
         assert rows(f.engine)==before
