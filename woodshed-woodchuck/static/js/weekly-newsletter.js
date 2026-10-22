@@ -44,7 +44,7 @@
     if (value) parent.append(node('p', `${label}: ${value.amount} ${value.reward_type.replaceAll('_', ' ')} recorded.`));
   }
   function create({container, status, heading, editProfile}) {
-    let active = false, epoch = 0, account, data, busy = false, stage = 1;
+    let active = false, epoch = 0, account, data, busy = false, stage = 1, expectedWeek = null;
     const valid = ticket => active && ticket === epoch && window.WWSessionBoundary?.isCurrent() === true && !!window.WWState.stateForResponse(account);
     function lock(value) { busy = value; container.setAttribute('aria-busy', String(value)); container.querySelectorAll('button,select').forEach(el => { el.disabled = value || el.dataset.unavailable === 'true'; }); }
     async function request(path, ticket, body) {
@@ -52,6 +52,7 @@
       const response = await fetch(path, {credentials: 'same-origin', cache: 'no-store', ...(body === undefined ? {} : {
         method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)})});
       const payload = await response.json();
+      if (path === '/weekly/newsletter' && expectedWeek && payload.context?.week_start !== expectedWeek) throw new Error('The edition changed. Reopen Newsletter manually.');
       if (!valid(ticket)) throw new Error('This session changed. Reopen Newsletter.');
       if (!response.ok) throw new Error(typeof payload.detail === 'string' ? payload.detail : payload.detail?.message || 'Unable to complete the request.');
       return payload;
@@ -155,7 +156,7 @@
         if (valid(ticket)) await refresh(`${error.message} Checking saved state.`, kind === 'plan' ? 1 : 2);
       }
     }
-    return Object.freeze({open() { account = window.WWState.accountRequest(); active = true; stage = 1; return refresh(); },
+    return Object.freeze({open(week = null) { expectedWeek = week; account = window.WWState.accountRequest(); active = true; stage = 1; return refresh(); },
       close() { active = false; epoch++; data = null; busy = false; container.replaceChildren(); status.textContent = ''; }});
   }
   window.WWNewsletter = Object.freeze({create});
@@ -167,13 +168,22 @@
   const controller = create({container: document.getElementById('weekly-newsletter-content'), status: document.getElementById('weekly-newsletter-status'), heading,
     editProfile() { close.click(); document.getElementById('instrument-object').click(); }});
   function restore() { controller.close(); view.hidden = true; care.hidden = false; heading.textContent = originalTitle; opener.setAttribute('aria-expanded', 'false'); close.setAttribute('aria-label', 'Close Mum’s Corner'); }
-  opener.addEventListener('click', () => {
+  function show(week = null) {
     if (!window.WWSessionBoundary?.isCurrent()) return;
     panel.dispatchEvent(new CustomEvent('woodshed:newsletter-opened'));
-    care.hidden = true; view.hidden = false; opener.setAttribute('aria-expanded', 'true'); close.setAttribute('aria-label', 'Close Newsletter'); void controller.open();
-  });
+    care.hidden = true; view.hidden = false; opener.setAttribute('aria-expanded', 'true'); close.setAttribute('aria-label', 'Close Newsletter'); void controller.open(week);
+  }
+  opener.addEventListener('click', () => show());
   document.getElementById('weekly-newsletter-back').addEventListener('click', () => { restore(); opener.focus(); });
   document.getElementById('weekly-newsletter-close').addEventListener('click', () => close.click());
   panel.addEventListener('woodshed:mum-opened', restore); panel.addEventListener('woodshed:mum-closed', restore);
+  window.WWNewsletter = Object.freeze({create, openAutomatic(week) {
+    if (!window.WWSessionBoundary?.isCurrent() || window.WWSurfaces.current() || document.querySelector('dialog[open]')) return false;
+    const mum = document.getElementById('mum-open-button');
+    mum.focus({preventScroll: true}); mum.click();
+    if (panel.hidden || !window.WWSessionBoundary.isCurrent()) return false;
+    show(week);
+    return true;
+  }});
   window.addEventListener('pagehide', restore); window.addEventListener('ww:session-changed', restore);
 })();

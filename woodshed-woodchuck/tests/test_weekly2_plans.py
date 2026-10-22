@@ -57,11 +57,12 @@ def old_rows(engine):
 
 def test_ancestry_catalog_and_disabled_gate():
     script = ScriptDirectory.from_config(config())
-    assert script.get_heads() == ["w25weekly004"]
+    assert script.get_heads() == ["w25weekly005"]
+    assert script.get_revision("w25weekly005").down_revision == "w25weekly004"
     assert script.get_revision("w25weekly004").down_revision == NEW
     assert script.get_revision(NEW).down_revision == OLD
     assert script.get_revision(OLD).down_revision == 'w25weekly001'
-    assert len(list(script.walk_revisions())) == 66
+    assert len(list(script.walk_revisions())) == 67
     from app.content import GOAL_OPTIONS
     assert tuple(GOAL_OPTIONS) == FOCI
     assert plans.TARGETS == {'Beginner': (3,30,10,3), 'Challenge': (4,60,15,7), 'Performance': (5,90,20,15)}

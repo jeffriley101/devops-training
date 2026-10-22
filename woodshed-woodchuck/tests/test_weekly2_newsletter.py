@@ -77,7 +77,7 @@ def db(request, tmp_path, monkeypatch):
 def runtime(db, monkeypatch):
     command.upgrade(config(), 'head')
     with db.connect() as connection:
-        assert connection.scalar(text('SELECT version_num FROM alembic_version')) == 'w25weekly004'
+        assert connection.scalar(text('SELECT version_num FROM alembic_version')) == 'w25weekly005'
     factory = sessionmaker(db, expire_on_commit=False, autoflush=False)
     factory.engine = db
     factory.clock = [NOW]

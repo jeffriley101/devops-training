@@ -14,6 +14,38 @@ from . import weekly_plans as plans
 router = APIRouter(prefix="/weekly", tags=["weekly"])
 
 
+class NewsletterPresentationSubmission(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    expected_week: StrictStr = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
+
+    @field_validator("expected_week")
+    @classmethod
+    def calendar_date(cls, value):
+        from datetime import date
+        date.fromisoformat(value)
+        return value
+
+
+@router.post("/newsletter/presentation")
+def reserve_newsletter_presentation(request: Request, body: NewsletterPresentationSubmission):
+    from .weekly_newsletter_presentation import reserve
+    cache = {"Cache-Control": "private, no-store"}
+    try:
+        if not same_origin_mutation(request):
+            raise HTTPException(403, "A first-party request is required.")
+        if request.query_params:
+            raise HTTPException(422, "Newsletter presentation accepts no selectors.")
+        with SessionLocal() as session:
+            result = reserve(session, request, body.expected_week,
+                authorize=lambda s: _authorized(request, s, refresh=True, feature="weekly_newsletter"),
+                clock=utc_instant)
+            session.commit()
+        return JSONResponse(result, headers=cache)
+    except HTTPException as error:
+        error.headers = {**(error.headers or {}), **cache}
+        raise
+
+
 @router.get("/newsletter")
 def load_newsletter(request: Request):
     """An owned read projection, never an opening/reward or publication writer."""

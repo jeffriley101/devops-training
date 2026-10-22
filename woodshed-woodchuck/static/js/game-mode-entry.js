@@ -20,13 +20,16 @@
       document.querySelector('#account-created-panel a[href="/home"]'))?.focus({preventScroll: true});
   });
   form.addEventListener('ww:game-mode-saved', () => { close.textContent = 'Continue'; });
+  let finishEntry;
+  const ready = new Promise(resolve => { finishEntry = resolve; });
+  dialog.addEventListener('close', () => finishEntry(true));
   let pending = null, scheduled = false, attempting = false;
   const presented = new Set();
   const current = request => Boolean(stateApi.stateForResponse(request));
 
   async function attempt() {
     if (!pending || !current(pending.request)) return;
-    if (stateApi.getState().profile.game_mode !== null) { pending = null; return; }
+    if (stateApi.getState().profile.game_mode !== null) { pending = null; finishEntry(true); return; }
     if (document.hidden || document.querySelector('.app-shell')?.hidden ||
         window.WWSurfaces.current() || document.querySelector('dialog[open]') ||
         document.body.classList.contains('world-entry-arrival') ||
@@ -39,9 +42,9 @@
       if (pending !== entry || !current(entry.request)) return;
       if (document.hidden || window.WWSurfaces.current() || document.querySelector('dialog[open]')) return;
       pending = null;
-      if (!entry.choice && presented.has(entry.marker)) return;
+      if (!entry.choice && presented.has(entry.marker)) { finishEntry(true); return; }
       try {
-        if (!entry.choice && localStorage.getItem(key) === entry.marker) return;
+        if (!entry.choice && localStorage.getItem(key) === entry.marker) { finishEntry(true); return; }
         localStorage.setItem(key, entry.marker);
       } catch (_) {
         // Presentation caches are optional. Native account/session guards still
@@ -118,12 +121,15 @@
       // existing 409 backup/recovery path before its revision can be adopted.
       // In particular, retain intervening local edits until that recovery.
       stateApi.saveState(next, {sync: false});
-      if (mode !== null) return;
+      await window.WWShedEntry?.ready;
+      if (!current(request)) return;
+      if (mode !== null) { finishEntry(true); return; }
       if (choice !== null && !modes.includes(choice)) throw new Error('Choose a supported Game Mode.');
       pending = {request, choice, marker: JSON.stringify([account.woodchuckId, profile.page_generation])};
       await window.WWWorldEntry?.arrivalReady;
       schedule();
     } catch (error) {
+      finishEntry(false);
       // A failed request is never interpreted as a missing selection or logout.
       if (created && window.WWSessionBoundary.isCurrent()) {
         const notice = document.getElementById('copy-account-feedback');
@@ -131,6 +137,6 @@
       }
     }
   }
-  window.WWGameModeEntry = Object.freeze({start});
+  window.WWGameModeEntry = Object.freeze({start, ready});
   if (dialog.dataset.auto === 'true') void start();
 })();

@@ -62,6 +62,13 @@ def seed(factory, scenario):
                 subject_key=str(p.id),profile_id=p.id,display_name_snapshot='PRIVATE IDENTITY',score=999,rank=1,medal='gold',created_at=at)
             s.add(honor);s.flush()
             s.add(RewardGrant(profile_id=p.id,contest_result_id=honor.id,source_key='synthetic-honor',reward_type='dandelion',amount=50,created_at=at));s.commit()
+    # Manual-only regression precondition: this edition's auto chance was used.
+    # Automatic reservation and no-prior-marker behavior have their own tests.
+    if not scenario.startswith('auto-') and scenario not in ('gate', 'before'):
+        from app.weekly_models import WeeklyNewsletterPresentation
+        with factory.begin() as s:
+            for p in s.query(WoodchuckProfile):
+                s.add(WeeklyNewsletterPresentation(profile_id=p.id,week_start=monday,reserved_at=now))
     FEATURES['weekly_plans'] = Feature(scenario != 'read-only', 'open')
 
 def business(database):
@@ -105,7 +112,7 @@ def edit_instrument(page, instrument):
 def newsletter_site(tmp_path, request, monkeypatch):
     import test_overhaul_profile_saves_browser as harness
     root=Path(__file__).resolve().parents[1]
-    migration=f"from alembic import command\nfrom alembic.config import Config\ncommand.upgrade(Config({str(root/'alembic.ini')!r}), 'w25weekly004')"
+    migration=f"from alembic import command\nfrom alembic.config import Config\ncommand.upgrade(Config({str(root/'alembic.ini')!r}), 'w25weekly005')"
     monkeypatch.setattr(harness, 'SERVER', server_source(harness.SERVER, migration, request.node.callspec.params['scenario']))
     yield from harness.save_site.__wrapped__(tmp_path)
 
@@ -123,9 +130,25 @@ def test_newsletter_interface(newsletter_site,tmp_path,browser_name,scenario):
             context=browser.new_context(base_url=origin,viewport={'width':1440,'height':900},reduced_motion='reduce')
             page=context.new_page();page.set_default_timeout(15000)
             page.on('pageerror',lambda e:result['page_errors'].append(str(e)))
-            context.on('request',lambda r:result['requests'].append({'path':r.url.removeprefix(origin),'method':r.method}) if r.url.startswith(origin+'/weekly/') else None)
-            login(page,origin);settle_entry(page,scenario)
+            context.on('request',lambda r:result['requests'].append({'path':r.url.removeprefix(origin),'method':r.method,'account_binding':r.headers.get('x-woodshed-account')}) if r.url.startswith(origin+'/weekly/') else None)
+            if scenario in ('reading','read-only','isolation','finalized'):
+                # Observe before login: automatic startup may finish before
+                # settle_entry returns. Manual reads begin only after its no-op.
+                with page.expect_response(lambda r:r.url==origin+'/weekly/newsletter/presentation' and r.request.method=='POST') as reservation:
+                    login(page,origin);settle_entry(page,scenario)
+                automatic=reservation.value
+                assert automatic.status==200
+                result['automatic_reservation_response']=automatic.json()
+                assert result['automatic_reservation_response']['status']=='already_reserved'
+                if scenario in ('isolation','finalized'):
+                    result['account_a']=page.evaluate('WWSessionBoundary.accountId()')
+                    assert automatic.request.frame==page.main_frame
+                    assert automatic.request.headers.get('x-woodshed-account')==result['account_a']
+            else:
+                login(page,origin);settle_entry(page,scenario)
             baseline=business(database)
+            manual_request_start=len(result['requests'])
+            result['manual_request_start']=manual_request_start
             if scenario=='gate':
                 page.locator('#mum-open-button').click()
                 assert page.locator('#weekly-newsletter-open').count()==0
@@ -181,11 +204,24 @@ def test_newsletter_interface(newsletter_site,tmp_path,browser_name,scenario):
                     page.get_by_role('button',name='Back to Last Week').click();finished(page)
                     if scenario=='finalized':
                         page.keyboard.press('Escape');page.wait_for_function('() => !WWSurfaces.current()')
-                        page.reload();settle_entry(page,'reading')
+                        assert not [r for r in result['requests'][manual_request_start:] if r['method']=='POST' and r['path'] not in ('/weekly/plan','/weekly/plan/instruments/current/start')]
+                        result['manual_phase_before_reload']=[manual_request_start,len(result['requests'])]
+                        with page.expect_response(lambda r:r.url==origin+'/weekly/newsletter/presentation' and r.request.method=='POST') as reservation_reload:
+                            page.reload();settle_entry(page,'reading')
+                        automatic_reload=reservation_reload.value
+                        assert automatic_reload.status==200
+                        result['automatic_reservation_response_reload']=automatic_reload.json()
+                        assert result['automatic_reservation_response_reload']['status']=='already_reserved'
+                        assert automatic_reload.request.frame==page.main_frame
+                        assert automatic_reload.request.headers.get('x-woodshed-account')==result['account_a']
+                        manual_request_start=len(result['requests'])
+                        result['manual_phase_after_reload_start']=manual_request_start
                         after_navigation=business(database)
+                        result['post_reload_business']=after_navigation
                         assert after_navigation['weekly_plans']==baseline['weekly_plans']
                         assert after_navigation['weekly_instrument_plans']==baseline['weekly_instrument_plans']
                         assert after_navigation['reward_grants']==baseline['reward_grants']
+                        assert after_navigation['weekly_newsletter_presentations']==baseline['weekly_newsletter_presentations']
                         opened(page)
                         assert 'Saved Focus: Improve tone and control' in body.inner_text()
                         assert business(database)==after_navigation
@@ -221,8 +257,23 @@ def test_newsletter_interface(newsletter_site,tmp_path,browser_name,scenario):
                     page.keyboard.press('Escape');page.wait_for_function('() => !WWSurfaces.current()')
                     assert not page.locator('#mum-panel').is_visible()
                     # Normal native login transition in a second tab retires A's page.
-                    page2=context.new_page();login(page2,origin,'B');settle_entry(page2,'reading')
+                    assert not [r for r in result['requests'][manual_request_start:] if r['method']=='POST' and r['path'] not in ('/weekly/plan','/weekly/plan/instruments/current/start')]
+                    result['manual_phase_a']=[manual_request_start,len(result['requests'])]
+                    page2=context.new_page()
+                    with page2.expect_response(lambda r:r.url==origin+'/weekly/newsletter/presentation' and r.request.method=='POST') as reservation_b:
+                        login(page2,origin,'B');settle_entry(page2,'reading')
+                    automatic_b=reservation_b.value
+                    assert automatic_b.status==200
+                    result['automatic_reservation_response_b']=automatic_b.json()
+                    assert result['automatic_reservation_response_b']['status']=='already_reserved'
+                    result['account_b']=page2.evaluate('WWSessionBoundary.accountId()')
+                    assert result['account_b']!=result['account_a']
+                    assert automatic_b.request.frame==page2.main_frame
+                    assert automatic_b.request.headers.get('x-woodshed-account')==result['account_b']
+                    manual_request_start=len(result['requests'])
+                    result['manual_phase_b_start']=manual_request_start
                     base_b=business(database)
+                    result['post_b_login_business']=base_b
                     page.wait_for_function('() => !WWSessionBoundary.isCurrent()')
                     route,response=held.pop();route.fulfill(response=response)
                     page.unroute('**/weekly/newsletter',delay)
@@ -239,7 +290,7 @@ def test_newsletter_interface(newsletter_site,tmp_path,browser_name,scenario):
                     assert page.locator('#mum-open-button').evaluate('(e)=>e===document.activeElement')
                     assert business(database)==before_close
             assert not result['page_errors'],result['page_errors']
-            assert not [r for r in result['requests'] if r['method']=='POST' and r['path'] not in ('/weekly/plan','/weekly/plan/instruments/current/start')]
+            assert not [r for r in result['requests'][manual_request_start:] if r['method']=='POST' and r['path'] not in ('/weekly/plan','/weekly/plan/instruments/current/start')]
             result['final_business']=business(database)
             result['baseline_business']=baseline
             result['version']=browser.version;result['result']='PASS'

@@ -91,3 +91,12 @@ class WeeklyTaskClaim(Base):
     plan_id: Mapped[int] = mapped_column(ForeignKey("weekly_plans.id", ondelete="CASCADE"))
     lane: Mapped[str] = mapped_column(String(10))
     claimed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class WeeklyNewsletterPresentation(Base):
+    """One automatic presentation attempt, not a read receipt or entitlement."""
+    __tablename__ = "weekly_newsletter_presentations"
+    profile_id: Mapped[int] = mapped_column(
+        ForeignKey("woodchuck_profiles.id", ondelete="CASCADE"), primary_key=True)
+    week_start: Mapped[date] = mapped_column(Date, primary_key=True)
+    reserved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

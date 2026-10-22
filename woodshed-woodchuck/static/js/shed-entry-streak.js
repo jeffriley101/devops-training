@@ -11,7 +11,12 @@
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
   };
   const current = () => !window.WWSessionBoundary || window.WWSessionBoundary.isCurrent();
-  let ready = false;
+  let finishEntry;
+  window.WWShedEntry = Object.freeze({ready: new Promise(resolve => { finishEntry = resolve; })});
+  let ready = false, opened = false;
+  new MutationObserver(() => {
+    if (opened && panel.hidden) finishEntry(true);
+  }).observe(panel, {attributes: true, attributeFilter: ['hidden', 'class']});
   function shown() {
     if (!current()) return;
     try { window.localStorage.setItem(key, localDay()); } catch (_) { /* Manual access still works. */ }
@@ -21,24 +26,26 @@
   function openIfDue() {
     if (!ready || document.hidden || !current() || document.querySelector('.app-shell')?.hidden ||
         document.body.classList.contains('world-entry-arrival') || document.querySelector('.world-entry-overlay[open]') ||
-        document.body.classList.contains('stickerbook-open') || window.WWSurfaces?.current()) return;
+        document.body.classList.contains('stickerbook-open') || window.WWSurfaces?.current()) { finishEntry(false); return; }
     const day = localDay();
     try {
-      if (window.localStorage.getItem(key) === day) return;
+      if (window.localStorage.getItem(key) === day) { finishEntry(true); return; }
       // Reserve the presentation before opening. If storage is unavailable,
       // leave L3 available rather than repeatedly surprising users on navigation.
       window.localStorage.setItem(key, day);
-    } catch (_) { return; }
+    } catch (_) { finishEntry(true); return; }
+    opened = true;
     control.focus({preventScroll: true});
     control.click();
     if (panel.hidden) {
+      finishEntry(false);
       try { window.localStorage.removeItem(key); } catch (_) {}
     }
   }
   function attempt() {
     if (!ready || !current()) return;
     if (navigator.locks?.request) {
-      void navigator.locks.request(`woodshed-streak-presentation:${account}`, openIfDue).catch(() => {});
+      void navigator.locks.request(`woodshed-streak-presentation:${account}`, openIfDue).catch(() => { finishEntry(false); });
     } else openIfDue();
   }
   Promise.all([window.WWSessionBoundary?.ready, window.WWWorldEntry?.arrivalReady]).then(([verified]) => {

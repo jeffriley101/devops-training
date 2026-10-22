@@ -162,6 +162,7 @@ def _render(request: Request, template_name: str, *, analytics_event: str | None
     authenticated_profile = None
     woodchuck_appearance = None
     game_mode_entry = False
+    weekly_newsletter_auto_allowed = False
     weekly_newsletter_allowed = False
     weekly_plans_allowed = False
     weekly_pantry_allowed = False
@@ -196,6 +197,8 @@ def _render(request: Request, template_name: str, *, analytics_event: str | None
                 if template_name == "home.html":
                     weekly_newsletter_allowed = (not adult_context and not authenticated_profile["band_director"]
                                                  and can_use_feature(session, profile.id, "weekly_newsletter"))
+                    from .weekly_newsletter_presentation import student_context
+                    weekly_newsletter_auto_allowed = weekly_newsletter_allowed and student_context(session, request, profile)
                     weekly_plans_allowed = can_use_feature(session, profile.id, "weekly_plans")
                 if template_name == "store.html":
                     weekly_pantry_allowed = can_use_feature(session, profile.id, "weekly_pantry")
@@ -217,6 +220,7 @@ def _render(request: Request, template_name: str, *, analytics_event: str | None
                 "game_modes": GAME_MODES,
                 "game_mode_entry": game_mode_entry,
                 "weekly_newsletter_allowed": weekly_newsletter_allowed,
+                "weekly_newsletter_auto_allowed": weekly_newsletter_auto_allowed,
                 "weekly_plans_allowed": weekly_plans_allowed,
                 "weekly_pantry_allowed": weekly_pantry_allowed,
                 "weekly_wheel_allowed": weekly_wheel_allowed,

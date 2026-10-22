@@ -110,9 +110,10 @@
   <script src="/static/js/account.js?v=wl2-04"></script>
   <script src="/static/js/world-entry.js?v=5"></script>
   {% if woodchuck_appearance %}<script src="/static/js/woodchuck-appearance.js?v=5"></script>{% endif %}
-  {% if authenticated_profile and active_nav == "home" %}<script src="/static/js/shed-entry-streak.js?v=1"></script>{% endif %}
-  {% if game_mode_entry or (selected_age is defined and selected_age in ("13to17", "adult")) %}<script src="/static/js/game-mode-entry.js?v=1"></script>{% endif %}
-  {% if weekly_newsletter_allowed %}<script src="/static/js/weekly-newsletter.js?v=wl2-17c"></script>{% endif %}
+  {% if authenticated_profile and active_nav == "home" %}<script src="/static/js/shed-entry-streak.js?v=wl2-17d"></script>{% endif %}
+  {% if game_mode_entry or (selected_age is defined and selected_age in ("13to17", "adult")) %}<script src="/static/js/game-mode-entry.js?v=wl2-17d"></script>{% endif %}
+  {% if weekly_newsletter_allowed %}<script src="/static/js/weekly-newsletter.js?v=wl2-17d"></script>{% endif %}
+  {% if weekly_newsletter_auto_allowed %}<script src="/static/js/weekly-newsletter-auto.js?v=wl2-17d"></script>{% endif %}
   {% if weekly_plans_allowed %}<script src="/static/js/weekly-caper.js?v=wl2-11"></script>{% endif %}
   {% if weekly_pantry_allowed %}<script src="/static/js/weekly-pantry.js?v=wl2-12a"></script>{% endif %}
   {% if weekly_wheel_allowed %}<script src="/static/js/weekly-wheel.js?v=wl2-14"></script>{% endif %}
