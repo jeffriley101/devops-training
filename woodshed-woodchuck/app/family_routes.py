@@ -76,6 +76,32 @@ def metrics(s,p):
         data['insights']=practice_insights(charts,approved,today=service.clock().astimezone(CENTRAL).date())
     return data
 
+def student_metrics_projection(data):
+    """Allow practice progress, never the shared adult rating or its derivatives.
+
+    Project nested structures too so future adult-only fields cannot become
+    student JSON, template context or bootstrap data by accident.
+    """
+    def fields(value,names):
+        return {key:value[key] for key in names if key in value}
+    totals=('total','verified','pristine','total_seconds','verified_seconds',
+            'pristine_seconds','charts','days')
+    result={key:fields(data[key],totals) for key in ('weekly','lifetime')}
+    result['practice_streak']=data['practice_streak']
+    result['season']=(fields(data['season'],('name','starts_on','ends_on','minutes',
+                      'charts','days','verified','pristine')) if data['season'] else None)
+    result['team']=fields(data['team'],('name',)) if data['team'] else None
+    result['achievements']=[fields(item,('key','type','label','icon','quantity','earned_at'))
+                            for item in data['achievements']]
+    if 'insights' in data:
+        insights=data['insights']
+        result['insights']=fields(insights,('total_seconds','average_weekly_seconds',
+                                           'total_minutes','average_weekly_minutes'))
+        result['insights']['weeks']=[fields(week,('week_start','week_end','seconds',
+            'verified_seconds','pristine_seconds','minutes','days','verified_minutes',
+            'pristine_minutes')) for week in insights['weeks']]
+    return result
+
 def charts(s,pid):
     # Deliberate private projection; no other adult's identity, tokens or unrelated records.
     rows=[]
@@ -180,7 +206,7 @@ def practice(request:Request):
     with SessionLocal() as s:
         p=student(s,request,activity=True)
         permission=next((r for r in s.scalars(select(DirectorPermission).where(DirectorPermission.profile_id==p.id)) if service.permission_valid(s,r)),None)
-        data={'charts':charts(s,p.id),'woodchuck_id':p.woodchuck_id,'metrics':metrics(s,p),'director':None}
+        data={'charts':charts(s,p.id),'woodchuck_id':p.woodchuck_id,'metrics':student_metrics_projection(metrics(s,p)),'director':None}
         if permission:data['director']={'name':permission.director_name,'connected':service.permission_valid(s,permission,require_connection=True),'can_review':permission.review_allowed,'connection_id':permission.connection_id}
         if request.url.path.endswith('/data'):return data
         response = page(request,'practice',**data,submission_key=secrets.token_urlsafe(20))
