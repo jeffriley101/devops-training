@@ -1,10 +1,47 @@
-/* Mum owns dialog isolation, scrolling, keyboard and room geometry. */
+/* The existing Mum surface owns isolation, focus, history and scrolling. */
 #mum-panel [hidden] { display: none !important; }
-.weekly-newsletter, #weekly-newsletter-content { display: grid; gap: 1rem; min-width: 0; overflow-wrap: anywhere; }
-.newsletter-toolbar { display: flex; flex-wrap: wrap; gap: .75rem; justify-content: space-between; }
-.weekly-newsletter section { padding: .8rem; border: 1px solid #907650; border-radius: .8rem; background: #fff8e8; }
+#mum-panel.newsletter-active > .mum-artwork { display: none; }
+#mum-panel.newsletter-active { max-width: 780px; }
+.weekly-newsletter, #weekly-newsletter-content { display: grid; gap: .75rem; min-width: 0; overflow-wrap: anywhere; }
+.newsletter-toolbar { display: flex; flex-wrap: wrap; gap: .5rem; justify-content: space-between; }
+.weekly-newsletter section { padding: .8rem; border: 1px solid #b29a72; border-radius: .8rem; background: #fff8e8; }
+.weekly-newsletter :is(h3,h4,p,ol) { margin: .25rem 0 .45rem; }
+.weekly-newsletter h3 { color: #365135; font-size: 1.15rem; }
+.weekly-newsletter h4 { font-size: 1rem; }
+.weekly-newsletter small { display: block; line-height: 1.45; }
 .weekly-newsletter button, .weekly-newsletter select, #weekly-newsletter-open { min-height: 44px; max-width: 100%; white-space: normal; }
-.weekly-newsletter :focus-visible, #weekly-newsletter-open:focus-visible { outline: 3px solid #315c35; outline-offset: 3px; }
-.newsletter-achievement { background: #e9f2d9; padding: .75rem; border-radius: .5rem; animation: newsletter-glow .7s ease-out; }
+.weekly-newsletter :is(button,select,summary):focus-visible, #weekly-newsletter-open:focus-visible { outline: 3px solid #315c35; outline-offset: 3px; }
+.newsletter-hero { display: grid; grid-template-columns: 96px minmax(0,1fr); align-items: center; gap: .9rem; }
+.newsletter-portrait { position: relative; width: 96px; height: 96px; overflow: hidden; border: 2px solid #907650; border-radius: 50%; }
+.newsletter-hero img { position: absolute; width: 264px; max-width: none; height: 352px; left: -44px; top: -88px; }
+.newsletter-hero small { color: #655138; font-weight: 700; }
+.newsletter-hero p { line-height: 1.4; }
+.newsletter-details { padding: .5rem .7rem; border: 1px solid #baa781; border-radius: .6rem; background: #fffaf0; }
+.newsletter-details summary { cursor: pointer; min-height: 44px; display: list-item; align-content: center; font-weight: 700; }
+.newsletter-details[open] > :not(summary) { margin-top: .6rem; }
+.newsletter-mission { display: grid; gap: .4rem; }
+.newsletter-mission > button:not(.newsletter-link), .newsletter-finale button { background: #365c39; color: #fff; border-color: #28462a; font-weight: 700; }
+.weekly-newsletter .newsletter-link { justify-self: start; font-size: .9rem; }
+.newsletter-homework > div + div { margin-top: .7rem; border-top: 1px solid #d4c29c; padding-top: .6rem; }
+.newsletter-homework ol { padding-left: 1.4rem; line-height: 1.45; }
+.newsletter-goals { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .55rem; }
+.weekly-newsletter .newsletter-goals section { padding: .6rem; }
+.newsletter-goals p, .newsletter-goals span { font-size: .9rem; }
+.newsletter-goals span { display: block; font-weight: 700; color: #365135; }
+.newsletter-goals progress { display: block; width: 100%; height: .55rem; margin: .3rem 0 .5rem; accent-color: #527341; }
+.newsletter-finale { padding: .8rem; text-align: center; border-radius: .8rem; background: #eee4c4; }
+.newsletter-finale p { color: #365135; font-size: 1.25rem; font-weight: 800; }
+.newsletter-finale button { width: 100%; }
+.newsletter-achievement { background: #e9f2d9; padding: .5rem .65rem; border-radius: .5rem; animation: newsletter-glow .7s ease-out; }
 @keyframes newsletter-glow { from { opacity: .6; } to { opacity: 1; } }
+@media (max-width: 480px) {
+  .newsletter-hero { grid-template-columns: 72px minmax(0,1fr); gap: .6rem; }
+  .newsletter-portrait { width: 72px; height: 72px; }
+  .newsletter-hero img { width: 200px; height: 267px; left: -28px; top: -64px; }
+  .newsletter-hero small { font-size: .75rem; }
+  .newsletter-recap { font-size: .9rem; }
+  .newsletter-goals { grid-template-columns: minmax(0,1fr); }
+  .newsletter-toolbar { gap: .35rem; }
+  .newsletter-toolbar button { flex: 1; }
+}
 @media (prefers-reduced-motion: reduce) { .newsletter-achievement { animation: none; } }
