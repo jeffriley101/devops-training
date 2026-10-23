@@ -1,6 +1,6 @@
 """Narrow installed-schema contract shared by the calendar and PTA operators.
 
-These are frozen c22/c23/c24 extension contracts, independent of live ORM metadata,
+These are frozen c22/c23/c24/w25 extension contracts, independent of live ORM metadata,
 feature flags, and plan/receipt versions. The existing operator-specific p21
 checks remain in their callers. Do not use this for historical seasonal repair.
 """
@@ -8,9 +8,9 @@ from __future__ import annotations
 
 import re
 
-from sqlalchemy import INTEGER, Boolean, DateTime, Integer, MetaData, String, Table, inspect, select, text
+from sqlalchemy import INTEGER, JSON, Boolean, Date, DateTime, Integer, MetaData, String, Table, inspect, select, text
 
-SUPPORTED_REVISIONS = ("p21team001", "c22class001", "c23class001", "c24class001")
+SUPPORTED_REVISIONS = ("p21team001", "c22class001", "c23class001", "c24class001", "w25weekly005")
 
 # Required c22 columns, keys, relationships, and indexes as installed by the
 # reviewed additive migration. PostgreSQL deparses CHECK expressions differently;
@@ -268,12 +268,15 @@ def installed_revision(connection, error):
     if revision == "p21team001":
         return revision
     expected_tables = dict(_C22)
-    if revision in {"c23class001", "c24class001"}:
+    if revision in {"c23class001", "c24class001", "w25weekly005"}:
         from .operator_classroom_s2_contract import C23
         expected_tables.update(C23)
-    if revision == "c24class001":
+    if revision in {"c24class001", "w25weekly005"}:
         from .operator_classroom_s3_contract import C24
         expected_tables.update(C24)
+    if revision == "w25weekly005":
+        from .operator_weekly_contract import W25
+        expected_tables.update(W25)
     dialect = connection.dialect.name
     if dialect not in {"sqlite", "postgresql"}:
         raise error("classroom_schema_backend_not_supported")
@@ -309,13 +312,15 @@ def installed_revision(connection, error):
         ), {"table": name}).all()) if dialect == "sqlite" else {}
         for column, (kind, length, nullable) in expected["columns"].items():
             actual = columns.get(column)
-            types = {"Integer": Integer, "String": String, "DateTime": DateTime, "Boolean": Boolean}
+            types = {"Integer": Integer, "String": String, "DateTime": DateTime,
+                     "Boolean": Boolean, "Date": Date, "JSON": JSON}
             if (actual is None or actual["nullable"] != nullable
                     or not isinstance(actual["type"], types[kind])
                     # SMALLINT/BIGINT inherit Integer; require physical INTEGER.
                     or (kind == "Integer" and (type(actual["type"]) is not INTEGER
                         or (dialect == "sqlite" and sqlite_types.get(column, "") != "INTEGER")))
                     or (kind == "String" and actual["type"].length != length)
+                    or (kind == "JSON" and type(actual["type"]).__name__ != "JSON")
                     or (kind == "DateTime" and dialect == "postgresql" and not actual["type"].timezone)):
                 refuse("columns")
             if expected.get("exact"):
@@ -429,26 +434,32 @@ def installed_revision(connection, error):
                                for token in re.split(r"('(?:''|[^'])*')", _sql(value)))
             if predicate_shape(actual_predicate) != predicate_shape(predicate):
                 refuse("indexes")
-    if revision in {"c23class001", "c24class001"}:
+    if revision in {"c23class001", "c24class001", "w25weekly005"}:
         from .operator_classroom_s2_contract import validate_s2_guards
         validate_s2_guards(connection, error)
-    if revision == "c24class001":
+    if revision in {"c24class001", "w25weekly005"}:
         from .operator_classroom_s3_contract import validate_s3_guards
         validate_s3_guards(connection, error)
+    if revision == "w25weekly005":
+        from .operator_weekly_contract import validate_profile_and_triggers
+        validate_profile_and_triggers(connection, error, _sql)
     return revision
 
 
 def classroom_snapshot(connection, revision):
-    """Separate transactional preservation evidence, never old receipt coverage."""
-    if revision not in {"c22class001", "c23class001", "c24class001"}:
+    """Preserve extensions and w25 profile/economy rows, never old receipt coverage."""
+    if revision not in {"c22class001", "c23class001", "c24class001", "w25weekly005"}:
         return {}
     names = CLASSROOM_TABLES
-    if revision in {"c23class001", "c24class001"}:
+    if revision in {"c23class001", "c24class001", "w25weekly005"}:
         from .operator_classroom_s2_contract import C23
         names += tuple(C23)
-    if revision == "c24class001":
+    if revision in {"c24class001", "w25weekly005"}:
         from .operator_classroom_s3_contract import C24
         names += tuple(C24)
+    if revision == "w25weekly005":
+        from .operator_weekly_contract import PRESERVED_TABLES
+        names += PRESERVED_TABLES
     metadata = MetaData()
     tables = [Table(name, metadata, autoload_with=connection, resolve_fks=False)
               for name in names]

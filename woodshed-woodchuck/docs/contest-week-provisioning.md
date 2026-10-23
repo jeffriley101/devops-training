@@ -14,7 +14,7 @@ Run from `woodshed-woodchuck` with the application environment and an explicit
 `DATABASE_URL` for the intended database. Never paste its value into logs.
 Provisioning also accepts `--database-url`; it has no local-database fallback.
 The compatible persistent-aware code accepts exactly one installed Alembic
-revision, `p21team001`, `c22class001`, or `c23class001`, with the required calendar/control columns,
+revision: `p21team001`, `c22class001`, `c23class001`, `c24class001`, or `w25weekly005`, with the required calendar/control columns,
 approved membership-rules and authority CHECK constraints, and the
 `persistent_team_control` singleton seeded by migration. On c22/c23 it additionally
 validates all eight Classroom tables' required column types/nullability, primary
@@ -23,8 +23,16 @@ and indexes including partial predicates. A c22 revision stamp without that
 structure is insufficient. On c23, the guard also requires the five exact S2
 tables, approved column defaults and owned serial sequences, exact indexes/FK
 options (including SQLite objects omitted by reflection), and the membership
-interval triggers/function, including PostgreSQL enforcement state. Operator transactions preserve all installed S1/S2 Classroom
-rows. These checks do not enable Classroom or depend on its
+interval triggers/function, including PostgreSQL enforcement state. C24 additionally requires the exact S3 tables and reporting guards. W25 requires
+all cumulative Classroom contracts plus the five exact Weekly tables and the two
+nullable profile preferences, including Game Mode validation. Column types,
+nullability, defaults, primary/unique/foreign keys, CHECK constraints, indexes,
+owned serial sequences, and enforcement state must match. Unknown Weekly
+triggers and disabled foreign-key enforcement refuse. Partial w25 revisions
+(w25weekly001–004) and falsely stamped databases remain unsupported.
+Operator transactions preserve all installed Classroom and Weekly rows, profile
+preferences, protected states, practice/Activity history, reward receipts and
+inventory, and saved contest results. These checks do not enable Classroom or depend on its
 feature flag.
 The calendar guard is separate from historical continuity repair's unchanged
 `d17contest001` approval. Older, unknown, multiple, or incomplete schema states
@@ -33,7 +41,7 @@ revision to bypass migration.
 
 Install at least `p21team001` before starting this code. Coordinate web/finalizer
 and calendar writers as described in [persistent Team cutover](persistent-team-cutover.md).
-Before upgrading an already staged p21/c22 database to c23, make compatible operator
+Before upgrading an already staged database to a newer supported revision, make compatible operator
 code available, including its activation and verification commands. Older pinned
 operators still refuse newer revisions; a source fix does not update external installations.
 The initial p20/p21 migrations leave the singleton dormant, existing weeks on

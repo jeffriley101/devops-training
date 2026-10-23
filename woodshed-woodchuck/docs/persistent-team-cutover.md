@@ -18,16 +18,16 @@ membership authority. Current authority remains legacy until the separately
 reviewed boundary operation.
 
 The compatible calendar and PTA operators accept exactly one installed revision,
-`p21team001`, `c22class001`, or the reviewed additive extension `c23class001`. PLAN, APPLY,
+`p21team001`, `c22class001`, `c23class001`, `c24class001`, or `w25weekly005`. PLAN, APPLY,
 ACTIVATE and VERIFY all retain structural validation; the installed stamp alone
 does not grant access. Existing required columns, staging/authority checks,
 partial unique indexes, restrictive origin-season foreign keys and exact
 membership-interval trigger checks remain in force. The c22 extension additionally
-requires all eight Classroom tables with their required column types/nullability,
+requires all eight S1 Classroom tables with their required column types/nullability,
 primary keys, CHECK constraints, restrictive foreign keys (including composite
 scope), unique constraints and indexes with their partial predicates. Older or
 unknown revisions, arbitrary descendants, multiple heads, missing revision rows,
-and incomplete or falsely stamped c22/c23 schemas refuse. C23 also requires the
+and incomplete or falsely stamped schemas refuse. C23 also requires the
 five exact S2 tables, approved column defaults and owned serial sequences,
 exact indexes/FK options (including SQLite objects omitted by reflection), and
 enforced membership interval guards. There is no bypass flag.
@@ -38,7 +38,7 @@ rows. Historical `team_preflight`/`team_continuity_repair` keep their separate
 `d17contest001` restriction and refuse p21, c22, and c23; `team_activate` stays retired.
 
 Compatible operator code must be available **before upgrading a staged p21/c22
-database to c23**. An old pinned binary still refuses newer revisions, including ACTIVATE and
+database to a newer supported revision**. An old pinned binary still refuses newer revisions, including ACTIVATE and
 VERIFY, while the due-boundary runtime fence can remain active. A source fix alone
 does not update separately installed operator binaries. Coordinate their approved
 rollout before the schema upgrade; do not clear the stage or move the boundary to
@@ -77,6 +77,42 @@ Promotion, week rollover, presentation rollover, administrative removal, and
 account deletion do not create student-choice records. Carried membership
 does not consume correction allowance. Effective authority uses half-open
 membership intervals and explicit persistent markers.
+
+## Weekly schema and historical evidence
+
+`w25weekly005` support requires the cumulative S1, S2 and S3 Classroom
+contracts, their enforcement guards, the exact five Weekly tables, and the
+nullable `first_choice_instrument` / `game_mode` profile additions. The stamp
+alone is insufficient. Partial Weekly revisions, unknown descendants, missing
+or altered constraints/defaults/indexes, disabled enforcement and unexpected
+Weekly/profile triggers refuse. All existing migration files are unchanged.
+This does not authorize production migration, feature activation, historical
+continuity repair, or a change to finalizer v3 provenance rules.
+
+An **unstaged** approval from an older revision cannot be applied on w25. Generate
+and review a new plan; never edit the old revision, content or SHA-256. A plan
+already staged on p21/c22/c23/c24 may activate on w25 only if its exact stored
+approval, target, boundary and current authority fingerprint still agree.
+Current-schema rows are compared before/after the transaction, including all
+Classroom/Weekly rows, profile preferences, protected states and reward data.
+
+Unversioned activation receipts created on p21 through c24 hashed all 18 profile
+columns then present. Verification on w25 reproduces **that exact original column
+set**, compares the unchanged original digests for every original receipt table,
+and reports `receipt_coverage` explicitly. It does not attest the two later
+profile columns or Classroom/Weekly extension rows. Changes to any originally
+covered value still refuse with `post_activation_state_changed: do_not_reapply`.
+The original approval and receipt are neither rewritten nor upgraded. This
+remains an immediate post-activation evidence comparison, not a repair tool or a
+promise that historical receipts verify after subsequent normal account activity.
+
+New w25 activation receipts include `evidence_contract: pta-w25weekly005-v1`
+and cover both new profile columns in their full-row hashes. This is true even
+when the stored approval predates w25. Unknown coverage markers refuse; a new
+w25 approval cannot use an unversioned receipt. There is no fallback from a failed
+current-schema digest to a legacy digest. Extension row preservation is checked
+inside each transaction separately; it is never claimed as historical receipt
+coverage. A receipt mismatch must be investigated, not resolved by reactivation.
 
 ## Inventory and approval
 
@@ -119,23 +155,24 @@ and cleartext codes are not exported. PLAN uses repeatable-read/read-only
 PostgreSQL or a query-only existing SQLite file; it has no writable fallback.
 
 An installed revision and an immutable plan's PTA contract are separate facts.
-New p21 plans keep their existing format. New c22/c23 plans record
+New p21 plans keep their existing format. New c22/c23/c24/w25 plans record
 `content.revision` as their actual installed revision and
 `content.pta_contract_revision = p21team001`; they do not claim that the installed
 schema is p21. The original canonical hash, exact selected IDs, database/schema
 target and authority fingerprint remain the approval. Compatibility does not
 authorize editing the approved file or substituting a fresh hash.
 
-| Approved artifact | Compatible operator behavior after additive p21 -> c22 -> c23 migrations |
+| Approved artifact | Compatible operator behavior after reviewed additive upgrades through w25weekly005 |
 | --- | --- |
 | Unstaged plan from an earlier revision supplied to APPLY | Refuse `plan_schema_revision_changed` before writes; create a PLAN on the installed revision and obtain fresh approval. |
-| Exact p21/c22 plan already staged on its original revision | ACTIVATE and immediate VERIFY retain its original file, hash, boundary and stored stage if approved authority and all existing checks pass. |
-| Activation and receipt already created on p21/c22 | VERIFY accepts the original plan/hash/receipt only if actual activation and every originally protected evidence row remain exactly unchanged. |
-| New c22/c23 plan | PLAN -> APPLY -> ACTIVATE -> VERIFY uses the same exact-ID approval, target, acknowledgments, boundary, locking and rollback requirements as p21. |
+| Exact p21/c22/c23/c24 plan already staged on its original revision | ACTIVATE and immediate VERIFY retain its original file, hash, boundary and stored stage if approved authority and all existing checks pass. |
+| Activation and receipt already created on p21/c22/c23/c24 | VERIFY accepts the original plan/hash/receipt only if actual activation and every originally protected evidence row remain exactly unchanged. |
+| New c22/c23/c24/w25 plan | PLAN -> APPLY -> ACTIVATE -> VERIFY uses the same exact-ID approval, target, acknowledgments, boundary, locking and rollback requirements as p21. |
 
 Existing receipts retain their original protected-table coverage. They do not
-retroactively attest to Classroom tables installed later. Compatible APPLY and
-ACTIVATE separately snapshot and compare all installed Classroom tables within their
+retroactively attest to Classroom/Weekly tables or profile columns installed later.
+The w25 receipt coverage rules above make this distinction explicit. Compatible
+APPLY and ACTIVATE separately snapshot and compare all installed extension rows within their
 mutation transactions and roll back an unexpected change; ordinary calendar apply
 does the same. This preservation evidence does not rewrite a plan, stored stage
 or receipt, and operator actions grant no Classroom authority or access. A newer
