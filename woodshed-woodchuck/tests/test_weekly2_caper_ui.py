@@ -7,7 +7,8 @@ ROOT=Path(__file__).resolve().parents[1]
 
 def test_default_off_gate_and_conditional_assets():
     gate=(ROOT/'app/feature_access.py').read_text()
-    assert '"weekly_plans": Feature(False, "open")' in gate
+    assert 'WEEKLY_LOOP2_ENABLED = os.getenv("WOODSHED_WEEKLY_LOOP2_ENABLED") == "true"' in gate
+    assert '"weekly_plans": Feature(WEEKLY_LOOP2_ENABLED, "open")' in gate
     main=(ROOT/'app/main.py').read_text()
     assert 'weekly_plans_allowed = can_use_feature(session, profile.id, "weekly_plans")' in main
     for file,marker in [('templates/base.html','weekly-caper.js'),('templates/home.html','weekly-caper-open')]:

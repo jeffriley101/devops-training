@@ -158,6 +158,20 @@ uvicorn app.main:app --host 0.0.0.0 --port $PORT
 Production deployment also depends on the configured PostgreSQL environment and current
 database migrations.
 
+Weekly Loop 2 is OFF by default. Set `WOODSHED_WEEKLY_LOOP2_ENABLED=true` to
+enable `weekly_newsletter`, `weekly_plans`, `weekly_pantry`, `weekly_wheel`,
+`weekly_monday_bonus`, and `weekly_pants` together for otherwise eligible students.
+Only the exact lowercase value `true` enables them; missing, empty, `false`,
+capitalized, whitespace-padded, and other values leave all six OFF. Existing
+authentication, parental authorization, ownership, and reward rules still apply.
+
+The switch is read at process startup. After OPS release approval, apply the
+setting consistently to every application instance and restart them. To disable,
+remove the variable or set it to `false` and restart all instances. Disabling
+preserves saved practice, plans, assignments, balances, and reward receipts;
+it does not undo previously earned rewards. Re-enabling retains the existing
+duplicate-reward safeguards. This switch introduces no database migration.
+
 ## Project status
 
 Woodshed Woodchuck is an actively developed application.

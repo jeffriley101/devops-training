@@ -4,6 +4,7 @@ Callers must first authorize the student context. Access never grants another
 student's data or verifier relationship permissions.
 """
 from dataclasses import dataclass
+import os
 from .memberships import student_has_full_access
 from .models import WoodchuckProfile
 
@@ -14,13 +15,17 @@ class Feature:
     required_access: str
 
 
+# Read once at process startup. Only the exact documented value opts in.
+WEEKLY_LOOP2_ENABLED = os.getenv("WOODSHED_WEEKLY_LOOP2_ENABLED") == "true"
+
+
 FEATURES: dict[str, Feature] = {
-    "weekly_newsletter": Feature(False, "open"),
-    "weekly_plans": Feature(False, "open"),
-    "weekly_pantry": Feature(False, "open"),
-    "weekly_wheel": Feature(False, "open"),
-    "weekly_monday_bonus": Feature(False, "open"),
-    "weekly_pants": Feature(False, "open"),  # Historical first-practice-streak gate.
+    "weekly_newsletter": Feature(WEEKLY_LOOP2_ENABLED, "open"),
+    "weekly_plans": Feature(WEEKLY_LOOP2_ENABLED, "open"),
+    "weekly_pantry": Feature(WEEKLY_LOOP2_ENABLED, "open"),
+    "weekly_wheel": Feature(WEEKLY_LOOP2_ENABLED, "open"),
+    "weekly_monday_bonus": Feature(WEEKLY_LOOP2_ENABLED, "open"),
+    "weekly_pants": Feature(WEEKLY_LOOP2_ENABLED, "open"),  # Historical first-practice-streak gate.
     "practice_insights": Feature(True, "full"),
     **{key: Feature(False, "full") for key in (
         "advanced_practice_analytics", "practice_history_tools",
