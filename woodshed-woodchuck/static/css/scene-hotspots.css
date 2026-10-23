@@ -1,10 +1,10 @@
-/* One uncropped artwork rectangle, shared exactly by ten equal hit targets. */
+/* One uncropped artwork rectangle with ten independently positioned controls. */
 .artwork-room-page {
   --art-width: 1024;
   --art-height: 1536;
   --room-nav-height: env(safe-area-inset-bottom);
 }
-.artwork-room-page.shed-screen { --art-width: 941; --art-height: 1672; }
+.artwork-room-page.shed-screen { --art-width: 948; --art-height: 1659; }
 .artwork-room-page .main-nav {
   height: var(--room-nav-height);
   padding: .5rem max(.5rem, env(safe-area-inset-right))
@@ -14,7 +14,7 @@
 }
 .artwork-room-page .nav-pill { min-height: 44px; display: grid; place-items: center; }
 .artwork-room-page .card.woodshed-page { padding: 0; border: 0; background: none; overflow: visible; box-shadow: none; }
-.artwork-scene.shed-artwork-scene { --art-width: 941; --art-height: 1672; }
+.artwork-scene.shed-artwork-scene { --art-width: 948; --art-height: 1659; }
 .artwork-scene.shop-artwork-scene { --art-width: 1024; --art-height: 1536; }
 .artwork-room-page .artwork-scene {
   position: relative;
@@ -44,21 +44,26 @@
 .scene-hotspots {
   position: absolute;
   inset: 0;
-  display: grid;
-  grid-template-columns: repeat(2, 50%);
-  grid-template-rows: repeat(5, 20%);
-  gap: 0;
+  display: block;
+  pointer-events: none;
   z-index: 5;
 }
 #woodshed-hotspots > .scene-hotspot,
 #shop-hotspots > .scene-hotspot {
-  position: static;
+  position: absolute;
   inset: auto !important;
-  display: block;
-  width: 100%;
-  height: 100%;
-  min-width: 0;
-  min-height: 0;
+  left: var(--hotspot-x) !important;
+  top: var(--hotspot-y) !important;
+  display: grid;
+  place-items: center;
+  width: var(--hotspot-width);
+  height: var(--hotspot-height);
+  min-width: 44px;
+  min-height: 44px;
+  max-width: none;
+  max-height: none;
+  box-sizing: border-box;
+  pointer-events: auto;
   margin: 0;
   padding: 0;
   border: 0;
@@ -74,6 +79,29 @@
   cursor: pointer;
   touch-action: manipulation;
 }
+/* Percentages are measured against each full artwork, not the viewport. */
+/* SHED signs, instruments, backpack, Mum’s chair and music player. */
+#woodshed-hotspots > [data-scene-cell="L1"] { --hotspot-x: 5%; --hotspot-y: 0.8%; --hotspot-width: 28.5%; --hotspot-height: 12.3%; }
+#woodshed-hotspots > [data-scene-cell="R1"] { --hotspot-x: 67.5%; --hotspot-y: 5.5%; --hotspot-width: 24%; --hotspot-height: 12.7%; }
+#woodshed-hotspots > [data-scene-cell="L2"] { --hotspot-x: 3%; --hotspot-y: 22.1%; --hotspot-width: 24.5%; --hotspot-height: 17.6%; }
+#woodshed-hotspots > [data-scene-cell="R2"] { --hotspot-x: 70.5%; --hotspot-y: 19.7%; --hotspot-width: 21%; --hotspot-height: 18%; }
+#woodshed-hotspots > [data-scene-cell="L3"] { --hotspot-x: 4%; --hotspot-y: 45.3%; --hotspot-width: 23.5%; --hotspot-height: 14.1%; }
+#woodshed-hotspots > [data-scene-cell="R3"] { --hotspot-x: 72%; --hotspot-y: 40.7%; --hotspot-width: 23.5%; --hotspot-height: 18.5%; }
+#woodshed-hotspots > [data-scene-cell="L4"] { --hotspot-x: 3%; --hotspot-y: 60.5%; --hotspot-width: 25%; --hotspot-height: 13.9%; }
+#woodshed-hotspots > [data-scene-cell="R4"] { --hotspot-x: 72%; --hotspot-y: 60.8%; --hotspot-width: 23.5%; --hotspot-height: 16.5%; }
+#woodshed-hotspots > [data-scene-cell="L5"] { --hotspot-x: 1.5%; --hotspot-y: 75.2%; --hotspot-width: 29%; --hotspot-height: 22%; }
+#woodshed-hotspots > [data-scene-cell="R5"] { --hotspot-x: 70%; --hotspot-y: 80.6%; --hotspot-width: 27%; --hotspot-height: 17.3%; }
+/* SHOP: the return arrow beside Crowns leads back to SHED. */
+#shop-hotspots > [data-scene-cell="L1"] { --hotspot-x: 28.5%; --hotspot-y: 23%; --hotspot-width: 10%; --hotspot-height: 8.3%; }
+#shop-hotspots > [data-scene-cell="R1"] { --hotspot-x: 73%; --hotspot-y: 4.5%; --hotspot-width: 23%; --hotspot-height: 16.3%; }
+#shop-hotspots > [data-scene-cell="L2"] { --hotspot-x: 1.7%; --hotspot-y: 15.5%; --hotspot-width: 25%; --hotspot-height: 22%; }
+#shop-hotspots > [data-scene-cell="R2"] { --hotspot-x: 72%; --hotspot-y: 21.8%; --hotspot-width: 25%; --hotspot-height: 10%; }
+#shop-hotspots > [data-scene-cell="L3"] { --hotspot-x: 1.5%; --hotspot-y: 41.5%; --hotspot-width: 27%; --hotspot-height: 15.6%; }
+#shop-hotspots > [data-scene-cell="R3"] { --hotspot-x: 72%; --hotspot-y: 39.1%; --hotspot-width: 26%; --hotspot-height: 20.2%; }
+#shop-hotspots > [data-scene-cell="L4"] { --hotspot-x: 1.5%; --hotspot-y: 57.8%; --hotspot-width: 22.7%; --hotspot-height: 12%; }
+#shop-hotspots > [data-scene-cell="R4"] { --hotspot-x: 71%; --hotspot-y: 60.3%; --hotspot-width: 26.5%; --hotspot-height: 13%; }
+#shop-hotspots > [data-scene-cell="L5"] { --hotspot-x: 1%; --hotspot-y: 72.2%; --hotspot-width: 25.5%; --hotspot-height: 17.3%; }
+#shop-hotspots > [data-scene-cell="R5"] { --hotspot-x: 71.8%; --hotspot-y: 75.7%; --hotspot-width: 26%; --hotspot-height: 15.8%; }
 .scene-hotspot > * { display: none; }
 #woodshed-hotspots > .scene-hotspot:focus-visible,
 #shop-hotspots > .scene-hotspot:focus-visible {
@@ -104,7 +132,7 @@
 .artwork-scene > .shed-decoration-layer { inset: 0; z-index: 2; }
 /* Stickerbook deliberately takes over dragging while its specialized UI is open. */
 .artwork-scene.is-decorating > .shed-decoration-layer { z-index: 6; }
-/* The hidden passcode dot is separate from the ten-cell artwork surface. */
+/* The hidden passcode dot is separate from the room’s ten controls. */
 .artwork-room-page .shed-secret-button {
   display: block;
   width: 2.25rem;
@@ -229,8 +257,12 @@ body.artwork-room-page.stickerbook-open {
 }
 .artwork-room-page .shed-decorate-close { position: static; }
 
-/* Small labels communicate moved destinations while the artwork remains the UI. */
-.scene-hotspot > .room-destination-label,
+/* Artwork supplies the descriptors; hotspot names remain available through aria-label. */
+#woodshed-hotspots > .scene-hotspot > .room-destination-label,
+#shop-hotspots > .scene-hotspot > .room-destination-label {
+  display: none !important;
+}
+/* The student's name and Team are account information, not destination descriptors. */
 .scene-hotspot > .room-identity-label {
   display: inline-flex;
   align-items: center;

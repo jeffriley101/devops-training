@@ -86,11 +86,13 @@ def test_profile_skill_level_editor_remains_separate() -> None:
     assert "const control = document.getElementById(\"xp-level-control\");" in xp_javascript()
 
 
-def test_mobile_shed_controls_use_static_five_row_columns() -> None:
+def test_mobile_shed_controls_use_individual_artwork_positions() -> None:
     layout = (ROOT / 'static/css/scene-hotspots.css').read_text()
-    assert 'grid-template-rows: repeat(5, 20%)' in layout
-    assert 'grid-template-columns: repeat(2, 50%)' in layout
-    assert 'gap: 0' in layout
+    assert 'grid-template-rows: repeat(5, 20%)' not in layout
+    assert 'grid-template-columns: repeat(2, 50%)' not in layout
+    assert 'left: var(--hotspot-x)' in layout and 'top: var(--hotspot-y)' in layout
+    assert all(f'#woodshed-hotspots > [data-scene-cell="{side}{row}"]' in layout
+               for row in range(1, 6) for side in ('L', 'R'))
     assert 'stageShedGrid' not in APP
     assert 'forceShedPositions' not in APP
 

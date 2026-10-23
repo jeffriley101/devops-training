@@ -1,7 +1,8 @@
-"""Final artwork is the interface; semantic equal cells supply its behavior."""
+"""Final artwork is the interface; semantic object targets supply its behavior."""
 from html.parser import HTMLParser
 from pathlib import Path
 import struct
+import re
 
 from test_world_entry import client, login
 
@@ -63,10 +64,12 @@ def test_rendered_rooms_have_exact_semantic_cells_and_only_shed_editor(client):
     assert next(a for _, a in cells(home) if a['data-scene-cell'] == 'R2')['aria-controls'] == 'your-woodchuck'
 
 
-def test_equal_uncropped_scene_contract_and_invisible_controls():
+def test_individual_uncropped_scene_contract_and_invisible_controls():
     css = (ROOT / 'static/css/scene-hotspots.css').read_text()
-    for rule in ['grid-template-columns: repeat(2, 50%)', 'grid-template-rows: repeat(5, 20%)',
-                 'gap: 0', 'aspect-ratio: var(--art-width) / var(--art-height)',
+    assert 'grid-template-columns: repeat(2, 50%)' not in css
+    assert 'grid-template-rows: repeat(5, 20%)' not in css
+    for rule in ['left: var(--hotspot-x)', 'top: var(--hotspot-y)',
+                 'min-width: 44px', 'min-height: 44px', 'aspect-ratio: var(--art-width) / var(--art-height)',
                  'object-fit: contain', '100dvh - var(--room-nav-height)', 'safe-area-inset-bottom',
                  ':focus-visible', 'outline: 3px solid #fff', 'pointer-events: none']:
         assert rule in css
@@ -81,7 +84,7 @@ def test_equal_uncropped_scene_contract_and_invisible_controls():
 
 def test_approved_art_dimensions_and_no_deleted_production_references():
     sizes = {'arcade/arcade-entry-splash.png': (512, 1024), 'sax-viking-portrait.png': (512, 1024),
-             'shed-cabin-new.png': (941, 1672), 'shop-viking-valley-fair.png': (1024, 1536),
+             'shed-cabin-new.png': (948, 1659), 'shop-viking-valley-fair.png': (1024, 1536),
              'rhythm-baseball-cabinet.png': (1024, 1536)}
     for filename, size in sizes.items():
         data = (ROOT / 'static/img' / filename).read_bytes()
@@ -120,3 +123,28 @@ def test_baseball_is_honest_arcade_feature_and_four_practice_rooms_remain(client
     assert 'Spectrogram. Temporarily unavailable' in shop
     assert 'brassspectrogram.netlify.app' not in shop
     assert 'rhythm-baseball' not in shop
+
+
+def test_hotspot_rectangles_keep_twenty_actions_clear_of_each_other_and_character():
+    css = (ROOT / 'static/css/scene-hotspots.css').read_text()
+    for room, size, mapping in [('woodshed', (948, 1659), SHED), ('shop', (1024, 1536), SHOP)]:
+        rules = re.findall(r'#' + room + r'-hotspots > \[data-scene-cell="([LR][1-5])"\] \{([^}]+)\}', css)
+        assert [cell for cell, _ in rules] == list(mapping)
+        for vw, vh in [(1440, 900), (390, 844), (320, 568), (844, 390), (568, 320)]:
+            width = min(vw, vh * size[0] / size[1])
+            height = width * size[1] / size[0]
+            rectangles = []
+            for cell, body in rules:
+                values = [float(re.search(r'--hotspot-' + field + r': ([0-9.]+)%', body)[1]) for field in ('x', 'y', 'width', 'height')]
+                x, y = width * values[0] / 100, height * values[1] / 100
+                w, h = max(44, width * values[2] / 100), max(44, height * values[3] / 100)
+                assert x >= 0 and y >= 0 and x + w <= width + .01 and y + h <= height + .01, (room, cell, vw, vh)
+                rect = (x, y, x + w, y + h)
+                character = (width * .32, height * .50, width * .68, height * .96)
+
+                def intersects(a, b):
+                    return min(a[2], b[2]) - max(a[0], b[0]) > .01 and min(a[3], b[3]) - max(a[1], b[1]) > .01
+
+                assert not intersects(rect, character), (room, cell, 'character', vw, vh)
+                assert not any(intersects(rect, prior) for prior in rectangles), (room, cell, vw, vh)
+                rectangles.append(rect)

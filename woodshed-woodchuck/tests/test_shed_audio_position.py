@@ -90,11 +90,12 @@ def test_shared_placement_keeps_page_content_and_accessibility_intact() -> None:
     assert ".sound-effects-button:focus-visible" in CSS
 
 
-def test_mobile_shed_columns_center_controls_without_changing_their_vertical_flow() -> None:
+def test_mobile_shed_controls_follow_artwork_percentage_positions() -> None:
     layout = (ROOT / 'static/css/scene-hotspots.css').read_text()
-    assert 'grid-template-rows: repeat(5, 20%)' in layout
-    assert 'grid-template-columns: repeat(2, 50%)' in layout
-    assert 'gap: 0' in layout
+    assert 'grid-template-rows: repeat(5, 20%)' not in layout
+    assert 'grid-template-columns: repeat(2, 50%)' not in layout
+    assert 'left: var(--hotspot-x)' in layout and 'top: var(--hotspot-y)' in layout
+    assert 'min-width: 44px' in layout and 'min-height: 44px' in layout
     assert 'width: 100%' in layout and 'height: 100%' in layout
 
 

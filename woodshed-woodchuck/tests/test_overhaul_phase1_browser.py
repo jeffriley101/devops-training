@@ -104,7 +104,12 @@ def test_phase1_visual_and_interaction_contract(local_site, tmp_path, browser_na
                     for i,cell in enumerate(proof['cells']):
                         assert cell['cell']==('R' if i%2 else 'L')+str(i//2+1)
                         assert cell['rect']['w']>=44 and cell['rect']['h']>=44
-                        assert abs(cell['rect']['w']-r['w']/2)<1 and abs(cell['rect']['h']-r['h']/5)<1
+                        box=cell['rect']
+                        assert box['x']>=r['x']-.5 and box['y']>=r['y']-.5
+                        assert box['x']+box['w']<=r['x']+r['w']+.5 and box['y']+box['h']<=r['y']+r['h']+.5
+                        for prior in proof['cells'][:i]:
+                            other=prior['rect']
+                            assert min(box['x']+box['w'],other['x']+other['w'])-max(box['x'],other['x'])<=.5 or min(box['y']+box['h'],other['y']+other['h'])-max(box['y'],other['y'])<=.5
                     page.locator('[data-scene-cell="L1"]').focus();page.keyboard.press('Tab')
                     assert page.locator('[data-scene-cell="R1"]').evaluate('(n)=>document.activeElement===n'),page.evaluate('({active:document.activeElement.outerHTML,current:WWSurfaces.current()?.id,inert:document.querySelector(".artwork-scene").inert})')
                     assert page.locator(':focus-visible').evaluate('(n)=>getComputedStyle(n).outlineStyle')=='solid'
