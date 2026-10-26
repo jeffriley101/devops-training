@@ -57,7 +57,7 @@ def test_auto(site, output, engine, scenario):
             page.wait_for_function('() => document.querySelector("#game-mode-entry").open')
             assert business(database)['weekly_newsletter_presentations']==[]
             page.keyboard.press('Escape')
-        if scenario in ('auto-gate','auto-adult','auto-before'):
+        if scenario in ('auto-gate','auto-before'):
             page.evaluate('async()=>{await WWShedEntry.ready;await WWGameModeEntry.ready;}')
             if scenario=='auto-before':
                 page.wait_for_event('response',predicate=lambda r:r.url.endswith('/weekly/newsletter')) if not any(r['path']=='/weekly/newsletter' for r in result['requests']) else None

@@ -49,15 +49,22 @@ def test_publication(student, day,hour,minute,second,eligible):
         assert r.headers['cache-control']=='private, no-store'
 
 
-def test_retry_other_profile_new_week_and_reads(student):
+@pytest.mark.parametrize('age_band', ['13to17', 'adult'])
+def test_retry_other_profile_new_week_and_reads(student, age_band):
     f=student
+    with f.begin() as s:
+        for pid in (1, 2):s.get(AccountPrivacy,pid).age_band=age_band
     with f.client() as a, f.client(2) as b:
+        assert '/static/js/weekly-newsletter-auto.js' in a.get('/home').text
         before=rows(f.engine)
         for _ in range(2):assert a.get('/weekly/newsletter').status_code==200
         assert rows(f.engine)==before
         assert post(a).json()['status']=='reserved'
         after=rows(f.engine)
+        for key in before:
+            if key!='weekly_newsletter_presentations':assert before[key]==after[key],key
         assert post(a).json()['status']=='already_reserved'
+        assert a.get('/weekly/newsletter').status_code==200
         assert rows(f.engine)==after
         assert post(b).json()['status']=='reserved'
         with f.begin() as s:s.get(WoodchuckProfile,1).instrument='Tuba'
@@ -68,13 +75,15 @@ def test_retry_other_profile_new_week_and_reads(student):
         with f() as s:assert s.query(WeeklyNewsletterPresentation).count()==3
 
 
-@pytest.mark.parametrize('denial',['gate','adult','pending','foreign','origin','selector','extra','revoked'])
-def test_denial(student,monkeypatch,denial):
+@pytest.mark.parametrize('age_band', ['13to17', 'adult'])
+@pytest.mark.parametrize('denial',['gate','pending','foreign','origin','selector','extra','revoked'])
+def test_denial(student,monkeypatch,denial,age_band):
     f=student
+    with f.begin() as s:s.get(AccountPrivacy,1).age_band=age_band
     with f.client() as c:
         if denial=='gate':monkeypatch.setitem(FEATURES,'weekly_newsletter',Feature(False,'open'))
-        if denial in ('adult','pending'):
-            with f.begin() as s:s.get(AccountPrivacy,1).age_band='adult' if denial=='adult' else 'under13'
+        if denial=='pending':
+            with f.begin() as s:s.get(AccountPrivacy,1).age_band='under13'
         if denial=='revoked':
             with f.begin() as s:s.get(WoodchuckProfile,1).session_version+=1
         cookie=c.cookies.get('session')
@@ -177,34 +186,42 @@ def test_authorized_child_withdrawal_and_privacy(arcade_factory,monkeypatch):
     with arcade_factory() as s:wid=s.scalar(select(WoodchuckProfile)).woodchuck_id
     with TestClient(app) as c:
         assert c.post('/account/login',data={'woodchuck_id':wid,'pin':'2468'}).status_code==200
+        assert '/static/js/weekly-newsletter-auto.js' in c.get('/home').text
         before=rows(arcade_factory.engine)
         response=post(c);assert response.status_code==200,response.text
         assert response.json()['status']=='reserved' and wid not in response.text
         after=rows(arcade_factory.engine)
         for key in before:
             if key!='weekly_newsletter_presentations':assert before[key]==after[key]
+        assert post(c).json()['status']=='already_reserved'
+        assert c.get('/weekly/newsletter').status_code==200
+        assert rows(arcade_factory.engine)==after
         with arcade_factory.begin() as s:consent.withdraw_evidence(s,s.scalar(select(ConsentEvidence)))
         before=rows(arcade_factory.engine);cookie=c.cookies.get('session')
         assert post(c).status_code in (401,403)
         assert_only_session_retirement(before,rows(arcade_factory.engine),cookie)
 
 
-def test_director_and_adult_session_context(student):
+@pytest.mark.parametrize('age_band', ['13to17', 'adult'])
+def test_director_and_management_session_context(student, age_band):
     from base64 import b64decode,b64encode
     from itsdangerous import TimestampSigner
     from app.main import SESSION_SECRET
     from app.models import ProfileCapability
     f=student
+    with f.begin() as s:s.get(AccountPrivacy,1).age_band=age_band
     with f.client() as c:
         cookie=c.cookies.get('session')
         # Negative fixtures add adult authority; never used to authorize a success.
-        for key in ('trusted_verifier_id','site_admin_fingerprint','child_parent_consent','child_director_permission'):
+        for key in ('trusted_verifier_id','site_admin_fingerprint','contest_admin_token_fingerprint','child_parent_consent','child_director_permission'):
             facts=json.loads(b64decode(cookie.split('.')[0]));facts[key]='synthetic-adult-context'
             c.cookies.clear();c.cookies.set('session',TimestampSigner(SESSION_SECRET).sign(b64encode(json.dumps(facts).encode())).decode())
             before=rows(f.engine);assert post(c).status_code==403;assert rows(f.engine)==before
+            assert '/static/js/weekly-newsletter-auto.js' not in c.get('/home').text
         c.cookies.clear();c.cookies.set('session',cookie)
         with f.begin() as s:s.add(ProfileCapability(profile_id=1,capability='band_director'))
         before=rows(f.engine);assert post(c).status_code==403;assert rows(f.engine)==before
+        assert '/static/js/weekly-newsletter-auto.js' not in c.get('/home').text
 
 
 def test_two_students_one_payer(student):

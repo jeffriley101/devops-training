@@ -14,10 +14,10 @@ from .weekly_newsletter import publication_context
 def student_context(session, request, profile):
     """Additional automatic-presentation restrictions, not a new auth policy."""
     privacy = session.get(AccountPrivacy, profile.id, populate_existing=True)
-    adult = any(request.session.get(key) for key in (
+    management_context = any(request.session.get(key) for key in (
         "trusted_verifier_id", "site_admin_fingerprint", "contest_admin_token_fingerprint",
         "child_parent_consent", "child_director_permission"))
-    return bool(not adult and privacy and privacy.age_band in ("under13", "13to17")
+    return bool(not management_context and privacy and privacy.age_band in ("under13", "13to17", "adult")
                 and not has_band_director_capability(session, profile_id=profile.id))
 
 
