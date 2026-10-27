@@ -32,6 +32,7 @@ from .account_routes import (
 from .membership_routes import router as membership_router
 from .classroom_invitation_routes import router as classroom_invitation_router
 from .classroom_s2_routes import router as classroom_s2_router
+from .classroom_director import router as classroom_director_router, enabled as classroom_director_enabled
 from .verifier_routes import (
     current_verifier,
     router as verifier_router,
@@ -133,6 +134,7 @@ async def age_screen_required_response(request, error):
 app.include_router(membership_router)
 app.include_router(classroom_invitation_router)
 app.include_router(classroom_s2_router)
+app.include_router(classroom_director_router)
 app.include_router(verifier_router)
 app.include_router(practice_chart_router)
 app.include_router(contest_router)
@@ -355,7 +357,8 @@ def trusted_verifier_dashboard_page(request: Request, connection_id: int | None 
         return templates.TemplateResponse(
             request=request, name="trusted_verifier_dashboard.html",
             context={"title": "Verifier Dashboard", "verifier_name": verifier.display_name,
-                     "verifier_email": verifier.email, **snapshot},
+                     "verifier_email": verifier.email,
+                     "classroom_director_enabled": classroom_director_enabled(), **snapshot},
             headers={"Cache-Control": "no-store"},
         )
 
@@ -389,6 +392,7 @@ def band_director_dashboard_page(request: Request, week: date | None = None):
                 "verifier_name": verifier.display_name,
                 "verifier_email": verifier.email,
                 "page_class": "band-director-page",
+                "classroom_director_enabled": classroom_director_enabled(),
                 **metrics,
             },
             headers={"Cache-Control": "no-store"},

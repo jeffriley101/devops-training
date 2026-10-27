@@ -9,6 +9,7 @@
   {% call dashboard_header('Band Director', 'Band Director Dashboard', verifier_name) %}
     <a href="/trusted-verifiers/dashboard">Verifier Dashboard · Review P-Charts</a>
     <a href="/membership?as_account=adult">Membership</a>
+    {% if classroom_director_enabled %}<a href="/classroom/director">Classroom</a>{% endif %}
   {% endcall %}
   <header class="bd-heading">
     {% if program_rating is defined %}

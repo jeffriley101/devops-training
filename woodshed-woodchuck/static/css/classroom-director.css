@@ -1,0 +1,24 @@
+.classroom-director { width: 100%; max-width: 1024px; margin: 0 auto; padding: clamp(.8rem, 3vw, 1.6rem); color: #33291e; text-align: left; background: #f3ecdc; }
+.classroom-director-page > p.body-copy { text-align: center; color: #f5f1df; }
+.classroom-director-page > p.body-copy a { color: #f5f1df; }
+.classroom-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; padding: .5rem 0 1rem; margin-bottom: 1.5rem; border-bottom: 1px solid #d8c8aa; }
+.classroom-header h1, .classroom-director h2, .classroom-director h3 { font-family: Georgia, serif; line-height: 1.2; }
+.classroom-header h1 { margin: 0; font-size: clamp(1.8rem, 5vw, 2.3rem); }
+.classroom-header p { margin: .25rem 0 0; }
+.classroom-kicker { margin: 0 0 .35rem; color: #476447; font-size: .75rem; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
+.classroom-director a { color: #315c3b; font-weight: 700; }
+.classroom-director a:focus-visible, .classroom-director button:focus-visible, .classroom-director input:focus-visible { outline: 3px solid #ae7624; outline-offset: 3px; }
+.classroom-back { display: inline-block; margin: 0 0 1rem; }
+.classroom-panel { background: #fffaf0; border: 1px solid #d8c9a9; }
+.classroom-message, .classroom-confirm { padding: 1.2rem; }
+.classroom-confirm { max-width: 32rem; }
+.classroom-confirm form { display: grid; gap: .55rem; max-width: 16rem; }
+.classroom-confirm input, .classroom-confirm button { min-height: 44px; font: inherit; }
+.classroom-confirm button { padding: .6rem .8rem; color: #fff9e9; background: #365b3d; border: 1px solid #263f2d; font-weight: 700; cursor: pointer; }
+.classroom-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem; }
+.classroom-class { display: flex; justify-content: space-between; align-items: center; gap: .8rem; min-height: 68px; padding: 1rem; text-decoration: none; }
+.classroom-class:hover { border-color: #658361; background: #fffdf7; }
+.classroom-class strong { font: 700 1.1rem Georgia, serif; overflow-wrap: anywhere; }
+.classroom-class span { font-size: 1.25rem; }
+.classroom-program { margin: 1.4rem 0 .65rem; }
+@media (max-width: 560px) { .classroom-list { grid-template-columns: 1fr; } .classroom-header { align-items: flex-start; } }

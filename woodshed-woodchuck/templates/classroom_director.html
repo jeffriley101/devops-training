@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block dashboard_styles %}<link rel="stylesheet" href="/static/css/classroom-director.css?v=1">{% endblock %}
+{% block content %}
+<section class="classroom-director" aria-labelledby="classroom-title">
+  <header class="classroom-header">
+    <div><p class="classroom-kicker">Woodshed Woodchuck · Director</p><h1 id="classroom-title">Classroom</h1><p>{{ verifier_name }}</p></div>
+    <a href="/trusted-verifiers/dashboard">Verifier Dashboard</a>
+  </header>
+  {% if selected_class and not selected_class.confirm %}
+    <a class="classroom-back" href="/classroom/director">← All classes</a>
+    <p class="classroom-kicker">{{ program.display_name }} · Class</p>
+    <h2>{{ selected_class.display_name }}</h2>
+    <div class="classroom-panel classroom-message">
+      <h3>Weekly practice</h3>
+      <p>Classroom reporting is unavailable.</p>
+    </div>
+  {% elif programs is not none %}
+    <p class="classroom-kicker">Music Programs</p>
+    <h2>Your classes</h2>
+    {% for program in programs %}
+      <h3 class="classroom-program">{{ program.display_name }}</h3>
+      {% if program.classes %}
+      <div class="classroom-list">
+        {% for item in program.classes %}
+        <a class="classroom-panel classroom-class" href="/classroom/director/{{ program.program_id }}/classes/{{ item.id }}"><strong>{{ item.display_name }}</strong><span aria-hidden="true">→</span></a>
+        {% endfor %}
+      </div>
+      {% else %}<p>No classes are available in this Music Program.</p>{% endif %}
+    {% else %}
+      <p class="classroom-panel classroom-message">No Music Programs with active Classroom access are available.</p>
+    {% endfor %}
+  {% else %}
+    {% if selected_class %}<a class="classroom-back" href="/classroom/director">← All classes</a>{% endif %}
+    <div class="classroom-panel classroom-confirm">
+      <p class="classroom-kicker">{% if selected_class %}Open class{% else %}Music Programs{% endif %}</p>
+      <h2>Confirm your PIN</h2>
+      <p>Enter your verifier PIN to view {% if selected_class %}this class{% else %}your classes{% endif %}.</p>
+      <form method="post">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <label for="classroom-pin">Verifier PIN</label>
+        <input id="classroom-pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" minlength="4" maxlength="4" autocomplete="off" required>
+        <button type="submit">{% if selected_class %}Open class{% else %}View classes{% endif %}</button>
+      </form>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}
