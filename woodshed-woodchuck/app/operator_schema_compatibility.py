@@ -10,7 +10,41 @@ import re
 
 from sqlalchemy import INTEGER, JSON, Boolean, Date, DateTime, Integer, MetaData, String, Table, inspect, select, text
 
-SUPPORTED_REVISIONS = ("p21team001", "c22class001", "c23class001", "c24class001", "w25weekly005")
+SUPPORTED_REVISIONS = ("p21team001", "c22class001", "c23class001", "c24class001", "w25weekly005", "c25class001")
+
+# Frozen migration contract: sharing preferences are not reporting authority.
+_C25 = {
+    'classroom_chart_shares': {
+        'exact': True,
+        'columns': {'chart_id': ('Integer', None, False), 'class_id': ('Integer', None, False),
+                    'selected_at': ('DateTime', None, False)},
+        'defaults': {'selected_at': 'clock'},
+        'checks': {}, 'pg_checks': {},
+        'foreign_keys': [(('chart_id',), 'practice_charts', ('id',), 'CASCADE'),
+                         (('class_id',), 'classroom_classes', ('id',), 'RESTRICT')],
+        'primary_key': ('chart_id', 'class_id'), 'unique': {}, 'indexes': {},
+    },
+    'classroom_chart_director_shares': {
+        'exact': True,
+        'columns': {'id': ('Integer', None, False), 'chart_id': ('Integer', None, False),
+                    'class_id': ('Integer', None, False), 'assignment_id': ('Integer', None, False),
+                    'membership_period_id': ('Integer', None, False), 'entitlement_id': ('Integer', None, False),
+                    'account_declared_at': ('DateTime', None, False),
+                    'class_activation_at': ('DateTime', None, False), 'source_audit_id': ('Integer', None, True),
+                    'selected_at': ('DateTime', None, False), 'withdrawn_at': ('DateTime', None, True)},
+        'defaults': {'id': 'serial'},
+        'checks': {'ck_classroom_chart_director_share_end': 'withdrawn_at IS NULL OR withdrawn_at >= selected_at'},
+        'pg_checks': {'ck_classroom_chart_director_share_end': 'withdrawn_at IS NULL OR withdrawn_at >= selected_at'},
+        'foreign_keys': [(('chart_id',), 'practice_charts', ('id',), 'CASCADE'),
+                         (('class_id',), 'classroom_classes', ('id',), 'RESTRICT'),
+                         (('assignment_id',), 'classroom_teaching_assignments', ('id',), 'RESTRICT'),
+                         (('membership_period_id',), 'classroom_membership_periods', ('id',), 'RESTRICT'),
+                         (('entitlement_id',), 'classroom_entitlements', ('id',), 'RESTRICT'),
+                         (('source_audit_id',), 'classroom_s2_audit_events', ('id',), 'RESTRICT')],
+        'primary_key': ('id',), 'unique': {},
+        'indexes': {'uq_classroom_chart_director_share_open': (('chart_id', 'assignment_id'), True, 'withdrawn_at IS NULL')},
+    },
+}
 
 # Required c22 columns, keys, relationships, and indexes as installed by the
 # reviewed additive migration. PostgreSQL deparses CHECK expressions differently;
@@ -268,15 +302,17 @@ def installed_revision(connection, error):
     if revision == "p21team001":
         return revision
     expected_tables = dict(_C22)
-    if revision in {"c23class001", "c24class001", "w25weekly005"}:
+    if revision in {"c23class001", "c24class001", "w25weekly005", "c25class001"}:
         from .operator_classroom_s2_contract import C23
         expected_tables.update(C23)
-    if revision in {"c24class001", "w25weekly005"}:
+    if revision in {"c24class001", "w25weekly005", "c25class001"}:
         from .operator_classroom_s3_contract import C24
         expected_tables.update(C24)
-    if revision == "w25weekly005":
+    if revision in {"w25weekly005", "c25class001"}:
         from .operator_weekly_contract import W25
         expected_tables.update(W25)
+    if revision == "c25class001":
+        expected_tables.update(_C25)
     dialect = connection.dialect.name
     if dialect not in {"sqlite", "postgresql"}:
         raise error("classroom_schema_backend_not_supported")
@@ -434,13 +470,13 @@ def installed_revision(connection, error):
                                for token in re.split(r"('(?:''|[^'])*')", _sql(value)))
             if predicate_shape(actual_predicate) != predicate_shape(predicate):
                 refuse("indexes")
-    if revision in {"c23class001", "c24class001", "w25weekly005"}:
+    if revision in {"c23class001", "c24class001", "w25weekly005", "c25class001"}:
         from .operator_classroom_s2_contract import validate_s2_guards
         validate_s2_guards(connection, error)
-    if revision in {"c24class001", "w25weekly005"}:
+    if revision in {"c24class001", "w25weekly005", "c25class001"}:
         from .operator_classroom_s3_contract import validate_s3_guards
         validate_s3_guards(connection, error)
-    if revision == "w25weekly005":
+    if revision in {"w25weekly005", "c25class001"}:
         from .operator_weekly_contract import validate_profile_and_triggers
         validate_profile_and_triggers(connection, error, _sql)
     return revision
@@ -448,18 +484,20 @@ def installed_revision(connection, error):
 
 def classroom_snapshot(connection, revision):
     """Preserve extensions and w25 profile/economy rows, never old receipt coverage."""
-    if revision not in {"c22class001", "c23class001", "c24class001", "w25weekly005"}:
+    if revision not in {"c22class001", "c23class001", "c24class001", "w25weekly005", "c25class001"}:
         return {}
     names = CLASSROOM_TABLES
-    if revision in {"c23class001", "c24class001", "w25weekly005"}:
+    if revision in {"c23class001", "c24class001", "w25weekly005", "c25class001"}:
         from .operator_classroom_s2_contract import C23
         names += tuple(C23)
-    if revision in {"c24class001", "w25weekly005"}:
+    if revision in {"c24class001", "w25weekly005", "c25class001"}:
         from .operator_classroom_s3_contract import C24
         names += tuple(C24)
-    if revision == "w25weekly005":
+    if revision in {"w25weekly005", "c25class001"}:
         from .operator_weekly_contract import PRESERVED_TABLES
         names += PRESERVED_TABLES
+    if revision == "c25class001":
+        names += tuple(_C25)
     metadata = MetaData()
     tables = [Table(name, metadata, autoload_with=connection, resolve_fks=False)
               for name in names]

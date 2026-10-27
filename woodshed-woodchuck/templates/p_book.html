@@ -100,6 +100,15 @@
 
     </section>
 
+    <section id="p-book-classroom-sharing" class="p-book-option-group" hidden>
+      <label class="contest-opt-in-control p-book-option-card" for="p-book-share-director">
+        <input id="p-book-share-director" type="checkbox" />
+        <span><strong>Send this P-Chart to my Band Director</strong><small>Share this chart in Classroom. No email is sent.</small></span>
+      </label>
+      <label id="p-book-share-director-choice-label" for="p-book-share-director-choice" hidden>Choose a director and Class</label>
+      <select id="p-book-share-director-choice" hidden></select>
+    </section>
+
     <section class="p-book-option-group p-book-verification-option-group">
     <h3>Verification (optional)</h3>
     <label for="p-book-verifier">Send this P-Chart to:</label>
@@ -128,6 +137,19 @@
       <button id="p-book-without-missing" class="btn btn-green" type="button"></button>
       <button id="p-book-missing-back" class="btn btn-secondary" type="button">Go Back</button>
     </div>
+  </dialog>
+
+  <dialog id="p-book-sharing-dialog" aria-labelledby="p-book-sharing-title">
+    <form id="p-book-sharing-form">
+      <h2 id="p-book-sharing-title">Edit Sharing</h2>
+      <p>Choose who can access this P-Chart.</p>
+      <label><input id="p-book-sharing-edit-check" type="checkbox"> Send this P-Chart to my Band Director</label>
+      <label id="p-book-sharing-edit-label" for="p-book-sharing-edit-choice" hidden>Choose a director and Class</label>
+      <select id="p-book-sharing-edit-choice" hidden></select>
+      <p id="p-book-sharing-edit-error" class="error-text" role="alert"></p>
+      <div class="button-row"><button type="submit" class="btn btn-green">Save sharing</button>
+        <button id="p-book-sharing-cancel" type="button" class="btn btn-secondary">Cancel</button></div>
+    </form>
   </dialog>
 
   <dialog id="p-book-final-confirmation" class="p-book-submit-dialog" aria-labelledby="p-book-confirm-title">

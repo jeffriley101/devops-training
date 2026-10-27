@@ -534,3 +534,40 @@ class ClassroomS3AuditEvent(Base):
     notice_version: Mapped[str] = mapped_column(String(80), nullable=False)
     reason: Mapped[str | None] = mapped_column(String(30))
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, server_default=func.now(), nullable=False)
+
+
+class ClassroomChartShare(Base):
+    """A stored preference, never evidence of reporting authorization.
+
+    An absent row means private for that Class. No reporting reader or mutation
+    service uses these rows until an independently verified scope is available.
+    """
+    __tablename__ = "classroom_chart_shares"
+
+    chart_id: Mapped[int] = mapped_column(
+        ForeignKey("practice_charts.id", ondelete="CASCADE"), primary_key=True)
+    class_id: Mapped[int] = mapped_column(
+        ForeignKey("classroom_classes.id", ondelete="RESTRICT"), primary_key=True)
+    selected_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now, server_default=func.now(), nullable=False)
+
+
+class ClassroomChartDirectorShare(Base):
+    """One explicit chart permission for one exact teacher and source period."""
+    __tablename__ = "classroom_chart_director_shares"
+    __table_args__ = (
+        CheckConstraint("withdrawn_at IS NULL OR withdrawn_at >= selected_at", name="ck_classroom_chart_director_share_end"),
+        Index("uq_classroom_chart_director_share_open", "chart_id", "assignment_id", unique=True,
+              sqlite_where=text("withdrawn_at IS NULL"), postgresql_where=text("withdrawn_at IS NULL")),
+    )
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    chart_id: Mapped[int] = mapped_column(ForeignKey("practice_charts.id", ondelete="CASCADE"), nullable=False)
+    class_id: Mapped[int] = mapped_column(ForeignKey("classroom_classes.id", ondelete="RESTRICT"), nullable=False)
+    assignment_id: Mapped[int] = mapped_column(ForeignKey("classroom_teaching_assignments.id", ondelete="RESTRICT"), nullable=False)
+    membership_period_id: Mapped[int] = mapped_column(ForeignKey("classroom_membership_periods.id", ondelete="RESTRICT"), nullable=False)
+    entitlement_id: Mapped[int] = mapped_column(ForeignKey("classroom_entitlements.id", ondelete="RESTRICT"), nullable=False)
+    account_declared_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    class_activation_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    source_audit_id: Mapped[int | None] = mapped_column(ForeignKey("classroom_s2_audit_events.id", ondelete="RESTRICT"))
+    selected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    withdrawn_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

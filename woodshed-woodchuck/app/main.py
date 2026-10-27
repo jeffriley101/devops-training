@@ -33,6 +33,7 @@ from .membership_routes import router as membership_router
 from .classroom_invitation_routes import router as classroom_invitation_router
 from .classroom_s2_routes import router as classroom_s2_router
 from .classroom_director import router as classroom_director_router, enabled as classroom_director_enabled
+from .classroom_chart_routes import router as classroom_chart_router
 from .verifier_routes import (
     current_verifier,
     router as verifier_router,
@@ -135,6 +136,7 @@ app.include_router(membership_router)
 app.include_router(classroom_invitation_router)
 app.include_router(classroom_s2_router)
 app.include_router(classroom_director_router)
+app.include_router(classroom_chart_router)
 app.include_router(verifier_router)
 app.include_router(practice_chart_router)
 app.include_router(contest_router)

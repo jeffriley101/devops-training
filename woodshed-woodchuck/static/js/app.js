@@ -4553,6 +4553,21 @@
     const verifierSelectEl = document.getElementById("p-book-verifier");
     const includeContestsEl = document.getElementById("p-book-include-contests");
     const includeTeamEl = document.getElementById("p-book-include-team");
+    const sharePanel = document.getElementById("p-book-classroom-sharing");
+    const shareCheck = document.getElementById("p-book-share-director");
+    const shareChoice = document.getElementById("p-book-share-director-choice");
+    const shareChoiceLabel = document.getElementById("p-book-share-director-choice-label");
+    const shareDialog = document.getElementById("p-book-sharing-dialog");
+    const shareEditForm = document.getElementById("p-book-sharing-form");
+    const shareEditCheck = document.getElementById("p-book-sharing-edit-check");
+    const shareEditChoice = document.getElementById("p-book-sharing-edit-choice");
+    const shareEditLabel = document.getElementById("p-book-sharing-edit-label");
+    const shareEditError = document.getElementById("p-book-sharing-edit-error");
+    let shareChoices = [];
+    let hasShares = false;
+    let shareCsrf = "";
+    let editingShareId = null;
+    let previousShareId = null;
     const verifierManageLink = document.getElementById("p-book-verifier-manage");
     const submitBtn = form.querySelector("button[type='submit']");
     const missingDialog = document.getElementById("p-book-missing-selection");
@@ -4751,6 +4766,7 @@
       submissionKey,
       includeContests,
       includeTeamContests,
+      classroomAssignmentIds,
     }) {
       const response = await fetch(
         "/practice-charts",
@@ -4771,6 +4787,7 @@
             submission_key: submissionKey,
             include_contests: includeContests,
             include_team_contests: includeTeamContests,
+            classroom_assignment_ids: classroomAssignmentIds,
           }),
         }
       );
@@ -5183,6 +5200,19 @@
         .map((entry) => `<p>${formatEntry(entry)}</p>`)
         .join("");
 
+      if ((shareChoices.length || hasShares) && shareDialog) {
+        [...entriesEl.children].forEach((row, index) => {
+          const id = entries[index]?.serverChartId;
+          if (!Number.isInteger(id)) return;
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "btn btn-secondary";
+          button.textContent = "Edit Sharing";
+          button.addEventListener("click", () => openSharingEditor(id));
+          row.append(" ", button);
+        });
+      }
+
       if (historyControlsEl) {
         const shown = Math.min(visibleEntryCount, allEntries.length);
         historyControlsEl.hidden = allEntries.length <= 10;
@@ -5286,6 +5316,72 @@
     initializeFeature(loadTeams, "Teams could not be loaded.");
     initializeFeature(loadPersistentPracticeCharts, "Practice history could not be loaded.");
     initializeFeature(loadPracticeTotals, "Practice totals could not be loaded.");
+    initializeFeature(loadSharingOptions, "Classroom sharing could not be loaded.");
+
+    function fillSharingChoices(select, label, choices) {
+      select.replaceChildren(...choices.map((choice) => new Option(
+        `${choice.director_name} — ${choice.class_name}`, String(choice.assignment_id))));
+      select.hidden = label.hidden = choices.length <= 1;
+    }
+
+    async function loadSharingOptions() {
+      const response = await fetch("/classroom/chart-sharing", {credentials: "same-origin", cache: "no-store"});
+      if (!response.ok) return;
+      const payload = await response.json();
+      shareChoices = Array.isArray(payload.choices) ? payload.choices : [];
+      hasShares = payload.has_shares === true;
+      shareCsrf = payload.csrf;
+      if (shareChoices.length && sharePanel && shareChoice && shareChoiceLabel) {
+        fillSharingChoices(shareChoice, shareChoiceLabel, shareChoices);
+        sharePanel.hidden = false;
+      }
+      if (shareChoices.length || hasShares) renderEntries(stateApi.getState());
+    }
+
+    async function openSharingEditor(id) {
+      shareEditError.textContent = "";
+      try {
+        const response = await fetch(`/classroom/chart-sharing/${id}`, {credentials: "same-origin", cache: "no-store"});
+        if (!response.ok) throw new Error("Sharing is unavailable. Reload and try again.");
+        const payload = await response.json();
+        shareCsrf = payload.csrf;
+        editingShareId = id;
+        previousShareId = payload.selected[0] || null;
+        fillSharingChoices(shareEditChoice, shareEditLabel, payload.choices);
+        shareEditCheck.checked = payload.selected.length > 0;
+        shareEditCheck.disabled = payload.choices.length === 0;
+        if (payload.selected.length) shareEditChoice.value = String(payload.selected[0]);
+        shareDialog.showModal();
+      } catch (error) { errorEl.textContent = error.message; }
+    }
+
+    document.getElementById("p-book-sharing-cancel")?.addEventListener("click", () => shareDialog.close());
+    shareEditForm?.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      shareEditError.textContent = "";
+      const assignmentIds = shareEditCheck.checked ? [Number(shareEditChoice.value)] : [];
+      let removedPrevious = false;
+      try {
+        const save = (ids) => fetch(`/classroom/chart-sharing/${editingShareId}`, {
+          method: "POST", credentials: "same-origin", headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({csrf: shareCsrf, assignment_ids: ids}),
+        });
+        if (previousShareId && assignmentIds.length && previousShareId !== assignmentIds[0]) {
+          const removed = await save([]);
+          if (!removed.ok) throw new Error("The previous sharing choice could not be removed.");
+          previousShareId = null;
+          removedPrevious = true;
+        }
+        const response = await save(assignmentIds);
+        if (!response.ok) throw new Error("Sharing could not be saved. Reload and try again.");
+        shareDialog.close();
+        feedbackEl.textContent = "Sharing updated.";
+      } catch (error) {
+        shareEditError.textContent = removedPrevious
+          ? "The previous choice was removed, but the new choice could not be saved. Try again."
+          : error.message;
+      }
+    });
 
     function updateSubmitGlow() {
       const glowing = [includeContestsEl, includeTeamEl]
@@ -5345,6 +5441,8 @@
           : "";
       const includeContests = includeContestsEl ? includeContestsEl.checked : true;
       const includeTeamContests = Boolean(includeTeamEl?.checked);
+      const classroomAssignmentIds = shareCheck?.checked && !sharePanel?.hidden
+        ? [Number(shareChoice.value)] : [];
 
       const missing = includeTeamContests && !currentTeam
         ? {message: "Choose a team, or continue without Team Competition.", choose: "Choose a Team", without: "Submit Without Team Competition", navigate: "/home#shed-team-panel", checkbox: includeTeamEl}
@@ -5378,6 +5476,7 @@
           `Band Camp contest: ${includeContests ? "Included" : "Not included"}`,
           `Team Competition: ${includeTeamContests && currentTeam ? `${currentTeam.emblem.value} ${currentTeam.name}` : "Not included"}`,
           `Validation request: ${verifierId ? verifierName : "Not requested"}`,
+          ...(classroomAssignmentIds.length ? [`Classroom sharing: ${shareChoice.selectedOptions[0].textContent}`] : []),
         ].forEach((text) => { const item = document.createElement("li"); item.textContent = text; confirmValuesEl.append(item); });
         finalDialog.showModal();
         return;
@@ -5404,6 +5503,7 @@
           submissionKey: pendingSubmissionKey,
           includeContests,
           includeTeamContests,
+          classroomAssignmentIds,
         });
         next = stateApi.stateForResponse(requestAccount);
         if (!next) return;
@@ -5439,10 +5539,11 @@
               `Rewards and contest credit require reviewer approval.`
             )
           : (
-              `A private practice log was saved. ` +
+              (classroomAssignmentIds.length ? `A P-Chart was saved and shared with your director. ` : `A private practice log was saved. `) +
               `Rewards and contest credit require reviewer approval.`
             );
         const deliveryMessages = [];
+        if (verifierId && classroomAssignmentIds.length) feedbackEl.textContent += " This P-Chart was also shared with your director.";
         const verificationStatus = createdPayload.verification_email || createdPayload.email_delivery;
         if (verificationStatus?.code && verificationStatus.code !== "not_requested") {
           deliveryMessages.push(
@@ -5488,6 +5589,7 @@
         });
         if (includeContestsEl) includeContestsEl.checked = true;
         if (includeTeamEl) includeTeamEl.checked = true;
+        if (shareCheck) shareCheck.checked = false;
         updateSubmitGlow();
 
         pendingSubmissionKey = null;

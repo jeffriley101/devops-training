@@ -89,6 +89,7 @@ def create_practice_chart_verification_request(
     detected_playing_seconds: int | None = None,
     award_dandelions: bool = False,
     streak_authorize=None,
+    chart_sharing=None,
 ) -> CreatedPracticeChartRequest:
     from .age_privacy import require_eligible, ordinary_director_connection
     from .child_authorization import protected_child, permitted_director
@@ -299,6 +300,9 @@ def create_practice_chart_verification_request(
                 status="pending",
             )
             session.add(verification)
+
+        if chart_sharing is not None:
+            chart_sharing(session, chart)
 
         from .weekly_rewards import award_first_practice_streak
         award_first_practice_streak(session, profile.id, authorize=streak_authorize)

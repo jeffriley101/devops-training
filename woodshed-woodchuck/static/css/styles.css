@@ -3295,6 +3295,8 @@ select {
   background: #eef7e8;
 }
 
+#p-book-classroom-sharing[hidden] { display: none; }
+
 .p-book-option-group .p-book-option-card {
   margin: 0;
   padding: 0;

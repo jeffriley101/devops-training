@@ -140,6 +140,7 @@ class PracticeChartCreate(BaseModel):
     submission_key: str = Field(min_length=1, max_length=64)
     include_contests: StrictBool = True
     include_team_contests: StrictBool = True
+    classroom_assignment_ids: list[StrictInt] = Field(default_factory=list, max_length=1)
 
 
 class PristinePracticeChartCreate(BaseModel):
@@ -384,6 +385,14 @@ def create_student_practice_chart(
             profile = current_profile(request, session)
             if profile is None:
                 raise HTTPException(status_code=401, detail="Student sign-in is required.")
+            chart_sharing = None
+            if submitted.classroom_assignment_ids:
+                from . import classroom_chart_sharing as sharing, classroom_s2
+                student = classroom_s2.student_from_request(session, request)
+                decision = sharing.lock_recipient(session, student, submitted.classroom_assignment_ids[0])
+                def chart_sharing(s, chart):
+                    sharing.set_sharing(s, student=student, chart_id=chart.id,
+                                        assignment_ids=submitted.classroom_assignment_ids)
             created = create_practice_chart_verification_request(
                 session,
                 profile=profile,
@@ -399,7 +408,20 @@ def create_student_practice_chart(
                 submission_key=submitted.submission_key,
                 include_contests=submitted.include_contests,
                 include_team_contests=submitted.include_team_contests,
+                chart_sharing=chart_sharing,
             )
+            if not created.created:
+                from . import classroom_director
+                if classroom_director.enabled():
+                    from .classroom_models import ClassroomChartDirectorShare
+                    existing = list(session.scalars(select(ClassroomChartDirectorShare).where(
+                        ClassroomChartDirectorShare.chart_id == created.chart.id,
+                        ClassroomChartDirectorShare.withdrawn_at.is_(None))))
+                    actual = {row.assignment_id for row in existing}
+                    if actual != set(submitted.classroom_assignment_ids) or (actual and any(
+                            row.membership_period_id != decision.membership_period_id
+                            or row.entitlement_id != decision.entitlement_id for row in existing)):
+                        raise HTTPException(409, "This P-Chart was already saved. Use Edit Sharing to change its recipient.")
         except ValueError as error:
             raise HTTPException(
                 status_code=400,
