@@ -26,6 +26,15 @@ MAX_PRACTICE_DETAILS = 30
 MAX_DETAIL_LENGTH = 50
 MAX_DAILY_CREDITS = 75
 
+# The existing BOOK choices, shared with read-only personal analytics. These are
+# display choices, not a new restriction on historical/custom practice details.
+PRACTICE_CATEGORIES = (
+    "Long Tones", "Arpeggios", "Etudes", "Patterns", "Dynamics", "Articulations",
+    "Transcribing", "Ear Training", "Tuning", "Metronome Work", "Band Class",
+    "Lessons", "Rehearsals", "Concerts", "Tests", "Performances", "Busking",
+    "Warm-ups", "Scales", "Songs", "Improvisation", "Auditions", "Fingerings",
+)
+
 
 @dataclass(frozen=True)
 class CreatedPracticeChartRequest:

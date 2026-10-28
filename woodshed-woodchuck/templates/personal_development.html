@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% from "dashboard_header.html" import dashboard_header %}
+{% block dashboard_styles %}
+<link rel="stylesheet" href="/static/css/dashboard.css?v=1">
+<link rel="stylesheet" href="/static/css/band-director-dashboard.css?v=2">
+<link rel="stylesheet" href="/static/css/personal-development.css?v=1">
+{% endblock %}
+{% block content %}
+<section class="card bd-dashboard pdd-dashboard" data-personal-development="dashboard" data-enabled="{{ 'true' if personal_dashboard_access else 'false' }}" aria-label="Personal Development Dashboard">
+  {% call dashboard_header('Your practice progress', 'Personal Development Dashboard', authenticated_profile.display_name) %}
+    <a href="/p-book">Back to Practice BOOK</a>
+  {% endcall %}
+  {% include "_personal_development_invitation.html" %}
+  <p class="pdd-status" data-pdd-status role="status">{% if personal_dashboard_access %}Loading your practice progress…{% endif %}</p>
+  <div data-pdd-content hidden></div>
+  <noscript><p>Enable JavaScript to view your private dashboard.</p></noscript>
+</section>
+{% endblock %}
+{% block page_scripts %}<script src="/static/js/personal-development.js?v=1"></script>{% endblock %}

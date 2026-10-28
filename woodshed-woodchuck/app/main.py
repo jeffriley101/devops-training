@@ -40,6 +40,7 @@ from .verifier_routes import (
     router as verifier_router,
 )
 from .practice_chart_routes import router as practice_chart_router
+from .personal_development import router as personal_development_router
 from .band_director_dashboard import dashboard_metrics, dashboard_csv
 from .trusted_verifier_dashboard import verifier_dashboard_snapshot
 from .verifiers import VERIFIER_ROLE_LABELS
@@ -141,6 +142,7 @@ app.include_router(classroom_chart_router)
 app.include_router(classroom_student_invitation_router)
 app.include_router(verifier_router)
 app.include_router(practice_chart_router)
+app.include_router(personal_development_router)
 app.include_router(contest_router)
 app.include_router(contest_admin_router)
 app.include_router(team_router)
@@ -236,7 +238,7 @@ def _render(request: Request, template_name: str, *, analytics_event: str | None
                 "weekly_pantry_allowed": weekly_pantry_allowed,
                 "weekly_wheel_allowed": weekly_wheel_allowed,
                 "nav_items": NAV_ITEMS,
-                "reconstructed_student_surface": template_name in {"home.html", "store.html", "p_book.html", "quest.html"},
+                "reconstructed_student_surface": template_name in {"home.html", "store.html", "p_book.html", "quest.html", "personal_development.html"},
                 "active_nav": context.pop("active_nav", None),
                 "sax_viking_welcome": SAX_VIKING_WELCOME,
                 "quest_pool": QUEST_POOL,
@@ -622,15 +624,35 @@ def home(request: Request):
 @app.get("/p-book")
 def p_book(request: Request):
     from .feature_access import can_use_feature
+    from .personal_development import age_allowed, access_allowed
+    from .practice_charts import PRACTICE_CATEGORIES
     with SessionLocal() as session:
         profile = current_profile(request, session)
         feature_access = {"practice_insights": bool(profile and can_use_feature(
             session, profile.id, "practice_insights"))}
+        personal_dashboard_entry = bool(profile and age_allowed(session, profile.id))
+        personal_dashboard_access = bool(profile and access_allowed(session, profile.id))
     response = _render(
         request, "p_book.html", title="book", active_nav="p_book",
         page_class="main-app-page", feature_access=feature_access,
+        personal_dashboard_entry=personal_dashboard_entry,
+        personal_dashboard_access=personal_dashboard_access,
+        practice_categories=PRACTICE_CATEGORIES,
     )
     response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@app.get("/personal-development")
+def personal_development_dashboard(request: Request):
+    from .personal_development import student, access_allowed, PRIVATE_HEADERS
+    with SessionLocal() as session:
+        profile = student(request, session)
+        available = access_allowed(session, profile.id)
+    response = _render(request, "personal_development.html", title="Personal Development Dashboard",
+                       active_nav="p_book", page_class="main-app-page personal-development-page",
+                       personal_dashboard_access=available)
+    response.headers.update(PRIVATE_HEADERS)
     return response
 
 

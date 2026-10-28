@@ -4,6 +4,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def rendered_work_options(template):
+    from jinja2 import Template
+    from app.practice_charts import PRACTICE_CATEGORIES
+    choices = template.split('<div class="practice-detail-grid">', 1)[1].split('</div>', 1)[0]
+    return Template(choices).render(practice_categories=PRACTICE_CATEGORIES)
+
+
 def test_removed_preset_elements_cannot_abort_book_initialization() -> None:
     script = (ROOT / "static/js/app.js").read_text(encoding="utf-8")
     assert "teacherEmailOptionsEl" not in script
@@ -82,7 +89,7 @@ def test_practice_book_title_and_work_disclosure_copy() -> None:
     summary_at = template.index("<summary>Check anything that fits this practice chart.</summary>")
     assert label_at < details_at < summary_at
     assert template.count("What did you work on?") == 1
-    assert template.count('name="practice-detail"') >= 20
+    assert rendered_work_options(template).count('name="practice-detail"') == 23
     assert "practiceDetailEls" in (ROOT / "static/js/app.js").read_text(encoding="utf-8")
 
 
@@ -199,8 +206,8 @@ def test_shed_team_selector_has_one_current_card_and_polished_emblems() -> None:
 def test_work_options_use_bounded_grid_without_compression() -> None:
     template = (ROOT / "templates/p_book.html").read_text(encoding="utf-8")
     css = (ROOT / "static/css/styles.css").read_text(encoding="utf-8")
-    assert template.count('class="practice-work-option"') == template.count('name="practice-detail"')
-    assert template.count('name="practice-detail"') >= 20
+    choices = rendered_work_options(template)
+    assert choices.count('class="practice-work-option"') == choices.count('name="practice-detail"') == 23
     assert '<summary>Check anything that fits this practice chart.</summary>' in template
     final_rules = css[css.index("/* Clean, left-aligned practice checkbox list */"):]
     assert "grid-template-columns: repeat(2, minmax(0, 1fr))" in final_rules
