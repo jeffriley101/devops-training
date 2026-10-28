@@ -1,4 +1,4 @@
-"""Opt-in Classroom director metadata views; no student reporting."""
+"""Opt-in Classroom navigation and explicitly shared P-Chart views."""
 import os
 from pathlib import Path
 
@@ -28,12 +28,12 @@ def _require_enabled():
         raise HTTPException(404, "Classroom unavailable.")
 
 
-def _render(request, verifier, *, program=None, selected_class=None, programs=None, shared_charts=None):
+def _render(request, verifier, *, program=None, selected_class=None, programs=None, dashboard=None):
     return templates.TemplateResponse(request=request, name="classroom_director.html", context={
         "title": "Classroom", "verifier_name": verifier.display_name,
         "csrf": csrf_token(request), "program": program, "selected_class": selected_class,
         "programs": programs, "page_class": "classroom-director-page",
-        "shared_charts": shared_charts,
+        "dashboard": dashboard,
     })
 
 
@@ -119,11 +119,11 @@ async def class_access(request: Request, program_id: int, class_id: int):
             raise HTTPException(404, "Classroom unavailable.") from error
         if len(programs) != 1 or len(programs[0]["classes"]) != 1:
             raise HTTPException(404, "Classroom unavailable.")
-        from . import classroom_chart_sharing
+        from . import classroom_dashboard
         try:
-            shared = classroom_chart_sharing.shared_charts(session, actor=actor, program_id=program_id,
-                                                          class_id=class_id)
+            dashboard = classroom_dashboard.dashboard(session, actor=actor, program_id=program_id,
+                                                       class_id=class_id)
         except classroom.ClassroomDenied:
-            shared = []
+            dashboard = None
         return _render(request, verifier, program=programs[0], selected_class=programs[0]["classes"][0],
-                       shared_charts=shared)
+                       dashboard=dashboard)

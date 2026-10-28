@@ -199,8 +199,12 @@ def set_sharing(session, *, student, chart_id, assignment_ids):
     session.flush()
 
 
-def shared_charts(session, *, actor, program_id, class_id):
-    """Return only explicitly shared charts after current exact-source checks."""
+def _shared_chart_records(session, *, actor, program_id, class_id):
+    """Internal, transaction-local records after current exact-source checks.
+
+    Both the original chart view and V3 analytics use this boundary. These
+    records are not a roster or a reusable reporting authorization.
+    """
     _enabled(session)
     classroom._lock_program(session, program_id)
     adult_id = classroom._actor(session, actor)
@@ -230,9 +234,17 @@ def shared_charts(session, *, actor, program_id, class_id):
                 raise classroom.ClassroomDenied(UNAVAILABLE)
             chart = session.get(PracticeChart, share.chart_id, populate_existing=True)
             profile = session.get(WoodchuckProfile, profile_id, populate_existing=True)
-            output.append({"student": profile.display_name, "date": chart.practice_date.isoformat(),
-                           "minutes": chart.minutes, "instrument": chart.instrument,
-                           "details": chart.practice_details or [], "note": chart.note or ""})
+            if chart is not None and chart.profile_id == profile_id and profile is not None:
+                output.append((profile_id, profile.display_name, chart))
         except classroom.ClassroomDenied:
             continue
     return output
+
+
+def shared_charts(session, *, actor, program_id, class_id):
+    """The existing individual-chart projection, with its original fields."""
+    return [{"student": name, "date": chart.practice_date.isoformat(),
+             "minutes": chart.minutes, "instrument": chart.instrument,
+             "details": chart.practice_details or [], "note": chart.note or ""}
+            for _, name, chart in _shared_chart_records(
+                session, actor=actor, program_id=program_id, class_id=class_id)]

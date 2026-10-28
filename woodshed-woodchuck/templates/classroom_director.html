@@ -1,7 +1,10 @@
 {% extends "base.html" %}
-{% block dashboard_styles %}<link rel="stylesheet" href="/static/css/classroom-director.css?v=1">{% endblock %}
+{% block dashboard_styles %}
+<link rel="stylesheet" href="/static/css/classroom-director.css?v=1">
+<link rel="stylesheet" href="/static/css/classroom-v3.css?v=1">
+{% endblock %}
 {% block content %}
-<section class="classroom-director" aria-labelledby="classroom-title">
+<section class="classroom-director classroom-v3" aria-labelledby="classroom-title">
   <header class="classroom-header">
     <div><p class="classroom-kicker">Woodshed Woodchuck · Director</p><h1 id="classroom-title">Classroom</h1><p>{{ verifier_name }}</p></div>
     <a href="/trusted-verifiers/dashboard">Verifier Dashboard</a>
@@ -11,21 +14,70 @@
     <p class="classroom-kicker">{{ program.display_name }} · Class</p>
     <h2>{{ selected_class.display_name }}</h2>
     <p><a href="/classroom/director/{{ program.program_id }}/classes/{{ selected_class.id }}/invitations">Manage student invitations</a></p>
-    <div class="classroom-panel classroom-message">
-      <h3>Weekly practice</h3>
-      <p>Classroom reporting is unavailable.</p>
-    </div>
-    <section class="classroom-panel classroom-message" aria-labelledby="shared-charts-title">
-      <h3 id="shared-charts-title">P-Charts shared with you</h3>
-      {% for chart in shared_charts or [] %}
-        <article>
-          <h4>{{ chart.student }} · {{ chart.date }}</h4>
-          <p>{{ chart.minutes }} minutes · {{ chart.instrument }}</p>
-          {% if chart.details %}<p>{{ chart.details | join(', ') }}</p>{% endif %}
-          {% if chart.note %}<p>{{ chart.note }}</p>{% endif %}
-        </article>
-      {% else %}<p>No P-Charts have been shared with you.</p>{% endfor %}
-    </section>
+    {% if dashboard is not none %}
+      <p class="v3-note"><strong>P-Charts shared with you.</strong> Only individually shared charts with current permission appear here.
+        These are partial records, not a full roster or a student's complete practice history.
+        Missing activity does not mean no practice. This is a live view, not a frozen Newsletter snapshot.</p>
+      <p id="v3-status" role="status"></p>
+      <p><a href="{{ request.url.path }}">Reopen class to refresh permissions and records</a></p>
+      <noscript><p>Enable JavaScript to explore shared charts, graphs, and student details.</p></noscript>
+      <div id="v3-data-view" hidden>
+        <div class="v3-pagehead"><h3>Shared practice overview</h3><label>Displayed week · Central time
+          <select id="v3-week" aria-label="Displayed week"></select></label></div>
+        <div class="v3-top-grid">
+          <section class="v3-panel"><h3>Program Rating</h3><p class="v3-unavailable">Unavailable</p>
+            <p>Complete reporting and rating authorization are required.</p></section>
+          <section class="v3-panel"><h3>Shared history · practice minutes</h3><strong id="v3-history-total"></strong>
+            <p class="v3-muted">Selected students · currently shared charts</p>
+            <svg id="v3-history-graph" class="v3-chart" role="img" aria-label="Cumulative shared practice minutes"></svg></section>
+          <section class="v3-panel"><h3>Weekly shared practice minutes</h3><strong id="v3-week-total"></strong>
+            <p class="v3-muted">Selected students · Monday–Sunday</p>
+            <svg id="v3-week-graph" class="v3-chart" role="img" aria-label="Daily shared practice minutes"></svg></section>
+        </div>
+        <details class="v3-graph-data"><summary>Graph values</summary><div id="v3-graph-values"></div></details>
+        <section class="v3-panel v3-coverage"><h3>Submission coverage</h3>
+          <p><strong>Full-roster submission percentage: unavailable.</strong> Shared charts cannot establish who still needs to submit.</p>
+          <p id="v3-submissions"></p></section>
+        <p id="v3-empty" class="v3-note" role="status" hidden></p>
+        <div class="v3-controls">
+          <button type="button" id="v3-select-all">Select all shared students</button>
+          <button type="button" id="v3-select-none">Clear selection</button>
+          <label><input type="checkbox" id="v3-selected-only"> Show selected only</label>
+          <span id="v3-selection" role="status"></span>
+          <details class="v3-column-picker"><summary>Choose Columns</summary>
+            <div class="v3-column-panel"><p>Choose statistics from shared charts. These choices do not grant reporting permission.</p>
+              <div id="v3-column-groups"></div>
+              <p>Unavailable: Student Ratings, rating trends, full practice streaks, Game Mode, login activity,
+                Homework, Weekly Focus, rewards, Arcade, and skill-building results. These require separate reporting authorization and supported records.</p>
+            </div></details>
+        </div>
+        <div class="v3-table-scroll" role="region" aria-label="Shared student practice spreadsheet" tabindex="0">
+          <table class="v3-sheet"><caption>Shared charts only. Column buttons sort students; student names open details.</caption>
+            <thead id="v3-sheet-head"></thead><tbody id="v3-sheet-body"></tbody><tfoot id="v3-sheet-foot"></tfoot>
+          </table></div>
+        <p class="v3-muted">Student names stay visible while the table scrolls. Totals use the temporary selection.
+          Category columns show whether each student selected that activity on a shared chart in the displayed week;
+          their totals count students once, not minutes or proficiency. Student details show chart counts.</p>
+        <dialog id="v3-detail" aria-labelledby="v3-detail-title" aria-describedby="v3-detail-week">
+          <div class="v3-dialog-header"><div><p class="classroom-kicker">Shared student practice</p><h2 id="v3-detail-title"></h2>
+            <p><strong id="v3-detail-week"></strong></p></div>
+            <button type="button" id="v3-close-detail" aria-label="Close student details">×</button></div>
+          <p>Only charts currently shared with you in this Class. Student Rating and comprehensive reporting are unavailable.</p>
+          <div id="v3-detail-stats" class="v3-detail-stats"></div>
+          <div class="v3-detail-graphs">
+            <section class="v3-panel"><h3>Shared history · minutes</h3><svg id="v3-detail-history" class="v3-chart" role="img" aria-label="Student cumulative shared practice minutes"></svg></section>
+            <section class="v3-panel"><h3>Weekly shared minutes</h3><svg id="v3-detail-weekly" class="v3-chart" role="img" aria-label="Student daily shared practice minutes"></svg></section>
+          </div>
+          <details><summary>Graph values</summary><div id="v3-detail-values"></div></details>
+          <details><summary>What Did You Work On? · all 23 categories</summary><div id="v3-detail-categories"></div></details>
+          <h3>Shared Practice Chart history</h3><p class="v3-muted">Submission timestamps are shown in Central time; practice dates are recorded separately.</p>
+          <div id="v3-detail-charts"></div>
+          <div class="v3-controls"><button id="v3-charts-prev" type="button">Previous charts</button>
+            <span id="v3-charts-page" role="status"></span><button id="v3-charts-next" type="button">Next charts</button></div>
+        </dialog>
+      </div>
+      <script id="v3-dashboard-data" type="application/json">{{ dashboard | tojson }}</script>
+    {% else %}<p class="classroom-panel classroom-message">Classroom reporting is unavailable. No shared-chart access is available for this assignment.</p>{% endif %}
   {% elif programs is not none %}
     <p class="classroom-kicker">Music Programs</p>
     <h2>Your classes</h2>
@@ -57,3 +109,4 @@
   {% endif %}
 </section>
 {% endblock %}
+{% block page_scripts %}{% if dashboard is not none %}<script src="/static/js/classroom-v3.js?v=2" defer></script>{% endif %}{% endblock %}

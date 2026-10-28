@@ -1,0 +1,81 @@
+/* V3's parchment, forest green, spreadsheet, and student-detail presentation. */
+.classroom-director-page .app-shell { max-width: 1572px; }
+.classroom-director-page .content-wrap { grid-template-columns: minmax(0, 1fr); }
+.classroom-v3 { min-width: 0; max-width: 1540px; font-family: system-ui, sans-serif; line-height: 1.45; }
+.classroom-v3 *, .classroom-v3 *::before, .classroom-v3 *::after { box-sizing: border-box; }
+.classroom-v3 [hidden] { display: none !important; }
+.classroom-v3 h3 { margin: 0 0 .65rem; }
+.classroom-v3 p { overflow-wrap: anywhere; }
+.classroom-v3 button, .classroom-v3 select, .classroom-v3 summary { font: inherit; cursor: pointer; }
+.classroom-v3 button, .classroom-v3 select, .classroom-v3 summary { min-height: 44px; color: #315c3b; }
+.classroom-v3 button, .classroom-v3 select { padding: .45rem .7rem; border: 1px solid #9bae91; background: #fffaf0; }
+.classroom-v3 button:disabled { opacity: .6; cursor: default; }
+.classroom-v3 summary { padding: .65rem .2rem; font-weight: 700; }
+.classroom-v3 :is(button, select, summary, input, [tabindex]):focus-visible { outline: 3px solid #ae7624; outline-offset: 2px; }
+.classroom-v3 input[type="checkbox"] { width: 18px; height: 18px; accent-color: #365b3d; flex-shrink: 0; }
+.v3-note { padding: .85rem 1rem; border-left: 4px solid #c49a4e; background: #f8f0df; }
+.v3-muted, .v3-panel p { color: #645a4b; font-size: .85rem; }
+.v3-pagehead, .v3-controls, .v3-dialog-header { display: flex; align-items: center; justify-content: space-between; gap: .7rem; flex-wrap: wrap; }
+.v3-pagehead { margin: 1rem 0; }
+.v3-pagehead label { display: grid; gap: .3rem; font-size: .8rem; font-weight: 700; }
+.v3-top-grid { display: grid; grid-template-columns: minmax(150px, .8fr) repeat(2, minmax(0, 1.4fr)); gap: .7rem; }
+.v3-panel { background: #fffaf0; border: 1px solid #d8c9a9; padding: 1rem; min-width: 0; }
+.v3-panel h3 { color: #405640; font-size: 1rem; }
+.v3-panel > strong { font-size: 1.4rem; font-variant-numeric: tabular-nums; }
+.v3-unavailable { font-weight: 700; }
+.v3-chart { display: block; width: 100%; height: 150px; }
+.v3-chart text { fill: #645a4b; font: 11px system-ui, sans-serif; }
+.v3-chart .grid { stroke: #dfd3bd; }
+.v3-chart .line { stroke: #426745; stroke-width: 3; fill: none; }
+.v3-chart .dot { fill: #426745; }
+.v3-chart .bar { fill: #698a5d; }
+.v3-coverage { margin: .75rem 0; }
+.v3-coverage p:last-child { margin-bottom: 0; }
+.v3-controls { justify-content: flex-start; margin: 1rem 0 .65rem; }
+.v3-controls label { display: inline-flex; align-items: center; min-height: 44px; gap: .35rem; }
+.v3-column-picker { margin-left: auto; position: relative; }
+.v3-column-picker > summary { padding: .55rem .75rem; border: 1px solid #9bae91; background: #fffaf0; }
+.v3-column-panel { position: absolute; z-index: 6; top: 100%; right: 0; width: min(610px, 84vw); max-height: 60vh; overflow: auto; padding: 1rem; background: #fffaf0; border: 1px solid #baa985; box-shadow: 0 8px 20px #33291e33; }
+#v3-column-groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .7rem; }
+#v3-column-groups fieldset { min-width: 0; margin: 0; border: 1px solid #d8c9a9; padding: .5rem; }
+#v3-column-groups legend { font-weight: 700; color: #405640; }
+#v3-column-groups label { display: flex; font-size: .85rem; }
+.v3-table-scroll { max-width: 100%; overflow: auto; max-height: 65vh; border: 1px solid #cbb68e; background: #fffaf0; }
+.v3-sheet { border-collapse: separate; border-spacing: 0; width: 100%; min-width: max-content; font-size: .8rem; font-variant-numeric: tabular-nums; }
+.v3-sheet caption { text-align: left; padding: .6rem; }
+.v3-sheet th, .v3-sheet td { border-right: 1px solid #e2d7c3; border-bottom: 1px solid #e2d7c3; padding: .45rem .6rem; text-align: right; min-width: 108px; }
+.v3-sheet thead th { position: sticky; top: 0; background: #e7eddf; z-index: 2; }
+.v3-sheet thead button { background: transparent; border: 0; padding: .25rem; font-weight: 700; max-width: 150px; }
+.v3-sheet .v3-name { position: sticky; left: 0; z-index: 1; width: 172px; min-width: 172px; max-width: 172px; text-align: left; background: #fffaf0; overflow-wrap: anywhere; }
+.v3-sheet .v3-name button { text-align: left; }
+.v3-sheet .v3-name label { display: inline-flex; align-items: center; min-height: 44px; }
+.v3-sheet thead .v3-name { z-index: 3; background: #e7eddf; }
+.v3-sheet .v3-student { border: 0; padding: .3rem; background: transparent; font-weight: 700; text-decoration: underline; max-width: 125px; }
+.v3-sheet tbody tr:hover td, .v3-sheet tbody tr:hover th { background: #f7f4e9; }
+.v3-sheet tfoot td, .v3-sheet tfoot th.v3-name { background: #f1eadb; font-weight: 700; }
+.classroom-v3 dialog { width: min(900px, calc(100% - 1.5rem)); max-width: calc(100% - 1.5rem); max-height: calc(100% - 2rem); overflow: auto; padding: 1.2rem; border: 1px solid #d6c5a1; background: #fffaf0; color: #33291e; }
+.classroom-v3 dialog::backdrop { background: #19271dc2; }
+.v3-dialog-header { flex-wrap: nowrap; align-items: flex-start; }
+.v3-dialog-header h2 { overflow-wrap: anywhere; margin: 0; }
+.v3-detail-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .5rem; }
+.v3-detail-stats div { background: #f5eedf; padding: .7rem; overflow-wrap: anywhere; }
+.v3-detail-stats span { display: block; font-size: .8rem; color: #645a4b; }
+.v3-detail-graphs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; margin: .8rem 0; }
+.v3-small-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+.v3-small-table th, .v3-small-table td { padding: .45rem .35rem; border-bottom: 1px solid #d8c9a9; text-align: right; overflow-wrap: anywhere; }
+.v3-small-table th:first-child, .v3-small-table td:first-child { text-align: left; }
+.v3-graph-values { max-height: 18rem; overflow: auto; }
+#v3-detail-charts article { border-top: 1px solid #d8c9a9; padding: .7rem 0; overflow-wrap: anywhere; }
+#v3-detail-charts h4, #v3-detail-charts p { margin: .35rem 0; }
+@media (max-width: 800px) { .v3-top-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .v3-top-grid > :first-child { grid-column: 1/-1; } .v3-detail-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) {
+  .classroom-v3 { padding: .7rem; }
+  .v3-top-grid, .v3-detail-graphs, #v3-column-groups { grid-template-columns: minmax(0, 1fr); }
+  .v3-pagehead label, .v3-pagehead select { width: 100%; min-width: 0; }
+  .v3-column-picker { margin-left: 0; }
+  .v3-column-panel { left: 0; right: auto; width: min(610px, 78vw); }
+  .v3-controls > * { max-width: 100%; }
+  .v3-sheet .v3-name { width: 128px; min-width: 128px; max-width: 128px; }
+  .v3-sheet .v3-student { max-width: 85px; }
+  .classroom-v3 dialog { padding: .8rem; }
+}

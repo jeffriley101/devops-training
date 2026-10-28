@@ -1,4 +1,4 @@
-"""Metadata-only director navigation with real credentials and private test data."""
+"""Director metadata navigation and default-denied student access."""
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import event, select
@@ -74,8 +74,9 @@ def test_metadata_scope_no_student_queries_or_output(web):
         assert home.headers['referrer-policy'] == 'no-referrer'
         detail = confirm(client, f'/classroom/director/1/classes/{web.ids[0]}')
         assert detail.status_code == 200 and 'Concert Band' in detail.text
-        assert 'Classroom reporting is unavailable.' in detail.text
-        for text in ('Private Student', 'Practice Rating', 'practice minutes', 'WC-SYNTHETIC'):
+        assert detail.context['dashboard']['students'] == []
+        assert 'Full-roster submission percentage: unavailable.' in detail.text
+        for text in ('Private Student', 'WC-SYNTHETIC'):
             assert text not in home.text and text not in detail.text
         assert confirm(client, f'/classroom/director/2/classes/{web.ids[1]}').status_code == 404
         assert confirm(client, f'/classroom/director/1/classes/{web.ids[1]}').status_code == 404
