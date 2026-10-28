@@ -35,6 +35,8 @@ from .classroom_s2_routes import router as classroom_s2_router
 from .classroom_director import router as classroom_director_router, enabled as classroom_director_enabled
 from .classroom_chart_routes import router as classroom_chart_router
 from .classroom_student_invitation_routes import router as classroom_student_invitation_router
+from .classroom_progress_routes import router as classroom_progress_router
+from .classroom_progress_authorization import enabled as classroom_progress_enabled
 from .verifier_routes import (
     current_verifier,
     router as verifier_router,
@@ -140,6 +142,7 @@ app.include_router(classroom_s2_router)
 app.include_router(classroom_director_router)
 app.include_router(classroom_chart_router)
 app.include_router(classroom_student_invitation_router)
+app.include_router(classroom_progress_router)
 app.include_router(verifier_router)
 app.include_router(practice_chart_router)
 app.include_router(personal_development_router)
@@ -247,6 +250,7 @@ def _render(request: Request, template_name: str, *, analytics_event: str | None
                 "account_state_bootstrap": account_state_bootstrap,
                 "authenticated_profile": authenticated_profile,
                 "classroom_invitations_enabled": classroom_invitations_enabled,
+                "classroom_progress_enabled": profile is not None and classroom_progress_enabled(),
                 "woodchuck_appearance": woodchuck_appearance,
                 **context,
             },

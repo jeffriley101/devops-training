@@ -1,0 +1,6 @@
+.classroom-reporting { overflow-wrap: anywhere; }
+.classroom-reporting .classroom-panel { margin-block: 1rem; }
+.classroom-reporting p { max-width: 68ch; line-height: 1.55; }
+.classroom-reporting .reporting-choice { display: flex; align-items: flex-start; gap: .7rem; padding-block: .8rem; font-weight: bold; cursor: pointer; }
+.classroom-reporting .reporting-choice input { flex: 0 0 1.25rem; width: 1.25rem; height: 1.25rem; min-height: 0; margin: .15rem 0 0; }
+.classroom-reporting button { width: fit-content; max-width: 100%; }

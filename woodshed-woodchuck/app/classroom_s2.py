@@ -98,6 +98,14 @@ def _teaching_adults(session, program_id, *, activating_class=None):
         ClassroomTeachingAssignment.starts_at <= _now(), ClassroomTeachingAssignment.ended_at.is_(None))))
 
 
+def _select_entitlement(rows, at):
+    """Select from descending-ID rows using the existing half-open periods."""
+    at = utc(at)
+    valid = [r for r in rows if r.status == "active" and utc(r.starts_at) <= at < utc(r.ends_at)]
+    # An approved package explicitly takes precedence over the ordinary trial.
+    return next((r for r in valid if r.source == "institutional"), valid[0] if valid else None)
+
+
 def entitlement_decision(session, program_id, *, at=None):
     if not enabled():
         return EntitlementDecision(False, "disabled")
@@ -105,9 +113,7 @@ def entitlement_decision(session, program_id, *, at=None):
     rows = list(session.scalars(select(ClassroomEntitlement).where(
         ClassroomEntitlement.program_id == program_id).order_by(ClassroomEntitlement.id.desc())
         .execution_options(populate_existing=True)))
-    valid = [r for r in rows if r.status == "active" and utc(r.starts_at) <= now < utc(r.ends_at)]
-    # An approved package explicitly takes precedence over the ordinary trial.
-    row = next((r for r in valid if r.source == "institutional"), valid[0] if valid else None)
+    row = _select_entitlement(rows, now)
     if row is None:
         reason = "expired" if any(utc(r.ends_at) <= now for r in rows) else "inactive" if rows else "missing"
         return EntitlementDecision(False, reason)

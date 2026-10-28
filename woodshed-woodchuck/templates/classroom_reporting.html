@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block dashboard_styles %}
+<link rel="stylesheet" href="/static/css/classroom-director.css?v=2">
+<link rel="stylesheet" href="/static/css/classroom-reporting.css?v=1">
+{% endblock %}
+{% block content %}
+<section class="classroom-director classroom-reporting" aria-labelledby="reporting-title">
+  <header class="classroom-header">
+    <div><p class="classroom-kicker">Woodshed Woodchuck · Classroom</p><h1 id="reporting-title">Classroom reporting</h1></div>
+    <a href="/home">Back to SHED</a>
+  </header>
+  {% if message %}<p role="status">{{ message }}</p>{% endif %}
+  <p>Reporting is optional. Your Classroom learning benefits do not depend on this choice.</p>
+  <p>Comprehensive reporting is not available yet. This page saves your choice for future authorized reporting. Unshared P-Charts remain private.</p>
+  {% for room in classes %}
+  <section class="classroom-panel classroom-message" aria-labelledby="class-{{ room.class_id }}">
+    <h2 id="class-{{ room.class_id }}">{{ room.name }}</h2>
+    {% if room.directors %}<p>Band Director(s): {{ room.directors|join(', ') }}</p>{% endif %}
+    {% if room.choice.eligible %}<p id="notice-{{ room.class_id }}">{{ notice }}</p>{% endif %}
+    {% if room.choice.authorized %}
+      <p><strong>Authorization saved.</strong> You can withdraw at any time.</p>
+    {% else %}
+      {% if room.choice.saved %}<p>Your saved authorization is inactive because your account or Classroom relationships changed. It does not authorize reporting now.</p>{% endif %}
+      {% if room.choice.eligible %}
+      <form method="post" class="classroom-invitation-form" action="/classroom/reporting/{{ room.program_id }}/classes/{{ room.class_id }}/authorize">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input type="hidden" name="notice_token" value="{{ room.notice_token }}">
+        <label class="reporting-choice"><input type="checkbox" name="opt_in" value="yes" required aria-describedby="notice-{{ room.class_id }}"> <span>{{ label }}</span></label>
+        <button type="submit">Save authorization</button>
+      </form>
+      {% endif %}
+    {% endif %}
+    {% if room.choice.saved %}
+      <form method="post" class="classroom-invitation-form" action="/classroom/reporting/{{ room.program_id }}/classes/{{ room.class_id }}/withdraw">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button type="submit">Withdraw authorization</button>
+      </form>
+    {% endif %}
+  </section>
+  {% else %}
+    <p class="classroom-panel classroom-message">No eligible Classes or saved reporting choices are available. Reporting authorization requires an eligible account aged 13 or older, confirmed enrollment, active Classroom access and a current Band Director. An invitation alone does not qualify.</p>
+  {% endfor %}
+</section>
+{% endblock %}

@@ -505,6 +505,76 @@ class ClassroomReportingPeriod(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, server_default=func.now(), nullable=False)
 
 
+class ClassroomProgressAuthorization(Base):
+    """Explicit educational-reporting acceptance, separate from S3 boundary grants."""
+
+    __tablename__ = "classroom_progress_authorizations"
+    __table_args__ = (
+        ForeignKeyConstraint(["class_id", "program_id"],
+            ["classroom_classes.id", "classroom_classes.program_id"], ondelete="RESTRICT"),
+        ForeignKeyConstraint(["entitlement_id", "program_id"],
+            ["classroom_entitlements.id", "classroom_entitlements.program_id"], ondelete="RESTRICT"),
+        UniqueConstraint("id", "class_id", "program_id", name="uq_classroom_progress_scope"),
+        CheckConstraint("accepted_by_profile_id = profile_id", name="ck_classroom_progress_acceptor"),
+        CheckConstraint("acceptance_session_version >= 0", name="ck_classroom_progress_session"),
+        CheckConstraint("length(notice_digest) = 64", name="ck_classroom_progress_notice_digest"),
+        CheckConstraint("length(trim(notice_version)) BETWEEN 1 AND 80", name="ck_classroom_progress_notice"),
+        CheckConstraint("length(trim(scope_version)) BETWEEN 1 AND 80", name="ck_classroom_progress_scope"),
+        CheckConstraint(
+            "(withdrawn_at IS NULL AND withdrawn_by_profile_id IS NULL AND withdrawal_reason IS NULL) OR "
+            "(withdrawn_at IS NOT NULL AND withdrawn_at >= accepted_at AND withdrawn_by_profile_id IS NOT NULL "
+            "AND withdrawn_by_profile_id = profile_id AND withdrawal_reason IS NOT NULL "
+            "AND withdrawal_reason IN ('withdrawn', 'replaced'))", name="ck_classroom_progress_withdrawal"),
+        Index("uq_classroom_progress_open", "profile_id", "class_id", unique=True,
+              sqlite_where=text("withdrawn_at IS NULL"), postgresql_where=text("withdrawn_at IS NULL")),
+    )
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    program_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    class_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    profile_id: Mapped[int] = mapped_column(ForeignKey("woodchuck_profiles.id", ondelete="RESTRICT"), nullable=False)
+    membership_id: Mapped[int] = mapped_column(ForeignKey("classroom_student_memberships.id", ondelete="RESTRICT"), nullable=False)
+    membership_period_id: Mapped[int] = mapped_column(ForeignKey("classroom_membership_periods.id", ondelete="RESTRICT"), nullable=False)
+    entitlement_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    account_declared_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    class_activation_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    source_audit_id: Mapped[int | None] = mapped_column(ForeignKey("classroom_s2_audit_events.id", ondelete="RESTRICT"))
+    scope_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    notice_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    notice_digest: Mapped[str] = mapped_column(String(64), nullable=False)
+    # NULL legacy evidence cannot prove an unchanged source history.
+    source_revision: Mapped[str | None] = mapped_column(String(64))
+    accepted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    accepted_by_profile_id: Mapped[int] = mapped_column(ForeignKey("woodchuck_profiles.id", ondelete="RESTRICT"), nullable=False)
+    acceptance_session_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    withdrawn_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    withdrawn_by_profile_id: Mapped[int | None] = mapped_column(ForeignKey("woodchuck_profiles.id", ondelete="RESTRICT"))
+    withdrawal_reason: Mapped[str | None] = mapped_column(String(12))
+
+    @property
+    def starts_at(self):
+        # Reuse the retained-source interruption calculation without upgrading
+        # or altering the old boundary-only reporting records.
+        return self.accepted_at
+
+
+class ClassroomProgressRecipient(Base):
+    """Assignments named at acceptance; replacement teachers never inherit consent."""
+
+    __tablename__ = "classroom_progress_recipients"
+    __table_args__ = (
+        ForeignKeyConstraint(["authorization_id", "class_id", "program_id"],
+            ["classroom_progress_authorizations.id", "classroom_progress_authorizations.class_id",
+             "classroom_progress_authorizations.program_id"], ondelete="RESTRICT"),
+        ForeignKeyConstraint(["assignment_id", "class_id", "program_id"],
+            ["classroom_teaching_assignments.id", "classroom_teaching_assignments.class_id",
+             "classroom_teaching_assignments.program_id"], ondelete="RESTRICT"),
+    )
+    authorization_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    assignment_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    class_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    program_id: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
 class ClassroomS3AuditEvent(Base):
     """Minimal reporting evidence; never practice, parent, or consent payloads."""
 
