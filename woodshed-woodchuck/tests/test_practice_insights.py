@@ -45,7 +45,8 @@ def test_registry(insights_db):
     reserved = {"advanced_practice_analytics", "practice_history_tools",
                 "customization_collections", "bonus_game_content",
                 "advanced_exercises", "seasonal_side_activities"}
-    assert set(features.FEATURES) == reserved | {"practice_insights"}
+    assert set(features.FEATURES) == reserved | {"practice_insights", "weekly_newsletter",
+        "weekly_plans", "weekly_pantry", "weekly_wheel", "weekly_monday_bonus", "weekly_pants"}
     grant(insights_db, "student")
     with insights_db() as session:
         assert features.can_use_feature(session, 1, "practice_insights")

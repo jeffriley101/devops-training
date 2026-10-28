@@ -692,11 +692,17 @@ def arcade(request: Request):
 
 @app.get("/practice/skill-building")
 def skill_building(request: Request):
-    from .arcade_access import CLASSROOM
-    return _render(
+    from .arcade_access import CLASSROOM, classroom_authorized
+    with SessionLocal() as session:
+        profile = current_profile(request, session)
+        classroom_access = bool(profile and classroom_authorized(session, profile.id))
+    response = _render(
         request, "skill_building.html", title="Skill Building Exercises",
         active_nav="store", page_class="main-app-page", classroom_games=CLASSROOM,
+        classroom_access=classroom_access,
     )
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 @app.get("/arcade/blue")

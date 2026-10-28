@@ -1,17 +1,17 @@
 """Internal, source-aware student decisions; never adult data authority.
 
-This read-only resolver describes existing account/Full access and the five S3
-game policies. It creates no Full seat, verifier relationship, saved progress,
+This read-only resolver describes existing account/Full access and Classroom
+learning benefits. It creates no Full seat, verifier relationship, saved progress,
 reward, or reporting permission. Callers must authenticate the student separately
 and must not serialize the scoped source evidence into public responses.
 """
 from dataclasses import dataclass, replace
-import os
 
 from sqlalchemy import select
 
 from . import classroom_s2 as s2
 from .age_privacy import eligible, utc
+from .age_models import AccountPrivacy
 from .classroom_models import (
     ClassroomClass, ClassroomClassState, ClassroomMembershipHold,
     ClassroomStudentMembership,
@@ -49,13 +49,19 @@ class CapabilityDecision:
 
 
 def enabled():
-    return s2.enabled() and os.getenv("CLASSROOM_S3_ENABLED") == "1"
+    # Student benefits need enrollment and subscription authority, not the
+    # separate S3 reporting gate or an adult's reporting authorization.
+    return s2.enabled()
 
 
 def _classroom_sources(session, profile_id, now, program_id, class_id):
     if not enabled():
         return [(SourceDecision(False, "classroom_disabled", "classroom", profile_id), frozenset())]
     from .arcade_access import CLASSROOM
+    grants = ORDINARY_CAPABILITIES | frozenset(CLASSROOM)
+    rule = session.get(AccountPrivacy, profile_id, populate_existing=True)
+    if rule and rule.age_band in {"13to17", "adult"}:
+        grants |= {"practice_insights"}
     query = select(ClassroomStudentMembership, ClassroomClass).join(
         ClassroomClass, ClassroomClass.id == ClassroomStudentMembership.class_id
     ).where(ClassroomStudentMembership.profile_id == profile_id)
@@ -97,7 +103,7 @@ def _classroom_sources(session, profile_id, now, program_id, class_id):
             continue
         output.append((replace(source, allowed=True, reason="active_classroom_source",
                                membership_period_id=period.id),
-                       ORDINARY_CAPABILITIES | frozenset(CLASSROOM)))
+                       grants))
     return output or [(SourceDecision(False, "classroom_source_missing", "classroom", profile_id,
                                     program_id=program_id, class_id=class_id), frozenset())]
 

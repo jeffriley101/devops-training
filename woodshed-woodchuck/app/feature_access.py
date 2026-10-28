@@ -42,6 +42,13 @@ def can_use_feature(session, profile_id, feature_key):
     profile = session.get(WoodchuckProfile, profile_id)
     if profile is None or profile.status != "active":
         return False
+    if feature_key == "practice_insights":
+        # The existing summary also has a narrow Classroom grant. This does
+        # not confer Full Access on other features or adult rating access.
+        from . import memberships
+        from .classroom_capabilities import capability_decision
+        return capability_decision(session, profile_id, feature_key,
+                                   at=memberships.clock()).allowed
     return feature.required_access == "open" or student_has_full_access(session, profile_id)
 
 
@@ -49,5 +56,7 @@ def require_feature(session, profile_id, feature_key):
     """Call after authenticating the student; recheck entitlement on each request."""
     if not can_use_feature(session, profile_id, feature_key):
         from fastapi import HTTPException
-        raise HTTPException(403, "This feature requires available Full Access.",
+        detail = ("Practice Insights requires Full Access or eligible Classroom enrollment."
+                  if feature_key == "practice_insights" else "This feature requires available Full Access.")
+        raise HTTPException(403, detail,
                             headers={"Cache-Control": "no-store"})

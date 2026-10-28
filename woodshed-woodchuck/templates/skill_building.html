@@ -4,8 +4,14 @@
 <a class="btn btn-secondary" href="/store">Back to SHOP</a>
   <section class="arcade-classroom" aria-label="Classroom Skill-Building games">
     <h1>Skill Building Exercises</h1>
-    <p>Locked · Requires authorized Classroom access. Personal Full Access does not unlock these games. Exercises for private director-led Classes. Coming with Classroom.</p>
-    <ul>{% for key, label in classroom_games.items() %}<li><span data-arcade-art="{{ key }}" aria-hidden="true">?</span><strong>{{ label }}</strong> · Locked</li>{% endfor %}</ul>
+    {% if classroom_access %}
+    <p>Classroom access confirmed. Your enrollment includes these exercises when they become available. The exercises are coming soon.</p>
+    {% else %}
+    <p>Locked · Requires confirmed enrollment in an active Classroom subscription. Personal Full Access does not unlock these exercises for private Classes.</p>
+    <p>The exercises are coming soon.</p>
+    {% endif %}
+    <p>Director reporting permission is not required for student learning benefits.</p>
+    <ul>{% for key, label in classroom_games.items() %}<li><span data-arcade-art="{{ key }}" aria-hidden="true">?</span><strong>{{ label }}</strong> · {{ 'Coming soon' if classroom_access else 'Locked' }}</li>{% endfor %}</ul>
   </section>
 {% endblock %}
 

@@ -23,6 +23,7 @@ from test_classroom_s2 import NOW, code, create, join, ready, s2_db, student
 @pytest.fixture
 def capability_db(s2_db, monkeypatch):
     monkeypatch.setenv("CLASSROOM_S3_ENABLED", "1")
+    monkeypatch.setattr("app.memberships.clock", lambda: s2._now())
     return s2_db
 
 
@@ -59,8 +60,8 @@ def test_source_matrix_preserves_only_express_grants(capability_db, source):
         assert decide(session, "full_access").allowed is full
         assert student_has_full_access(session, 1, at=NOW) is full
         assert decide(session, "normal_arcade_waiver").allowed is full
-        assert decide(session, "practice_insights").allowed is full
-        assert can_use_feature(session, 1, "practice_insights") is full
+        assert decide(session, "practice_insights").allowed is (full or classroom)
+        assert can_use_feature(session, 1, "practice_insights") is (full or classroom)
         for key in arcade_access.CLASSROOM:
             assert decide(session, key).allowed is classroom
             policy = arcade_access.access_policy(session, 1, key)
@@ -170,6 +171,9 @@ def test_disabled_classroom_and_guest_fail_closed_preserving_ordinary(capability
         ready(session)
         join(session)
         monkeypatch.delenv("CLASSROOM_S3_ENABLED")
+        assert decide(session, "note-names").allowed
+        assert can_use_feature(session, 1, "practice_insights")
+        monkeypatch.delenv("CLASSROOM_S2_ENABLED")
         assert not decide(session, "note-names").allowed
         assert decide(session, "pristine_use").allowed
         assert decide(session, "personal_progress_save").allowed
@@ -207,6 +211,7 @@ def test_existing_child_account_consent_allows_tools_without_reporting(capabilit
         assert decide(session, "personal_progress_save").allowed
         assert not decide(session, "class_reporting").allowed
         assert not decide(session, "full_access").allowed
+        assert not can_use_feature(session, 1, "practice_insights")
 
 
 def test_arcade_playable_normal_and_always_free_policies_unchanged(capability_db):
@@ -219,7 +224,7 @@ def test_arcade_playable_normal_and_always_free_policies_unchanged(capability_db
             "transposition": "Transposition",
         }
         assert ARCADE_PLAY_GAME_KEYS == arcade_access.ALWAYS_FREE | arcade_access.NORMAL
-        assert arcade_access.ALWAYS_FREE == {"plunge-burrow", "blue"}
+        assert arcade_access.ALWAYS_FREE == {"plunge-burrow", "blue", "thirds"}
         for key in arcade_access.CLASSROOM:
             with pytest.raises(ValueError):
                 validate_arcade_play_game_key(key)
