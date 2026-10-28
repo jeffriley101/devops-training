@@ -34,6 +34,7 @@ from .classroom_invitation_routes import router as classroom_invitation_router
 from .classroom_s2_routes import router as classroom_s2_router
 from .classroom_director import router as classroom_director_router, enabled as classroom_director_enabled
 from .classroom_chart_routes import router as classroom_chart_router
+from .classroom_student_invitation_routes import router as classroom_student_invitation_router
 from .verifier_routes import (
     current_verifier,
     router as verifier_router,
@@ -137,6 +138,7 @@ app.include_router(classroom_invitation_router)
 app.include_router(classroom_s2_router)
 app.include_router(classroom_director_router)
 app.include_router(classroom_chart_router)
+app.include_router(classroom_student_invitation_router)
 app.include_router(verifier_router)
 app.include_router(practice_chart_router)
 app.include_router(contest_router)
@@ -171,11 +173,16 @@ def _render(request: Request, template_name: str, *, analytics_event: str | None
     weekly_plans_allowed = False
     weekly_pantry_allowed = False
     weekly_wheel_allowed = False
+    classroom_invitations_enabled = False
     from .login_streaks import stage_monday_opening, authorize_monday_opening
     with SessionLocal() as session:
         profile = current_profile(request, session)
         monday_awarded = stage_monday_opening(session, request, profile)
         if profile is not None:
+            if template_name == 'home.html' and classroom_director_enabled():
+                from .age_models import AccountPrivacy
+                rule = session.get(AccountPrivacy, profile.id)
+                classroom_invitations_enabled = bool(rule and rule.age_band in {'13to17', 'adult'} and not rule.consent_id)
             page_generation(request)
             authenticated_profile = {
                 # Presentation-only account scope for the daily Arcade entrance.
@@ -237,6 +244,7 @@ def _render(request: Request, template_name: str, *, analytics_event: str | None
                 "instrument_definitions": instrument_definition_payloads(),
                 "account_state_bootstrap": account_state_bootstrap,
                 "authenticated_profile": authenticated_profile,
+                "classroom_invitations_enabled": classroom_invitations_enabled,
                 "woodchuck_appearance": woodchuck_appearance,
                 **context,
             },

@@ -22,3 +22,10 @@
 .classroom-class span { font-size: 1.25rem; }
 .classroom-program { margin: 1.4rem 0 .65rem; }
 @media (max-width: 560px) { .classroom-list { grid-template-columns: 1fr; } .classroom-header { align-items: flex-start; } }
+.classroom-invitations .classroom-panel { margin-bottom: 1rem; }
+.classroom-invitation-form { display: grid; gap: .55rem; max-width: 36rem; }
+.classroom-invitations textarea { width: 100%; box-sizing: border-box; max-width: 100%; overflow-wrap: anywhere; }
+.classroom-invitation-form input, .classroom-invitation-form button { min-height: 44px; font: inherit; }
+.classroom-invitation-form input[type="password"] { width: 10rem; max-width: 100%; }
+.classroom-invitation-form button { padding: .6rem .8rem; color: #fff9e9; background: #365b3d; border: 1px solid #263f2d; font-weight: 700; cursor: pointer; }
+.classroom-invitations textarea:focus-visible { outline: 3px solid #ae7624; outline-offset: 3px; }

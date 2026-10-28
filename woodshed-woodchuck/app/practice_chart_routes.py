@@ -420,6 +420,7 @@ def create_student_practice_chart(
                     actual = {row.assignment_id for row in existing}
                     if actual != set(submitted.classroom_assignment_ids) or (actual and any(
                             row.membership_period_id != decision.membership_period_id
+                            or row.invitation_id != decision.invitation_id
                             or row.entitlement_id != decision.entitlement_id for row in existing)):
                         raise HTTPException(409, "This P-Chart was already saved. Use Edit Sharing to change its recipient.")
         except ValueError as error:

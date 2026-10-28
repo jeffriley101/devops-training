@@ -557,6 +557,10 @@ class ClassroomChartDirectorShare(Base):
     __tablename__ = "classroom_chart_director_shares"
     __table_args__ = (
         CheckConstraint("withdrawn_at IS NULL OR withdrawn_at >= selected_at", name="ck_classroom_chart_director_share_end"),
+        CheckConstraint(
+            "(membership_period_id IS NOT NULL AND invitation_id IS NULL) OR "
+            "(membership_period_id IS NULL AND invitation_id IS NOT NULL)",
+            name="ck_classroom_chart_director_share_source"),
         Index("uq_classroom_chart_director_share_open", "chart_id", "assignment_id", unique=True,
               sqlite_where=text("withdrawn_at IS NULL"), postgresql_where=text("withdrawn_at IS NULL")),
     )
@@ -564,10 +568,52 @@ class ClassroomChartDirectorShare(Base):
     chart_id: Mapped[int] = mapped_column(ForeignKey("practice_charts.id", ondelete="CASCADE"), nullable=False)
     class_id: Mapped[int] = mapped_column(ForeignKey("classroom_classes.id", ondelete="RESTRICT"), nullable=False)
     assignment_id: Mapped[int] = mapped_column(ForeignKey("classroom_teaching_assignments.id", ondelete="RESTRICT"), nullable=False)
-    membership_period_id: Mapped[int] = mapped_column(ForeignKey("classroom_membership_periods.id", ondelete="RESTRICT"), nullable=False)
+    membership_period_id: Mapped[int | None] = mapped_column(ForeignKey("classroom_membership_periods.id", ondelete="RESTRICT"))
+    invitation_id: Mapped[int | None] = mapped_column(ForeignKey("classroom_student_invitations.id", ondelete="RESTRICT",
+        name="fk_classroom_chart_share_invitation"))
     entitlement_id: Mapped[int] = mapped_column(ForeignKey("classroom_entitlements.id", ondelete="RESTRICT"), nullable=False)
     account_declared_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     class_activation_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     source_audit_id: Mapped[int | None] = mapped_column(ForeignKey("classroom_s2_audit_events.id", ondelete="RESTRICT"))
     selected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     withdrawn_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class ClassroomStudentInvitation(Base):
+    """Retained invitation evidence only; never enrollment or sharing authority."""
+    __tablename__ = "classroom_student_invitations"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["assignment_id", "class_id", "program_id"],
+            ["classroom_teaching_assignments.id", "classroom_teaching_assignments.class_id",
+             "classroom_teaching_assignments.program_id"],
+            ondelete="RESTRICT", name="fk_classroom_student_invitation_assignment"),
+        CheckConstraint("expires_at > issued_at", name="ck_classroom_student_invitation_expiry"),
+        CheckConstraint(
+            "(accepted_at IS NULL AND accepted_by_profile_id IS NULL) OR "
+            "(accepted_at IS NOT NULL AND accepted_by_profile_id IS NOT NULL AND "
+            "accepted_by_profile_id = profile_id AND accepted_at >= issued_at AND accepted_at < expires_at)",
+            name="ck_classroom_student_invitation_acceptance"),
+        CheckConstraint(
+            "(revoked_at IS NULL AND revoked_by_verifier_id IS NULL) OR "
+            "(revoked_at IS NOT NULL AND revoked_by_verifier_id IS NOT NULL AND "
+            "revoked_by_verifier_id = issued_by_verifier_id AND revoked_at >= issued_at AND "
+            "(accepted_at IS NULL OR revoked_at >= accepted_at))",
+            name="ck_classroom_student_invitation_revocation"),
+        Index("ix_classroom_student_invitation_recipient", "profile_id", "assignment_id"),
+    )
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    program_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    class_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    assignment_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    profile_id: Mapped[int] = mapped_column(ForeignKey("woodchuck_profiles.id", ondelete="RESTRICT"), nullable=False)
+    issued_by_verifier_id: Mapped[int] = mapped_column(ForeignKey("trusted_verifiers.id", ondelete="RESTRICT"), nullable=False)
+    issued_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    accepted_by_profile_id: Mapped[int | None] = mapped_column(ForeignKey("woodchuck_profiles.id", ondelete="RESTRICT"))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revoked_by_verifier_id: Mapped[int | None] = mapped_column(ForeignKey("trusted_verifiers.id", ondelete="RESTRICT"))
+    # Only a fresh acceptance under the deadline policy records this marker.
+    # NULL preserves the original expiry for legacy accepted invitations.
+    deadline_accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

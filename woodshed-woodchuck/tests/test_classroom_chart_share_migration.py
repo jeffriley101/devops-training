@@ -3,7 +3,7 @@ from datetime import date
 
 from alembic import command
 import pytest
-from sqlalchemy import inspect, select, text
+from sqlalchemy import inspect, select, text, MetaData, Table
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -86,7 +86,9 @@ def test_recipient_history_blocks_downgrade(db):
         session.add(cm.ClassroomTeachingAssignment(id=1, program_id=1, class_id=1, verifier_id=1,
             starts_at=NOW, granted_by_verifier_id=1))
         session.flush()
-        session.add(cm.ClassroomChartDirectorShare(chart_id=1, class_id=1, assignment_id=1,
+        # Use the frozen c25 schema; the current ORM includes invitation evidence.
+        shares = Table("classroom_chart_director_shares", MetaData(), autoload_with=session.connection())
+        session.execute(shares.insert().values(chart_id=1, class_id=1, assignment_id=1,
             membership_period_id=1, entitlement_id=1, account_declared_at=NOW,
             class_activation_at=NOW, selected_at=NOW))
         session.commit()

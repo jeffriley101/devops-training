@@ -50,11 +50,11 @@ def _visible_programs(session, actor, *, program_id=None, class_id=None):
             if classroom_s2.entitlement_decision(session, program["program_id"]).allowed]
 
 
-async def _authenticate_form(request, session):
+async def _authenticate_form(request, session, *, fields=()):
     if not same_origin_mutation(request):
         raise HTTPException(403, "A same-origin request is required.")
     form = await request.form()
-    if len(form.multi_items()) != len(form) or set(form) != {"csrf", "pin"}:
+    if len(form.multi_items()) != len(form) or set(form) != {"csrf", "pin", *fields}:
         raise HTTPException(400, "Unsupported fields.")
     check_csrf(request, form.get("csrf"))
     verifier = _verifier(request, session)

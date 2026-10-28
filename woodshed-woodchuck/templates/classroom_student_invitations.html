@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block dashboard_styles %}<link rel="stylesheet" href="/static/css/classroom-director.css?v=2">{% endblock %}
+{% block content %}
+<section class="classroom-director classroom-invitations" aria-labelledby="invitations-title">
+  <header class="classroom-header">
+    <div><p class="classroom-kicker">Woodshed Woodchuck · Classroom</p><h1 id="invitations-title">Classroom invitations</h1></div>
+    <a href="{{ '/classroom/director' if mode == 'director' else '/home' }}">{{ 'All classes' if mode == 'director' else 'Back to SHED' }}</a>
+  </header>
+  {% if message %}<p role="status">{{ message }}</p>{% endif %}
+  {% if confirm %}
+    <div class="classroom-panel classroom-confirm">
+      <h2>Confirm your PIN</h2>
+      <form method="post">
+        <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="view">
+        <label for="invitation-pin">Verifier PIN</label>
+        <input id="invitation-pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" minlength="4" maxlength="4" autocomplete="off" required>
+        <button type="submit">Manage invitations</button>
+      </form>
+    </div>
+  {% else %}
+    <p>Accept within seven days to choose “Send this P-Chart to my Band Director” on individual P-Charts. After acceptance, sharing remains available while your account, Class, director assignment and Classroom access remain eligible, unless the invitation is revoked. Acceptance does not enroll you or share any charts automatically.</p>
+    {% if mode == 'director' %}
+      <h2>{{ class_name }}</h2>
+      {% if can_issue %}
+      <section class="classroom-panel classroom-message">
+        <h3>Invite a student</h3>
+        <p>Ask the student to sign in and open <a href="/classroom/student-invitations">Classroom invitations</a> to generate an invitation code. Paste the code here. The student must accept within seven days.</p>
+        <form method="post" class="classroom-invitation-form">
+          <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="issue">
+          <label for="identity-code">Student invitation code</label>
+          <textarea id="identity-code" name="identity_code" rows="3" maxlength="1500" autocomplete="off" spellcheck="false" required></textarea>
+          <label for="issue-pin">Verifier PIN</label>
+          <input id="issue-pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" minlength="4" maxlength="4" autocomplete="off" required>
+          <button type="submit">Create invitation</button>
+        </form>
+      </section>
+      {% else %}<p>You can revoke invitations you issued. Creating invitations requires a current director assignment and active Classroom access.</p>{% endif %}
+    {% else %}
+      <section class="classroom-panel classroom-message">
+        <h2>Get an invitation from your director</h2>
+        <p>Generate a code and give it only to your Classroom director. It identifies your signed-in account for an invitation and expires in 30 minutes. It does not share your practice.</p>
+        <form method="post" action="/classroom/student-invitations/identity" class="classroom-invitation-form">
+          <input type="hidden" name="csrf" value="{{ csrf }}">
+          <button type="submit">Generate invitation code</button>
+        </form>
+        {% if identity_code %}
+          <label for="student-identity-code">Copy this code for your director</label>
+          <textarea id="student-identity-code" rows="4" readonly spellcheck="false">{{ identity_code }}</textarea>
+        {% endif %}
+      </section>
+    {% endif %}
+    <h2>{{ 'Your issued invitations' if mode == 'director' else 'Your invitations' }}</h2>
+    <p>Showing up to 50 recent invitations. <a href="{{ request.url.path }}">Check for updates</a></p>
+    {% for invitation in invitations %}
+      <article class="classroom-panel classroom-message">
+        <h3>Invitation #{{ invitation.id }}{% if mode == 'student' %} · {{ invitation.class_name }}{% endif %}</h3>
+        {% if mode == 'student' %}<p>From {{ invitation.director_name }}</p>{% endif %}
+        <p>{{ invitation.status }}{% if invitation.status != 'Accepted' or invitation.legacy_expiry %} · {{ 'Sharing ends' if invitation.legacy_expiry else 'Acceptance deadline' }} {{ invitation.expires }}{% endif %}</p>
+        {% if invitation.legacy_expiry %}<p>This invitation was accepted under the earlier expiry rule and keeps its original end date. After it expires, a new invitation and explicit P-Chart sharing choices are required.</p>{% endif %}
+        {% if mode == 'student' and invitation.can_accept %}
+          <form method="post" action="/classroom/student-invitations/{{ invitation.id }}/accept" class="classroom-invitation-form">
+            <input type="hidden" name="csrf" value="{{ csrf }}"><button type="submit">Accept invitation #{{ invitation.id }}</button>
+          </form>
+        {% elif mode == 'director' and invitation.can_revoke %}
+          <form method="post" class="classroom-invitation-form">
+            <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="action" value="revoke">
+            <input type="hidden" name="invitation_id" value="{{ invitation.id }}">
+            <label for="revoke-pin-{{ invitation.id }}">Verifier PIN</label>
+            <input id="revoke-pin-{{ invitation.id }}" name="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" minlength="4" maxlength="4" autocomplete="off" required>
+            <button type="submit">Revoke invitation #{{ invitation.id }}</button>
+          </form>
+        {% endif %}
+      </article>
+    {% else %}<p class="classroom-panel classroom-message">No invitations are currently available.</p>{% endfor %}
+  {% endif %}
+</section>
+{% endblock %}
