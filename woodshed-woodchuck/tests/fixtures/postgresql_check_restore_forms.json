@@ -1,0 +1,175 @@
+{
+  "inventory_sha256": "f38baaa4f41f741f30997ad3788a258cbfb4b40daf13878eca5032ed3eecbc65",
+  "postgresql": "16.15",
+  "sqlalchemy": "2.0.51",
+  "forms": [
+    {
+      "table": "classroom_audit_events",
+      "constraint": "ck_classroom_audit_action",
+      "expected": "action::text = ANY (ARRAY['program_provisioned'::character varying, 'role_granted'::character varying, 'role_revoked'::character varying, 'class_created'::character varying, 'teacher_assigned'::character varying, 'teacher_revoked'::character varying, 'teacher_departed'::character varying, 'transfer_proposed'::character varying, 'transfer_cancelled'::character varying, 'transfer_superseded'::character varying, 'ownership_transferred'::character varying]::text[])",
+      "native": "action::text = ANY (ARRAY['program_provisioned'::character varying, 'role_granted'::character varying, 'role_revoked'::character varying, 'class_created'::character varying, 'teacher_assigned'::character varying, 'teacher_revoked'::character varying, 'teacher_departed'::character varying, 'transfer_proposed'::character varying, 'transfer_cancelled'::character varying, 'transfer_superseded'::character varying, 'ownership_transferred'::character varying]::text[])",
+      "restored": "action::text = ANY (ARRAY['program_provisioned'::character varying::text, 'role_granted'::character varying::text, 'role_revoked'::character varying::text, 'class_created'::character varying::text, 'teacher_assigned'::character varying::text, 'teacher_revoked'::character varying::text, 'teacher_departed'::character varying::text, 'transfer_proposed'::character varying::text, 'transfer_cancelled'::character varying::text, 'transfer_superseded'::character varying::text, 'ownership_transferred'::character varying::text])"
+    },
+    {
+      "table": "classroom_audit_events",
+      "constraint": "ck_classroom_audit_role_evidence",
+      "expected": "(action::text <> ALL (ARRAY['role_granted'::character varying, 'role_revoked'::character varying]::text[])) OR role_grant_id IS NOT NULL AND target_verifier_id IS NOT NULL",
+      "native": "(action::text <> ALL (ARRAY['role_granted'::character varying, 'role_revoked'::character varying]::text[])) OR role_grant_id IS NOT NULL AND target_verifier_id IS NOT NULL",
+      "restored": "(action::text <> ALL (ARRAY['role_granted'::character varying::text, 'role_revoked'::character varying::text])) OR role_grant_id IS NOT NULL AND target_verifier_id IS NOT NULL"
+    },
+    {
+      "table": "classroom_audit_events",
+      "constraint": "ck_classroom_audit_teacher_evidence",
+      "expected": "(action::text <> ALL (ARRAY['teacher_assigned'::character varying, 'teacher_revoked'::character varying, 'teacher_departed'::character varying]::text[])) OR assignment_id IS NOT NULL AND class_id IS NOT NULL AND target_verifier_id IS NOT NULL",
+      "native": "(action::text <> ALL (ARRAY['teacher_assigned'::character varying, 'teacher_revoked'::character varying, 'teacher_departed'::character varying]::text[])) OR assignment_id IS NOT NULL AND class_id IS NOT NULL AND target_verifier_id IS NOT NULL",
+      "restored": "(action::text <> ALL (ARRAY['teacher_assigned'::character varying::text, 'teacher_revoked'::character varying::text, 'teacher_departed'::character varying::text])) OR assignment_id IS NOT NULL AND class_id IS NOT NULL AND target_verifier_id IS NOT NULL"
+    },
+    {
+      "table": "classroom_audit_events",
+      "constraint": "ck_classroom_audit_transfer_evidence",
+      "expected": "(action::text <> ALL (ARRAY['transfer_proposed'::character varying, 'transfer_cancelled'::character varying, 'transfer_superseded'::character varying, 'ownership_transferred'::character varying]::text[])) OR transfer_id IS NOT NULL AND target_verifier_id IS NOT NULL",
+      "native": "(action::text <> ALL (ARRAY['transfer_proposed'::character varying, 'transfer_cancelled'::character varying, 'transfer_superseded'::character varying, 'ownership_transferred'::character varying]::text[])) OR transfer_id IS NOT NULL AND target_verifier_id IS NOT NULL",
+      "restored": "(action::text <> ALL (ARRAY['transfer_proposed'::character varying::text, 'transfer_cancelled'::character varying::text, 'transfer_superseded'::character varying::text, 'ownership_transferred'::character varying::text])) OR transfer_id IS NOT NULL AND target_verifier_id IS NOT NULL"
+    },
+    {
+      "table": "classroom_class_states",
+      "constraint": "ck_classroom_class_state",
+      "expected": "state::text = ANY (ARRAY['active'::character varying, 'archived'::character varying]::text[])",
+      "native": "state::text = ANY (ARRAY['active'::character varying, 'archived'::character varying]::text[])",
+      "restored": "state::text = ANY (ARRAY['active'::character varying::text, 'archived'::character varying::text])"
+    },
+    {
+      "table": "classroom_entitlements",
+      "constraint": "ck_classroom_entitlement_source",
+      "expected": "source::text = ANY (ARRAY['trial'::character varying, 'institutional'::character varying]::text[])",
+      "native": "source::text = ANY (ARRAY['trial'::character varying, 'institutional'::character varying]::text[])",
+      "restored": "source::text = ANY (ARRAY['trial'::character varying::text, 'institutional'::character varying::text])"
+    },
+    {
+      "table": "classroom_entitlements",
+      "constraint": "ck_classroom_entitlement_status",
+      "expected": "status::text = ANY (ARRAY['active'::character varying, 'ended'::character varying]::text[])",
+      "native": "status::text = ANY (ARRAY['active'::character varying, 'ended'::character varying]::text[])",
+      "restored": "status::text = ANY (ARRAY['active'::character varying::text, 'ended'::character varying::text])"
+    },
+    {
+      "table": "classroom_membership_holds",
+      "constraint": "ck_classroom_hold_reason",
+      "expected": "reason::text = ANY (ARRAY['conduct'::character varying, 'admin_removal'::character varying]::text[])",
+      "native": "reason::text = ANY (ARRAY['conduct'::character varying, 'admin_removal'::character varying]::text[])",
+      "restored": "reason::text = ANY (ARRAY['conduct'::character varying::text, 'admin_removal'::character varying::text])"
+    },
+    {
+      "table": "classroom_membership_holds",
+      "constraint": "ck_classroom_hold_state",
+      "expected": "state::text = ANY (ARRAY['suspended'::character varying, 'removed'::character varying]::text[])",
+      "native": "state::text = ANY (ARRAY['suspended'::character varying, 'removed'::character varying]::text[])",
+      "restored": "state::text = ANY (ARRAY['suspended'::character varying::text, 'removed'::character varying::text])"
+    },
+    {
+      "table": "classroom_membership_periods",
+      "constraint": "ck_classroom_membership_period_end",
+      "expected": "ended_at IS NULL AND ended_reason IS NULL OR ended_at IS NOT NULL AND ended_reason IS NOT NULL AND (ended_reason::text = ANY (ARRAY['departed'::character varying, 'changed'::character varying]::text[]))",
+      "native": "ended_at IS NULL AND ended_reason IS NULL OR ended_at IS NOT NULL AND ended_reason IS NOT NULL AND (ended_reason::text = ANY (ARRAY['departed'::character varying, 'changed'::character varying]::text[]))",
+      "restored": "ended_at IS NULL AND ended_reason IS NULL OR ended_at IS NOT NULL AND ended_reason IS NOT NULL AND (ended_reason::text = ANY (ARRAY['departed'::character varying::text, 'changed'::character varying::text]))"
+    },
+    {
+      "table": "classroom_membership_periods",
+      "constraint": "ck_classroom_membership_period_state",
+      "expected": "state::text = ANY (ARRAY['active'::character varying, 'held'::character varying]::text[])",
+      "native": "state::text = ANY (ARRAY['active'::character varying, 'held'::character varying]::text[])",
+      "restored": "state::text = ANY (ARRAY['active'::character varying::text, 'held'::character varying::text])"
+    },
+    {
+      "table": "classroom_ownership_transfers",
+      "constraint": "ck_classroom_transfer_status",
+      "expected": "status::text = ANY (ARRAY['pending'::character varying, 'accepted'::character varying, 'cancelled'::character varying, 'superseded'::character varying]::text[])",
+      "native": "status::text = ANY (ARRAY['pending'::character varying, 'accepted'::character varying, 'cancelled'::character varying, 'superseded'::character varying]::text[])",
+      "restored": "status::text = ANY (ARRAY['pending'::character varying::text, 'accepted'::character varying::text, 'cancelled'::character varying::text, 'superseded'::character varying::text])"
+    },
+    {
+      "table": "classroom_progress_authorizations",
+      "constraint": "ck_classroom_progress_withdrawal",
+      "expected": "withdrawn_at IS NULL AND withdrawn_by_profile_id IS NULL AND withdrawal_reason IS NULL OR withdrawn_at IS NOT NULL AND withdrawn_at >= accepted_at AND withdrawn_by_profile_id IS NOT NULL AND withdrawn_by_profile_id = profile_id AND withdrawal_reason IS NOT NULL AND (withdrawal_reason::text = ANY (ARRAY['withdrawn'::character varying, 'replaced'::character varying]::text[]))",
+      "native": "withdrawn_at IS NULL AND withdrawn_by_profile_id IS NULL AND withdrawal_reason IS NULL OR withdrawn_at IS NOT NULL AND withdrawn_at >= accepted_at AND withdrawn_by_profile_id IS NOT NULL AND withdrawn_by_profile_id = profile_id AND withdrawal_reason IS NOT NULL AND (withdrawal_reason::text = ANY (ARRAY['withdrawn'::character varying, 'replaced'::character varying]::text[]))",
+      "restored": "withdrawn_at IS NULL AND withdrawn_by_profile_id IS NULL AND withdrawal_reason IS NULL OR withdrawn_at IS NOT NULL AND withdrawn_at >= accepted_at AND withdrawn_by_profile_id IS NOT NULL AND withdrawn_by_profile_id = profile_id AND withdrawal_reason IS NOT NULL AND (withdrawal_reason::text = ANY (ARRAY['withdrawn'::character varying::text, 'replaced'::character varying::text]))"
+    },
+    {
+      "table": "classroom_reporting_periods",
+      "constraint": "ck_classroom_reporting_end",
+      "expected": "ended_at IS NULL AND ended_by_profile_id IS NULL AND ended_reason IS NULL OR ended_at IS NOT NULL AND ended_at >= starts_at AND ended_by_profile_id IS NOT NULL AND ended_reason IS NOT NULL AND (ended_reason::text = ANY (ARRAY['withdrawn'::character varying, 'source_changed'::character varying]::text[]))",
+      "native": "ended_at IS NULL AND ended_by_profile_id IS NULL AND ended_reason IS NULL OR ended_at IS NOT NULL AND ended_at >= starts_at AND ended_by_profile_id IS NOT NULL AND ended_reason IS NOT NULL AND (ended_reason::text = ANY (ARRAY['withdrawn'::character varying, 'source_changed'::character varying]::text[]))",
+      "restored": "ended_at IS NULL AND ended_by_profile_id IS NULL AND ended_reason IS NULL OR ended_at IS NOT NULL AND ended_at >= starts_at AND ended_by_profile_id IS NOT NULL AND ended_reason IS NOT NULL AND (ended_reason::text = ANY (ARRAY['withdrawn'::character varying::text, 'source_changed'::character varying::text]))"
+    },
+    {
+      "table": "classroom_role_grants",
+      "constraint": "ck_classroom_role_end_evidence",
+      "expected": "ended_at IS NULL AND ended_by_verifier_id IS NULL AND ended_reason IS NULL OR ended_at IS NOT NULL AND ended_by_verifier_id IS NOT NULL AND ended_reason IS NOT NULL AND (ended_reason::text = ANY (ARRAY['revoked'::character varying, 'departed'::character varying]::text[]))",
+      "native": "ended_at IS NULL AND ended_by_verifier_id IS NULL AND ended_reason IS NULL OR ended_at IS NOT NULL AND ended_by_verifier_id IS NOT NULL AND ended_reason IS NOT NULL AND (ended_reason::text = ANY (ARRAY['revoked'::character varying, 'departed'::character varying]::text[]))",
+      "restored": "ended_at IS NULL AND ended_by_verifier_id IS NULL AND ended_reason IS NULL OR ended_at IS NOT NULL AND ended_by_verifier_id IS NOT NULL AND ended_reason IS NOT NULL AND (ended_reason::text = ANY (ARRAY['revoked'::character varying::text, 'departed'::character varying::text]))"
+    },
+    {
+      "table": "classroom_role_grants",
+      "constraint": "ck_classroom_role_kind",
+      "expected": "role::text = ANY (ARRAY['head_director'::character varying, 'admin'::character varying, 'code_manager'::character varying, 'billing'::character varying]::text[])",
+      "native": "role::text = ANY (ARRAY['head_director'::character varying, 'admin'::character varying, 'code_manager'::character varying, 'billing'::character varying]::text[])",
+      "restored": "role::text = ANY (ARRAY['head_director'::character varying::text, 'admin'::character varying::text, 'code_manager'::character varying::text, 'billing'::character varying::text])"
+    },
+    {
+      "table": "classroom_s2_audit_events",
+      "constraint": "ck_classroom_s2_audit_action",
+      "expected": "action::text = ANY (ARRAY['trial_started'::character varying, 'institutional_created'::character varying, 'institutional_changed'::character varying, 'institutional_ended'::character varying, 'class_activated'::character varying, 'class_archived'::character varying, 'class_reactivated'::character varying, 'enrollment_opened'::character varying, 'enrollment_closed'::character varying, 'code_issued'::character varying, 'code_rotated'::character varying, 'code_revoked'::character varying, 'student_joined'::character varying, 'student_left'::character varying, 'student_suspended'::character varying, 'student_removed'::character varying, 'student_reinstated'::character varying, 'teacher_activated'::character varying, 'teacher_deactivated'::character varying]::text[])",
+      "native": "action::text = ANY (ARRAY['trial_started'::character varying, 'institutional_created'::character varying, 'institutional_changed'::character varying, 'institutional_ended'::character varying, 'class_activated'::character varying, 'class_archived'::character varying, 'class_reactivated'::character varying, 'enrollment_opened'::character varying, 'enrollment_closed'::character varying, 'code_issued'::character varying, 'code_rotated'::character varying, 'code_revoked'::character varying, 'student_joined'::character varying, 'student_left'::character varying, 'student_suspended'::character varying, 'student_removed'::character varying, 'student_reinstated'::character varying, 'teacher_activated'::character varying, 'teacher_deactivated'::character varying]::text[])",
+      "restored": "action::text = ANY (ARRAY['trial_started'::character varying::text, 'institutional_created'::character varying::text, 'institutional_changed'::character varying::text, 'institutional_ended'::character varying::text, 'class_activated'::character varying::text, 'class_archived'::character varying::text, 'class_reactivated'::character varying::text, 'enrollment_opened'::character varying::text, 'enrollment_closed'::character varying::text, 'code_issued'::character varying::text, 'code_rotated'::character varying::text, 'code_revoked'::character varying::text, 'student_joined'::character varying::text, 'student_left'::character varying::text, 'student_suspended'::character varying::text, 'student_removed'::character varying::text, 'student_reinstated'::character varying::text, 'teacher_activated'::character varying::text, 'teacher_deactivated'::character varying::text])"
+    },
+    {
+      "table": "classroom_s3_audit_events",
+      "constraint": "ck_classroom_s3_audit_action",
+      "expected": "action::text = ANY (ARRAY['reporting_granted'::character varying, 'reporting_withdrawn'::character varying, 'reporting_reauthorized'::character varying]::text[])",
+      "native": "action::text = ANY (ARRAY['reporting_granted'::character varying, 'reporting_withdrawn'::character varying, 'reporting_reauthorized'::character varying]::text[])",
+      "restored": "action::text = ANY (ARRAY['reporting_granted'::character varying::text, 'reporting_withdrawn'::character varying::text, 'reporting_reauthorized'::character varying::text])"
+    },
+    {
+      "table": "classroom_s3_audit_events",
+      "constraint": "ck_classroom_s3_audit_reason",
+      "expected": "action::text = 'reporting_withdrawn'::text AND reason IS NOT NULL AND (reason::text = ANY (ARRAY['withdrawn'::character varying, 'source_changed'::character varying]::text[])) OR action::text <> 'reporting_withdrawn'::text AND reason IS NULL",
+      "native": "action::text = 'reporting_withdrawn'::text AND reason IS NOT NULL AND (reason::text = ANY (ARRAY['withdrawn'::character varying, 'source_changed'::character varying]::text[])) OR action::text <> 'reporting_withdrawn'::text AND reason IS NULL",
+      "restored": "action::text = 'reporting_withdrawn'::text AND reason IS NOT NULL AND (reason::text = ANY (ARRAY['withdrawn'::character varying::text, 'source_changed'::character varying::text])) OR action::text <> 'reporting_withdrawn'::text AND reason IS NULL"
+    },
+    {
+      "table": "classroom_teaching_assignments",
+      "constraint": "ck_classroom_assignment_end_evidence",
+      "expected": "ended_at IS NULL AND ended_by_verifier_id IS NULL AND ended_reason IS NULL OR ended_at IS NOT NULL AND ended_by_verifier_id IS NOT NULL AND ended_reason IS NOT NULL AND (ended_reason::text = ANY (ARRAY['revoked'::character varying, 'departed'::character varying]::text[]))",
+      "native": "ended_at IS NULL AND ended_by_verifier_id IS NULL AND ended_reason IS NULL OR ended_at IS NOT NULL AND ended_by_verifier_id IS NOT NULL AND ended_reason IS NOT NULL AND (ended_reason::text = ANY (ARRAY['revoked'::character varying, 'departed'::character varying]::text[]))",
+      "restored": "ended_at IS NULL AND ended_by_verifier_id IS NULL AND ended_reason IS NULL OR ended_at IS NOT NULL AND ended_by_verifier_id IS NOT NULL AND ended_reason IS NOT NULL AND (ended_reason::text = ANY (ARRAY['revoked'::character varying::text, 'departed'::character varying::text]))"
+    },
+    {
+      "table": "weekly_plans",
+      "constraint": "ck_weekly_plan_focus",
+      "expected": "focus::text = ANY (ARRAY['Build daily consistency'::character varying, 'Improve tone and control'::character varying, 'Learn songs faster'::character varying, 'Strengthen improvisation'::character varying]::text[])",
+      "native": "focus::text = ANY (ARRAY['Build daily consistency'::character varying, 'Improve tone and control'::character varying, 'Learn songs faster'::character varying, 'Strengthen improvisation'::character varying]::text[])",
+      "restored": "focus::text = ANY (ARRAY['Build daily consistency'::character varying::text, 'Improve tone and control'::character varying::text, 'Learn songs faster'::character varying::text, 'Strengthen improvisation'::character varying::text])"
+    },
+    {
+      "table": "weekly_plans",
+      "constraint": "ck_weekly_plan_game_mode",
+      "expected": "issued_game_mode::text = ANY (ARRAY['Beginner'::character varying, 'Challenge'::character varying, 'Performance'::character varying]::text[])",
+      "native": "issued_game_mode::text = ANY (ARRAY['Beginner'::character varying, 'Challenge'::character varying, 'Performance'::character varying]::text[])",
+      "restored": "issued_game_mode::text = ANY (ARRAY['Beginner'::character varying::text, 'Challenge'::character varying::text, 'Performance'::character varying::text])"
+    },
+    {
+      "table": "weekly_task_claims",
+      "constraint": "ck_weekly_task_claim_lane",
+      "expected": "lane::text = ANY (ARRAY['board'::character varying, 'thirds'::character varying]::text[])",
+      "native": "lane::text = ANY (ARRAY['board'::character varying, 'thirds'::character varying]::text[])",
+      "restored": "lane::text = ANY (ARRAY['board'::character varying::text, 'thirds'::character varying::text])"
+    },
+    {
+      "table": "woodchuck_profiles",
+      "constraint": "ck_woodchuck_profile_game_mode",
+      "expected": "game_mode IS NULL OR (game_mode::text = ANY (ARRAY['Beginner'::character varying, 'Challenge'::character varying, 'Performance'::character varying]::text[]))",
+      "native": "game_mode IS NULL OR (game_mode::text = ANY (ARRAY['Beginner'::character varying, 'Challenge'::character varying, 'Performance'::character varying]::text[]))",
+      "restored": "game_mode IS NULL OR (game_mode::text = ANY (ARRAY['Beginner'::character varying::text, 'Challenge'::character varying::text, 'Performance'::character varying::text]))"
+    }
+  ]
+}

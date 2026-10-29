@@ -290,6 +290,316 @@ def _sql(value):
                    for token in re.split(r"('(?:''|[^'])*')", str(value)))
 
 
+# Only the two PostgreSQL CHECK renderings independently audited after a
+# PostgreSQL 16.15 dump/restore are compatible. Keep this finite and scoped by
+# table AND constraint name; casts, literals and Boolean grouping still matter.
+# The general normalizer and frozen schema contracts remain unchanged.
+_POSTGRES_CHECK_RESTORE_FORMS = {
+    ("classroom_audit_events", "ck_classroom_audit_action"): (
+        (
+            "action::text = ANY (ARRAY['program_provisioned'::character varying, 'role_granted'::character "
+            "varying, 'role_revoked'::character varying, 'class_created'::character varying, "
+            "'teacher_assigned'::character varying, 'teacher_revoked'::character varying, "
+            "'teacher_departed'::character varying, 'transfer_proposed'::character varying, "
+            "'transfer_cancelled'::character varying, 'transfer_superseded'::character varying, "
+            "'ownership_transferred'::character varying]::text[])"
+        ),
+        (
+            "action::text = ANY (ARRAY['program_provisioned'::character varying::text, "
+            "'role_granted'::character varying::text, 'role_revoked'::character varying::text, "
+            "'class_created'::character varying::text, 'teacher_assigned'::character varying::text, "
+            "'teacher_revoked'::character varying::text, 'teacher_departed'::character varying::text, "
+            "'transfer_proposed'::character varying::text, 'transfer_cancelled'::character varying::text, "
+            "'transfer_superseded'::character varying::text, 'ownership_transferred'::character "
+            "varying::text])"
+        ),
+    ),
+    ("classroom_audit_events", "ck_classroom_audit_role_evidence"): (
+        (
+            "(action::text <> ALL (ARRAY['role_granted'::character varying, 'role_revoked'::character "
+            "varying]::text[])) OR role_grant_id IS NOT NULL AND target_verifier_id IS NOT NULL"
+        ),
+        (
+            "(action::text <> ALL (ARRAY['role_granted'::character varying::text, "
+            "'role_revoked'::character varying::text])) OR role_grant_id IS NOT NULL AND "
+            "target_verifier_id IS NOT NULL"
+        ),
+    ),
+    ("classroom_audit_events", "ck_classroom_audit_teacher_evidence"): (
+        (
+            "(action::text <> ALL (ARRAY['teacher_assigned'::character varying, "
+            "'teacher_revoked'::character varying, 'teacher_departed'::character varying]::text[])) OR "
+            "assignment_id IS NOT NULL AND class_id IS NOT NULL AND target_verifier_id IS NOT NULL"
+        ),
+        (
+            "(action::text <> ALL (ARRAY['teacher_assigned'::character varying::text, "
+            "'teacher_revoked'::character varying::text, 'teacher_departed'::character varying::text])) OR "
+            "assignment_id IS NOT NULL AND class_id IS NOT NULL AND target_verifier_id IS NOT NULL"
+        ),
+    ),
+    ("classroom_audit_events", "ck_classroom_audit_transfer_evidence"): (
+        (
+            "(action::text <> ALL (ARRAY['transfer_proposed'::character varying, "
+            "'transfer_cancelled'::character varying, 'transfer_superseded'::character varying, "
+            "'ownership_transferred'::character varying]::text[])) OR transfer_id IS NOT NULL AND "
+            "target_verifier_id IS NOT NULL"
+        ),
+        (
+            "(action::text <> ALL (ARRAY['transfer_proposed'::character varying::text, "
+            "'transfer_cancelled'::character varying::text, 'transfer_superseded'::character "
+            "varying::text, 'ownership_transferred'::character varying::text])) OR transfer_id IS NOT NULL "
+            "AND target_verifier_id IS NOT NULL"
+        ),
+    ),
+    ("classroom_class_states", "ck_classroom_class_state"): (
+        (
+            "state::text = ANY (ARRAY['active'::character varying, 'archived'::character varying]::text[])"
+        ),
+        (
+            "state::text = ANY (ARRAY['active'::character varying::text, 'archived'::character "
+            "varying::text])"
+        ),
+    ),
+    ("classroom_entitlements", "ck_classroom_entitlement_source"): (
+        (
+            "source::text = ANY (ARRAY['trial'::character varying, 'institutional'::character "
+            "varying]::text[])"
+        ),
+        (
+            "source::text = ANY (ARRAY['trial'::character varying::text, 'institutional'::character "
+            "varying::text])"
+        ),
+    ),
+    ("classroom_entitlements", "ck_classroom_entitlement_status"): (
+        (
+            "status::text = ANY (ARRAY['active'::character varying, 'ended'::character varying]::text[])"
+        ),
+        (
+            "status::text = ANY (ARRAY['active'::character varying::text, 'ended'::character "
+            "varying::text])"
+        ),
+    ),
+    ("classroom_membership_holds", "ck_classroom_hold_reason"): (
+        (
+            "reason::text = ANY (ARRAY['conduct'::character varying, 'admin_removal'::character "
+            "varying]::text[])"
+        ),
+        (
+            "reason::text = ANY (ARRAY['conduct'::character varying::text, 'admin_removal'::character "
+            "varying::text])"
+        ),
+    ),
+    ("classroom_membership_holds", "ck_classroom_hold_state"): (
+        (
+            "state::text = ANY (ARRAY['suspended'::character varying, 'removed'::character "
+            "varying]::text[])"
+        ),
+        (
+            "state::text = ANY (ARRAY['suspended'::character varying::text, 'removed'::character "
+            "varying::text])"
+        ),
+    ),
+    ("classroom_membership_periods", "ck_classroom_membership_period_end"): (
+        (
+            "ended_at IS NULL AND ended_reason IS NULL OR ended_at IS NOT NULL AND ended_reason IS NOT "
+            "NULL AND (ended_reason::text = ANY (ARRAY['departed'::character varying, 'changed'::character "
+            "varying]::text[]))"
+        ),
+        (
+            "ended_at IS NULL AND ended_reason IS NULL OR ended_at IS NOT NULL AND ended_reason IS NOT "
+            "NULL AND (ended_reason::text = ANY (ARRAY['departed'::character varying::text, "
+            "'changed'::character varying::text]))"
+        ),
+    ),
+    ("classroom_membership_periods", "ck_classroom_membership_period_state"): (
+        (
+            "state::text = ANY (ARRAY['active'::character varying, 'held'::character varying]::text[])"
+        ),
+        (
+            "state::text = ANY (ARRAY['active'::character varying::text, 'held'::character varying::text])"
+        ),
+    ),
+    ("classroom_ownership_transfers", "ck_classroom_transfer_status"): (
+        (
+            "status::text = ANY (ARRAY['pending'::character varying, 'accepted'::character varying, "
+            "'cancelled'::character varying, 'superseded'::character varying]::text[])"
+        ),
+        (
+            "status::text = ANY (ARRAY['pending'::character varying::text, 'accepted'::character "
+            "varying::text, 'cancelled'::character varying::text, 'superseded'::character varying::text])"
+        ),
+    ),
+    ("classroom_progress_authorizations", "ck_classroom_progress_withdrawal"): (
+        (
+            "withdrawn_at IS NULL AND withdrawn_by_profile_id IS NULL AND withdrawal_reason IS NULL OR "
+            "withdrawn_at IS NOT NULL AND withdrawn_at >= accepted_at AND withdrawn_by_profile_id IS NOT "
+            "NULL AND withdrawn_by_profile_id = profile_id AND withdrawal_reason IS NOT NULL AND "
+            "(withdrawal_reason::text = ANY (ARRAY['withdrawn'::character varying, 'replaced'::character "
+            "varying]::text[]))"
+        ),
+        (
+            "withdrawn_at IS NULL AND withdrawn_by_profile_id IS NULL AND withdrawal_reason IS NULL OR "
+            "withdrawn_at IS NOT NULL AND withdrawn_at >= accepted_at AND withdrawn_by_profile_id IS NOT "
+            "NULL AND withdrawn_by_profile_id = profile_id AND withdrawal_reason IS NOT NULL AND "
+            "(withdrawal_reason::text = ANY (ARRAY['withdrawn'::character varying::text, "
+            "'replaced'::character varying::text]))"
+        ),
+    ),
+    ("classroom_reporting_periods", "ck_classroom_reporting_end"): (
+        (
+            "ended_at IS NULL AND ended_by_profile_id IS NULL AND ended_reason IS NULL OR ended_at IS NOT "
+            "NULL AND ended_at >= starts_at AND ended_by_profile_id IS NOT NULL AND ended_reason IS NOT "
+            "NULL AND (ended_reason::text = ANY (ARRAY['withdrawn'::character varying, "
+            "'source_changed'::character varying]::text[]))"
+        ),
+        (
+            "ended_at IS NULL AND ended_by_profile_id IS NULL AND ended_reason IS NULL OR ended_at IS NOT "
+            "NULL AND ended_at >= starts_at AND ended_by_profile_id IS NOT NULL AND ended_reason IS NOT "
+            "NULL AND (ended_reason::text = ANY (ARRAY['withdrawn'::character varying::text, "
+            "'source_changed'::character varying::text]))"
+        ),
+    ),
+    ("classroom_role_grants", "ck_classroom_role_end_evidence"): (
+        (
+            "ended_at IS NULL AND ended_by_verifier_id IS NULL AND ended_reason IS NULL OR ended_at IS NOT "
+            "NULL AND ended_by_verifier_id IS NOT NULL AND ended_reason IS NOT NULL AND "
+            "(ended_reason::text = ANY (ARRAY['revoked'::character varying, 'departed'::character "
+            "varying]::text[]))"
+        ),
+        (
+            "ended_at IS NULL AND ended_by_verifier_id IS NULL AND ended_reason IS NULL OR ended_at IS NOT "
+            "NULL AND ended_by_verifier_id IS NOT NULL AND ended_reason IS NOT NULL AND "
+            "(ended_reason::text = ANY (ARRAY['revoked'::character varying::text, 'departed'::character "
+            "varying::text]))"
+        ),
+    ),
+    ("classroom_role_grants", "ck_classroom_role_kind"): (
+        (
+            "role::text = ANY (ARRAY['head_director'::character varying, 'admin'::character varying, "
+            "'code_manager'::character varying, 'billing'::character varying]::text[])"
+        ),
+        (
+            "role::text = ANY (ARRAY['head_director'::character varying::text, 'admin'::character "
+            "varying::text, 'code_manager'::character varying::text, 'billing'::character varying::text])"
+        ),
+    ),
+    ("classroom_s2_audit_events", "ck_classroom_s2_audit_action"): (
+        (
+            "action::text = ANY (ARRAY['trial_started'::character varying, "
+            "'institutional_created'::character varying, 'institutional_changed'::character varying, "
+            "'institutional_ended'::character varying, 'class_activated'::character varying, "
+            "'class_archived'::character varying, 'class_reactivated'::character varying, "
+            "'enrollment_opened'::character varying, 'enrollment_closed'::character varying, "
+            "'code_issued'::character varying, 'code_rotated'::character varying, "
+            "'code_revoked'::character varying, 'student_joined'::character varying, "
+            "'student_left'::character varying, 'student_suspended'::character varying, "
+            "'student_removed'::character varying, 'student_reinstated'::character varying, "
+            "'teacher_activated'::character varying, 'teacher_deactivated'::character varying]::text[])"
+        ),
+        (
+            "action::text = ANY (ARRAY['trial_started'::character varying::text, "
+            "'institutional_created'::character varying::text, 'institutional_changed'::character "
+            "varying::text, 'institutional_ended'::character varying::text, 'class_activated'::character "
+            "varying::text, 'class_archived'::character varying::text, 'class_reactivated'::character "
+            "varying::text, 'enrollment_opened'::character varying::text, 'enrollment_closed'::character "
+            "varying::text, 'code_issued'::character varying::text, 'code_rotated'::character "
+            "varying::text, 'code_revoked'::character varying::text, 'student_joined'::character "
+            "varying::text, 'student_left'::character varying::text, 'student_suspended'::character "
+            "varying::text, 'student_removed'::character varying::text, 'student_reinstated'::character "
+            "varying::text, 'teacher_activated'::character varying::text, 'teacher_deactivated'::character "
+            "varying::text])"
+        ),
+    ),
+    ("classroom_s3_audit_events", "ck_classroom_s3_audit_action"): (
+        (
+            "action::text = ANY (ARRAY['reporting_granted'::character varying, "
+            "'reporting_withdrawn'::character varying, 'reporting_reauthorized'::character "
+            "varying]::text[])"
+        ),
+        (
+            "action::text = ANY (ARRAY['reporting_granted'::character varying::text, "
+            "'reporting_withdrawn'::character varying::text, 'reporting_reauthorized'::character "
+            "varying::text])"
+        ),
+    ),
+    ("classroom_s3_audit_events", "ck_classroom_s3_audit_reason"): (
+        (
+            "action::text = 'reporting_withdrawn'::text AND reason IS NOT NULL AND (reason::text = ANY "
+            "(ARRAY['withdrawn'::character varying, 'source_changed'::character varying]::text[])) OR "
+            "action::text <> 'reporting_withdrawn'::text AND reason IS NULL"
+        ),
+        (
+            "action::text = 'reporting_withdrawn'::text AND reason IS NOT NULL AND (reason::text = ANY "
+            "(ARRAY['withdrawn'::character varying::text, 'source_changed'::character varying::text])) OR "
+            "action::text <> 'reporting_withdrawn'::text AND reason IS NULL"
+        ),
+    ),
+    ("classroom_teaching_assignments", "ck_classroom_assignment_end_evidence"): (
+        (
+            "ended_at IS NULL AND ended_by_verifier_id IS NULL AND ended_reason IS NULL OR ended_at IS NOT "
+            "NULL AND ended_by_verifier_id IS NOT NULL AND ended_reason IS NOT NULL AND "
+            "(ended_reason::text = ANY (ARRAY['revoked'::character varying, 'departed'::character "
+            "varying]::text[]))"
+        ),
+        (
+            "ended_at IS NULL AND ended_by_verifier_id IS NULL AND ended_reason IS NULL OR ended_at IS NOT "
+            "NULL AND ended_by_verifier_id IS NOT NULL AND ended_reason IS NOT NULL AND "
+            "(ended_reason::text = ANY (ARRAY['revoked'::character varying::text, 'departed'::character "
+            "varying::text]))"
+        ),
+    ),
+    ("weekly_plans", "ck_weekly_plan_focus"): (
+        (
+            "focus::text = ANY (ARRAY['Build daily consistency'::character varying, 'Improve tone and "
+            "control'::character varying, 'Learn songs faster'::character varying, 'Strengthen "
+            "improvisation'::character varying]::text[])"
+        ),
+        (
+            "focus::text = ANY (ARRAY['Build daily consistency'::character varying::text, 'Improve tone "
+            "and control'::character varying::text, 'Learn songs faster'::character varying::text, "
+            "'Strengthen improvisation'::character varying::text])"
+        ),
+    ),
+    ("weekly_plans", "ck_weekly_plan_game_mode"): (
+        (
+            "issued_game_mode::text = ANY (ARRAY['Beginner'::character varying, 'Challenge'::character "
+            "varying, 'Performance'::character varying]::text[])"
+        ),
+        (
+            "issued_game_mode::text = ANY (ARRAY['Beginner'::character varying::text, "
+            "'Challenge'::character varying::text, 'Performance'::character varying::text])"
+        ),
+    ),
+    ("weekly_task_claims", "ck_weekly_task_claim_lane"): (
+        (
+            "lane::text = ANY (ARRAY['board'::character varying, 'thirds'::character varying]::text[])"
+        ),
+        (
+            "lane::text = ANY (ARRAY['board'::character varying::text, 'thirds'::character varying::text])"
+        ),
+    ),
+    ("woodchuck_profiles", "ck_woodchuck_profile_game_mode"): (
+        (
+            "game_mode IS NULL OR (game_mode::text = ANY (ARRAY['Beginner'::character varying, "
+            "'Challenge'::character varying, 'Performance'::character varying]::text[]))"
+        ),
+        (
+            "game_mode IS NULL OR (game_mode::text = ANY (ARRAY['Beginner'::character varying::text, "
+            "'Challenge'::character varying::text, 'Performance'::character varying::text]))"
+        ),
+    ),
+}
+
+
+def _check_sql(dialect, table, constraint, value):
+    normalized = _sql(value)
+    forms = (_POSTGRES_CHECK_RESTORE_FORMS.get((table, constraint))
+             if dialect == "postgresql" else None)
+    if forms is not None and normalized == _sql(forms[1]):
+        return _sql(forms[0])
+    return normalized
+
+
 def installed_revision(connection, error):
     """Validate the single installed revision and its additive extension."""
     inspector = inspect(connection)
@@ -426,7 +736,8 @@ def installed_revision(connection, error):
         expected_checks = expected["pg_checks"] if dialect == "postgresql" else expected["checks"]
         if expected.get("exact") and set(checks) != set(expected_checks):
             refuse("checks")
-        if any(_sql(checks.get(key, "")) != _sql(sql) for key, sql in expected_checks.items()):
+        if any(_check_sql(dialect, name, key, checks.get(key, "")) != _sql(sql)
+               for key, sql in expected_checks.items()):
             refuse("checks")
         unique = {c["name"]: tuple(c["column_names"]) for c in inspector.get_unique_constraints(name)}
         if expected.get("exact") and set(unique) != set(expected["unique"]):
@@ -498,7 +809,8 @@ def installed_revision(connection, error):
         validate_s3_guards(connection, error)
     if revision in {"w25weekly005", "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001"}:
         from .operator_weekly_contract import validate_profile_and_triggers
-        validate_profile_and_triggers(connection, error, _sql)
+        validate_profile_and_triggers(connection, error, lambda value: _check_sql(
+            dialect, "woodchuck_profiles", "ck_woodchuck_profile_game_mode", value))
     if revision == "p31pta001":
         from .pta_receipt_schema import validate_guards
         validate_guards(connection, error)
