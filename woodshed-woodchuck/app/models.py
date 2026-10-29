@@ -1451,6 +1451,21 @@ class PersistentTeamControl(Base):
     staged_plan_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
 
+from . import pta_receipt_schema as _pta_receipt_schema
+
+
+class PersistentTeamReceiptIssuance(Base):
+    """Immutable evidence for the database-scoped PTA authority's activation."""
+    __table__ = _pta_receipt_schema.table(Base.metadata)
+
+
+def _install_pta_receipt_guards(target, connection, **kwargs):
+    _pta_receipt_schema.install(connection)
+
+
+event.listen(PersistentTeamReceiptIssuance.__table__, "after_create", _install_pta_receipt_guards)
+
+
 class TeamMembershipTransition(Base):
     """Actual student choices only; carried membership creates no transition."""
 

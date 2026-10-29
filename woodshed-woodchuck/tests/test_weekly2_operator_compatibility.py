@@ -17,6 +17,8 @@ from tests.test_c24_operational_compatibility import install_c24
 from tests.test_persistent_team_cutover import NOW, activate, plan, seed, stage
 from tests.test_persistent_team_migration import disposable_sqlite_configuration
 from tests.test_team_families import disposable_url
+from tests.pta_legacy_receipts import activate_legacy_fixture
+from app import pta_receipt_schema as issuance
 
 
 @pytest.fixture(params=["sqlite", "postgresql"])
@@ -104,6 +106,8 @@ def test_calendar_and_pta_full_cycle(migrated_db, monkeypatch, revision, record_
     assert all_rows(db[1]) == before
     assert approved["content"]["revision"] == revision
     stage(db, approved)
+    command.upgrade(config(), issuance.REVISION)
+    before = all_rows(db[1])
     receipt = activate(db, approved)
     after = all_rows(db[1])
     verified = cutover.verify_cutover(db[0], approved, approved["plan_sha256"], receipt)
@@ -117,7 +121,7 @@ def test_calendar_and_pta_full_cycle(migrated_db, monkeypatch, revision, record_
     final = all_rows(db[1])
     assert calendar.provision(db[0], apply=True, seasons=["halloween-2026"])["status"] == "ALREADY_COMPLETE"
     assert all_rows(db[1]) == final
-    allowed = {"contest_weeks", "teams", "team_memberships", "persistent_team_control", "team_week_membership_snapshots"}
+    allowed = {"contest_weeks", "teams", "team_memberships", "persistent_team_control", "team_week_membership_snapshots", issuance.NAME}
     for name in before.keys() - allowed:
         assert final[name] == before[name], name
     record_property("operator_receipt", receipt)
@@ -133,9 +137,9 @@ def test_historical_approval_and_receipt(migrated_db, original, state, record_pr
     original_plan = deepcopy(approved)
     if state != "unstaged":
         stage(db, approved)
-    receipt = activate(db, approved) if state == "activated" else None
+    receipt = activate_legacy_fixture(db, approved) if state == "activated" else None
     original_receipt = deepcopy(receipt)
-    command.upgrade(config(), "w25weekly005")
+    command.upgrade(config(), issuance.REVISION)
     before = all_rows(db[1])
     if state == "unstaged":
         with pytest.raises(cutover.CutoverError, match="plan_schema_revision_changed"):
@@ -149,16 +153,20 @@ def test_historical_approval_and_receipt(migrated_db, original, state, record_pr
     else:
         assert "evidence_contract" not in receipt["verification"]
     after = all_rows(db[1])
-    result = cutover.verify_cutover(db[0], approved, approved["plan_sha256"], receipt)
-    assert result["passed"] and all_rows(db[1]) == after
+    if state == "activated":
+        with pytest.raises(cutover.CutoverError, match="trusted_receipt_issuance_required"):
+            cutover.verify_cutover(db[0], approved, approved["plan_sha256"], receipt)
+        assert after[issuance.NAME] == []
+    else:
+        result = cutover.verify_cutover(db[0], approved, approved["plan_sha256"], receipt)
+        assert result["passed"]
+    assert all_rows(db[1]) == after
     assert approved == original_plan
     if original_receipt is not None:
         assert receipt == original_receipt
-        assert set(result["receipt_coverage"]["excluded_added_columns"]) == {
-            "woodchuck_profiles.first_choice_instrument", "woodchuck_profiles.game_mode"}
     assert after["persistent_team_control"][0]["staged_plan"] == original_plan
     assert after["persistent_team_control"][0]["staged_plan_sha256"] == approved["plan_sha256"]
-    record_property("historical_coverage", result["receipt_coverage"])
+    record_property("historical_provenance", "missing_refused" if state == "activated" else "new_issuance_verified")
     record_property("approval_and_old_receipt_unchanged", True)
 
 
@@ -166,22 +174,22 @@ def test_receipt_coverage_never_falls_back_or_ignores_old_changes(migrated_db):
     db = migrated_db
     approved = plan(db)
     stage(db, approved)
-    receipt = activate(db, approved)
-    command.upgrade(config(), "w25weekly005")
+    receipt = activate_legacy_fixture(db, approved)
+    command.upgrade(config(), issuance.REVISION)
     original = deepcopy((approved, receipt))
     with db[1].begin() as c:
         c.execute(text("UPDATE woodchuck_profiles SET game_mode='Challenge', first_choice_instrument='Flute' WHERE id=24"))
-    # Old evidence explicitly cannot attest columns that did not exist then.
-    result = cutover.verify_cutover(db[0], approved, approved["plan_sha256"], receipt)
-    assert result["passed"] and len(result["receipt_coverage"]["excluded_added_columns"]) == 2
+    # A digest that matches historical columns cannot establish issuance history.
+    with pytest.raises(cutover.CutoverError, match="trusted_receipt_issuance_required"):
+        cutover.verify_cutover(db[0], approved, approved["plan_sha256"], receipt)
     unknown = deepcopy(receipt)
     unknown["verification"]["evidence_contract"] = "invented-contract"
-    with pytest.raises(cutover.CutoverError, match="evidence_contract_not_supported"):
+    with pytest.raises(cutover.CutoverError, match="trusted_receipt_issuance_required"):
         cutover.verify_cutover(db[0], approved, approved["plan_sha256"], unknown)
     with db[1].begin() as c:
         c.execute(text("UPDATE woodchuck_profiles SET display_name='changed' WHERE id=24"))
     before = all_rows(db[1])
-    with pytest.raises(cutover.CutoverError, match="post_activation_state_changed"):
+    with pytest.raises(cutover.CutoverError, match="trusted_receipt_issuance_required"):
         cutover.verify_cutover(db[0], approved, approved["plan_sha256"], receipt)
     assert all_rows(db[1]) == before and (approved, receipt) == original
 
@@ -190,11 +198,11 @@ def test_new_receipt_covers_preferences_even_for_old_staged_plan(migrated_db):
     db = migrated_db
     approved = plan(db)
     stage(db, approved)
-    command.upgrade(config(), "w25weekly005")
+    command.upgrade(config(), issuance.REVISION)
     receipt = activate(db, approved)
     missing_marker = deepcopy(receipt)
     del missing_marker["verification"]["evidence_contract"]
-    with pytest.raises(cutover.CutoverError, match="post_activation_state_changed"):
+    with pytest.raises(cutover.CutoverError, match="activation_receipt_issuance_mismatch"):
         cutover.verify_cutover(db[0], approved, approved["plan_sha256"], missing_marker)
     with db[1].begin() as c:
         c.execute(text("UPDATE woodchuck_profiles SET game_mode='Beginner' WHERE id=24"))
@@ -319,6 +327,7 @@ def test_postgres_enforcement_refuses(migrated_db, damage):
 def test_transaction_rollback_preserves_every_business_row(migrated_db, monkeypatch, operation, mutation):
     db = migrated_db
     install(db, "w25weekly005")
+    command.upgrade(config(), issuance.REVISION)
     populate_weekly(db)
     set_clock(monkeypatch, NOW)
     approved = plan(db)

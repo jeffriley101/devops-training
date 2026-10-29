@@ -17,15 +17,24 @@ import os
 from pathlib import Path
 import re
 from zoneinfo import ZoneInfo
+from uuid import uuid4
 
 from sqlalchemy import MetaData, Table, create_engine, inspect, select, text, update
 from sqlalchemy.pool import NullPool
 
 from . import team_continuity_inventory as inventory
 from . import operator_schema_compatibility as compatibility
+from . import pta_receipt_schema as issuance_schema
 
-# Immutable PTA contract; the installed schema may include the c22 extension.
+# Immutable PTA approval contract; installed schemas are validated separately.
 REVISION = "p21team001"
+# Explicitly reviewed single migration lineage, not arbitrary descendants of p21.
+# Keep this independent of the structural allowlist: a newly accepted schema
+# does not automatically approve continuity of existing plans or receipts.
+_REVIEWED_REVISIONS = (
+    "p21team001", "c22class001", "c23class001", "c24class001", "w25weekly005",
+    "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001",
+)
 LEGACY = "legacy_seasonal_v1"
 PERSISTENT = "persistent_v1"
 CONFIRMATION = "STAGE PERSISTENT TEAM AUTHORITY"
@@ -328,21 +337,13 @@ def _approved(plan, expected_sha256):
 
 
 def _plan_schema_guard(content, revision, *, staging=False):
-    # Staged p21/c22/c23/c24 approvals survive reviewed additions.
+    # Only already-staged approvals survive reviewed forward additions.
     # An unstaged approval must still match a fresh plan exactly; never rewrite
     # its revision/hash/evidence to make an APPLY succeed on another schema.
-    reviewed_extensions = {("p21team001", "c22class001"),
-                           ("p21team001", "c23class001"),
-                           ("c22class001", "c23class001"),
-                           ("p21team001", "c24class001"),
-                           ("c22class001", "c24class001"),
-                           ("c23class001", "c24class001"),
-                           ("p21team001", "w25weekly005"),
-                           ("c22class001", "w25weekly005"),
-                           ("c23class001", "w25weekly005"),
-                           ("c24class001", "w25weekly005")}
-    if content["revision"] != revision and (staging or
-            (content["revision"], revision) not in reviewed_extensions):
+    original = content["revision"]
+    if (original not in _REVIEWED_REVISIONS or revision not in _REVIEWED_REVISIONS
+            or (staging and original != revision)
+            or _REVIEWED_REVISIONS.index(original) > _REVIEWED_REVISIONS.index(revision)):
         raise CutoverError("plan_schema_revision_changed: generate_and_review_new_plan_before_apply")
 
 
@@ -558,8 +559,13 @@ def activate_cutover(url, plan, expected_sha256, *, acknowledgments, confirmatio
         moment = _clock(now)
         revision = _schema_guard(connection)
         _plan_schema_guard(content, revision)
+        if revision != issuance_schema.REVISION:
+            raise CutoverError("receipt_issuance_schema_required: migrate_before_activate")
         if _target(connection, url) != content["target"]:
             raise CutoverError("target_mismatch")
+        issuances = Table(issuance_schema.NAME, MetaData(), autoload_with=connection, resolve_fks=False)
+        if connection.execute(select(issuances.c.receipt_id)).first() is not None:
+            raise CutoverError("receipt_issuance_already_present: do_not_reactivate")
         tables = _tables(connection)
         before = _snapshot(connection, tables)
         classroom_before = compatibility.classroom_snapshot(connection, revision)
@@ -579,50 +585,49 @@ def activate_cutover(url, plan, expected_sha256, *, acknowledgments, confirmatio
         for row in expected["contest_weeks"]:
             if row["id"] in content["prospective_week_ids"]:
                 row["team_membership_rules_version"] = PERSISTENT
+        expected["persistent_team_control"][0].update(activated_at=normalized(boundary),
+            rules_from_week_start=content["rules_from_week_start"])
+        # Insert while the approved control is still staged. The database guard
+        # forbids retrospective issuance for an already activated control. Hash
+        # the expected final snapshot, then prove that exact state before commit.
+        binding = {"receipt_id": uuid4().hex, "control_id": 1,
+            "target_sha256": digest(content["target"]), "plan_sha256": expected_sha256,
+            "authority_sha256": content["authority_sha256"], "activation_revision": revision,
+            "evidence_contract": issuance_schema.CONTRACT,
+            "effective_at": boundary, "issued_at": moment}
+        receipt = {"transaction_state": "committed", "operation": "activated",
+            "issuance": normalized(binding),
+            "verification": {"passed": True, "before": _evidence(before), "after": _evidence(expected),
+                "historical_attribution_unchanged": True, "new_teams": 0, "new_memberships": 0,
+                "activated_at": boundary.isoformat(), "approved_plan_sha256": expected_sha256,
+                "evidence_contract": issuance_schema.CONTRACT}}
+        issued = dict(binding, receipt_sha256=digest(receipt))
+        connection.execute(issuances.insert().values(**issued))
         connection.execute(update(tables["persistent_team_control"]).where(
             tables["persistent_team_control"].c.id == 1).values(activated_at=boundary,
                 rules_from_week_start=date.fromisoformat(content["rules_from_week_start"])))
-        expected["persistent_team_control"][0].update(activated_at=normalized(boundary),
-            rules_from_week_start=content["rules_from_week_start"])
         after = _snapshot(connection, tables)
         if after != expected:
             raise CutoverError("unexpected_row_change: transaction_rolled_back")
+        issuance_rows = connection.execute(select(issuances)).all()
+        if normalized([dict(r._mapping) for r in issuance_rows]) != [normalized(issued)]:
+            raise CutoverError("unexpected_receipt_issuance_change: transaction_rolled_back")
+        # Only ACTIVATE may add this exact validated row. Other operators retain
+        # the original empty/nonempty issuance snapshot and refuse any insertion.
+        classroom_before[issuance_schema.NAME] = [tuple(r) for r in issuance_rows]
         compatibility.assert_classroom_unchanged(connection, revision, classroom_before, CutoverError)
-        receipt = {"transaction_state": "committed", "operation": "activated",
-            "verification": {"passed": True, "before": _evidence(before), "after": _evidence(after),
-                "historical_attribution_unchanged": True, "new_teams": 0, "new_memberships": 0,
-                "activated_at": boundary.isoformat(), "approved_plan_sha256": expected_sha256}}
-        if revision == "w25weekly005":
-            # A pre-w25 staged approval can activate on w25. Receipt coverage
-            # therefore follows the activation schema, not the plan's revision.
-            receipt["verification"]["evidence_contract"] = "pta-w25weekly005-v1"
     return receipt
 
 
-def _receipt_evidence(rows, content, revision, receipt):
-    """Reproduce original evidence, never rehash or upgrade an old artifact.
-
-    Unversioned accepted receipts predate w25 and hashed the 18 original profile
-    columns. All other original table evidence remains byte-for-byte comparable.
-    New extension rows/preferences are not retroactively attested by that receipt.
-    Transactional preservation uses full current rows independently of this check.
-    """
-    marker = receipt["verification"].get("evidence_contract")
-    if marker == "pta-w25weekly005-v1" and revision == "w25weekly005":
-        return _evidence(rows), "pta-w25weekly005-v1", []
-    if marker is not None or content["revision"] == "w25weekly005":
+def _receipt_evidence(rows, issuance):
+    """Use only the independently stored contract; never infer historical coverage."""
+    if (issuance["activation_revision"] != issuance_schema.REVISION
+            or issuance["evidence_contract"] != issuance_schema.CONTRACT):
         raise CutoverError("activation_receipt_evidence_contract_not_supported")
-    excluded = []
-    if revision == "w25weekly005":
-        from .operator_weekly_contract import PROFILE_COLUMNS_V1, PROFILE_COLUMNS_W25
-        if any(set(row) != set(PROFILE_COLUMNS_W25) for row in rows["woodchuck_profiles"]):
-            raise CutoverError("historical_profile_evidence_shape_changed")
-        rows = dict(rows)
-        rows["woodchuck_profiles"] = [
-            {name: row[name] for name in PROFILE_COLUMNS_V1}
-            for row in rows["woodchuck_profiles"]]
-        excluded = ["woodchuck_profiles.first_choice_instrument", "woodchuck_profiles.game_mode"]
-    return _evidence(rows), "pta-p21-through-c24-original", excluded
+    from .operator_weekly_contract import PROFILE_COLUMNS_W25
+    if any(set(row) != set(PROFILE_COLUMNS_W25) for row in rows["woodchuck_profiles"]):
+        raise CutoverError("receipt_profile_evidence_shape_changed")
+    return _evidence(rows), issuance["evidence_contract"], []
 
 
 def verify_cutover(url, plan, expected_sha256, receipt):
@@ -637,6 +642,22 @@ def verify_cutover(url, plan, expected_sha256, receipt):
         _plan_schema_guard(content, revision)
         if _target(connection, url) != content["target"]:
             raise CutoverError("target_mismatch")
+        if revision != issuance_schema.REVISION:
+            raise CutoverError("trusted_receipt_issuance_required: historical_provenance_unavailable")
+        issuances = Table(issuance_schema.NAME, MetaData(), autoload_with=connection, resolve_fks=False)
+        issued = connection.execute(select(issuances).where(issuances.c.control_id == 1)).mappings().all()
+        if len(issued) != 1:
+            raise CutoverError("trusted_receipt_issuance_required: historical_provenance_unavailable")
+        issuance = normalized(dict(issued[0]))
+        binding = {key: value for key, value in issuance.items() if key != "receipt_sha256"}
+        if (issuance["target_sha256"] != digest(content["target"])
+                or issuance["plan_sha256"] != expected_sha256
+                or issuance["authority_sha256"] != content["authority_sha256"]
+                or inventory.utc(issuance["effective_at"]) != _boundary(content["rules_from_week_start"])
+                or receipt.get("issuance") != binding
+                or receipt["verification"].get("evidence_contract") != issuance["evidence_contract"]
+                or not hmac.compare_digest(digest(receipt), issuance["receipt_sha256"])):
+            raise CutoverError("activation_receipt_issuance_mismatch")
         rows = _snapshot(connection, _tables(connection))
         boundary = _boundary(content["rules_from_week_start"])
         control = rows["persistent_team_control"]
@@ -668,7 +689,7 @@ def verify_cutover(url, plan, expected_sha256, receipt):
                 key=lambda row: row["profile_id"])
             if actual != roster:
                 raise CutoverError("closing_legacy_roster_not_established")
-        evidence, evidence_contract, excluded_columns = _receipt_evidence(rows, content, revision, receipt)
+        evidence, evidence_contract, excluded_columns = _receipt_evidence(rows, issuance)
         if evidence != receipt["verification"].get("after"):
             raise CutoverError("post_activation_state_changed: do_not_reapply")
         return {"passed": True, "after": evidence, "persistent_authority_active": True,

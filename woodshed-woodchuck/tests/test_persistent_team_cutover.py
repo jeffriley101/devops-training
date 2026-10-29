@@ -33,7 +33,7 @@ def seed(url, *, migrated=False):
         # This fixture represents p21, including when later models are imported.
         Base.metadata.create_all(engine, tables=[
             table for table in Base.metadata.sorted_tables
-            if not table.name.startswith("classroom_")
+            if not table.name.startswith("classroom_") and table.name != "persistent_team_receipt_issuances"
         ])
         with engine.begin() as c:
             c.execute(text("CREATE TABLE alembic_version (version_num VARCHAR(32) PRIMARY KEY NOT NULL)"))
@@ -102,9 +102,15 @@ def seed(url, *, migrated=False):
 
 
 @pytest.fixture(params=["sqlite", "postgresql"])
-def db(request, tmp_path):
+def db(request, tmp_path, monkeypatch):
     url = disposable_url(tmp_path, request.param)
-    engine = seed(url)
+    # Activation now requires authoritative issuance storage. Exercise the real
+    # successor schema; keep seed(migrated=False) for explicitly historical tests.
+    from alembic import command
+    from tests.test_classroom_s1_migration import config
+    monkeypatch.setenv("DATABASE_URL", url)
+    command.upgrade(config(), "p31pta001")
+    engine = seed(url, migrated=True)
     yield url, engine
     engine.dispose()
 

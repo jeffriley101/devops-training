@@ -18,7 +18,7 @@ def compare_p21_metadata(connection):
     # unexpected later tables in the actual database must still be detected.
     expected = MetaData()
     for table in Base.metadata.sorted_tables:
-        if not table.name.startswith("classroom_"):
+        if not table.name.startswith("classroom_") and table.name != "persistent_team_receipt_issuances":
             table.to_metadata(expected)
     return compare_metadata(MigrationContext.configure(connection), expected)
 

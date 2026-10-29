@@ -18,8 +18,10 @@ membership authority. Current authority remains legacy until the separately
 reviewed boundary operation.
 
 The compatible calendar and PTA operators accept exactly one installed revision,
-`p21team001`, `c22class001`, `c23class001`, `c24class001`, or `w25weekly005`. PLAN, APPLY,
-ACTIVATE and VERIFY all retain structural validation; the installed stamp alone
+`p21team001`, `c22class001`, `c23class001`, `c24class001`, `w25weekly005`, and
+`c25class001` through `c30class001`, and `p31pta001`. PLAN and APPLY remain
+available on the earlier reviewed schemas. New ACTIVATE and authenticated VERIFY
+require `p31pta001` issuance storage. Every operation retains structural validation; the installed stamp alone
 does not grant access. Existing required columns, staging/authority checks,
 partial unique indexes, restrictive origin-season foreign keys and exact
 membership-interval trigger checks remain in force. The c22 extension additionally
@@ -78,41 +80,108 @@ account deletion do not create student-choice records. Carried membership
 does not consume correction allowance. Effective authority uses half-open
 membership intervals and explicit persistent markers.
 
-## Weekly schema and historical evidence
+## Schema and authoritative receipt issuance
 
-`w25weekly005` support requires the cumulative S1, S2 and S3 Classroom
-contracts, their enforcement guards, the exact five Weekly tables, and the
-nullable `first_choice_instrument` / `game_mode` profile additions. The stamp
-alone is insufficient. Partial Weekly revisions, unknown descendants, missing
-or altered constraints/defaults/indexes, disabled enforcement and unexpected
-Weekly/profile triggers refuse. All existing migration files are unchanged.
-This does not authorize production migration, feature activation, historical
-continuity repair, or a change to finalizer v3 provenance rules.
+`p31pta001` is the single successor of `c30class001`. It adds only
+`persistent_team_receipt_issuances`; no Classroom authorization behavior changes.
+Its migration creates an empty table and enforcement guards. It does not backfill
+provenance, rewrite approvals or receipts, or activate authority. Production
+migration, deployment, and cutover still require separate OPS authorization.
 
-An **unstaged** approval from an older revision cannot be applied on w25. Generate
-and review a new plan; never edit the old revision, content or SHA-256. A plan
-already staged on p21/c22/c23/c24 may activate on w25 only if its exact stored
-approval, target, boundary and current authority fingerprint still agree.
-Current-schema rows are compared before/after the transaction, including all
-Classroom/Weekly rows, profile preferences, protected states and reward data.
+The explicit reviewed lineage is:
 
-Unversioned activation receipts created on p21 through c24 hashed all 18 profile
-columns then present. Verification on w25 reproduces **that exact original column
-set**, compares the unchanged original digests for every original receipt table,
-and reports `receipt_coverage` explicitly. It does not attest the two later
-profile columns or Classroom/Weekly extension rows. Changes to any originally
-covered value still refuse with `post_activation_state_changed: do_not_reapply`.
-The original approval and receipt are neither rewritten nor upgraded. This
-remains an immediate post-activation evidence comparison, not a repair tool or a
-promise that historical receipts verify after subsequent normal account activity.
+```text
+p21team001 -> c22class001 -> c23class001 -> c24class001
+  -> w25weekly005 -> c25class001 -> c26class001 -> c27class001
+  -> c28class001 -> c29class001 -> c30class001 -> p31pta001
+```
 
-New w25 activation receipts include `evidence_contract: pta-w25weekly005-v1`
-and cover both new profile columns in their full-row hashes. This is true even
-when the stored approval predates w25. Unknown coverage markers refuse; a new
-w25 approval cannot use an unversioned receipt. There is no fallback from a failed
-current-schema digest to a legacy digest. Extension row preservation is checked
-inside each transaction separately; it is never claimed as historical receipt
-coverage. A receipt mismatch must be investigated, not resolved by reactivation.
+The intermediate w25weekly001 through w25weekly004 migrations must run in order,
+but remain unsupported operator stopping points. P31 requires all cumulative c30
+Classroom and Weekly contracts, the frozen 20-column profile layout, and its exact
+issuance schema and guards. Unknown descendants and falsely stamped schemas
+refuse. Earlier migration files remain unchanged.
+
+An **unstaged** older approval still cannot APPLY on a newer schema. A plan
+already staged on a reviewed earlier revision may ACTIVATE after migration to
+p31 only if its original stored approval, hash, target, authority fingerprint and
+Monday boundary still agree. ACTIVATE on an earlier schema refuses
+`receipt_issuance_schema_required` before authority writes; migrate using an
+OPS-approved procedure rather than issue another unauthenticated receipt.
+
+PTA currently governs one global authority per database/schema: singleton
+`persistent_team_control.id = 1`. It is not partitioned by Classroom Program.
+The issuance record binds that existing scope through a restrictive foreign key
+and a digest of the exact approved database/schema target. It also binds the
+approved plan's canonical SHA-256, approved authority fingerprint, actual
+activation revision, authorized boundary, issuance time, random receipt identity,
+coverage contract, and canonical digest of the entire returned receipt.
+A receipt from a different database/schema authority cannot be substituted even
+when both databases use control ID 1. No Classroom Program or new enrollment
+relationship is inferred from a PTA receipt.
+
+Issuance and activation share the existing fenced transaction. The operator
+inserts issuance while the exact control is still staged, then performs the final
+activation update and proves the complete expected business state before commit.
+The digest covers that verified final state; the issuance table is kept outside
+the original receipt table set to avoid a circular digest. The entire issuance row
+is checked before commit. Any failure rolls back issuance and authority together.
+A repeat activation refuses and cannot replace the existing record.
+Staging and calendar writes preserve the issuance table exactly, including its
+empty state, so unexpected insertion by a write side effect also rolls back.
+
+Database guards enforce one issuance per control and reject retroactive insertion
+after activation. UPDATE and DELETE always refuse. PostgreSQL also refuses
+TRUNCATE, including cascading truncation. SQLite INSERT OR REPLACE is blocked by
+the insertion guard before replacement can delete evidence, including when
+recursive triggers are disabled. Primary/unique keys and the control foreign key
+provide additional identity constraints. PostgreSQL guards use a fixed schema
+search path and ALWAYS enforcement; operators validate their bodies, firing mode,
+function properties, constraints, and foreign-key enforcement. These guards
+protect supported application and operator DML, not a database owner who can
+replace the schema or restore arbitrary database files.
+
+VERIFY obtains the contract from the issuance row for the trusted singleton,
+checks every binding against the approved plan and receipt, and verifies the
+receipt's complete canonical digest against the immutable stored digest. Only
+then does it compare current rows under that stored contract. P31 issues exactly
+`pta-w25weekly005-v1`, covering all 20 profile columns. Removing a marker, replacing
+a digest, or splicing an old 18-column plan digest cannot change this contract.
+There is no digest-format fallback and no legacy projection in VERIFY.
+
+| Evidence | Behavior under the new verifier |
+| --- | --- |
+| New p31 receipt with matching issuance record | Verify the full 20-column contract and every original receipt table; changed covered data refuses. |
+| Genuine pre-w25 18-column receipt without issuance provenance | Preserve the artifact exactly; refuse `trusted_receipt_issuance_required`. Do not pretend it covered later columns. |
+| Historical marked w25 or c25–c30 receipt without issuance provenance | Preserve the artifact exactly; refuse `trusted_receipt_issuance_required`. |
+| Historical unmarked c25–c30 receipt | Preserve its full original digests; refuse missing issuance evidence. Never reinterpret as 18-column evidence. |
+| Altered marker, digest, identity, target or binding on an issued receipt | Refuse `activation_receipt_issuance_mismatch`. |
+
+The old plan revision proves plan creation history, not receipt issuance history.
+A c24 plan can have activated before or after the profile additions. No migration
+can infer which event happened from a mutable marker or matching digest. Historical
+activations with no issuance row remain unauthenticated; the new operator cannot
+mint a replacement record for them. Keep receipts, plans and backups for OPS
+review. Do not clear activation, rewrite the plan, restamp the schema, or rerun
+ACTIVATE to manufacture provenance. An independent archival-authentication process
+would require a separately approved design; none is provided by this migration.
+
+Receipt coverage remains separate from transactional preservation. APPLY and
+ACTIVATE compare full current business rows, including all installed Classroom
+and Weekly extensions, and roll back unexpected changes. The historical receipt
+table set does not attest extension rows merely because the operator preserved
+them. Normal later activity can still invalidate immediate-state receipt checks.
+
+Downgrade from p31 refuses whenever any issuance record exists, under the same
+control/table locking order used for activation. An unused empty installation can
+return to c30 without changing business records. Existing c29/c30 refusal guards
+remain unchanged. There is no production downgrade or provenance-repair shortcut.
+
+Upgrade every separately installed Calendar/PTA artifact and its schema-contract
+modules before an approved schema migration. Coordinate migrations with staged
+Monday boundaries; do not move a boundary or clear the runtime fence to bypass an
+incompatible operator. Classroom feature gates remain independent and OFF unless
+separately authorized.
 
 ## Inventory and approval
 
@@ -155,23 +224,23 @@ and cleartext codes are not exported. PLAN uses repeatable-read/read-only
 PostgreSQL or a query-only existing SQLite file; it has no writable fallback.
 
 An installed revision and an immutable plan's PTA contract are separate facts.
-New p21 plans keep their existing format. New c22/c23/c24/w25 plans record
+New p21 plans keep their existing format. New c22/c23/c24/w25/c25-through-c30/p31 plans record
 `content.revision` as their actual installed revision and
 `content.pta_contract_revision = p21team001`; they do not claim that the installed
 schema is p21. The original canonical hash, exact selected IDs, database/schema
 target and authority fingerprint remain the approval. Compatibility does not
 authorize editing the approved file or substituting a fresh hash.
 
-| Approved artifact | Compatible operator behavior after reviewed additive upgrades through w25weekly005 |
+| Approved artifact | Compatible operator behavior after reviewed additive upgrades through p31pta001 |
 | --- | --- |
 | Unstaged plan from an earlier revision supplied to APPLY | Refuse `plan_schema_revision_changed` before writes; create a PLAN on the installed revision and obtain fresh approval. |
-| Exact p21/c22/c23/c24 plan already staged on its original revision | ACTIVATE and immediate VERIFY retain its original file, hash, boundary and stored stage if approved authority and all existing checks pass. |
-| Activation and receipt already created on p21/c22/c23/c24 | VERIFY accepts the original plan/hash/receipt only if actual activation and every originally protected evidence row remain exactly unchanged. |
-| New c22/c23/c24/w25 plan | PLAN -> APPLY -> ACTIVATE -> VERIFY uses the same exact-ID approval, target, acknowledgments, boundary, locking and rollback requirements as p21. |
+| Exact supported plan already staged on its original revision | ACTIVATE on p31 and immediate VERIFY retain the original file, hash, boundary and stored stage if approved authority and all existing checks pass; issuance records the actual activation revision. |
+| Activation and receipt already created on a supported earlier revision | VERIFY fails closed when issuance provenance is absent. Preserve the plan and receipt without rewriting either. |
+| New supported-revision plan | PLAN and APPLY keep exact-ID approval and target rules. ACTIVATE/VERIFY on p31 add mandatory issuance provenance while retaining acknowledgments, boundary, locking and rollback requirements. |
 
 Existing receipts retain their original protected-table coverage. They do not
 retroactively attest to Classroom/Weekly tables or profile columns installed later.
-The w25 receipt coverage rules above make this distinction explicit. Compatible
+The issuance and historical-refusal rules above make this distinction explicit. Compatible
 APPLY and ACTIVATE separately snapshot and compare all installed extension rows within their
 mutation transactions and roll back an unexpected change; ordinary calendar apply
 does the same. This preservation evidence does not rewrite a plan, stored stage
@@ -344,14 +413,14 @@ fragment. Receipts record the before/after evidence. A later ordinary write can
 make an exact receipt comparison fail even when activation committed correctly;
 this is why operators should keep the verification window quiet.
 
-VERIFY independently checks actual activation, approved
-authority, week rules, and closing-roster evidence in addition to the receipt;
+VERIFY independently authenticates the receipt against its immutable issuance
+record and checks actual activation, approved authority, week rules, and closing-roster evidence;
 a receipt describing an unchanged, inactive database is insufficient. Repeating
 an activated plan cannot reset authority or duplicate roster evidence.
 
 VERIFY is an exact activation/receipt check, not an evergreen health check.
 Additional weeks, membership changes or ordinary practice/reward activity may
-invalidate its exact comparison, including after a c22 migration.
+invalidate its exact comparison.
 `post_activation_state_changed: do_not_reapply` and other relevant refusals remain
 valid outcomes; never recreate the old receipt or automatically activate again to
 make verification pass. A schema-only additive upgrade cannot excuse a real
