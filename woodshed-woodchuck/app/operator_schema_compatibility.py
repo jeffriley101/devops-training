@@ -10,7 +10,7 @@ import re
 
 from sqlalchemy import INTEGER, JSON, Boolean, Date, DateTime, Integer, MetaData, String, Table, inspect, select, text
 
-SUPPORTED_REVISIONS = ("p21team001", "c22class001", "c23class001", "c24class001", "w25weekly005", "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001")
+SUPPORTED_REVISIONS = ("p21team001", "c22class001", "c23class001", "c24class001", "w25weekly005", "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001")
 
 # Frozen migration contract: sharing preferences are not reporting authority.
 _C25 = {
@@ -597,6 +597,13 @@ def _check_sql(dialect, table, constraint, value):
              if dialect == "postgresql" else None)
     if forms is not None and normalized == _sql(forms[1]):
         return _sql(forms[0])
+    if dialect == "postgresql":
+        # c32 has its own finite restore qualification. Do not expand the
+        # audited C5 mappings or teach the general normalizer to erase casts.
+        from .operator_classroom_enrollment_contract import C32, POSTGRES_RESTORE_CHECK_FORMS
+        restored = POSTGRES_RESTORE_CHECK_FORMS.get((table, constraint))
+        if restored is not None and normalized == _sql(restored):
+            return _sql(C32[table]["pg_checks"][constraint])
     return normalized
 
 
@@ -609,40 +616,45 @@ def installed_revision(connection, error):
     if len(revisions) != 1 or revisions[0] not in SUPPORTED_REVISIONS:
         raise error("revision_not_approved: require exactly one of " + ", ".join(SUPPORTED_REVISIONS))
     revision = revisions[0]
-    if revision != "p31pta001" and "persistent_team_receipt_issuances" in tables:
+    if revision not in {"p31pta001", "c32enroll001"} and "persistent_team_receipt_issuances" in tables:
         raise error("revision_not_approved: receipt_schema_revision_mismatch")
+    from .operator_classroom_enrollment_contract import C32
+    if revision != "c32enroll001" and set(C32) & tables:
+        raise error("revision_not_approved: enrollment_schema_revision_mismatch")
     if revision == "p21team001":
         return revision
     expected_tables = dict(_C22)
-    if revision in {"c23class001", "c24class001", "w25weekly005", "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001"}:
+    if revision in {"c23class001", "c24class001", "w25weekly005", "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001"}:
         from .operator_classroom_s2_contract import C23
         expected_tables.update(C23)
-    if revision in {"c24class001", "w25weekly005", "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001"}:
+    if revision in {"c24class001", "w25weekly005", "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001"}:
         from .operator_classroom_s3_contract import C24
         expected_tables.update(C24)
-    if revision in {"w25weekly005", "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001"}:
+    if revision in {"w25weekly005", "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001"}:
         from .operator_weekly_contract import W25
         expected_tables.update(W25)
-    if revision in {"c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001"}:
+    if revision in {"c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001"}:
         expected_tables.update(_C25)
-    if revision in {"c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001"}:
+    if revision in {"c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001"}:
         from .operator_classroom_invitation_contract import C26
         expected_tables.update(C26)
-    if revision in {"c27class001", "c28class001", "c29class001", "c30class001", "p31pta001"}:
+    if revision in {"c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001"}:
         from .operator_classroom_invited_sharing_contract import C27
         expected_tables.update(C27)
-    if revision in {"c28class001", "c29class001", "c30class001", "p31pta001"}:
+    if revision in {"c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001"}:
         from .operator_classroom_deadline_contract import C28
         expected_tables.update(C28)
-    if revision in {"c29class001", "c30class001", "p31pta001"}:
+    if revision in {"c29class001", "c30class001", "p31pta001", "c32enroll001"}:
         from .operator_classroom_progress_contract import C29
         expected_tables.update(C29)
-    if revision in {"c30class001", "p31pta001"}:
+    if revision in {"c30class001", "p31pta001", "c32enroll001"}:
         from .operator_classroom_progress_revision_contract import C30
         expected_tables.update(C30)
-    if revision == "p31pta001":
+    if revision in {"p31pta001", "c32enroll001"}:
         from .pta_receipt_schema import P31
         expected_tables.update(P31)
+    if revision == "c32enroll001":
+        expected_tables.update(C32)
     dialect = connection.dialect.name
     if dialect not in {"sqlite", "postgresql"}:
         raise error("classroom_schema_backend_not_supported")
@@ -801,17 +813,17 @@ def installed_revision(connection, error):
                                for token in re.split(r"('(?:''|[^'])*')", _sql(value)))
             if predicate_shape(actual_predicate) != predicate_shape(predicate):
                 refuse("indexes")
-    if revision in {"c23class001", "c24class001", "w25weekly005", "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001"}:
+    if revision in {"c23class001", "c24class001", "w25weekly005", "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001"}:
         from .operator_classroom_s2_contract import validate_s2_guards
         validate_s2_guards(connection, error)
-    if revision in {"c24class001", "w25weekly005", "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001"}:
+    if revision in {"c24class001", "w25weekly005", "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001"}:
         from .operator_classroom_s3_contract import validate_s3_guards
         validate_s3_guards(connection, error)
-    if revision in {"w25weekly005", "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001"}:
+    if revision in {"w25weekly005", "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001"}:
         from .operator_weekly_contract import validate_profile_and_triggers
         validate_profile_and_triggers(connection, error, lambda value: _check_sql(
             dialect, "woodchuck_profiles", "ck_woodchuck_profile_game_mode", value))
-    if revision == "p31pta001":
+    if revision in {"p31pta001", "c32enroll001"}:
         from .pta_receipt_schema import validate_guards
         validate_guards(connection, error)
     return revision
@@ -819,29 +831,32 @@ def installed_revision(connection, error):
 
 def classroom_snapshot(connection, revision):
     """Preserve extensions, profile/economy rows and issuance independently of receipts."""
-    if revision not in {"c22class001", "c23class001", "c24class001", "w25weekly005", "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001"}:
+    if revision not in {"c22class001", "c23class001", "c24class001", "w25weekly005", "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001"}:
         return {}
     names = CLASSROOM_TABLES
-    if revision in {"c23class001", "c24class001", "w25weekly005", "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001"}:
+    if revision in {"c23class001", "c24class001", "w25weekly005", "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001"}:
         from .operator_classroom_s2_contract import C23
         names += tuple(C23)
-    if revision in {"c24class001", "w25weekly005", "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001"}:
+    if revision in {"c24class001", "w25weekly005", "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001"}:
         from .operator_classroom_s3_contract import C24
         names += tuple(C24)
-    if revision in {"w25weekly005", "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001"}:
+    if revision in {"w25weekly005", "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001"}:
         from .operator_weekly_contract import PRESERVED_TABLES
         names += PRESERVED_TABLES
-    if revision in {"c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001"}:
+    if revision in {"c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001"}:
         names += tuple(_C25)
-    if revision in {"c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001"}:
+    if revision in {"c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001"}:
         from .operator_classroom_invitation_contract import C26
         names += tuple(C26)
-    if revision in {"c29class001", "c30class001", "p31pta001"}:
+    if revision in {"c29class001", "c30class001", "p31pta001", "c32enroll001"}:
         from .operator_classroom_progress_contract import C29
         names += tuple(C29)
-    if revision == "p31pta001":
+    if revision in {"p31pta001", "c32enroll001"}:
         from .pta_receipt_schema import NAME
         names += (NAME,)
+    if revision == "c32enroll001":
+        from .operator_classroom_enrollment_contract import C32
+        names += tuple(C32)
     metadata = MetaData()
     tables = [Table(name, metadata, autoload_with=connection, resolve_fks=False)
               for name in names]

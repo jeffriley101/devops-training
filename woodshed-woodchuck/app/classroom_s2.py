@@ -557,16 +557,32 @@ def join_class(session, *, student, program_id, code=None, intent=None):
     # Eligibility locks can wait. Recheck time, code and all paid entry predicates
     # immediately before writing, including an intent expiring during that wait.
     row = _entry(session, program_id, code=code, intent=intent, student=student)
-    anchor = _anchor(session, row.class_id, profile.id)
+    return _enroll_student(session, profile=profile, program_id=program_id,
+                           class_id=row.class_id, code_id=row.id)
+
+
+def _enroll_student(session, *, profile, program_id, class_id, code_id=None):
+    """Shared membership write, AFTER the caller validates its entry authority.
+
+    The code and Enrollment V2 adapters hold Program -> Class -> account locks,
+    authenticate the exact student and recheck their own entry proof after waits.
+    This private write is not an alternative public entry/authentication service.
+    It never changes reporting, chart sharing, parent consent or consumer access.
+    """
+    if session.info.get("classroom_write_program") != (session.get_transaction(), program_id):
+        raise ClassroomDenied("Enrollment requires its Program-first transaction.")
+    _active(session, program_id, class_id, enrollment=True)
+    _paid(session, program_id)
+    anchor = _anchor(session, class_id, profile.id)
     if anchor is None:
-        anchor = ClassroomStudentMembership(class_id=row.class_id, profile_id=profile.id)
+        anchor = ClassroomStudentMembership(class_id=class_id, profile_id=profile.id)
         session.add(anchor)
         session.flush()
     if _held(session, anchor.id):
         raise ClassroomDenied("Membership requires explicit reinstatement.")
     if _open_period(session, anchor, _now()):
         _audit(session, program_id, "student_joined", student=profile.id, profile_id=profile.id,
-               class_id=row.class_id, membership_id=anchor.id, code_id=row.id,
+               class_id=class_id, membership_id=anchor.id, code_id=code_id,
                entitlement_id=_paid(session, program_id).entitlement_id)
     return anchor
 
