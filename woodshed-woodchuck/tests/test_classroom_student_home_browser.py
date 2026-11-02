@@ -10,6 +10,7 @@ from app.child_models import ConsentEvidence
 from app.feature_access import FEATURES, Feature
 from app.models import WoodchuckProfile, PracticeChart
 from app.weekly_models import WeeklyPlan, WeeklyInstrumentPlan
+from app.weekly import CENTRAL
 from test_classroom_student_home import (
     student_home, guardian_data, migrated_db, captured, adult_pin_hash,
     allowed_class, parent_proof, rows, FOCI,
@@ -73,7 +74,7 @@ def test_student_home_focus_instrument_mode_practice_and_withdrawal(student_site
         assert page.get_by_role('button', name='Start Homework', exact=False).count() == 0
         refs.clock[0] += timedelta(seconds=2)
         with refs.factory() as session:
-            session.add(PracticeChart(profile_id=refs.profile_id, practice_date=refs.clock[0].date(),
+            session.add(PracticeChart(profile_id=refs.profile_id, practice_date=refs.clock[0].astimezone(CENTRAL).date(),
                 created_at=refs.clock[0], instrument='Clarinet', source='p-book', minutes=15,
                 note='STUDENT PRIVATE NOTE', practice_details=['STUDENT PRIVATE DETAIL']))
             session.commit()

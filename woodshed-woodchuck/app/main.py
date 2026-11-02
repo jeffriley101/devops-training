@@ -40,6 +40,7 @@ from .classroom_guardian_routes import router as classroom_guardian_router
 from .classroom_school_routes import router as classroom_school_router
 from .classroom_enrollment_routes import router as classroom_enrollment_router
 from .classroom_student_home import router as classroom_student_home_router
+from .classroom_choice_routes import router as classroom_choice_router
 from .classroom_enrollment import enabled as classroom_enrollment_enabled
 from .classroom_management_routes import router as classroom_management_router, enabled as classroom_management_enabled
 from .classroom_identity_routes import router as classroom_identity_router
@@ -155,6 +156,7 @@ app.include_router(classroom_guardian_router)
 app.include_router(classroom_school_router)
 app.include_router(classroom_enrollment_router)
 app.include_router(classroom_student_home_router)
+app.include_router(classroom_choice_router)
 app.include_router(classroom_management_router)
 app.include_router(classroom_identity_router)
 app.include_router(classroom_workspace_router)

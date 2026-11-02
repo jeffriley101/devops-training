@@ -1,0 +1,7 @@
+<article class="choice-assignment" data-choice-id="{{ assignment.id }}">
+  <p class="enrollment-step">{{ assignment.week }} – {{ assignment.through }} · Central · Version {{ assignment.version }}</p>
+  <h3>{{ assignment.content.title }}</h3>
+  <p data-choice-status>{{ 'Cancelled' if assignment.state == 'cancelled' else assignment.timing | capitalize }}{% if not assignment.editable %} · Read-only{% endif %}</p>
+  {% if assignment.content.kind == 'recipe' %}<p>{{ assignment.content.instrument }} · {{ assignment.content.focus }} · {{ assignment.content.mode }}</p>{% endif %}
+  <ol class="choice-instructions">{% for instruction in assignment.content.instructions %}<li>{{ instruction }}</li>{% endfor %}</ol>
+</article>

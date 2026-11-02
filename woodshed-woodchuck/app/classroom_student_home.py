@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
 
-from . import classroom as s1, classroom_s2 as s2
+from . import classroom as s1, classroom_s2 as s2, classroom_directors_choice as choice
 from . import classroom_enrollment_routes as enrollment, classroom_enrollment_views as views
 from . import classroom_capabilities as capabilities, weekly_plans, weekly_routes, weekly_tasks
 from .age_privacy import eligible
@@ -63,6 +63,8 @@ def _classes(request, account, before):
                 # Full, another Class or another Program. Never serialize sources.
                 item['membership']['access'] = capabilities.capability_decision(session, proof.profile_id,
                     'note-names', program_id=program_id, class_id=class_id).allowed
+                if choice.enabled() and item['membership']['access']:
+                    item['choice'] = choice.student_page(session, student=proof, program_id=program_id, class_id=class_id)
                 _student(session, request, account)
             except s1.ClassroomDenied as error:
                 raise HTTPException(409, 'Your Class status could not be verified. Reopen Classroom.') from error
@@ -127,4 +129,4 @@ def home(request: Request):
     # Standalone rendering avoids the ordinary home renderer's opening rewards.
     return templates.TemplateResponse(request=request, name='classroom_student_home.html', context={
         'account': account, 'ready': ready, 'members': members, 'next_before': next_before,
-        'homework': homework, 'foci': GOAL_OPTIONS})
+        'homework': homework, 'foci': GOAL_OPTIONS, 'choice_enabled': choice.enabled()})

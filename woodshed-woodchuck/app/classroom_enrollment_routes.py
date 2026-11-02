@@ -19,6 +19,7 @@ from .age_privacy import sharing_allowed
 from .classroom_enrollment_models import ClassroomEnrollmentInvitation as Invitation
 from .classroom_models import ClassroomClass, ClassroomStudentMembership
 from .db import SessionLocal
+from . import classroom_directors_choice as choice
 from .login_limits import enforce_login_limit
 from .membership_routes import PrivateRoute
 from .session_origin import same_origin_mutation
@@ -47,7 +48,7 @@ def _number(value, *, optional=False):
     return number
 
 
-async def _form(request):
+async def _form(request, *, max_bytes=4096):
     _enabled()
     if not same_origin_mutation(request):
         raise HTTPException(403, 'A same-origin request is required.')
@@ -56,7 +57,7 @@ async def _form(request):
     body = bytearray()
     async for chunk in request.stream():
         body.extend(chunk)
-        if len(body) > 4096:
+        if len(body) > max_bytes:
             raise HTTPException(413, 'The enrollment form is too large.')
     try:
         pairs = parse_qsl(body.decode('utf-8'), keep_blank_values=True, strict_parsing=True,
@@ -103,6 +104,7 @@ def _page(request, *, mode='home', status_code=200, **context):
         status_code=status_code, context={'title': 'Classroom enrollment', 'mode': mode,
         'csrf': csrf_token(request), 'account': None if mode.startswith('director') else _account(request),
         'message': request.session.pop('classroom_enrollment_message', None),
+        'choice_enabled': choice.enabled(),
         'management_enabled': service.enabled() and os.getenv('CLASSROOM_DIRECTOR_ENABLED') == '1', **context})
 
 

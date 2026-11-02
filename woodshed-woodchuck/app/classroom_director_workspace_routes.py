@@ -9,6 +9,7 @@ from . import classroom as s1, classroom_identity, classroom_management_routes a
 from . import classroom_management_views, classroom_director_workspace as service
 from .classroom_enrollment_routes import _adult, _number
 from .db import SessionLocal
+from . import classroom_directors_choice as choice
 from .membership_routes import PrivateRoute
 from .site_admin import csrf_token
 from .verifier_routes import current_verifier
@@ -36,7 +37,7 @@ def _page(request, **context):
         verifier = current_verifier(request, session)
         director = {'id': verifier.id, 'name': verifier.display_name} if verifier else None
     response = templates.TemplateResponse(request=request, name='classroom_director_workspace.html',
-        context={'title': 'Classroom Director Dashboard', 'director': director, 'csrf': csrf_token(request), **context},
+        context={'title': 'Classroom Director Dashboard', 'director': director, 'csrf': csrf_token(request), 'choice_enabled': choice.enabled(), **context},
         status_code=context.get('status_code',200))
     response.headers['X-Frame-Options'] = 'DENY'
     return response

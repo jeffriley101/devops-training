@@ -1,0 +1,100 @@
+D2 OPS — Director's Choice local implementation
+Starting checkpoint: 7ef358320d81b509a47533eb7124250d79c19e27
+Workspace: /home/geph/Training_scripts-classroom-completion-20261102
+Branch: feature/classroom-completion-20261102
+
+Implemented contract
+--------------------
+Current, PIN-authenticated teachers can assign an existing Homework recipe or short
+plain-text music-practice instructions to their exact assigned Class. Students see
+Class-labeled Director's Choice separately from their personalized Weekly Loop
+Homework. Assignments use Monday–Sunday America/Chicago weeks, including DST.
+Current/future weeks support creation; expired work is read-only. The saved week
+is fixed; cancel and create new work to change weeks.
+
+Edits and cancellations append immutable versions with author teaching-assignment
+identity, content, state, and timestamp. Directors can inspect version history.
+Cancelled work remains visible as cancelled and is read-only. Stale edits require
+a reload. Identical creation retries return the original saved assignment.
+Assignment and version lists have bounded pagination.
+
+The shared Homework instruction generator is reused without creating personal
+Homework plans, targets, progress, completion, grades, attendance, practice credit,
+or rewards. Custom content is escaped, bounded to a 120-character title and
+1,000-character instructions, and normalizes browser line endings.
+
+Authorization and privacy
+-------------------------
+Every reader/writer rechecks exact Program/Class, active Class, current entitlement,
+and native authentication. Director access requires a current teaching assignment;
+Owner/admin status and another Class never substitute for that assignment.
+
+Student access requires current exact-Class membership, account eligibility, and
+qualified guardian participation where required. Parent withdrawal, membership
+withdrawal/holds, teacher changes, archived Classes, and entitlement loss remove
+access. Work survives teacher changes, but existing parent permissions bound to a
+previous teacher set do not authorize the replacement set. Current authorized
+teachers retain Class work and its original author provenance.
+
+P-Chart invitations do not grant assignment access. Class instructions are not
+student activity history. Nothing grants comprehensive reporting, individual chart
+sharing, school authority, or historical practice disclosure. Under-13 reporting
+and the 26 excluded reporting fields remain unavailable. The 41-field reporting
+implementation, approved Practice Rating calculations, guardian/KWS contract,
+school legal-review gates, and protected P-Chart contract are unchanged.
+
+Routes use native account/PIN proofs, same-origin and CSRF checks, strict bounded
+forms/selectors, post-wait credential/session rechecks, no-store responses, and
+browser privacy clearing. PostgreSQL uses the existing Program-first lock order
+and READ COMMITTED requirement. No teacher/member lists are copied into assignments.
+
+Storage and local status
+------------------------
+Additive migration c36choice001 follows c35school001. It creates only assignment
+anchors and immutable version records, with exact Class/Program/author foreign
+keys and a Class/week paging index. Update/delete/TRUNCATE guards retain history;
+a populated downgrade is refused. Operator schema validation and snapshots cover
+the new tables and guards. There is no backfill or prior migration rewrite.
+
+CLASSROOM_DIRECTORS_CHOICE_ENABLED defaults off and requires existing Classroom
+and enrollment gates. No activation setting or environment file was changed.
+
+Verification
+------------
+Final result: 381 distinct tests passed; zero remaining failures or skips.
+This includes 14 browser tests and a golden comparison of 768 Homework cases.
+Per-case results are in the evidence folder's test-coverage-final.json and
+implementation-report.txt. The suite includes
+native signed synthetic KWS/parent flows, PostgreSQL observed lock waits, migration
+round trips and preserved rows, immutable history, cross-Class/Program isolation,
+role/entitlement changes, parent withdrawal, session/credential revocation, expiry,
+and desktop/mobile Chrome and Firefox workflows at 1440, 390, and 320 pixels.
+
+The extracted personal Homework generator is checked against the accepted commit
+for all 768 combinations of supported instruments, Focus, Game Mode, rotation, and
+recent-support inputs. Existing student-home test fixtures now use Central practice
+dates, correcting their UTC-midnight assumption without changing application credit
+rules. Temporary SQLite quota failures were diagnosed as EDQUOT; completed fixtures
+were preserved in evidence and later fixtures archived after teardown before retry.
+No authorization checks were relaxed for testing. Earlier attempts remain recorded.
+
+Evidence: /home/geph/review-evidence/classroom-directors-choice-20261102T225736Z
+
+Remaining scope and next UI task
+-------------------------------
+All approved saved-assignment and Classroom-screen requirements are implemented.
+The Weekly Newsletter Director's Choice lane remains unavailable; integrating these
+saved assignments there with exact current authorization and Class labels is the
+next UI task. Completion/assessment tracking remains outside approval and would
+require a separate evidence and disclosure contract.
+
+Existing legal review remains required for the common school agreement, independently
+verified authority/delegation and Program purposes, official-contact/phone evidence,
+identity assurance, annual effective dates, retention, and revocation/renewal duties.
+Separately, the protected Class P-Chart adapter needs review of the named-director
+parent notice and whether fresh Class-specific permission is required. See
+classroom-school-authorization.txt. Neither path is enabled by this change.
+
+No production changes, pushes, deployments, production migrations, provider calls,
+or Classroom activation were performed. Disposable test servers are stopped after
+verification. Existing worktrees and prior evidence are preserved.

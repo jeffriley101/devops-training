@@ -18,7 +18,7 @@
       <a href="/classroom/enrollment"{% if mode in ['home','review'] %} aria-current="page"{% endif %}>Join a Class</a>
       <a href="/classroom/enrollment/invitations"{% if mode == 'inbox' %} aria-current="page"{% endif %}>Invitations</a><a href="/home">My Woodshed</a>
     {% endif %}
-  </nav>
+  {% if choice_enabled %}<a href="/classroom/directors-choice">Director’s Choice</a>{% endif %}</nav>
 </header>
 <main class="enrollment-shell" id="enrollment-main">
 {% macro field_csrf() %}<input type="hidden" name="csrf" value="{{ csrf }}">{% endmacro %}

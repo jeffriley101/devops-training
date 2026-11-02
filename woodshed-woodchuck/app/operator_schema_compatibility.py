@@ -10,7 +10,7 @@ import re
 
 from sqlalchemy import INTEGER, JSON, Boolean, Date, DateTime, Integer, MetaData, String, Table, inspect, select, text
 
-SUPPORTED_REVISIONS = ("p21team001", "c22class001", "c23class001", "c24class001", "w25weekly005", "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001")
+SUPPORTED_REVISIONS = ("p21team001", "c22class001", "c23class001", "c24class001", "w25weekly005", "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001", "c36choice001")
 
 # Frozen migration contract: sharing preferences are not reporting authority.
 _C25 = {
@@ -622,61 +622,66 @@ def installed_revision(connection, error):
     if len(revisions) != 1 or revisions[0] not in SUPPORTED_REVISIONS:
         raise error("revision_not_approved: require exactly one of " + ", ".join(SUPPORTED_REVISIONS))
     revision = revisions[0]
-    if revision not in {"p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001"} and "persistent_team_receipt_issuances" in tables:
+    if revision not in {"p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001", "c36choice001"} and "persistent_team_receipt_issuances" in tables:
         raise error("revision_not_approved: receipt_schema_revision_mismatch")
     from .operator_classroom_enrollment_contract import C32
-    if revision not in {"c32enroll001", "c33identity001", "c34guardian001", "c35school001"} and set(C32) & tables:
+    if revision not in {"c32enroll001", "c33identity001", "c34guardian001", "c35school001", "c36choice001"} and set(C32) & tables:
         raise error("revision_not_approved: enrollment_schema_revision_mismatch")
     from .operator_classroom_identity_contract import C33
-    if revision not in {"c33identity001", "c34guardian001", "c35school001"} and set(C33) & tables:
+    if revision not in {"c33identity001", "c34guardian001", "c35school001", "c36choice001"} and set(C33) & tables:
         raise error("revision_not_approved: private_identity_schema_revision_mismatch")
     from .operator_classroom_guardian_contract import C34
-    if revision not in {"c34guardian001", "c35school001"} and set(C34) & tables:
+    if revision not in {"c34guardian001", "c35school001", "c36choice001"} and set(C34) & tables:
         raise error("revision_not_approved: guardian_schema_revision_mismatch")
+    from .operator_classroom_choice_contract import C36
+    if revision != "c36choice001" and set(C36) & tables:
+        raise error("classroom_revision_schema_mismatch: c36choice001")
     from .operator_classroom_school_contract import C35, CHART_C35
-    if revision != "c35school001" and set(C35) & tables:
+    if revision not in {"c35school001", "c36choice001"} and set(C35) & tables:
         raise error("revision_not_approved: school_schema_revision_mismatch")
     if revision == "p21team001":
         return revision
     expected_tables = dict(_C22)
-    if revision in {"c23class001", "c24class001", "w25weekly005", "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001"}:
+    if revision in {"c23class001", "c24class001", "w25weekly005", "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001", "c36choice001"}:
         from .operator_classroom_s2_contract import C23
         expected_tables.update(C23)
-    if revision in {"c24class001", "w25weekly005", "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001"}:
+    if revision in {"c24class001", "w25weekly005", "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001", "c36choice001"}:
         from .operator_classroom_s3_contract import C24
         expected_tables.update(C24)
-    if revision in {"w25weekly005", "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001"}:
+    if revision in {"w25weekly005", "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001", "c36choice001"}:
         from .operator_weekly_contract import W25
         expected_tables.update(W25)
-    if revision in {"c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001"}:
+    if revision in {"c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001", "c36choice001"}:
         expected_tables.update(_C25)
-    if revision in {"c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001"}:
+    if revision in {"c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001", "c36choice001"}:
         from .operator_classroom_invitation_contract import C26
         expected_tables.update(C26)
-    if revision in {"c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001"}:
+    if revision in {"c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001", "c36choice001"}:
         from .operator_classroom_invited_sharing_contract import C27
         expected_tables.update(C27)
-    if revision in {"c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001"}:
+    if revision in {"c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001", "c36choice001"}:
         from .operator_classroom_deadline_contract import C28
         expected_tables.update(C28)
-    if revision in {"c29class001", "c30class001", "p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001"}:
+    if revision in {"c29class001", "c30class001", "p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001", "c36choice001"}:
         from .operator_classroom_progress_contract import C29
         expected_tables.update(C29)
-    if revision in {"c30class001", "p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001"}:
+    if revision in {"c30class001", "p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001", "c36choice001"}:
         from .operator_classroom_progress_revision_contract import C30
         expected_tables.update(C30)
-    if revision in {"p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001"}:
+    if revision in {"p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001", "c36choice001"}:
         from .pta_receipt_schema import P31
         expected_tables.update(P31)
-    if revision in {"c32enroll001", "c33identity001", "c34guardian001", "c35school001"}:
+    if revision in {"c32enroll001", "c33identity001", "c34guardian001", "c35school001", "c36choice001"}:
         expected_tables.update(C32)
-    if revision in {"c33identity001", "c34guardian001", "c35school001"}:
+    if revision in {"c33identity001", "c34guardian001", "c35school001", "c36choice001"}:
         expected_tables.update(C33)
-    if revision in {"c34guardian001", "c35school001"}:
+    if revision in {"c34guardian001", "c35school001", "c36choice001"}:
         expected_tables.update(C34)
-    if revision == "c35school001":
+    if revision in {"c35school001", "c36choice001"}:
         expected_tables.update(C35)
         expected_tables.update(CHART_C35)
+    if revision == "c36choice001":
+        expected_tables.update(C36)
     dialect = connection.dialect.name
     if dialect not in {"sqlite", "postgresql"}:
         raise error("classroom_schema_backend_not_supported")
@@ -835,59 +840,65 @@ def installed_revision(connection, error):
                                for token in re.split(r"('(?:''|[^'])*')", _sql(value)))
             if predicate_shape(actual_predicate) != predicate_shape(predicate):
                 refuse("indexes")
-    if revision in {"c23class001", "c24class001", "w25weekly005", "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001"}:
+    if revision in {"c23class001", "c24class001", "w25weekly005", "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001", "c36choice001"}:
         from .operator_classroom_s2_contract import validate_s2_guards
         validate_s2_guards(connection, error)
-    if revision in {"c24class001", "w25weekly005", "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001"}:
+    if revision in {"c24class001", "w25weekly005", "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001", "c36choice001"}:
         from .operator_classroom_s3_contract import validate_s3_guards
         validate_s3_guards(connection, error)
-    if revision in {"w25weekly005", "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001"}:
+    if revision in {"w25weekly005", "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001", "c36choice001"}:
         from .operator_weekly_contract import validate_profile_and_triggers
         validate_profile_and_triggers(connection, error, lambda value: _check_sql(
             dialect, "woodchuck_profiles", "ck_woodchuck_profile_game_mode", value))
-    if revision in {"p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001"}:
+    if revision in {"p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001", "c36choice001"}:
         from .pta_receipt_schema import validate_guards
+        validate_guards(connection, error)
+    if revision == "c36choice001":
+        from .classroom_choice_guards import validate_guards
         validate_guards(connection, error)
     return revision
 
 
 def classroom_snapshot(connection, revision):
     """Preserve extensions, profile/economy rows and issuance independently of receipts."""
-    if revision not in {"c22class001", "c23class001", "c24class001", "w25weekly005", "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001"}:
+    if revision not in {"c22class001", "c23class001", "c24class001", "w25weekly005", "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001", "c36choice001"}:
         return {}
     names = CLASSROOM_TABLES
-    if revision in {"c23class001", "c24class001", "w25weekly005", "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001"}:
+    if revision in {"c23class001", "c24class001", "w25weekly005", "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001", "c36choice001"}:
         from .operator_classroom_s2_contract import C23
         names += tuple(C23)
-    if revision in {"c24class001", "w25weekly005", "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001"}:
+    if revision in {"c24class001", "w25weekly005", "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001", "c36choice001"}:
         from .operator_classroom_s3_contract import C24
         names += tuple(C24)
-    if revision in {"w25weekly005", "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001"}:
+    if revision in {"w25weekly005", "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001", "c36choice001"}:
         from .operator_weekly_contract import PRESERVED_TABLES
         names += PRESERVED_TABLES
-    if revision in {"c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001"}:
+    if revision in {"c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001", "c36choice001"}:
         names += tuple(_C25)
-    if revision in {"c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001"}:
+    if revision in {"c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001", "c36choice001"}:
         from .operator_classroom_invitation_contract import C26
         names += tuple(C26)
-    if revision in {"c29class001", "c30class001", "p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001"}:
+    if revision in {"c29class001", "c30class001", "p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001", "c36choice001"}:
         from .operator_classroom_progress_contract import C29
         names += tuple(C29)
-    if revision in {"p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001"}:
+    if revision in {"p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001", "c36choice001"}:
         from .pta_receipt_schema import NAME
         names += (NAME,)
-    if revision in {"c32enroll001", "c33identity001", "c34guardian001", "c35school001"}:
+    if revision in {"c32enroll001", "c33identity001", "c34guardian001", "c35school001", "c36choice001"}:
         from .operator_classroom_enrollment_contract import C32
         names += tuple(C32)
-    if revision in {"c33identity001", "c34guardian001", "c35school001"}:
+    if revision in {"c33identity001", "c34guardian001", "c35school001", "c36choice001"}:
         from .operator_classroom_identity_contract import C33
         names += tuple(C33)
-    if revision in {"c34guardian001", "c35school001"}:
+    if revision in {"c34guardian001", "c35school001", "c36choice001"}:
         from .operator_classroom_guardian_contract import C34
         names += tuple(C34)
-    if revision == "c35school001":
+    if revision in {"c35school001", "c36choice001"}:
         from .operator_classroom_school_contract import C35
         names += tuple(C35)
+    if revision == "c36choice001":
+        from .operator_classroom_choice_contract import C36
+        names += tuple(C36)
     metadata = MetaData()
     tables = [Table(name, metadata, autoload_with=connection, resolve_fks=False)
               for name in names]

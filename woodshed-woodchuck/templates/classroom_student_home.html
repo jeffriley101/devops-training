@@ -6,6 +6,7 @@
   <link rel="stylesheet" href="/static/css/styles.css?v=125">
   <link rel="stylesheet" href="/static/css/classroom-enrollment.css?v=1">
   <link rel="stylesheet" href="/static/css/classroom-student-home.css?v=1">
+  <link rel="stylesheet" href="/static/css/classroom-choice.css?v=1">
 </head>
 <body class="enrollment-page student-home" data-student-account="{{ account or '' }}">
 <header class="enrollment-header"><a class="enrollment-brand" href="/home">Woodshed Woodchuck<span>CLASSROOM</span></a>
@@ -77,6 +78,12 @@
       {% endif %}
     </section>
     </div>
+    {% if choice_enabled %}<section class="enrollment-card" id="student-directors-choice"><p class="enrollment-step">Class assignments</p><h2>Director’s Choice</h2><p>Separate assignments from each Class, alongside your personal Weekly Loop Homework.</p>
+    {% for item in members %}{% if item.choice %}<section class="choice-item" data-choice-class="{{ item.class_id }}"><p>{{ item.program_name }}</p><h3>{{ item.class_name }}</h3>
+    {% for assignment in item.choice.assignments %}{% include 'classroom_choice_card.html' %}{% else %}<p>No saved assignments this week.</p>{% endfor %}
+    <a class="enrollment-button enrollment-secondary" href="/classroom/directors-choice/student/{{ item.program_id }}/classes/{{ item.class_id }}">Open Class assignments and weeks</a></section>
+    {% else %}<p>{{ item.class_name }}: assignments currently unavailable.</p>{% endif %}{% else %}<p>Join an authorized Class to see its assignments.</p>{% endfor %}
+    <p class="enrollment-muted">No completion, grades, attendance, practice credit, or rewards are recorded for these assignments.</p></section>{% endif %}
     <section class="enrollment-card enrollment-privacy" id="student-permissions"><h2>Your sharing choices</h2><p>Joining a Class, authorizing comprehensive reporting, and sharing an individual P-Chart are separate choices. Joining or starting Homework does not grant reporting or P-Chart permission.</p><div class="enrollment-actions"><a class="enrollment-button enrollment-secondary" href="/p-book">Individual P-Chart choices</a><a class="enrollment-button enrollment-secondary" href="/classroom/reporting">Review reporting permission</a></div><p class="enrollment-muted">Existing age and parent requirements apply. Comprehensive director reporting remains unavailable under 13.</p></section>
   </div>
   {% endif %}

@@ -23,7 +23,7 @@ from app.feature_access import FEATURES, Feature
 from app.db import Base
 from app.main import app
 from app.models import PracticeChart, WoodchuckProfile
-from app.weekly import utc_instant
+from app.weekly import CENTRAL, utc_instant
 from app.weekly_homework import homework_spec
 from app.weekly_models import WeeklyPlan, WeeklyInstrumentPlan
 from test_classroom_guardian_authorization import (
@@ -121,7 +121,7 @@ def test_explicit_focus_start_saved_specs_and_actual_submission_evidence(student
             ('Flute', refs.clock[0]+timedelta(days=1), refs.profile_id),
             ('Flute', refs.clock[0]+timedelta(seconds=1), refs.profile_id+1),
         ]:
-            session.add(PracticeChart(profile_id=owner, practice_date=refs.clock[0].date(),
+            session.add(PracticeChart(profile_id=owner, practice_date=refs.clock[0].astimezone(CENTRAL).date(),
                 created_at=submitted, source='p-book', minutes=900, instrument=instrument,
                 note='PRIVATE HOMEWORK NOTE', practice_details=['PRIVATE DETAIL']))
         session.commit()
@@ -130,7 +130,7 @@ def test_explicit_focus_start_saved_specs_and_actual_submission_evidence(student
     assert '0 / 15 minutes of matching submitted practice' in body
     assert 'Weekly Loop qualification not yet met' in body
     with refs.factory() as session:
-        session.add(PracticeChart(profile_id=refs.profile_id, practice_date=refs.clock[0].date(),
+        session.add(PracticeChart(profile_id=refs.profile_id, practice_date=refs.clock[0].astimezone(CENTRAL).date(),
             created_at=refs.clock[0], source='pristine', minutes=1, detected_playing_seconds=901,
             instrument='Flute', note='PRIVATE HOMEWORK NOTE', practice_details=['PRIVATE DETAIL']))
         session.commit()

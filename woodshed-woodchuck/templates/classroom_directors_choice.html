@@ -1,0 +1,65 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer">
+<title>Director’s Choice · Classroom</title><link rel="stylesheet" href="/static/css/classroom-enrollment.css?v=1"><link rel="stylesheet" href="/static/css/classroom-choice.css?v=1">
+</head><body class="enrollment-page">
+<header class="enrollment-header"><a class="enrollment-brand" href="/home">Woodshed Woodchuck<span>CLASSROOM</span></a><nav aria-label="Classroom navigation"><a href="/classroom">My Classroom</a>{% if not student %}<a href="/classroom/directors-choice">Assigned Classes</a><a href="/classroom/dashboard">Director Dashboard</a>{% endif %}</nav></header>
+<main class="enrollment-shell"><p class="enrollment-eyebrow">Class assignments</p><h1>Director’s Choice</h1>
+<p class="enrollment-intro">Practice assigned by your Class director, separate from your personalized Weekly Loop Homework.</p>
+{% macro auth(action, key) -%}
+<input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="director" value="{{ director.id }}">
+{% if action %}<input type="hidden" name="action" value="{{ action }}">{% endif %}
+<label for="pin-{{ key }}">Director PIN</label><input id="pin-{{ key }}" name="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" minlength="4" maxlength="4" autocomplete="off" required>
+{%- endmacro %}
+{% macro content_form(kind, assignment=None) -%}
+{% set key = kind ~ '-' ~ (assignment.id if assignment else 'new') %}
+<form method="post" class="enrollment-form" data-choice-form="{{ key }}">
+  {{ auth('edit' if assignment else 'create', key) }}<input type="hidden" name="kind" value="{{ kind }}">
+  {% if assignment %}<input type="hidden" name="assignment" value="{{ assignment.id }}"><input type="hidden" name="version" value="{{ assignment.version }}">
+  {% else %}<input type="hidden" name="week" value="{{ detail.week }}"><input type="hidden" name="request_key" value="{{ request_key }}">{% endif %}
+  {% if kind == 'custom' %}
+    <label for="title-{{ key }}">Practice title</label><input id="title-{{ key }}" name="title" maxlength="120" required value="{{ assignment.content.title if assignment else '' }}">
+    <label for="instructions-{{ key }}">Short music-practice instructions</label><textarea id="instructions-{{ key }}" name="instructions" maxlength="1000" rows="5" required>{{ assignment.content.instructions | join('\n') if assignment else '' }}</textarea>
+  {% else %}
+    <label for="instrument-{{ key }}">Recipe instrument</label><select id="instrument-{{ key }}" name="instrument" required>{% for instrument in instruments %}<option value="{{ instrument.key }}" {% if assignment and assignment.content.instrument == instrument.key %}selected{% endif %}>{{ instrument.label }}</option>{% endfor %}</select>
+    <label for="focus-{{ key }}">Recipe Focus</label><select id="focus-{{ key }}" name="focus" required>{% for focus in foci %}<option {% if assignment and assignment.content.focus == focus %}selected{% endif %}>{{ focus }}</option>{% endfor %}</select>
+    <label for="mode-{{ key }}">Recipe Game Mode</label><select id="mode-{{ key }}" name="mode" required>{% for mode in modes %}<option {% if assignment and assignment.content.mode == mode %}selected{% endif %}>{{ mode }}</option>{% endfor %}</select>
+    <p class="enrollment-muted">Uses the existing Homework exercise instructions. Students’ personal Homework settings and targets stay separate.</p>
+  {% endif %}
+  <button class="enrollment-button" type="submit">{{ 'Save new version' if assignment else 'Assign recipe' if kind == 'recipe' else 'Assign practice instructions' }}</button>
+</form>
+{%- endmacro %}
+{% if error %}<p role="alert" class="enrollment-notice">{{ error }}</p>{% endif %}
+{% if message %}<p role="status">{{ message }}</p>{% endif %}
+<div data-choice-private>
+{% if not student and not director %}
+<section class="enrollment-card"><h2>Director sign-in required</h2><a class="enrollment-button" href="/trusted-verifiers">Sign in as a director</a></section>
+{% elif detail %}
+<section class="enrollment-card"><p class="enrollment-step">{{ detail.program_name }}</p><h2>{{ detail.class_name }}</h2>
+<p>Week of {{ detail.week }} through {{ detail.through }} (Central).</p>
+<form method="{{ 'get' if student else 'post' }}" class="enrollment-form" data-week-form>
+{% if not student %}{{ auth('view', 'week') }}{% endif %}<input type="hidden" name="before" value="">
+<label for="choice-week">Week starting Monday</label><input type="date" id="choice-week" name="week" value="{{ detail.week }}" required>
+<button type="submit" class="enrollment-button enrollment-secondary">Show week</button></form></section>
+{% if not student and detail.can_create %}<section class="enrollment-card"><h2>Assign to this Class</h2><p>All current eligible members of {{ detail.class_name }} can read these assignments. Work expires at the end of Sunday, Central time.</p>
+<details><summary>Existing Homework recipe</summary>{{ content_form('recipe') }}</details>
+<details><summary>Short practice instructions</summary>{{ content_form('custom') }}</details></section>{% endif %}
+<section class="enrollment-card" id="choice-list"><h2>Assignments</h2>
+{% for assignment in detail.assignments %}
+<div class="choice-item">{% include 'classroom_choice_card.html' %}
+{% if not student %}
+{% if assignment.editable %}<details><summary>Edit assignment</summary>{{ content_form(assignment.content.kind, assignment) }}</details>
+<details><summary>Cancel assignment</summary><p>Cancellation retains the saved instructions and version history. Students see it marked cancelled.</p>
+<form method="post" class="enrollment-form" data-cancel-id="{{ assignment.id }}">{{ auth('cancel', 'cancel-' ~ assignment.id) }}<input type="hidden" name="assignment" value="{{ assignment.id }}"><input type="hidden" name="version" value="{{ assignment.version }}"><button type="submit" class="enrollment-button enrollment-secondary">Confirm cancellation</button></form></details>{% endif %}
+<details><summary>Version history</summary><form method="post" class="enrollment-form" data-history-id="{{ assignment.id }}">{{ auth('history', 'history-' ~ assignment.id) }}<input type="hidden" name="assignment" value="{{ assignment.id }}"><input type="hidden" name="before" value=""><button class="enrollment-button enrollment-secondary">Show version history</button></form></details>
+{% endif %}</div>
+{% else %}<p>No saved assignments for this Class and week.</p>{% endfor %}
+{% if detail.next_before %}{% if student %}<a class="enrollment-button enrollment-secondary" href="?week={{ detail.week }}&amp;before={{ detail.next_before }}">More assignments</a>{% else %}<form method="post" class="enrollment-form">{{ auth('view', 'more') }}<input type="hidden" name="week" value="{{ detail.week }}"><input type="hidden" name="before" value="{{ detail.next_before }}"><button class="enrollment-button enrollment-secondary">More assignments</button></form>{% endif %}{% endif %}</section>
+{% if history %}<section class="enrollment-card" id="choice-history"><h2>Saved version history</h2>{% for assignment in history.versions %}{% include 'classroom_choice_card.html' %}<p>Saved by {{ assignment.author_name }} · {{ assignment.authored_at }} (Central)</p>{% endfor %}
+{% if history.next_before %}<form method="post" class="enrollment-form">{{ auth('history', 'older') }}<input type="hidden" name="assignment" value="{{ history.assignment_id }}"><input type="hidden" name="before" value="{{ history.next_before }}"><button class="enrollment-button enrollment-secondary">Older versions</button></form>{% endif %}</section>{% endif %}
+{% elif classes is defined %}
+<section class="enrollment-card"><h2>Your assigned Classes</h2>{% for item in classes %}<article class="choice-item"><p>{{ item.program_name }}</p><h3>{{ item.class_name }}</h3><a class="enrollment-button" href="/classroom/directors-choice/{{ item.program_id }}/classes/{{ item.class_id }}">Manage assignments</a></article>{% else %}<p>No currently authorized Classes are available.</p>{% endfor %}</section>
+{% else %}
+<section class="enrollment-card enrollment-narrow"><h2>{{ 'Open Class assignments' if class_entry else 'Open assigned Classes' }}</h2><form method="post" class="enrollment-form">{{ auth('view' if class_entry else None, 'entry') }}{% if class_entry %}<input type="hidden" name="week" value="{{ current_week }}"><input type="hidden" name="before" value="">{% endif %}<button class="enrollment-button">Open assignments</button></form></section>
+{% endif %}</div>
+<p class="enrollment-muted">Director’s Choice does not record completion, grades, attendance, practice credit, or rewards. Joining, comprehensive reporting, and individual P-Chart sharing remain separate choices.</p>
+</main><script src="/static/js/classroom-choice.js?v=1" defer></script></body></html>
