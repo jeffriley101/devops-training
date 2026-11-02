@@ -199,7 +199,7 @@ def set_sharing(session, *, student, chart_id, assignment_ids):
     session.flush()
 
 
-def _shared_chart_records(session, *, actor, program_id, class_id):
+def _shared_chart_records(session, *, actor, program_id, class_id, _profile_id=None):
     """Internal, transaction-local records after current exact-source checks.
 
     Both the original chart view and V3 analytics use this boundary. These
@@ -217,10 +217,18 @@ def _shared_chart_records(session, *, actor, program_id, class_id):
     if len(assignments) != 1:
         raise classroom.ClassroomDenied(UNAVAILABLE)
     assignment = assignments[0]
-    rows = session.scalars(select(ClassroomChartDirectorShare).where(
+    query = select(ClassroomChartDirectorShare).where(
         ClassroomChartDirectorShare.class_id == class_id,
         ClassroomChartDirectorShare.assignment_id == assignment.id,
-        ClassroomChartDirectorShare.withdrawn_at.is_(None))).all()
+        ClassroomChartDirectorShare.withdrawn_at.is_(None))
+    if _profile_id is not None:
+        # Internal subject from a freshly authorized Class membership, never a
+        # caller-supplied account lookup. Filter before reading/projecting charts.
+        if type(_profile_id) is not int or _profile_id <= 0:
+            raise classroom.ClassroomDenied(UNAVAILABLE)
+        query = query.join(PracticeChart, PracticeChart.id == ClassroomChartDirectorShare.chart_id).where(
+            PracticeChart.profile_id == _profile_id)
+    rows = session.scalars(query).all()
     output = []
     for share in rows:
         try:

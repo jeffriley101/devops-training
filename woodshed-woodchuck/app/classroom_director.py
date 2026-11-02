@@ -29,6 +29,7 @@ def _require_enabled():
 
 
 def _render(request, verifier, *, program=None, selected_class=None, programs=None, dashboard=None):
+    from .classroom_identity import enabled as private_identity_enabled
     return templates.TemplateResponse(request=request, name="classroom_director.html", context={
         "title": "Classroom", "verifier_name": verifier.display_name,
         "csrf": csrf_token(request), "program": program, "selected_class": selected_class,
@@ -36,6 +37,7 @@ def _render(request, verifier, *, program=None, selected_class=None, programs=No
         "dashboard": dashboard,
         "classroom_enrollment_enabled": classroom_enrollment.enabled(),
         "classroom_management_enabled": enabled() and classroom_enrollment.enabled(),
+        "classroom_workspace_enabled": private_identity_enabled(),
     })
 
 

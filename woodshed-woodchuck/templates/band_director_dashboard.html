@@ -9,7 +9,7 @@
   {% call dashboard_header('Band Director', 'Band Director Dashboard', verifier_name) %}
     <a href="/trusted-verifiers/dashboard">Verifier Dashboard · Review P-Charts</a>
     <a href="/membership?as_account=adult">Membership</a>
-    {% if classroom_director_enabled %}<a href="/classroom/director">Classroom</a>{% endif %}
+    {% if classroom_workspace_enabled %}<a href="/classroom/dashboard">Classroom Director Dashboard</a>{% elif classroom_director_enabled %}<a href="/classroom/director">Classroom</a>{% endif %}
     {% if classroom_enrollment_enabled %}<a href="/classroom/enrollment/director">Class enrollment</a>{% endif %}
     {% if classroom_management_enabled %}<a href="/classroom/programs">Programs &amp; Class management</a>{% endif %}
   {% endcall %}

@@ -40,6 +40,7 @@ from .classroom_enrollment_routes import router as classroom_enrollment_router
 from .classroom_enrollment import enabled as classroom_enrollment_enabled
 from .classroom_management_routes import router as classroom_management_router, enabled as classroom_management_enabled
 from .classroom_identity_routes import router as classroom_identity_router
+from .classroom_director_workspace_routes import router as classroom_workspace_router, enabled as classroom_workspace_enabled
 from .classroom_progress_authorization import enabled as classroom_progress_enabled
 from .verifier_routes import (
     current_verifier,
@@ -150,6 +151,7 @@ app.include_router(classroom_progress_router)
 app.include_router(classroom_enrollment_router)
 app.include_router(classroom_management_router)
 app.include_router(classroom_identity_router)
+app.include_router(classroom_workspace_router)
 app.include_router(verifier_router)
 app.include_router(practice_chart_router)
 app.include_router(personal_development_router)
@@ -384,7 +386,8 @@ def trusted_verifier_dashboard_page(request: Request, connection_id: int | None 
                      "verifier_email": verifier.email,
                      "classroom_director_enabled": classroom_director_enabled(),
                      "classroom_enrollment_enabled": classroom_enrollment_enabled(),
-                     "classroom_management_enabled": classroom_management_enabled(), **snapshot},
+                     "classroom_management_enabled": classroom_management_enabled(),
+                     "classroom_workspace_enabled": classroom_workspace_enabled(), **snapshot},
             headers={"Cache-Control": "no-store"},
         )
 
@@ -421,6 +424,7 @@ def band_director_dashboard_page(request: Request, week: date | None = None):
                 "classroom_director_enabled": classroom_director_enabled(),
                 "classroom_enrollment_enabled": classroom_enrollment_enabled(),
                 "classroom_management_enabled": classroom_management_enabled(),
+                "classroom_workspace_enabled": classroom_workspace_enabled(),
                 **metrics,
             },
             headers={"Cache-Control": "no-store"},

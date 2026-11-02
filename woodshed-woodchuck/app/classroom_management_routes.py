@@ -44,12 +44,13 @@ async def _form(request):
 
 
 def _page(request, *, mode='home', status_code=200, **context):
+    from .classroom_identity import enabled as private_identity_enabled
     with SessionLocal() as session:
         verifier = current_verifier(request, session)
         identity = {'id': verifier.id, 'name': verifier.display_name} if verifier else None
     response = templates.TemplateResponse(request=request, name='classroom_management.html',
         context={'title': 'Programs and Classes', 'csrf': csrf_token(request),
-            'director': identity, 'mode': mode, **context}, status_code=status_code)
+            'director': identity, 'mode': mode, 'workspace_enabled': private_identity_enabled(), **context}, status_code=status_code)
     response.headers['X-Frame-Options'] = 'DENY'
     return response
 

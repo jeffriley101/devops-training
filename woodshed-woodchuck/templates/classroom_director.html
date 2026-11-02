@@ -8,6 +8,7 @@
   <header class="classroom-header">
     <div><p class="classroom-kicker">Woodshed Woodchuck · Director</p><h1 id="classroom-title">Classroom</h1><p>{{ verifier_name }}</p></div>
     <a href="/trusted-verifiers/dashboard">Verifier Dashboard</a>
+    {% if classroom_workspace_enabled %}<a href="/classroom/dashboard{% if selected_class and not selected_class.confirm %}/{{ program.program_id }}/classes/{{ selected_class.id }}{% endif %}">Director Dashboard</a>{% endif %}
     {% if classroom_management_enabled %}<a href="/classroom/programs{% if selected_class and not selected_class.confirm %}/{{ program.program_id }}/classes/{{ selected_class.id }}{% endif %}">Program &amp; Class management</a>{% endif %}
   </header>
   {% if selected_class and not selected_class.confirm %}

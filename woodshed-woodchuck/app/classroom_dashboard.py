@@ -31,8 +31,9 @@ def _timestamp(value):
     return utc(value).isoformat() if value is not None else None
 
 
-def dashboard(session, *, actor, program_id, class_id):
-    records = _shared_chart_records(session, actor=actor, program_id=program_id, class_id=class_id)
+def dashboard(session, *, actor, program_id, class_id, _profile_id=None):
+    records = _shared_chart_records(session, actor=actor, program_id=program_id, class_id=class_id,
+        _profile_id=_profile_id)
     # Only verification status for already-authorized chart IDs. Never verifier
     # identities, responses, contact details, or other students' verifications.
     ids = [chart.id for _, _, chart in records]
