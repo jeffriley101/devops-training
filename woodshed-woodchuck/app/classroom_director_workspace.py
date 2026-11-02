@@ -1,8 +1,8 @@
-"""Three separate director sources; no comprehensive statistics dataset approved."""
+"""Three separate director sources, with the approved individual field contract."""
 from sqlalchemy import select
 
 from . import classroom as s1, classroom_s2 as s2, classroom_management_views as management
-from . import classroom_dashboard as charts, classroom_progress_authorization as progress
+from . import classroom_dashboard as charts, classroom_comprehensive_reporting as reporting
 from .classroom_models import ClassroomStudentMembership
 
 
@@ -14,9 +14,7 @@ def _administration(detail):
 
 
 def _statistics(authorized=None):
-    return {'source': 'separate_reporting_authorization', 'authorization_available': authorized,
-        'field_contract': 'pending', 'values': None,
-        'message': 'Comprehensive statistics are withheld until the exact fields and derived outputs are approved.'}
+    return reporting.unavailable(authorized)
 
 
 @s2._mutation
@@ -33,7 +31,7 @@ def class_view(session, *, actor, program_id, class_id, before=None):
 
 
 @s2._mutation
-def student_view(session, *, actor, program_id, class_id, membership_id):
+def student_view(session, *, actor, program_id, class_id, membership_id, selected_week=None):
     if type(membership_id) is not int or not 1 <= membership_id < 2147483647:
         raise s1.ClassroomDenied('Class student unavailable.')
     # Seek the exact membership in the accepted bounded roster reader. Do not
@@ -51,11 +49,8 @@ def student_view(session, *, actor, program_id, class_id, membership_id):
         profile_id = session.scalar(select(ClassroomStudentMembership.profile_id).where(
             ClassroomStudentMembership.id == membership_id, ClassroomStudentMembership.class_id == class_id))
         try:
-            # Internal boundary only: no DTO IDs, dates, reason or fields are
-            # serialized. An accepted notice is not dataset/field permission.
-            decision = progress.authorize_boundary(session, actor=actor, program_id=program_id,
-                class_id=class_id, profile_id=profile_id)
-            statistics = _statistics(bool(decision.allowed))
+            statistics = reporting.report(session, actor=actor, program_id=program_id,
+                class_id=class_id, profile_id=profile_id, selected_week=selected_week)
         except s1.ClassroomDenied:
             pass
         try:

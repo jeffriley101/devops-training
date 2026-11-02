@@ -114,7 +114,7 @@ def test_pg_exact_program_class_and_membership_scope(workspace_pg, changes):
         with pytest.raises(s1.ClassroomDenied): read(session, refs, adult=3)
 
 
-def test_pg_valid_reporting_notice_is_not_a_data_field_grant(workspace_pg):
+def test_pg_valid_reporting_notice_uses_only_new_approved_field_reader(workspace_pg):
     refs = workspace_pg
     with refs.factory() as session:
         row = accept(session, refs)
@@ -125,8 +125,10 @@ def test_pg_valid_reporting_notice_is_not_a_data_field_grant(workspace_pg):
         assert proof.allowed and proof.starts_at == boundary.utc(accepted_at)
         data = read(session, refs)
         assert data['statistics']['authorization_available'] is True
-        assert data['statistics']['field_contract'] == 'pending'
-        assert data['statistics'].get('values') is None
+        assert data['statistics']['field_contract'] == 'classroom-reporting-41-v1'
+        assert len(data['statistics']['values']['fields']) == 41
+        # No complete occurrence day has elapsed in this accepted interval.
+        assert all(value is None for value in data['statistics']['values']['fields'].values())
         assert 'SHARED_PG_WORKSPACE_SENTINEL' in serialized(data)
         assert count_rows(session, ClassroomProgressAuthorization) == 1
         assert session.get(ClassroomProgressAuthorization, authorization_id).withdrawn_at is None
@@ -165,7 +167,8 @@ def test_pg_chart_withdrawal_keeps_admin_and_reporting_independent(workspace_pg)
         assert data['statistics']['authorization_available'] is True
         encoded = serialized(data)
         assert 'PG Workspace School Synthetic' in encoded
-        assert 'SHARED_PG_WORKSPACE_SENTINEL' not in encoded and data['statistics'].get('values') is None
+        assert 'SHARED_PG_WORKSPACE_SENTINEL' not in encoded
+        assert len(data['statistics']['values']['fields']) == 41
 
 
 def test_pg_waiting_view_does_not_retain_revoked_teaching_authority(workspace_pg):

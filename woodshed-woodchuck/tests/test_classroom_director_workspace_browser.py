@@ -125,7 +125,7 @@ def assert_separate_sources(page):
         expect(page.locator(selector)).to_be_visible()
     stats = page.locator('#authorized-statistics').inner_text()
     assert SHARED_NOTE not in stats and PRIVATE_NOTE not in stats
-    assert re.search(r'not.+approv|not available|await|pending|withheld', stats, re.I), stats
+    assert re.search(r'not.+approv|unavailable|not available|await|pending|withheld', stats, re.I), stats
     assert PUBLIC_NICKNAME not in page.content()
     assert PRIVATE_NOTE not in page.content()
     assert 'PRIVATE_VERIFIER_RESPONSE' not in page.content()

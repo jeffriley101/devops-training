@@ -1,5 +1,6 @@
 """PIN-confirmed director workspace; Connected Students remains a separate app."""
 from pathlib import Path
+from datetime import date
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.templating import Jinja2Templates
@@ -59,7 +60,16 @@ async def open_workspace(request: Request, program_id: int | None=None, class_id
     for value in (program_id, class_id, membership_id):
         if value is not None:_number(str(value))
     form = await management._form(request)
-    management._exact(form, {'director','pin'} | (set() if membership_id is not None else {'before'}))
+    optional_week = {'week'} if membership_id is not None and 'week' in form else set()
+    management._exact(form, {'director','pin'} | (optional_week if membership_id is not None else {'before'}))
+    selected_week = None
+    if membership_id is not None and form.get('week'):
+        try:
+            selected_week = date.fromisoformat(form['week'])
+        except (ValueError, TypeError):
+            raise HTTPException(400, 'Choose a reporting week beginning Monday.')
+        if selected_week.weekday() != 0:
+            raise HTTPException(400, 'Choose a reporting week beginning Monday.')
     data = catalog = None
     with SessionLocal() as session:
         _, actor = _adult(request, session, form)
@@ -71,7 +81,7 @@ async def open_workspace(request: Request, program_id: int | None=None, class_id
                     before=_number(form['before'],optional=True))
             else:
                 data = service.student_view(session, actor=actor, program_id=program_id, class_id=class_id,
-                    membership_id=membership_id)
+                    membership_id=membership_id, selected_week=selected_week)
         except s1.ClassroomDenied:
             failed=True
         else:

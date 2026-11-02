@@ -5,6 +5,7 @@ four-week Insights summary reuses the same totals without changing dashboard
 snapshot/rating semantics or introducing advanced analytics.
 """
 from datetime import date, datetime, time, timedelta
+from math import sqrt
 
 from .practice_duration import chart_seconds
 from .contests import CENTRAL, central_week_boundaries
@@ -38,9 +39,15 @@ def week_start(day: date) -> date:
 
 
 def student_practice_rating(minutes: float, days: int, verified: bool, pristine: bool) -> float:
-    # Volume supplies 95% of the core; four distinct positive-practice days
-    # supply at most 5%. Each category bonus is awarded once, never per minute.
-    core = min(max(minutes, 0), 120) / 120 * (95 + 5 * min(max(days, 0), 4) / 4)
+    # Leadership-confirmed individual formula: a square-root volume curve with
+    # a small five-day consistency adjustment. Keep the independent Team Practice
+    # Rating calculation unchanged. Bonuses are awarded once per qualifying week.
+    capped_minutes = min(max(minutes, 0), 120)
+    if capped_minutes == 0:
+        return 0.0
+    minutes_score = sqrt(capped_minutes / 120)
+    consistency_factor = .95 + .05 * min(max(days, 0), 5) / 5
+    core = 100 * minutes_score * consistency_factor
     return min(104.0, core + (3 if verified else 0) + (1 if pristine else 0))
 
 

@@ -19,13 +19,13 @@ def metrics(factory, **kwargs):
 
 def test_volume_frequency_bonuses_and_cap():
     assert student_practice_rating(0, 0, False, False) == 0
-    assert student_practice_rating(120, 1, False, False) == 96.25
-    assert student_practice_rating(120, 4, False, False) == 100
-    assert student_practice_rating(120, 4, True, False) == 103
-    assert student_practice_rating(120, 4, False, True) == 101
-    assert student_practice_rating(120, 4, True, True) == 104
+    assert student_practice_rating(120, 1, False, False) == 96
+    assert student_practice_rating(120, 4, False, False) == 99
+    assert student_practice_rating(120, 4, True, False) == 102
+    assert student_practice_rating(120, 4, False, True) == 100
+    assert student_practice_rating(120, 5, True, True) == 104
     assert student_practice_rating(999, 7, True, True) == 104
-    assert student_practice_rating(60, 1, False, False) == 48.125
+    assert student_practice_rating(60, 1, False, False) == pytest.approx(67.88225099390857)
 
 
 @pytest.mark.parametrize("delta,direction", [(3, "steady"), (-3, "steady"), (0, "steady"),
@@ -71,8 +71,8 @@ def test_completed_rating_four_week_baseline_and_zero_students(roster_db):
     add_chart(roster_db, student, TODAY, 999, status="approved")
     current = metrics(roster_db)
     historical = metrics(roster_db, selected_week=date(2026, 8, 31))
-    assert current["program_rating"] == historical["program_rating"] == 96.25 / 2
-    assert current["program_trend"]["delta"] == (96.25 - 48.125) / 2
+    assert current["program_rating"] == historical["program_rating"] == 96 / 2
+    assert current["program_trend"]["delta"] == pytest.approx((96 - 67.88225099390857) / 2)
     assert current["students"][0]["weekly"]["total"] == 999
     assert historical["students"][0]["weekly"]["total"] == 120
     assert current["students"][1]["rating"] == 0
@@ -81,8 +81,8 @@ def test_completed_rating_four_week_baseline_and_zero_students(roster_db):
     assert metrics(roster_db)["program_trend"] == current["program_trend"]
     # An earlier selected completed week has its own rating and baseline.
     earlier = metrics(roster_db, selected_week=date(2026, 8, 24))
-    assert earlier["program_rating"] == 48.125 / 2
-    assert earlier["program_trend"]["delta"] == (48.125 - 3 * 48.125 / 4) / 2
+    assert earlier["program_rating"] == pytest.approx(67.88225099390857 / 2)
+    assert earlier["program_trend"]["delta"] == pytest.approx((67.88225099390857 - 3 * 67.88225099390857 / 4) / 2)
 
 
 def test_program_baseline_recomputes_same_authorized_cohort_after_roster_change(roster_db):
@@ -100,8 +100,8 @@ def test_program_baseline_recomputes_same_authorized_cohort_after_roster_change(
         connection.status = "disconnected"
         session.commit()
     only_first = metrics(roster_db)
-    assert only_first["program_rating"] == 96.25
-    assert only_first["program_trend"]["delta"] == 96.25 - 48.125
+    assert only_first["program_rating"] == 96
+    assert only_first["program_trend"]["delta"] == pytest.approx(96 - 67.88225099390857)
     assert [row["display_name"] for row in only_first["students"]] == ["WC-First"]
 
 
@@ -113,7 +113,7 @@ def test_rating_exceeds_100_and_counts_distinct_days(roster_db):
         session.add(PracticeChart(profile_id=student, practice_date=date(2026, 9, 1),
                                  minutes=5, source="pristine", instrument="Trumpet", detected_playing_seconds=300))
         session.commit()
-    assert metrics(roster_db)["program_rating"] == 104
+    assert metrics(roster_db)["program_rating"] == 103  # Four days, below the five-day consistency maximum.
 
 
 def test_week_validation_and_scoped_availability(roster_db):
