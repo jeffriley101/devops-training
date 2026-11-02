@@ -11,7 +11,6 @@ from sqlalchemy import select
 from . import classroom as s1, classroom_progress_authorization as progress
 from .age_privacy import utc
 from .models import PracticeChart, PracticeChartVerification
-from .practice_charts import PRACTICE_CATEGORIES
 from .practice_duration import chart_seconds
 from .student_practice_metrics import CENTRAL, WEEK, practice_totals, week_start
 from .weekly import weekly_credit
@@ -19,10 +18,33 @@ from .weekly_models import WeeklyInstrumentPlan, WeeklyPlan
 from .instruments import canonical_instrument_key
 
 CONTRACT_VERSION = "classroom-reporting-41-v1"
-# Leadership reconfirmed the September 11 square-root/five-day equation in the
-# implementation authorization. The shared helper is covered by mathematical
-# regression tests; Team Practice Rating is a separate, unchanged calculation.
-RATING_FORMULA_VERIFIED = True
+# This is a versioned disclosure contract, not the changing BOOK input menu.
+# New practice choices must never silently become approved reporting fields.
+CATEGORY_FIELDS = (
+    ("category_long_tones", "Long Tones"),
+    ("category_arpeggios", "Arpeggios"),
+    ("category_etudes", "Etudes"),
+    ("category_patterns", "Patterns"),
+    ("category_dynamics", "Dynamics"),
+    ("category_articulations", "Articulations"),
+    ("category_transcribing", "Transcribing"),
+    ("category_ear_training", "Ear Training"),
+    ("category_tuning", "Tuning"),
+    ("category_metronome_work", "Metronome Work"),
+    ("category_band_class", "Band Class"),
+    ("category_lessons", "Lessons"),
+    ("category_rehearsals", "Rehearsals"),
+    ("category_concerts", "Concerts"),
+    ("category_tests", "Tests"),
+    ("category_performances", "Performances"),
+    ("category_busking", "Busking"),
+    ("category_warm_ups", "Warm-ups"),
+    ("category_scales", "Scales"),
+    ("category_songs", "Songs"),
+    ("category_improvisation", "Improvisation"),
+    ("category_auditions", "Auditions"),
+    ("category_fingerings", "Fingerings"),
+)
 
 FIELD_LABELS = (
     ("weekly_practice_minutes", "Weekly practice minutes"),
@@ -37,8 +59,7 @@ FIELD_LABELS = (
     ("last_p_chart_submission", "Last P-Chart submission"),
     ("lifetime_practice_graph", "Lifetime practice graph"),
     ("weekly_practice_graph", "Weekly practice graph"),
-) + tuple(("category_" + name.lower().replace(" ", "_").replace("-", "_"), name)
-          for name in PRACTICE_CATEGORIES) + (
+) + CATEGORY_FIELDS + (
     ("student_practice_rating", "Student Practice Rating"),
     ("rating_trend", "Rating trend"),
     ("current_practice_streak", "Current practice streak"),
@@ -205,8 +226,7 @@ def report(session, *, actor, program_id, class_id, profile_id, selected_week=No
             weekly_practice_charts=weekly["charts"], weekly_verified_minutes=weekly["verified"],
             weekly_pristine_minutes=weekly["pristine"])
         categories = {item for c in selected for item in (c.practice_details or ()) if isinstance(item, str)}
-        for name in PRACTICE_CATEGORIES:
-            key = "category_" + name.lower().replace(" ", "_").replace("-", "_")
+        for key, name in CATEGORY_FIELDS:
             values[key] = name in categories
         values["weekly_practice_graph"] = [{"date": day.isoformat(),
             "minutes": sum(chart_seconds(c) for c in selected if c.practice_date == day) / 60
@@ -215,20 +235,21 @@ def report(session, *, actor, program_id, class_id, profile_id, selected_week=No
     if submissions:
         values["last_p_chart_submission"] = max(submissions).astimezone(CENTRAL).isoformat()
     rating_week = current - WEEK
-    if RATING_FORMULA_VERIFIED:
-        from .student_practice_metrics import student_practice_rating, trend
-        ratings = []
-        for offset in range(5):
-            start = rating_week - WEEK * offset
-            if _midnight(start) < decision.starts_at or _midnight(start + WEEK) > decision.ends_at:
-                ratings.append(None)
-                continue
-            totals = practice_totals([c for c in charts if start <= c.practice_date < start + WEEK], approved)
-            ratings.append(student_practice_rating(totals["total"], totals["days"],
-                totals["verified"] > 0, totals["pristine"] > 0))
-        values["student_practice_rating"] = ratings[0]
-        if all(value is not None for value in ratings):
-            values["rating_trend"] = trend(ratings[0] - sum(ratings[1:]) / 4)
+    # The exact square-root/five-day equation was confirmed by the owner in
+    # the retained reporting formula evidence. Reuse its tested shared helper.
+    from .student_practice_metrics import student_practice_rating, trend
+    ratings = []
+    for offset in range(5):
+        start = rating_week - WEEK * offset
+        if _midnight(start) < decision.starts_at or _midnight(start + WEEK) > decision.ends_at:
+            ratings.append(None)
+            continue
+        totals = practice_totals([c for c in charts if start <= c.practice_date < start + WEEK], approved)
+        ratings.append(student_practice_rating(totals["total"], totals["days"],
+            totals["verified"] > 0, totals["pristine"] > 0))
+    values["student_practice_rating"] = ratings[0]
+    if all(value is not None for value in ratings):
+        values["rating_trend"] = trend(ratings[0] - sum(ratings[1:]) / 4)
     # The accepted history policy excludes the incomplete current occurrence
     # day. An exact current streak cannot be inferred from yesterday alone.
     values["current_practice_streak"] = None
@@ -238,8 +259,6 @@ def report(session, *, actor, program_id, class_id, profile_id, selected_week=No
         "field_contract": CONTRACT_VERSION, "field_labels": FIELD_LABELS,
         "message": "Individual authorized history only. Practice uses complete eligible occurrence days; "
             "today's incomplete day and preauthorization history are excluded. "
-            "Current practice streak is unavailable because the current day is outside that boundary. "
-            + ("" if RATING_FORMULA_VERIFIED else
-               "Rating and trend are unavailable pending verification of the approved scoring equation."),
+            "Current practice streak is unavailable because the current day is outside that boundary.",
         "values": {"fields": values, "selected_week": selected_week.isoformat(),
             "rating_week": rating_week.isoformat(), "as_of": decision.ends_at.isoformat()}}

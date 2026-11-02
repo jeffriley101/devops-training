@@ -184,7 +184,7 @@ def test_conditional_trusted_verifier_navigation(roster_db, kwargs, visible):
 
 @pytest.mark.parametrize("width", [390, 1440])
 def test_browser_table_layout_and_sorting(roster_db, tmp_path, width):
-    """Exercise rendered roster, shared styles and dashboard JS in Chromium."""
+    """Large ordinary rosters keep ratings private while layout and sorting work."""
     import json
     import re
     import shutil
@@ -258,24 +258,14 @@ process.stdin.on("end", async () => {
       const count = table.tBodies[0].rows.length;
       buttons[3].click(); buttons[3].click();
       const totals = [...table.tBodies[0].rows].map(row => Number(row.cells[3].dataset.sortValue));
-      const heading = document.querySelector('.bd-heading').getBoundingClientRect();
-      const rating = document.querySelector('.bd-rating');
-      rating.firstElementChild.textContent = '104.0';
-      const circle = rating.getBoundingClientRect();
-      const programArrow = document.querySelector('.bd-rating-row > .bd-trend').getBoundingClientRect();
-      const fits = [...rating.children].every(child => {
-        const box = child.getBoundingClientRect();
-        return box.left >= circle.left && box.right <= circle.right;
-      });
       scroll.scrollLeft = 500;
       return { count, columns: buttons.length, totals: totals.slice(0, 3),
         width: innerWidth, pageWidth: document.documentElement.scrollWidth,
         scrollable: scroll.scrollWidth > scroll.clientWidth,
         firstColumnX: table.tBodies[0].rows[0].cells[0].getBoundingClientRect().left,
         scrollX: scroll.getBoundingClientRect().left,
-        aligned: Math.abs(heading.left - circle.left) < 1,
-        circleWidth: circle.width, circleHeight: circle.height, fits,
-        arrowBeside: programArrow.left > circle.right,
+        ratingPresent: !!document.querySelector('.bd-rating'),
+        programArrowPresent: !!document.querySelector('.bd-rating-row > .bd-trend'),
         errors: window.dashboardErrors || [] };
     })()` }, sessionId);
     if (result.exceptionDetails) throw result.exceptionDetails;
@@ -294,9 +284,9 @@ process.stdin.on("end", async () => {
     assert values["pageWidth"] <= width
     assert values["count"] == 100 and values["columns"] == 12
     assert values["totals"] == [6118 / 60, 9, 0]
-    assert values["aligned"] and values["circleWidth"] == values["circleHeight"]
-    assert values["fits"]
-    assert values["arrowBeside"]
+    # These connections have no paid purchaser evidence. A Classroom reporting
+    # implementation must not make the separate Connected Students rating public.
+    assert values["ratingPresent"] is False and values["programArrowPresent"] is False
     assert abs(values["firstColumnX"] - values["scrollX"]) <= 2
     if width == 390:
         assert values["scrollable"]

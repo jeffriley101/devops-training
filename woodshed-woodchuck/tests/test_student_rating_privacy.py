@@ -66,6 +66,11 @@ def privacy_db(db,monkeypatch):
         s.add(TrustedVerifier(id=1,email='synthetic-verifier@example.test',
                              display_name='Synthetic verifier',pin_hash=hash_pin('1357')))
         s.flush()
+        if db.dialect.name == 'postgresql':
+            # Explicit fixture IDs do not advance PostgreSQL sequences. Native
+            # parent/director onboarding must be free to allocate the next ID.
+            s.execute(text("SELECT setval(pg_get_serial_sequence('trusted_verifiers', 'id'), "
+                           "(SELECT max(id) FROM trusted_verifiers))"))
         chart=PracticeChart(profile_id=1,practice_date=today,minutes=2,source='manual',
                             instrument='Flute',note='Own saved practice')
         s.add(chart);s.flush()

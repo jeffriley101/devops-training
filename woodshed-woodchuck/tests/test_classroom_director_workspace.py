@@ -158,3 +158,11 @@ def test_unknown_or_restricted_statistics_never_display_zero_or_private_values(w
     assert page.status_code==200
     assert page.context['data']['statistics']['values'] is None
     assert 'SCHOOL_ADMIN_SENTINEL' not in page.text and 'EXPLICIT_CHART_SENTINEL' not in page.text
+
+
+@pytest.mark.parametrize('week', ['bad', '2026-11-03', '20261102', '2026-W45-1'])
+def test_reporting_week_requires_canonical_monday_and_no_private_response(workspace_web, week):
+    refs=workspace_web
+    page=open_page(signed(2),refs.student_path,week=week)
+    assert page.status_code==400
+    assert 'SCHOOL_ADMIN_SENTINEL' not in page.text and 'EXPLICIT_CHART_SENTINEL' not in page.text

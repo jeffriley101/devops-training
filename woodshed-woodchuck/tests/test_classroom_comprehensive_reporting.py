@@ -1,8 +1,9 @@
 """SQLite product semantics for the approved individual 41-field report."""
-from datetime import datetime, time, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
+from types import SimpleNamespace
 
 import pytest
-from sqlalchemy import event
+from sqlalchemy import event, select
 
 from app import classroom_comprehensive_reporting as service
 from app import classroom_reporting as boundary, classroom_s2 as s2
@@ -150,3 +151,90 @@ def test_unapproved_projection_denied_before_private_queries(report_db, fields):
     refs = report_db
     with refs.factory() as session:
         with pytest.raises(s2.s1.ClassroomDenied): read(session, refs, fields=fields)
+
+
+def test_versioned_contract_cannot_grow_with_book_activity_menu(monkeypatch):
+    import importlib
+    from app import practice_charts
+    expected = service.FIELD_LABELS
+    monkeypatch.setattr(practice_charts, 'PRACTICE_CATEGORIES',
+        practice_charts.PRACTICE_CATEGORIES + ('UNAPPROVED_NEW_CATEGORY',))
+    importlib.reload(service)
+    assert service.FIELD_LABELS == expected
+    assert len(service.CATEGORY_FIELDS) == 23
+    assert 'UNAPPROVED_NEW_CATEGORY' not in dict(service.FIELD_LABELS).values()
+
+
+def test_category_activity_is_one_credit_and_never_custom_free_text(report_db):
+    refs = report_db
+    with refs.factory() as session:
+        charts = session.scalars(select(PracticeChart).where(PracticeChart.profile_id == 1)).all()
+        for chart in charts:
+            chart.practice_details = ['Scales', 'Scales', 'UNAPPROVED_CUSTOM_DETAIL']
+        session.commit()
+        fields = read(session, refs)['values']['fields']
+    categories = {key: fields[key] for key, _ in service.CATEGORY_FIELDS}
+    assert categories['category_scales'] is True
+    assert sum(categories.values()) == 1
+    assert 'UNAPPROVED_CUSTOM_DETAIL' not in str(fields)
+
+
+def test_changing_practice_week_does_not_change_last_completed_rating(report_db):
+    refs = report_db
+    with refs.factory() as session:
+        latest = read(session, refs)['values']
+        historical = read(session, refs, selected_week=refs.week - timedelta(weeks=1))['values']
+    assert historical['fields']['weekly_practice_minutes'] == 0
+    assert historical['rating_week'] == latest['rating_week'] == refs.week.isoformat()
+    assert historical['fields']['student_practice_rating'] == latest['fields']['student_practice_rating'] == 104
+    assert historical['fields']['rating_trend'] == latest['fields']['rating_trend']
+
+
+@pytest.mark.parametrize('day,hours', [(date(2026, 3, 8), 23), (date(2026, 11, 1), 25)])
+@pytest.mark.parametrize('start_offset,end_offset,visible', [
+    (timedelta(), timedelta(), True),
+    (timedelta(microseconds=1), timedelta(), False),
+    (timedelta(), -timedelta(microseconds=1), False),
+])
+def test_occurrence_requires_entire_central_day_across_dst(report_db, day, hours,
+                                                          start_offset, end_offset, visible):
+    refs = report_db
+    start, end = midnight(day), midnight(day + timedelta(days=1))
+    assert (end - start).total_seconds() == hours * 3600
+    with refs.factory() as session:
+        chart = PracticeChart(profile_id=1, practice_date=day, minutes=7,
+            instrument='Trumpet', created_at=start + timedelta(hours=12))
+        session.add(chart); session.flush()
+        decision = SimpleNamespace(starts_at=start + start_offset, ends_at=end + end_offset)
+        rows = service._charts(session, 1, decision)
+        assert (chart.id in {row.id for row in rows}) is visible
+
+
+@pytest.mark.parametrize('offset,visible', [
+    (-timedelta(microseconds=1), False), (timedelta(), True),
+    (timedelta(microseconds=1), True),
+])
+def test_submission_lower_bound_is_independent_of_practice_date(report_db, offset, visible):
+    refs = report_db
+    with refs.factory() as session:
+        authorization = progress.authorize_boundary(session, actor=actor(session, 2),
+            program_id=1, class_id=refs.class_id, profile_id=1)
+        chart = PracticeChart(profile_id=1, practice_date=refs.week, minutes=7,
+            instrument='Trumpet', created_at=authorization.starts_at + offset)
+        session.add(chart); session.flush()
+        assert (chart.id in {row.id for row in service._charts(session, 1, authorization)}) is visible
+
+
+@pytest.mark.parametrize('week', [datetime(2026, 1, 5), date(2026, 1, 6), '2026-01-05'])
+def test_invalid_week_denied_before_measurement_sql(report_db, week):
+    refs = report_db
+    statements = []
+    engine = refs.factory.kw['bind']
+    def observe(_connection, _cursor, sql, *_args): statements.append(sql.lower())
+    event.listen(engine, 'before_cursor_execute', observe)
+    try:
+        with refs.factory() as session:
+            with pytest.raises(s2.s1.ClassroomDenied): read(session, refs, selected_week=week)
+    finally:
+        event.remove(engine, 'before_cursor_execute', observe)
+    assert not any('from practice_charts' in sql or 'from weekly_plans' in sql for sql in statements)

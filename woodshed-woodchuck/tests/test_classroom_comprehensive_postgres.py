@@ -20,7 +20,7 @@ from app.practice_charts import PRACTICE_CATEGORIES
 from app.student_practice_metrics import CENTRAL, week_start
 from app.weekly_models import WeeklyInstrumentPlan, WeeklyPlan
 from test_classroom_s1_postgres import classroom_pg, ordered_wait
-from test_classroom_s2 import NOW, actor, student, create, code, join
+from test_classroom_s2 import NOW, actor, student, create, code, join, institutional
 from test_classroom_s2_postgres import s2_pg
 from test_classroom_s3_postgres import s3_pg, setup_reporting
 from test_classroom_progress_authorization import accept
@@ -340,3 +340,63 @@ def test_pg_reporting_never_uses_snapshot_isolation(comprehensive_pg, isolation)
     with refs.factory.kw['bind'].connect().execution_options(isolation_level=isolation) as connection:
         with refs.factory(bind=connection) as session:
             with pytest.raises(s1.ClassroomDenied): report(session, refs)
+
+
+@pytest.mark.parametrize('loss', ['suspend', 'leave', 'archive', 'entitlement', 'new_teacher'])
+@pytest.mark.parametrize('writer_first', [False, True])
+def test_pg_actual_measurement_reader_rechecks_lifecycle_after_wait(comprehensive_pg, loss, writer_first):
+    refs = comprehensive_pg
+    def revoke(session):
+        if loss == 'suspend':
+            return s2.suspend_member(session, actor=actor(session), program_id=1,
+                class_id=refs.class_id, membership_id=refs.membership_id).id
+        if loss == 'leave':
+            return s2.leave_class(session, student=student(session), program_id=1,
+                class_id=refs.class_id).id
+        if loss == 'archive':
+            return s2.set_class_state(session, actor=actor(session), program_id=1,
+                class_id=refs.class_id, state='archived').class_id
+        if loss == 'entitlement':
+            return institutional(session, status='ended').id
+        return s2.assign_teacher(session, actor=actor(session), program_id=1,
+            class_id=refs.class_id, verifier_id=3).id
+    def read(session):
+        cached = session.scalar(select(ClassroomProgressAuthorization))
+        assert cached.withdrawn_at is None
+        return by_label(report(session, refs))['Lifetime practice minutes']
+    outcomes = ordered_wait(refs.factory, *((revoke, read) if writer_first else (read, revoke)))
+    assert tuple(row[0] for row in outcomes) == (('ok', 'denied') if writer_first else ('ok', 'ok'))
+    with refs.factory() as session:
+        with pytest.raises(s1.ClassroomDenied): report(session, refs)
+        assert session.get(PracticeChart, refs.valid_id).minutes == 30
+
+
+@pytest.mark.parametrize('qualification', ['canonical', 'wrong_instrument', 'before_assignment', 'at_week_end'])
+def test_pg_homework_matches_existing_qualification_without_unbounded_reader(comprehensive_pg, qualification):
+    refs = comprehensive_pg
+    issued = midnight(refs.selected_week) + timedelta(minutes=1)
+    started = midnight(refs.valid_day) + timedelta(hours=1)
+    with refs.factory() as session:
+        plan = WeeklyPlan(profile_id=1, week_start=refs.selected_week,
+            focus='Improve tone and control', issued_game_mode='Beginner',
+            generator_version='synthetic-reporting-test', issued_at=issued,
+            recent_results_cutoff=issued, recent_results={}, logging_days_target=3,
+            practice_minutes_target=30, homework_minutes_target=10, thirds_target=3)
+        session.add(plan); session.flush()
+        assignment = WeeklyInstrumentPlan(plan_id=plan.id, slot_no=1,
+            instrument='trumpet' if qualification == 'canonical' else 'Flute',
+            started_at=started, homework_spec={})
+        session.add(assignment)
+        if qualification in {'before_assignment', 'at_week_end'}:
+            submitted = (started if qualification == 'before_assignment'
+                else midnight(refs.selected_week + timedelta(days=7)))
+            session.add(PracticeChart(profile_id=1, practice_date=refs.valid_day, minutes=99,
+                source='p-book', instrument='Flute', created_at=submitted))
+        session.commit()
+        # Close the week so a supported failure can be observed. Future practice
+        # in the fixture stays excluded by the independent instrument filter.
+        refs.clock[0] = midnight(refs.selected_week + timedelta(days=8))
+        from app.weekly_tasks import homework_progress
+        expected = homework_progress(session, 1, plan, now=refs.clock[0])['qualified']
+        actual = by_label(report(session, refs))['Homework completion']
+        assert actual is expected is (qualification == 'canonical')

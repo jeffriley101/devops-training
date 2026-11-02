@@ -1,4 +1,4 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>{{ title }} · Woodshed Woodchuck</title><link rel="stylesheet" href="/static/css/styles.css?v=125"><link rel="stylesheet" href="/static/css/classroom-enrollment.css?v=1"><link rel="stylesheet" href="/static/css/classroom-workspace.css?v=2"></head>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>{{ title }} · Woodshed Woodchuck</title><link rel="stylesheet" href="/static/css/styles.css?v=125"><link rel="stylesheet" href="/static/css/classroom-enrollment.css?v=1"><link rel="stylesheet" href="/static/css/classroom-workspace.css?v=3"></head>
 <body class="enrollment-page workspace-page"><header class="enrollment-header"><a class="enrollment-brand" href="/classroom/dashboard">Woodshed Woodchuck<span>DIRECTOR DASHBOARD</span></a><nav aria-label="Director navigation"><a href="/classroom/dashboard">My Classes</a><a href="/classroom/programs">Program management</a><a href="/band-director/dashboard">Connected Students</a></nav></header>
 <main class="enrollment-shell">
 {% macro identity() %}<input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="director" value="{{ director.id }}">{% endmacro %}
@@ -34,7 +34,36 @@
 {% endif %}{% endfor %}</dl>
 <h3>What did you work on?</h3><p class="enrollment-muted">Each category indicates reported activity in eligible charts for this student and selected week. It does not measure proficiency or category minutes.</p>
 <dl class="workspace-categories">{% for key,label in data.statistics.field_labels %}{% if key.startswith('category_') %}{% set value = fields.get(key) %}<div data-reporting-field="{{ key }}"><dt>{{ label }}</dt><dd>{% if value is none %}<span class="workspace-unavailable">Unavailable</span>{% elif value %}Reported{% else %}Not reported{% endif %}</dd></div>{% endif %}{% endfor %}</dl>
-<div class="workspace-graphs">{% for key,label in data.statistics.field_labels %}{% if key.endswith('_graph') %}{% set points = fields.get(key) %}<figure class="workspace-graph" data-reporting-field="{{ key }}"><figcaption><h3>{{ label }}</h3></figcaption>{% if points is none or not points %}<p class="workspace-unavailable">Unavailable</p>{% else %}{% set measured = points | selectattr('minutes', 'ne', none) | list %}{% set maximum = ([1] + (measured | map(attribute='minutes') | list)) | max %}<table><caption class="workspace-sr-only">{{ label }} for this student’s authorized records, in minutes</caption><thead><tr><th scope="col">Date</th><th scope="col">Minutes</th></tr></thead><tbody>{% for point in points %}<tr><th scope="row">{{ point.date }}</th><td>{% if point.minutes is none %}<span class="workspace-unavailable">Unavailable</span>{% else %}<span class="workspace-graph-bar" style="--practice-width:{{ ((point.minutes / maximum) * 100) | round(3) }}%" aria-hidden="true"></span><span class="workspace-graph-value">{{ point.minutes | round(2) }}</span>{% endif %}</td></tr>{% endfor %}</tbody></table>{% endif %}</figure>{% endif %}{% endfor %}</div>
+<div class="workspace-graphs">
+{% for key,label in data.statistics.field_labels %}{% if key.endswith('_graph') %}{% set points = fields.get(key) %}
+<figure class="workspace-graph" data-reporting-field="{{ key }}">
+<figcaption><h3>{{ label }}</h3></figcaption>
+{% if points is none or not points %}<p class="workspace-unavailable">Unavailable</p>{% else %}
+{% set measured = points | selectattr('minutes', 'ne', none) | list %}
+{% set maximum = ([1] + (measured | map(attribute='minutes') | list)) | max %}
+<svg class="workspace-plot" viewBox="0 0 360 190" role="img" aria-labelledby="{{ key }}-title">
+<title id="{{ key }}-title">{{ label }} in minutes, for this student's authorized history. Exact dates and values are available below.</title>
+<path class="workspace-plot-axis" d="M24 24V150H340M24 90H340M24 30H340" />
+<text x="24" y="18">{{ maximum | round(1) }} min</text><text x="8" y="154">0</text>
+{% if key == 'lifetime_practice_graph' %}
+{% set intervals = [1, points | length - 1] | max %}
+<polyline class="workspace-plot-line" points="{% for point in points %}{{ (24 + loop.index0 * 312 / intervals) | round(2) }},{{ (150 - point.minutes * 120 / maximum) | round(2) }} {% endfor %}" />
+{% if points | length == 1 %}<circle class="workspace-plot-point" cx="24" cy="{{ (150 - points[0].minutes * 120 / maximum) | round(2) }}" r="3" />{% endif %}
+<text x="24" y="177">{{ points[0].date }}</text><text x="336" y="177" text-anchor="end">{{ points[-1].date }}</text>
+{% else %}
+{% for point in points %}
+{% if point.minutes is not none %}<rect class="workspace-plot-column" x="{{ 30 + loop.index0 * 44 }}" y="{{ (150 - point.minutes * 120 / maximum) | round(2) }}" width="28" height="{{ (point.minutes * 120 / maximum) | round(2) }}"><title>{{ point.date }}: {{ point.minutes | round(2) }} minutes</title></rect>
+{% else %}<text x="{{ 44 + loop.index0 * 44 }}" y="142" text-anchor="middle"><title>{{ point.date }}: unavailable</title>—</text>{% endif %}
+<text x="{{ 44 + loop.index0 * 44 }}" y="177" text-anchor="middle">{{ point.date[5:] }}</text>
+{% endfor %}
+{% endif %}
+</svg>
+<details class="workspace-graph-details"><summary>View dates and minutes</summary>
+<div class="workspace-graph-values" tabindex="0" role="region" aria-label="{{ label }} values">
+<table><caption class="workspace-sr-only">{{ label }} for this student’s authorized records, in minutes</caption><thead><tr><th scope="col">Date</th><th scope="col">Minutes</th></tr></thead><tbody>{% for point in points %}<tr><th scope="row">{{ point.date }}</th><td>{% if point.minutes is none %}<span class="workspace-unavailable">Unavailable</span>{% else %}<span class="workspace-graph-value">{{ point.minutes | round(2) }}</span>{% endif %}</td></tr>{% endfor %}</tbody></table>
+</div></details>
+{% endif %}</figure>{% endif %}{% endfor %}
+</div>
 {% endif %}
 <p class="enrollment-muted">Missing or restricted measurements are unavailable, never assumed to be zero. Comprehensive notes, exports, cohort statistics and other unapproved reporting remain unavailable. Individually selected P-Charts keep their separate permissions below.</p></section>
 <section id="shared-pcharts" class="enrollment-card" data-enrollment-private><p class="enrollment-step">INDIVIDUALLY SELECTED P-CHARTS</p><h2>Explicitly shared P-Charts</h2><p>Each chart needs its own current sharing permission. These charts and their totals are a partial view, separate from comprehensive statistics.</p>

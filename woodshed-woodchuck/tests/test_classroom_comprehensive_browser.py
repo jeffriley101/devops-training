@@ -139,8 +139,30 @@ def test_comprehensive_fields_week_navigation_and_independent_withdrawal(compreh
         expect(stats.locator('[data-reporting-field=category_scales] dd')).to_have_text('Reported')
         expect(stats.locator('[data-reporting-field=category_arpeggios] dd')).to_have_text('Not reported')
         expect(stats.locator('[data-reporting-field=weekly_practice_graph] tbody tr')).to_have_count(7)
+        expect(stats.locator('.workspace-plot')).to_have_count(2)
+        expect(stats.locator('[data-reporting-field=lifetime_practice_graph] polyline')).to_have_count(1)
+        weekly_graph=stats.locator('[data-reporting-field=weekly_practice_graph]')
+        weekly_graph.locator('summary').click()
+        expect(weekly_graph.locator('table')).to_be_visible()
+        expect(weekly_graph.locator('table')).to_contain_text('13.0')
+        expect(stats.locator('[data-reporting-field=student_practice_rating] dd')).to_have_text('76.6')
+        expect(stats.locator('[data-reporting-field=rating_trend] .workspace-trend-down')).to_contain_text('-6.7')
         assert_private_fields_absent(page)
         snapshot(page,tmp_path/f'comprehensive-completed-week-{engine}-{width}.png')
+        # Withdrawing an individual chart never withdraws comprehensive access.
+        with refs.factory() as session:
+            proof=s2.authenticate_student(session,woodchuck_id='WC-TEST0001',pin='2468')
+            sharing.set_sharing(session,student=proof,chart_id=refs.workspace_chart_id,assignment_ids=[])
+            session.commit()
+        open_dashboard(page,refs.workspace_student_path)
+        expect(stats.locator('[data-reporting-field]')).to_have_count(41)
+        expect(stats.locator('[data-reporting-field=student_practice_rating] dd')).to_have_text('76.6')
+        expect(page.locator('#shared-pcharts')).not_to_contain_text(SHARED_NOTE)
+        with refs.factory() as session:
+            proof=s2.authenticate_student(session,woodchuck_id='WC-TEST0001',pin='2468')
+            sharing.set_sharing(session,student=proof,chart_id=refs.workspace_chart_id,
+                assignment_ids=[refs.workspace_assignment_id])
+            session.commit()
         # Reporting withdrawal stops comprehensive reads, but selected charts
         # and private administrative identity retain their independent authority.
         with refs.factory() as session:

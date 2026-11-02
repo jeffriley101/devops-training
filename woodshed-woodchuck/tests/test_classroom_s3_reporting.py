@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from sqlalchemy import event, func, select
 
-from app import classroom, classroom_s2 as s2, classroom_reporting as reporting
+from app import classroom, classroom_models, classroom_s2 as s2, classroom_reporting as reporting
 from app.age_models import AccountPrivacy
 from app.age_privacy import utc
 from app.classroom_models import (
@@ -247,10 +247,18 @@ def test_reauthorization_excludes_old_interval_and_unauthorized_gap(report_db):
 
 
 @pytest.mark.parametrize("local_start", [(2026, 11, 1), (2027, 3, 14)])
-def test_exact_midnight_boundaries_use_chicago_calendar_across_dst(report_db, local_start):
+def test_exact_midnight_boundaries_use_chicago_calendar_across_dst(report_db, local_start, monkeypatch):
     factory, clock = report_db
     midnight = datetime(*local_start, tzinfo=reporting.CENTRAL)
     clock[0] = midnight.astimezone(timezone.utc)
+    # S1 teaching starts use their own clock. Keep synthetic authority on the
+    # same calendar as the tested grant, even after the fixed DST date passes.
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return clock[0].astimezone(tz) if tz else clock[0].replace(tzinfo=None)
+    monkeypatch.setattr(classroom, 'datetime', Clock)
+    monkeypatch.setattr(classroom_models, 'datetime', Clock)
     with factory() as session:
         class_id, _, _ = setup(session)
         grant(session, class_id)

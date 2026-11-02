@@ -169,8 +169,8 @@ def test_director_html_csv_and_aggregate_boundary(privacy_db,paid_students):
 @pytest.mark.parametrize('paid',[False,True])
 def test_kws_parent_and_legacy_director_boundary(privacy_db,captured,paid):
     f=privacy_db
-    # The native director flow allocates a verifier; this fixture already seeds id1.
-    # SQLite advances its integer key correctly; PostgreSQL coverage is separate.
+    # The fixture seeds id1 and advances PostgreSQL's sequence before this
+    # native director flow allocates a separate verifier.
     with f.begin() as s:
         rule=s.get(AccountPrivacy,1);rule.age_band='unknown';rule.public_from=None
     child,_,pid,wid=authorize(f,captured)
@@ -209,8 +209,8 @@ def test_purchaser_cannot_expand_seat_scope(privacy_db):
         assert first.status_code==second.status_code==200
         safe(first.context['student'])
         assert 'rating' in second.context['student']
-        assert first.context['student']['display_name']=='Synthetic A'
-        assert second.context['student']['display_name']=='Synthetic B'
+        assert first.context['student']['display_name']=='WC-AGE-A'
+        assert second.context['student']['display_name']=='WC-AGE-B'
         with f.begin() as s:
             s.add(TrustedVerifier(id=2,email='foreign@example.test',display_name='Foreign',pin_hash=hash_pin('1357')))
             s.flush()

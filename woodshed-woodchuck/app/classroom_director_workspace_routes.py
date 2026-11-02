@@ -68,7 +68,7 @@ async def open_workspace(request: Request, program_id: int | None=None, class_id
             selected_week = date.fromisoformat(form['week'])
         except (ValueError, TypeError):
             raise HTTPException(400, 'Choose a reporting week beginning Monday.')
-        if selected_week.weekday() != 0:
+        if selected_week.isoformat() != form['week'] or selected_week.weekday() != 0:
             raise HTTPException(400, 'Choose a reporting week beginning Monday.')
     data = catalog = None
     with SessionLocal() as session:
