@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from . import classroom, classroom_s2
+from . import classroom, classroom_s2, classroom_enrollment
 from .db import SessionLocal
 from .login_limits import enforce_login_limit
 from .membership_routes import PrivateRoute
@@ -34,6 +34,7 @@ def _render(request, verifier, *, program=None, selected_class=None, programs=No
         "csrf": csrf_token(request), "program": program, "selected_class": selected_class,
         "programs": programs, "page_class": "classroom-director-page",
         "dashboard": dashboard,
+        "classroom_enrollment_enabled": classroom_enrollment.enabled(),
     })
 
 

@@ -16,5 +16,6 @@
 {% else %}<p>The previous parent permission request expired. <a href="/family/request">Start a new parent permission request</a>.</p>{% endif %}
 <p>Contact support for a mistaken age correction. Guest tools remain available.</p>
 {% else %}<form method="post" action="/account/age" class="stack-form"><input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="confirm_account" value="{{ confirm_account }}"><label for="account-age">Age band</label><select id="account-age" name="age_band" required>{% include "age_options.html" %}</select><p>Only future qualifying activity may appear to other users. Earlier private competition history remains private.</p><button class="btn btn-primary" type="submit">Save age declaration</button></form>{% endif %}
+{% if classroom_return %}<p>Your Class entry is saved briefly. <a href="{{ classroom_return }}">Return to Classroom enrollment</a> to check your status and confirm when authorization is complete.</p>{% endif %}
 <p><a href="/account/privacy">Account privacy and deletion</a> · <a href="/account/help">Help</a></p><p><a class="btn btn-secondary" href="/guest">Sign out to Guest</a></p>
 {% endif %}<p><a href="/guest">Explore as Guest</a> · <a href="/login">Sign in</a></p></main></body></html>

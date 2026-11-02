@@ -13,7 +13,7 @@
     <a class="classroom-back" href="/classroom/director">← All classes</a>
     <p class="classroom-kicker">{{ program.display_name }} · Class</p>
     <h2>{{ selected_class.display_name }}</h2>
-    <p><a href="/classroom/director/{{ program.program_id }}/classes/{{ selected_class.id }}/invitations">Manage student invitations</a></p>
+    <p>{% if classroom_enrollment_enabled %}<a href="/classroom/enrollment/director/{{ program.program_id }}/classes/{{ selected_class.id }}">Enrollment invitations · Invite by WC#</a> · {% endif %}<a href="/classroom/director/{{ program.program_id }}/classes/{{ selected_class.id }}/invitations">P-Chart sharing invitations</a></p>
     {% if dashboard is not none %}
       <p class="v3-note"><strong>P-Charts shared with you.</strong> Only individually shared charts with current permission appear here.
         These are partial records, not a full roster or a student's complete practice history.

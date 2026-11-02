@@ -7,6 +7,7 @@
   {% call dashboard_header('Verifier', 'Verifier Dashboard', verifier_name, identity_id='verifier-dashboard-title') %}
     <a href="/membership?as_account=adult">Membership</a>
     {% if classroom_director_enabled %}<a href="/classroom/director">Classroom</a>{% endif %}
+    {% if classroom_enrollment_enabled %}<a href="/classroom/enrollment/director">Class enrollment</a>{% endif %}
     {% if has_director_students %}<a href="/band-director/dashboard">Band Director Dashboard</a>{% endif %}
   {% endcall %}
 

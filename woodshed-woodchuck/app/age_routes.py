@@ -9,6 +9,7 @@ from .age_privacy import declare_age,eligible,correct_age,utc
 from .consent_status import student_consent_status
 from .db import SessionLocal
 from .site_admin import csrf_token,check_csrf,require_site_admin
+from .classroom_enrollment_views import account_return_path
 router=APIRouter()
 templates=Jinja2Templates(directory=str(Path(__file__).resolve().parent.parent/'templates'))
 
@@ -26,12 +27,13 @@ def age_page(request:Request):
     with SessionLocal() as session:
         profile=current_profile(request,session)
         if profile is None:return RedirectResponse('/login',303)
-        if eligible(session,profile.id):return RedirectResponse('/home',303)
+        if eligible(session,profile.id):return RedirectResponse(account_return_path(request,profile) or '/home',303)
         rule=session.get(AccountPrivacy,profile.id)
         blocked_child=bool(rule and rule.age_band=='under13')
         return page(request,csrf=csrf_token(request),confirm_account=profile.woodchuck_id,
                     blocked_child=blocked_child,
                     consent_status=student_consent_status(session,profile.id) if blocked_child else None,
+                    classroom_return=account_return_path(request,profile),
                     help_only=False)
 
 @router.post('/account/age')
@@ -45,7 +47,7 @@ async def age_submit(request:Request):
         if data.get('confirm_account')!=profile.woodchuck_id:raise HTTPException(409,'Sign-in changed. Reload this page.')
         try:declare_age(session,profile.id,data.get('age_band'));session.commit()
         except ValueError as error:raise HTTPException(409,str(error)) from error
-        return RedirectResponse('/home' if eligible(session,profile.id) else '/account/age',303)
+        return RedirectResponse((account_return_path(request,profile) or '/home') if eligible(session,profile.id) else '/account/age',303)
 
 
 def support_page(request, **context):

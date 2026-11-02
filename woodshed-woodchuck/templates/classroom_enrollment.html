@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>{{ title }} · Woodshed Woodchuck</title>
+  <link rel="stylesheet" href="/static/css/styles.css?v=125">
+  <link rel="stylesheet" href="/static/css/classroom-enrollment.css?v=1">
+</head>
+<body class="enrollment-page" data-enrollment-signed-in="{{ 'true' if account else 'false' }}">
+<header class="enrollment-header"><a class="enrollment-brand" href="/home">Woodshed Woodchuck<span>CLASSROOM</span></a>
+  <nav aria-label="Classroom navigation">
+    {% if mode.startswith('director') %}
+      <a href="/classroom/enrollment/director">Assigned classes</a><a href="/trusted-verifiers/dashboard">Adult dashboard</a>
+    {% else %}
+      <a href="/classroom/enrollment"{% if mode in ['home','review'] %} aria-current="page"{% endif %}>Join a Class</a>
+      <a href="/classroom/enrollment/invitations"{% if mode == 'inbox' %} aria-current="page"{% endif %}>Invitations</a><a href="/home">My Woodshed</a>
+    {% endif %}
+  </nav>
+</header>
+<main class="enrollment-shell" id="enrollment-main">
+{% macro field_csrf() %}<input type="hidden" name="csrf" value="{{ csrf }}">{% endmacro %}
+{% macro student_fields() %}{{ field_csrf() }}<input type="hidden" name="account" value="{{ account.woodchuck_id }}">{% endmacro %}
+{% macro director_fields() %}{{ field_csrf() }}<input type="hidden" name="director" value="{{ director.id }}">{% endmacro %}
+{% macro pin(id) %}<label for="{{ id }}">Verifier PIN</label><input id="{{ id }}" name="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" minlength="4" maxlength="4" autocomplete="off" required>{% endmacro %}
+
+{% if message %}<p class="enrollment-notice" role="status">{{ message }}</p>{% endif %}
+{% if error %}<p class="enrollment-notice enrollment-error" role="alert">{{ error }}</p>{% endif %}
+
+{% if mode.startswith('director') %}
+  <p class="enrollment-eyebrow">Director enrollment</p>
+  <h1>{% if detail and detail.class_name %}{{ detail.class_name }}{% else %}Enrollment invitations{% endif %}</h1>
+  <p class="enrollment-intro">Invite a student using their WC#. Only that student can accept. An invitation does not share their practice.</p>
+  {% if not director %}
+    <section class="enrollment-card"><h2>Sign in as a trusted adult</h2><p>Your current Class assignment is checked before enrollment controls are shown.</p><a class="enrollment-button" href="/trusted-verifiers/login">Adult sign in</a></section>
+  {% elif mode == 'director-home' %}
+    {% if classes is defined %}
+      <section class="enrollment-card"><h2>Your assigned classes</h2><div class="enrollment-list">
+      {% for item in classes %}<a class="enrollment-class-link" href="/classroom/enrollment/director/{{ item.program_id }}/classes/{{ item.class_id }}"><span><small>{{ item.program_name }}</small><strong>{{ item.class_name }}</strong></span><span aria-hidden="true">→</span></a>
+      {% else %}<p>No current teaching assignments are available. Program roles alone do not grant enrollment controls.</p>{% endfor %}
+      </div></section>
+    {% else %}<section class="enrollment-card enrollment-narrow"><h2>Open your classes</h2><p>{{ director.name }}, confirm your PIN to continue.</p><form method="post" class="enrollment-form">{{ director_fields() }}{{ pin('classes-pin') }}<button class="enrollment-button" type="submit">View assigned classes</button></form></section>{% endif %}
+  {% elif detail is none %}
+    <section class="enrollment-card enrollment-narrow"><h2>Confirm your Class access</h2><p>Enter your verifier PIN to view invitations for this Class.</p><form method="post" class="enrollment-form">{{ director_fields() }}<input type="hidden" name="action" value="view"><input type="hidden" name="before" value="">{{ pin('view-pin') }}<button class="enrollment-button" type="submit">View enrollment invitations</button></form></section>
+  {% else %}
+    {% if detail.program_name %}<p class="enrollment-eyebrow">{{ detail.program_name }} · Music Program {{ detail.program_id }}</p>{% endif %}
+    {% if not detail.current_teacher %}<p class="enrollment-notice">Your teaching assignment has ended. Only retained invitation references are available for cleanup; student details are hidden.</p>
+    {% elif not detail.has_access %}<p class="enrollment-notice">Classroom access is inactive. New invitations are unavailable; you can revoke your outstanding invitations.</p>
+    {% elif not detail.enrollment_open %}<p class="enrollment-notice">Enrollment is closed. New invitations, code joins and invitation acceptance are blocked.</p>{% endif %}
+    {% if detail.can_issue %}
+    <div class="enrollment-grid">
+      <section class="enrollment-card"><p class="enrollment-step">DIRECT INVITATION</p><h2>Invite by WC#</h2><p>The student will find the invitation in their own Classroom inbox.</p>
+        <form method="post" class="enrollment-form">{{ director_fields() }}<input type="hidden" name="action" value="issue"><label for="invite-wc">Student WC#</label><input id="invite-wc" name="woodchuck_id" placeholder="WC-ABCDEFGH" maxlength="64" autocapitalize="characters" autocomplete="off" spellcheck="false" required>{{ pin('issue-pin') }}<button class="enrollment-button" type="submit">Send enrollment invitation</button></form>
+      </section>
+      <section class="enrollment-card"><p class="enrollment-step">CLASS CODE</p><h2>Make a Class QR</h2><p>Use the current code from your Program Owner or code manager. This does not issue or rotate a code.</p>
+        <form method="post" class="enrollment-form">{{ director_fields() }}<input type="hidden" name="action" value="qr"><label for="qr-code">Current Class code</label><input id="qr-code" name="code" maxlength="64" autocapitalize="characters" autocomplete="off" spellcheck="false" required>{{ pin('qr-pin') }}<button class="enrollment-button enrollment-secondary" type="submit">Make QR</button></form>
+      </section>
+    </div>
+    {% endif %}
+    {% if qr %}<section class="enrollment-card enrollment-qr" aria-labelledby="qr-title"><div><p class="enrollment-step">READY TO SCAN</p><h2 id="qr-title">Join {{ detail.class_name }}</h2><p>Music Program number <strong>{{ detail.program_id }}</strong><br>Class code <strong>{{ qr.code }}</strong></p><p>Scan with your phone’s camera, or open the enrollment link. Students still sign in and confirm before joining.</p><a class="enrollment-button" href="{{ qr.url }}" data-enrollment-join-link>Open enrollment link</a><p class="enrollment-muted">Share only with the intended Class. Refreshing this page clears this QR.</p></div><img src="{{ qr.image }}" width="288" height="288" alt="QR code for this Class enrollment link"></section>{% endif %}
+    <section class="enrollment-card" data-enrollment-private><div class="enrollment-section-head"><div><p class="enrollment-step">YOUR INVITATIONS</p><h2>Responses and pending offers</h2></div><a href="{{ request.url.path }}">Refresh access</a></div>
+      <form method="post" class="enrollment-form">{{ director_fields() }}<input type="hidden" name="action" value="revoke">
+        {% if detail.offers %}{{ pin('revoke-pin') }}<p class="enrollment-muted">Enter your PIN, then choose an outstanding invitation to revoke.</p>{% endif %}
+        <div class="enrollment-list">
+        {% for offer in detail.offers %}<article class="enrollment-offer" data-invitation="{{ offer.id }}"><div><h3>{{ offer.woodchuck_id or 'Retained invitation' }}</h3><p>Reference {{ offer.id }} · <span class="enrollment-badge" data-state="{{ offer.state }}">{{ offer.state | capitalize }}</span></p><p class="enrollment-muted">Respond by {{ offer.expires }}</p></div>{% if offer.can_revoke %}<button class="enrollment-button enrollment-secondary" name="invitation_id" value="{{ offer.id }}" type="submit" aria-label="Revoke invitation {{ offer.id }}">Revoke invitation</button>{% endif %}</article>
+        {% else %}<p>No invitations issued by you are available on this page.</p>{% endfor %}
+        </div>
+      </form>
+      {% if detail.next_before %}<form method="post" class="enrollment-form enrollment-pagination">{{ director_fields() }}<input type="hidden" name="action" value="view"><input type="hidden" name="before" value="{{ detail.next_before }}">{{ pin('older-pin') }}<button class="enrollment-button enrollment-secondary" type="submit">Older invitations</button></form>{% endif %}
+    </section>
+  {% endif %}
+{% elif not account %}
+  <p class="enrollment-eyebrow">Your music. Your Class.</p><h1>Join and Share</h1><p class="enrollment-intro">Sign in to join your Class or respond to a director’s invitation.</p>
+  <div class="enrollment-grid"><section class="enrollment-card"><h2>Sign in to your Woodchuck</h2>
+    <form id="account-login-form" class="enrollment-form" method="post" action="/account/login" data-enrollment-return="/classroom/enrollment" novalidate><label for="login-woodchuck-id">Woodchuck ID</label><input id="login-woodchuck-id" name="woodchuck_id" maxlength="11" autocomplete="username" autocapitalize="characters" placeholder="WC-ABCDEFGH" required><label for="login-pin">Four-digit PIN</label><input id="login-pin" name="pin" type="password" pattern="[0-9]{4}" inputmode="numeric" minlength="4" maxlength="4" autocomplete="current-password" required><p id="login-error" class="enrollment-error" role="alert"></p><button class="enrollment-button" type="submit">Sign in and continue</button></form>
+    <p>New to Woodshed? <a href="/setup">Create a Woodchuck</a>, then return here or scan your Class QR again.</p><noscript><p>JavaScript is off. Sign-in will show the account service confirmation; then reopen this page and enter your Class details manually.</p></noscript>
+  </section><aside class="enrollment-card enrollment-privacy"><p class="enrollment-step">YOU CHOOSE WHAT TO SHARE</p><h2>Class access comes first</h2><p>Joining a Class does not share your existing Practice Charts or authorize comprehensive reporting.</p><p>Your personal account, history and Full Access benefits stay separate.</p><a href="/classroom/enrollment/director">I’m a Class director</a></aside></div>
+{% elif mode == 'review' %}
+  <p class="enrollment-eyebrow">Join and Share · Step 1 of 2</p><h1>Is this your Class?</h1><p class="enrollment-intro">Review the Class before confirming enrollment.</p>
+  <div class="enrollment-grid"><section class="enrollment-card"><p class="enrollment-step">{{ review.program_name }}</p><h2>{{ review.class_name }}</h2><p>Joining as <strong>{{ account.woodchuck_id }}</strong></p><p>Current membership: <strong>{{ review.membership.label }}</strong></p>
+    {% if review.can_join %}<form action="/classroom/enrollment/join" method="post" class="enrollment-form">{{ student_fields() }}<input type="hidden" name="program_id" value="{{ review.program_id }}"><input type="hidden" name="intent" value="{{ review.intent }}"><p>This confirms Class membership. Next, choose any individual charts to share. Nothing is shared automatically.</p><button class="enrollment-button" name="confirm_join" value="yes" type="submit">Join and Share</button></form>
+    {% elif not review.account_ready %}<div class="enrollment-notice"><h3>Account authorization needed</h3><p>Complete the existing age or parent authorization process before joining. Your entry is saved briefly; it does not enroll you.</p><a class="enrollment-button" href="/account/age">Complete account authorization</a></div>
+    {% else %}<p class="enrollment-notice">Your membership is {{ review.membership.label | lower }}. A Class code cannot release this restriction. Ask your director for help.</p>{% endif %}
+    <p><a href="/classroom/enrollment">Use a different Class code</a></p>
+  </section><aside class="enrollment-card enrollment-privacy"><p class="enrollment-step">STEP 2 · SHARING IS OPTIONAL</p><h2>Keep control of your practice</h2><p>Existing private charts stay private. Class membership does not create reporting permission.</p><p>Existing account and parent requirements continue to apply.</p></aside></div>
+{% elif mode == 'inbox' %}
+  <p class="enrollment-eyebrow">Signed in as {{ account.woodchuck_id }}</p><h1>Your enrollment invitations</h1><p class="enrollment-intro">An invitation is an offer. Membership begins only after you accept and current requirements pass.</p>
+  {% if not account.ready %}<p class="enrollment-notice">Account authorization is needed before accepting. You can still decline or choose Not Now. <a href="/account/age">Check account authorization</a>.</p>{% endif %}
+  <div class="enrollment-list" data-enrollment-private>
+  {% for offer in offers %}<article class="enrollment-card" data-invitation="{{ offer.id }}"><div class="enrollment-section-head"><div><p class="enrollment-step">{{ offer.program_name }}</p><h2>{{ offer.class_name }}</h2><p>From {{ offer.director_name }}</p></div><span class="enrollment-badge" data-state="{{ offer.state }}">{{ offer.state | capitalize }}</span></div><p>Membership: <strong>{{ offer.membership.label }}</strong>{% if offer.membership.active and not offer.membership.access %} · Learning access is currently unavailable.{% endif %}</p><p class="enrollment-muted">Response deadline: {{ offer.expires }}</p>
+    {% if offer.state in ['pending','deferred'] %}<form action="/classroom/enrollment/invitations/{{ offer.id }}/respond" method="post">{{ student_fields() }}<div class="enrollment-actions"><button class="enrollment-button" name="choice" value="accept" type="submit"{% if not offer.can_accept %} disabled{% endif %}>Accept</button><button class="enrollment-button enrollment-secondary" name="choice" value="decline" type="submit">Decline</button><button class="enrollment-button enrollment-text" name="choice" value="defer" type="submit">Not Now</button></div></form>
+      {% if not offer.can_accept and offer.account_ready %}<p>Acceptance is unavailable. Ask your director to check current Class access or any hold.</p>{% endif %}
+      <p class="enrollment-muted">Not Now keeps the same deadline. Declining or revoking an offer does not remove a membership you already joined by code.</p>
+    {% elif offer.state == 'accepted' %}<p>Accepted earlier. This offer cannot rejoin a Class or release a hold. <a href="/classroom/enrollment">View current memberships</a>.</p>
+    {% else %}<p>This offer cannot enroll you. Ask your director for a fresh invitation if needed.</p>{% endif %}
+  </article>{% else %}<section class="enrollment-card"><h2>No invitations here yet</h2><p>Your director can send an enrollment invitation to your WC#. Existing P-Chart sharing invitations remain separate.</p></section>{% endfor %}
+  </div>
+  {% if next_before %}<p><a class="enrollment-button enrollment-secondary" href="?before={{ next_before }}">Older invitations</a></p>{% endif %}
+  {% if account.sharing %}<p><a href="/p-book">Choose sharing on individual Practice Charts</a></p>{% endif %}
+{% else %}
+  <p class="enrollment-eyebrow">Signed in as {{ account.woodchuck_id }}</p><h1>Join and Share</h1><p class="enrollment-intro">Join your Class, then choose what to share. Your account and practice history stay yours.</p>
+  {% if not account.ready %}<p class="enrollment-notice">Account authorization is incomplete. You can prepare a Class entry, but joining waits for the existing <a href="/account/age">age or parent authorization process</a>.</p>{% endif %}
+  <div class="enrollment-grid"><section class="enrollment-card"><p class="enrollment-step">STEP 1 · YOUR CLASS CODE</p><h2>Find your Class</h2><p id="enrollment-qr-status" role="status">Enter the details from your director, or scan their QR with your phone’s camera.</p>
+    <form action="/classroom/enrollment/review" method="post" class="enrollment-form" id="enrollment-code-form">{{ student_fields() }}<label for="enrollment-program">Music Program number</label><input id="enrollment-program" name="program_id" type="text" inputmode="numeric" pattern="[0-9]{1,10}" maxlength="10" autocomplete="off" aria-describedby="program-help" required><small id="program-help">Shown with your Class code.</small><label for="enrollment-code">Class code</label><input id="enrollment-code" name="code" maxlength="64" autocomplete="off" autocapitalize="characters" spellcheck="false" required><button class="enrollment-button" type="submit">Review Class</button></form>
+    <p><a href="/classroom/enrollment/invitations">Have an invitation instead? Open your inbox →</a></p>
+  </section><aside class="enrollment-card enrollment-privacy"><p class="enrollment-step">STEP 2 · YOU CHOOSE</p><h2>Sharing stays separate</h2><p>Joining does not share private charts or approve comprehensive reports.</p><p>After joining, choose sharing on each eligible Practice Chart. Existing account and parent requirements still apply.</p></aside></div>
+  <section class="enrollment-card" data-enrollment-private><h2>Your current and past Classes</h2><div class="enrollment-list">
+    {% for item in members %}<article class="enrollment-offer"><div><p class="enrollment-step">{{ item.program_name or 'Classroom' }}</p><h3>{{ item.class_name }}</h3><p>Membership: <strong>{{ item.membership.label }}</strong>{% if item.membership.active %} · {{ 'Learning access available' if item.membership.access else 'Learning access currently unavailable' }}{% endif %}</p></div></article>{% else %}<p>You have no Class memberships to show yet.</p>{% endfor %}
+  </div>{% if members and account.sharing %}<div class="enrollment-actions"><a class="enrollment-button" href="/p-book">Choose Practice Chart sharing</a><a class="enrollment-button enrollment-secondary" href="/practice/skill-building">Classroom learning</a></div>{% elif members %}<p>Classroom sharing and reporting are unavailable for this account under current policy. Eligible learning access remains separate.</p>{% endif %}</section>
+{% endif %}
+<p class="enrollment-muted enrollment-footer">Enrollment does not grant reporting access. Individual P-Chart invitations remain <a href="/classroom/student-invitations">sharing-only invitations</a>.</p>
+</main>
+{% if not account and not mode.startswith('director') %}<script src="/static/js/state.js?v=wl2-05" defer></script><script src="/static/js/account.js?v=enrollment-v2" defer></script>{% endif %}
+<script src="/static/js/classroom-enrollment.js?v=1" defer></script>
+</body>
+</html>

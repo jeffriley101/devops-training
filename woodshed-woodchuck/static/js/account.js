@@ -243,6 +243,22 @@
 
     const errorEl = document.getElementById("login-error");
 
+    function enrollmentReturn() {
+      // Only this fixed, server-rendered enrollment destination is permitted.
+      // A QR fragment remains browser-only and is never an HTTP query/credential.
+      if (form.dataset.enrollmentReturn !== "/classroom/enrollment") return false;
+      const fragment = window.location.hash.length <= 257 ? window.location.hash : "";
+      // Replacing an identical URL with a fragment is only a same-document
+      // navigation. Refetch the signed-in page so QR entry cannot leave the
+      // student looking at the old signed-out form after successful login.
+      if (window.location.pathname === "/classroom/enrollment" && !window.location.search) {
+        window.location.reload();
+      } else {
+        window.location.replace("/classroom/enrollment" + fragment);
+      }
+      return true;
+    }
+
     form.addEventListener("submit", async function (event) {
       event.preventDefault();
       errorEl.textContent = "";
@@ -293,7 +309,7 @@
         const loginPayload = await loginResponse.json();
         const profile = loginPayload.profile;
         if (loginPayload.age_screen_required) {
-          window.location.assign("/account/age");
+          if (!enrollmentReturn()) window.location.assign("/account/age");
           return;
         }
 
@@ -341,7 +357,7 @@
           await uploadState(restoredState);
         }
 
-        window.location.assign("/home");
+        if (!enrollmentReturn()) window.location.assign("/home");
       } catch (error) {
         errorEl.textContent =
           error.message || "The Woodshed could not be restored.";
