@@ -12,7 +12,7 @@
 <header class="enrollment-header"><a class="enrollment-brand" href="/home">Woodshed Woodchuck<span>CLASSROOM</span></a>
   <nav aria-label="Classroom navigation">
     {% if mode.startswith('director') %}
-      <a href="/classroom/enrollment/director">Assigned classes</a><a href="/trusted-verifiers/dashboard">Adult dashboard</a>
+      {% if management_enabled %}<a href="/classroom/programs">Programs &amp; Class management</a>{% endif %}<a href="/classroom/enrollment/director">Assigned classes</a><a href="/trusted-verifiers/dashboard">Adult dashboard</a>
     {% else %}
       <a href="/classroom/enrollment"{% if mode in ['home','review'] %} aria-current="page"{% endif %}>Join a Class</a>
       <a href="/classroom/enrollment/invitations"{% if mode == 'inbox' %} aria-current="page"{% endif %}>Invitations</a><a href="/home">My Woodshed</a>

@@ -102,7 +102,8 @@ def _page(request, *, mode='home', status_code=200, **context):
     return templates.TemplateResponse(request=request, name='classroom_enrollment.html',
         status_code=status_code, context={'title': 'Classroom enrollment', 'mode': mode,
         'csrf': csrf_token(request), 'account': None if mode.startswith('director') else _account(request),
-        'message': request.session.pop('classroom_enrollment_message', None), **context})
+        'message': request.session.pop('classroom_enrollment_message', None),
+        'management_enabled': service.enabled() and os.getenv('CLASSROOM_DIRECTOR_ENABLED') == '1', **context})
 
 
 def _cursor(request):

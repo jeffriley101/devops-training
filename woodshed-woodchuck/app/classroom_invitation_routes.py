@@ -139,4 +139,6 @@ async def accept_program_invitation_route(request: Request, token: str):
             session.rollback()
             raise HTTPException(409, "This invitation cannot be accepted. Reload and try again.") from error
     request.session[SESSION_VERIFIER_ID] = owner_id
-    return RedirectResponse("/trusted-verifiers/dashboard", 303)
+    from .classroom_management_routes import enabled as management_enabled
+    return RedirectResponse(f"/classroom/programs/{invitation.organization_id}" if management_enabled()
+                            else "/trusted-verifiers/dashboard", 303)

@@ -35,6 +35,7 @@ def _render(request, verifier, *, program=None, selected_class=None, programs=No
         "programs": programs, "page_class": "classroom-director-page",
         "dashboard": dashboard,
         "classroom_enrollment_enabled": classroom_enrollment.enabled(),
+        "classroom_management_enabled": enabled() and classroom_enrollment.enabled(),
     })
 
 

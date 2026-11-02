@@ -38,6 +38,7 @@ from .classroom_student_invitation_routes import router as classroom_student_inv
 from .classroom_progress_routes import router as classroom_progress_router
 from .classroom_enrollment_routes import router as classroom_enrollment_router
 from .classroom_enrollment import enabled as classroom_enrollment_enabled
+from .classroom_management_routes import router as classroom_management_router, enabled as classroom_management_enabled
 from .classroom_progress_authorization import enabled as classroom_progress_enabled
 from .verifier_routes import (
     current_verifier,
@@ -146,6 +147,7 @@ app.include_router(classroom_chart_router)
 app.include_router(classroom_student_invitation_router)
 app.include_router(classroom_progress_router)
 app.include_router(classroom_enrollment_router)
+app.include_router(classroom_management_router)
 app.include_router(verifier_router)
 app.include_router(practice_chart_router)
 app.include_router(personal_development_router)
@@ -379,7 +381,8 @@ def trusted_verifier_dashboard_page(request: Request, connection_id: int | None 
             context={"title": "Verifier Dashboard", "verifier_name": verifier.display_name,
                      "verifier_email": verifier.email,
                      "classroom_director_enabled": classroom_director_enabled(),
-                     "classroom_enrollment_enabled": classroom_enrollment_enabled(), **snapshot},
+                     "classroom_enrollment_enabled": classroom_enrollment_enabled(),
+                     "classroom_management_enabled": classroom_management_enabled(), **snapshot},
             headers={"Cache-Control": "no-store"},
         )
 
@@ -415,6 +418,7 @@ def band_director_dashboard_page(request: Request, week: date | None = None):
                 "page_class": "band-director-page",
                 "classroom_director_enabled": classroom_director_enabled(),
                 "classroom_enrollment_enabled": classroom_enrollment_enabled(),
+                "classroom_management_enabled": classroom_management_enabled(),
                 **metrics,
             },
             headers={"Cache-Control": "no-store"},
