@@ -1,0 +1,30 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>Classroom parent permissions · Woodshed Woodchuck</title><link rel="stylesheet" href="/static/css/styles.css?v=125"><link rel="stylesheet" href="/static/css/classroom-enrollment.css?v=1"><link rel="stylesheet" href="/static/css/classroom-parent.css?v=1"></head>
+<body class="enrollment-page"><header class="enrollment-header"><a class="enrollment-brand" href="/family/parent">Woodshed Woodchuck<span>PARENT PERMISSIONS</span></a><nav><a href="/family/parent">Private parent view</a><a href="/family/parent-access">Refresh parent access</a></nav></header>
+<main class="enrollment-shell" data-enrollment-private>
+<h1>Classroom parent permissions</h1>
+<p><strong>{{ child.name }} · {{ child.woodchuck_id }}</strong></p>
+{% if message %}<p role="status">{{ message }}</p>{% endif %}
+<p>Your private parent access applies to your child only. Adult verification, legal-guardian attestation and each permission are separate.</p>
+<p>Participation does not require reporting. Your child must also choose reporting before an assigned director can see approved comprehensive statistics. Individual P-Charts keep their own permissions.</p>
+{% for room in classes %}<section class="enrollment-card" data-parent-class="{{ room.class_id }}">
+<p class="enrollment-step">{{ room.program_name }}</p><h2>{{ room.class_name }}</h2>
+{% if room.directors %}<p>Current Band Director(s): {{ room.directors | join(', ') }}</p>{% endif %}
+{% for item in room.choices %}<section class="parent-choice" data-parent-purpose="{{ item.purpose }}">
+<h3>{{ 'Classroom participation' if item.purpose == 'participation' else 'Comprehensive reporting' }}</h3>
+{% if item.choice.authorized %}<p class="parent-status"><strong>Permission is current.</strong> You can withdraw it independently.</p>
+{% elif item.choice.saved %}<p class="parent-status">Your saved permission is inactive because required evidence or Classroom relationships changed. It does not authorize access.</p>
+{% else %}<p class="parent-status">Permission has not been given for this Class.</p>{% endif %}
+{% if item.choice.eligible and not item.choice.authorized %}
+<p>{{ item.notice }}</p>
+{% if item.purpose == 'reporting' %}<details><summary>Review the 41 approved fields</summary><ul>{% for key,label in fields %}<li>{{ label }}</li>{% endfor %}</ul><p>Missing or restricted measurements remain unavailable. The exact current practice streak is unavailable while today's occurrence day is excluded.</p></details>{% endif %}
+<form method="post" class="enrollment-form" action="/classroom/parent/{{ room.program_id }}/classes/{{ room.class_id }}/{{ item.purpose }}/authorize">
+<input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="notice_token" value="{{ item.token }}">
+<label class="parent-checkbox"><input type="checkbox" name="guardian_attestation" value="yes" required><span>{{ attestation }}</span></label>
+<label class="parent-checkbox"><input type="checkbox" name="opt_in" value="yes" required><span>{{ 'I authorize Classroom participation for this Class.' if item.purpose == 'participation' else 'I authorize only the listed reporting fields for the current directors of this Class.' }}</span></label>
+<button type="submit" class="enrollment-button">{{ 'Authorize participation' if item.purpose == 'participation' else 'Authorize reporting' }}</button></form>
+{% elif not item.choice.eligible %}<p>Current account permission, confirmed enrollment and active Classroom access are required. Reporting also needs current participation permission and an assigned director.</p>{% endif %}
+{% if item.choice.saved %}<form method="post" class="enrollment-form" action="/classroom/parent/{{ room.program_id }}/classes/{{ room.class_id }}/{{ item.purpose }}/withdraw"><input type="hidden" name="csrf" value="{{ csrf }}"><label class="parent-checkbox"><input type="checkbox" name="confirm" value="yes" required><span>Withdraw this permission for this Class.</span></label><button class="enrollment-button enrollment-secondary" type="submit">{{ 'Withdraw participation' if item.purpose == 'participation' else 'Withdraw reporting' }}</button></form>{% endif %}
+</section>{% endfor %}</section>
+{% else %}<section class="enrollment-card"><p>No confirmed Class memberships are available for your child. Class enrollment and parent permission are separate steps.</p></section>{% endfor %}
+<p>School authorization is currently unavailable. Please use the qualified parent or legal-guardian flow.</p>
+</main><script src="/static/js/classroom-enrollment.js?v=1"></script></body></html>

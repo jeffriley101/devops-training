@@ -113,7 +113,7 @@ async def authorize(request: Request, program_id: int, class_id: int):
         except (BadData, classroom.ClassroomDenied) as error:
             session.rollback()
             raise HTTPException(409, "Authorization was not saved. Reload to review your current Class and directors.") from error
-    request.session["classroom_reporting_message"] = "Authorization saved. Comprehensive reporting is not available yet."
+    request.session["classroom_reporting_message"] = "Authorization saved. Approved reporting requires all current account, Classroom and applicable guardian permissions."
     return RedirectResponse(PATH, 303)
 
 

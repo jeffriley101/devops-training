@@ -68,7 +68,7 @@ def test_firefox_explicit_choice_and_withdrawal(progress_site, tmp_path, width, 
         expect(page.get_by_role("heading", name="Classroom reporting", exact=True)).to_be_visible()
         checkbox = page.get_by_role("checkbox", name=LABEL)
         expect(checkbox).not_to_be_checked()
-        assert "Comprehensive reporting is not available yet" in page.locator("main").inner_text()
+        assert "approved individual Classroom reporting fields" in page.locator("main").inner_text()
         assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
         save = page.get_by_role("button", name="Save authorization", exact=True)
         assert save.bounding_box()["height"] >= 44

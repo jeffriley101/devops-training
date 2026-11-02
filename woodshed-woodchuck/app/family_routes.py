@@ -340,7 +340,8 @@ def parent_view(request:Request):
         permissions=[{'id':r.id,'name':r.director_name,'email':r.email,'review_allowed':r.review_allowed} for r in s.scalars(select(DirectorPermission).where(DirectorPermission.consent_id==evidence.id,DirectorPermission.revoked_at.is_(None)))]
         data={'name':p.display_name,'metrics':rating_metrics_projection(metrics(s,p),allowed=adult_rating_allowed(s,p.id,guardian=True)),'can_confirm_age':rule.age_band=='under13','permissions':permissions,'age_wording':parent_access.AGE_WORDING,'age_version':parent_access.AGE_WORDING_VERSION}
         if request.url.path.endswith('/data'):return data
-        return page(request,'parent',**data)
+        from .classroom_guardian_authorization import enabled as classroom_parent_enabled
+        return page(request,'parent',classroom_parent_enabled=classroom_parent_enabled(),**data)
 
 @router.post('/family/parent/age')
 async def parent_age(request:Request):

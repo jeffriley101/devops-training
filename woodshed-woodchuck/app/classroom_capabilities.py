@@ -101,6 +101,14 @@ def _classroom_sources(session, profile_id, now, program_id, class_id):
         if period is None:
             output.append((replace(source, reason="membership_inactive"), frozenset()))
             continue
+        from . import classroom_guardian_authorization as guardian, classroom_reporting as boundary
+        if guardian.required(session, profile_id):
+            from .classroom_models import ClassroomEntitlement
+            package = session.get(ClassroomEntitlement, entitlement.entitlement_id, populate_existing=True)
+            context = (anchor, period, package, rule, boundary._activation(session, state), now)
+            if not guardian.participation_source_allowed(session, context):
+                output.append((replace(source, reason='guardian_participation_required'), frozenset()))
+                continue
         output.append((replace(source, allowed=True, reason="active_classroom_source",
                                membership_period_id=period.id),
                        grants))

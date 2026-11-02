@@ -206,7 +206,11 @@ def test_existing_child_account_consent_allows_tools_without_reporting(capabilit
         rule = session.get(AccountPrivacy, 1)
         rule.age_band, rule.consent_id = "under13", consent.id
         session.flush()
-        assert decide(session, "note-names").allowed
+        # Account consent retains ordinary tools; exact-Class participation is
+        # a separate qualified guardian choice, including while its UI is off.
+        class_source = decide(session, "note-names")
+        assert not class_source.allowed
+        assert any(source.reason == "guardian_participation_required" for source in class_source.sources)
         assert decide(session, "pristine_use").allowed
         assert decide(session, "personal_progress_save").allowed
         assert not decide(session, "class_reporting").allowed

@@ -201,7 +201,9 @@ def roster(session, *, current, class_id, before=None):
             profile = profiles.get(anchor.profile_id)
         else:
             profile = session.get(WoodchuckProfile, anchor.profile_id, populate_existing=True) if show_identity else None
-        show_identity = bool(profile and profile.status == 'active' and sharing_allowed(session, profile.id))
+        show_identity = bool(profile and profile.status == 'active' and
+            classroom_identity.account_identity_allowed(session, program_id=program_id,
+                class_id=class_id, profile_id=profile.id))
         # Unassigned roles cannot reach this Class projection. Former/held student
         # identities remain hidden from teachers while management keeps references.
         if not current['manage'] and not member['active']:

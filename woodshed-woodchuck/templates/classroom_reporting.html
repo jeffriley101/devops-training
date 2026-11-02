@@ -11,7 +11,7 @@
   </header>
   {% if message %}<p role="status">{{ message }}</p>{% endif %}
   <p>Reporting is optional. Your Classroom learning benefits do not depend on this choice.</p>
-  <p>Comprehensive reporting is not available yet. This page saves your choice for future authorized reporting. Unshared P-Charts remain private.</p>
+  <p>Your choice controls the approved individual Classroom reporting fields. Required parent or legal-guardian permissions remain separate. Unshared P-Charts remain private.</p>
   {% for room in classes %}
   <section class="classroom-panel classroom-message" aria-labelledby="class-{{ room.class_id }}">
     <h2 id="class-{{ room.class_id }}">{{ room.name }}</h2>
@@ -38,7 +38,7 @@
     {% endif %}
   </section>
   {% else %}
-    <p class="classroom-panel classroom-message">No eligible Classes or saved reporting choices are available. Reporting authorization requires an eligible account aged 13 or older, confirmed enrollment, active Classroom access and a current Band Director. An invitation alone does not qualify.</p>
+    <p class="classroom-panel classroom-message">No eligible Classes or saved reporting choices are available. Reporting authorization requires an eligible account, confirmed enrollment, active Classroom access, a current Band Director and any required qualified parent or legal-guardian permissions. An invitation alone does not qualify.</p>
   {% endfor %}
 </section>
 {% endblock %}

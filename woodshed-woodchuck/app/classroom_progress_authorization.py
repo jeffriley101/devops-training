@@ -131,7 +131,7 @@ def _capacity_revision(session, entitlement):
     return assignments or 0, activity or 0
 
 
-def _source_revision(session, context):
+def _source_revision_base(session, context):
     """Revision of this student's sources, read while holding the Program lock.
 
     S1/S2 writers append these retained audit IDs atomically with each source
@@ -167,6 +167,18 @@ def _source_revision(session, context):
     return hashlib.sha256(json.dumps(snapshot, separators=(",", ":")).encode()).hexdigest()
 
 
+def _source_revision(session, context):
+    base = _source_revision_base(session, context)
+    anchor, _, entitlement, rule, _, _ = context
+    if rule.consent_id or rule.age_band == 'under13':
+        from . import classroom_guardian_authorization as guardian
+        grants = guardian.reporting_evidence(session, entitlement.program_id, anchor.class_id, anchor.profile_id)
+        return hashlib.sha256(json.dumps(('classroom-progress-guardian-v1', base,
+            [(grant.id, grant.consent_id, grant.notice_digest) for grant in grants]),
+            separators=(',', ':')).encode()).hexdigest()
+    return base
+
+
 def _current(session, row, context, teachers):
     anchor, member, entitlement, rule, activation, now = context
     recipients = set(session.scalars(select(Recipient.assignment_id).where(
@@ -196,7 +208,7 @@ def accept(session, *, student, program_id, class_id, notice_version, opted_in, 
            source_revision):
     if opted_in is not True or notice_version != NOTICE_VERSION or type(student) is not s2.StudentAuthentication:
         raise s1.ClassroomDenied(UNAVAILABLE)
-    context = boundary._context(session, program_id, class_id, student.profile_id, student=student)
+    context = boundary._context(session, program_id, class_id, student.profile_id, student=student, _educational=True)
     anchor, member, entitlement, rule, activation, now = context
     # Check before idempotency: a stale form may never be used as new consent,
     # even when current source values or the recipient set have returned.
@@ -266,7 +278,7 @@ def choice(session, *, student, program_id, class_id):
     row = _open(session, program_id, class_id, profile.id)
     revision = _revision(_latest(session, program_id, class_id, profile.id))
     try:
-        context = boundary._context(session, program_id, class_id, profile.id, student=student)
+        context = boundary._context(session, program_id, class_id, profile.id, student=student, _educational=True)
         teachers = _teachers(session, program_id, class_id, context[-1])
     except s1.ClassroomDenied:
         return Choice(False, False, row is not None, revision=revision)
@@ -280,7 +292,7 @@ def authorize_boundary(session, *, actor, program_id, class_id, profile_id,
     """Internal, transaction-bound evidence only. No data fields or exports approved."""
     if operation != "authorization_boundary" or fields != ():
         raise s1.ClassroomDenied(UNAVAILABLE)
-    context = boundary._context(session, program_id, class_id, profile_id)
+    context = boundary._context(session, program_id, class_id, profile_id, _educational=True)
     teachers = _teachers(session, program_id, class_id, context[-1])
     actor_id = s1._actor(session, actor)
     teacher = next((t for t in teachers if t.verifier_id == actor_id), None)
@@ -291,6 +303,10 @@ def authorize_boundary(session, *, actor, program_id, class_id, profile_id,
     start = max(utc(row.accepted_at), utc(member.starts_at), utc(teacher.starts_at),
                 utc(entitlement.starts_at), utc(entitlement.created_at), activation,
                 utc(rule.declared_at), utc(rule.public_from or rule.declared_at))
+    if rule.consent_id or rule.age_band == 'under13':
+        from .classroom_guardian_authorization import reporting_evidence
+        start = max(start, *(utc(grant.accepted_at) for grant in
+            reporting_evidence(session, program_id, class_id, profile_id)))
     return boundary.ReportingDecision(True, "authorized_boundary_only", SCOPE_VERSION,
         program_id, class_id, profile_id, row.id, teacher.id, start, now,
         _session=session, _transaction=session.get_transaction())

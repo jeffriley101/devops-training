@@ -1,5 +1,5 @@
 """Transition scoping and independent recovery withdrawal, synthetic PostgreSQL."""
-import sys,re,json,importlib.util
+import os,sys,re,json,importlib.util
 from pathlib import Path
 from datetime import datetime,timedelta,timezone,date
 from types import SimpleNamespace
@@ -20,8 +20,11 @@ from test_private_practice import captured,authorize,connect,open_parent,post,pa
 
 def load_recovery():
     # Import only the independent boundary/router, not the recovery app or seeds.
-    root=Path('/recovery/app')
-    if not root.exists():root=Path(__file__).resolve().parents[3]/'recovery/woodshed-woodchuck/app'
+    configured=os.getenv('WW_PRIVATE_RECOVERY_APP_ROOT')
+    root=Path(configured) if configured else Path('/recovery/app')
+    if not configured and not root.exists():root=Path(__file__).resolve().parents[3]/'recovery/woodshed-woodchuck/app'
+    if not all((root/(name+'.py')).is_file() for name in ('recovery_authorization','age_recovery')):
+        pytest.skip('External recovery fixture is unavailable: '+str(root))
     modules=[]
     for name in ('recovery_authorization','age_recovery'):
         spec=importlib.util.spec_from_file_location('app.'+name,root/(name+'.py'))

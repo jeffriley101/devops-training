@@ -111,7 +111,8 @@ def test_complete_free_private_journey(age_db,captured,existing):
     d=connect(mail)
     assert save(c).status_code==303
     data=d.get('/family/director/data').json();assert len(data['charts'])==2
-    assert set(data['metrics'])=={'weekly','lifetime','rating','trend','practice_streak'}
+    # Accepted paid-seat rating policy is independent of free director access.
+    assert set(data['metrics'])=={'weekly','lifetime','practice_streak'}
     rid=data['reviews'][0]['id']
     r=post(d,f'/family/director/review/{rid}',{'decision':'approved','note':'Synthetic approval'},page='/family/director');assert r.status_code==303,r.text
     p=open_parent(p,captured,wid)
@@ -300,7 +301,7 @@ def test_13plus_http_connection_invitation_needs_no_parent(age_db,captured):
     assert r.status_code==200,r.text
     assert mail[-1]['To']=='older-director@example.test'
     body=mail[-1].get_body(preferencelist=('plain',)).get_content()
-    assert 'Synthetic A' in body
+    assert 'WC-AGE-A' in body and 'Synthetic A' not in body
     with age_db() as s:assert s.scalar(select(func.count(PendingConsent.id)))==0
 
 

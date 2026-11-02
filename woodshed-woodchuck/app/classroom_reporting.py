@@ -97,7 +97,7 @@ def _activation(session, state):
     return utc(instant or state.created_at)
 
 
-def _context(session, program_id, class_id, profile_id, *, student=None):
+def _context(session, program_id, class_id, profile_id, *, student=None, _educational=False):
     _exact_ids(program_id, class_id, profile_id)
     s1._lock_program(session, program_id)
     state = s2._active(session, program_id, class_id)
@@ -105,7 +105,17 @@ def _context(session, program_id, class_id, profile_id, *, student=None):
         s2._eligible_profile(session, profile_id)
     elif s2._student(session, student).id != profile_id:
         raise s1.ClassroomDenied(UNAVAILABLE)
-    rule = _account_rule(session, profile_id)
+    if _educational:
+        from . import classroom_guardian_authorization as guardian
+        if guardian.required(session, profile_id):
+            # Only the independently approved educational reader may use the
+            # qualified parent path. S3 proofs and P-Chart readers stay separate.
+            guardian.reporting_evidence(session, program_id, class_id, profile_id)
+            rule = session.get(AccountPrivacy, profile_id, populate_existing=True)
+        else:
+            rule = _account_rule(session, profile_id)
+    else:
+        rule = _account_rule(session, profile_id)
     anchor = s2._anchor(session, class_id, profile_id)
     if anchor is None or s2._held(session, anchor.id):
         raise s1.ClassroomDenied(UNAVAILABLE)

@@ -1,0 +1,142 @@
+Classroom parent/guardian authorization — local implementation
+=============================================================
+
+Scope and existing contracts
+----------------------------
+This continues the accepted D2 41-field individual reporting implementation.
+It adds qualified parent choices for an existing child's exact Class. It does
+not activate Classroom or KWS, approve new data fields, create parent accounts,
+verify a school, send new notifications, or change existing KWS bindings,
+callbacks, notices, account permissions, or free director permissions.
+
+The existing native KWS flow records adult verification, a separate guardian
+attestation, acceptance of the current account notice and account permission.
+Its verified result is activated into an exact child's ConsentEvidence. Parent
+access then requires that consent's separate one-use emailed link and bounded
+private parent session. Matching an email, a TrustedVerifier role/PIN, payment,
+a school domain or a Class membership cannot substitute for that mechanism.
+
+Class membership is a retained administrative relationship. Existing native
+enrollment remains separate from permission to participate, report or share.
+Protected students may have a confirmed membership while Class learning awaits
+qualified parent participation permission. Ordinary account-authorized private
+practice, personal access and saving retain their existing sources.
+
+Qualified parent evidence
+-------------------------
+The new path requires current native parent authentication for the exact child;
+active current account consent; exactly one activated KWS verification linked to
+that consent; current configured environment/organization/product and notice;
+the original immutable pending-request binding; completed adult verification;
+original guardian attestation/notice times; matching activation, child and parent
+contact bindings; and a fresh separate Class guardian attestation/explicit choice.
+The accepted guardian wording is reused. The provider's verification result is
+never treated as proof of legal guardianship or as Class reporting consent.
+
+Activated account verification is durable evidence, not an unexpired pending
+verification request. It does not depend on the old request's activation deadline
+after valid activation. Current account withdrawal, evidence invalidation,
+deletion or notice/configuration mismatch still blocks the Class path.
+
+Independent Class choices
+------------------------
+Participation: the parent expressly authorizes this Class's learning participation
+and the already approved private roster identity (school name/WC#/instrument and
+membership records) under existing exact Program/Class administrative authority.
+It does not create enrollment, reporting, chart sharing or a verifier connection.
+
+Reporting: a separate parent choice names the current exact teaching assignments
+and binds the fixed classroom-reporting-41-v1 fields. The student must separately
+accept the existing educational reporting notice for the same Class/recipients.
+Both current participation and current parent/student reporting choices are
+required. Parent reporting is optional and never required for Class learning.
+
+Individual P-Charts: existing S3 and per-chart sharing readers keep their strict
+account boundary. Parent comprehensive consent does not enable protected-child
+Class P-Chart sharing, create a share, or expand a free DirectorPermission. The
+existing separately authorized private director flow retains its own permissions.
+
+Under-13 and all consent-linked reporting remain denied if any required evidence
+is missing or invalid. Unlinked eligible 13+ student reporting keeps its accepted
+contract. The 41-field reader and rating formula are unchanged. The other 26
+fields, comprehensive notes, exports and cohort reporting stay unavailable.
+
+Dates, source changes and withdrawal
+-----------------------------------
+C34 choices start at explicit server-recorded acceptance, never at enrollment,
+KWS verification, a supplied date or an earlier authorization. They expire no
+later than the current Program entitlement. Each binds its current membership
+period, entitlement, source revision, notice and evidence references. Reporting
+additionally binds the participation receipt and exact current recipients.
+
+The student reporting source revision includes both guardian receipts. Rejoining,
+membership holds/reinstatement, archive/reactivation, entitlement/source changes,
+changed teachers, changed account declaration/consent, withdrawal or replacement
+require fresh applicable choices. Reversing a source change does not revive old
+receipts. Current parent sessions are rechecked after lock waits; a stale form
+cannot undo withdrawal or silently switch child/Class/directors.
+
+Withdrawal of parent reporting immediately stops comprehensive reads without
+ending participation, enrollment, account permission or individual chart choices.
+Participation withdrawal also blocks Class learning and reporting but retains
+membership records and ordinary separately authorized private practice. The
+existing account withdrawal invalidates all dependent choices. Reapproval needs
+fresh applicable student/parent choices and cannot backfill earlier private data.
+
+Reporting lower bounds include both guardian acceptances and the existing exact
+student/teacher/membership/entitlement/account bounds. Complete America/Chicago
+occurrence days and independent submission instants must both qualify, including
+DST boundaries. Missing/partial measurements stay unavailable. Exact current
+practice streak remains unavailable under the accepted complete-day boundary.
+
+Storage, locking and operator boundaries
+---------------------------------------
+Additive c34guardian001 follows c33identity001 and adds only guardian authorizations,
+exact reporting recipients and minimal audit receipts. Restrictive scoped foreign
+keys, one-open-choice uniqueness, date/shape checks and retained audit evidence
+support the service's current-source checks. The tables contain no copied names,
+addresses, credentials, raw KWS results, practice measurements or notes. No earlier
+row, schema object, migration or consent receipt is rewritten or backfilled.
+
+Mutation/read authority follows Program -> Class -> existing consent/profile ->
+membership order, PostgreSQL READ COMMITTED and caller-owned transactions/savepoints.
+Supported writers serialize on those fences. Capability projections remain read
+only and never acquire a Program lock beneath an account lock. C33 protected
+identity remains masked when its global account-lock prepass is disabled.
+
+The frozen C34 operator contract validates the exact new schema and preserves its
+tables in operator snapshots. False old stamps with guardian tables refuse. Used
+evidence refuses downgrade. Original PTA receipts and P31-only new-issuance rules
+are unchanged; this is not permission to issue a new activation on a later head.
+
+CLASSROOM_GUARDIAN_AUTHORIZATION_ENABLED defaults off and requires S1/S2. Protected
+Class benefits fail closed when the workflow is off; disabling its UI cannot
+revive withdrawn permission. Participation and its withdrawal do not depend on
+S3/reporting gates. Reports still require their separate original reporting gates.
+Install/validation and any activation remain separate operations; no production
+migration or feature enablement is performed by this local implementation.
+
+Specific missing Leadership decision: school authority
+-----------------------------------------------------
+No independently verifiable school-authority contract exists in the accepted
+sources. School authorization therefore has no positive implementation path.
+The service rejects school claims before using them as authority; the UI directs
+users to the qualified parent/guardian flow. Director role, school email/domain,
+Class enrollment and institutional funding never become school consent evidence.
+
+Leadership must approve the school's authority-evidence contract before a school
+path can be implemented: the qualifying institution and authorized signer/delegation;
+an independent issuer or verification process and its authenticated evidence;
+the exact child/Program/Class, allowed participation/reporting purposes and fixed
+field scope; notice/attestation versions; effective dates and retained evidence;
+and expiry/revocation verification. No school portal checkbox, unverifiable letter,
+administrator assertion or operator-provided boolean is silently accepted instead.
+
+Qualification limits
+--------------------
+Local tests use synthetic native signed KWS callbacks and existing activation and
+parent-access mechanisms on disposable actual migrations. They do not contact
+KWS/mail providers or independently establish a real person's legal relationship.
+PostgreSQL waits, complete desktop/mobile journeys and a focused independent
+security review qualify this change. They are not production/legal/provider or
+whole-product activation acceptance. External evidence records exact results.

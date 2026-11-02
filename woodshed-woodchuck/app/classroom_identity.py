@@ -23,6 +23,18 @@ def enabled():
         and os.getenv('CLASSROOM_PRIVATE_IDENTITY_ENABLED') == '1')
 
 
+def account_identity_allowed(session, *, program_id, class_id, profile_id):
+    if sharing_allowed(session, profile_id):
+        return True
+    if not enabled():
+        # The C33 reader prelocks page subjects in global profile order only
+        # while this identity gate is enabled. Keep protected identity masked
+        # otherwise; do not add per-row consent/profile locks under the reader.
+        return False
+    from .classroom_guardian_authorization import participation_allowed
+    return participation_allowed(session, program_id, class_id, profile_id)
+
+
 def normalize_name(value):
     if not isinstance(value, str) or len(value) > 300:
         raise s1.ClassroomDenied(UNAVAILABLE)
@@ -83,7 +95,7 @@ def _subject(session, *, actor, program_id, class_id, woodchuck_id):
     anchor = s1._fresh(session, ClassroomStudentMembership,
         ClassroomStudentMembership.class_id == class_id, ClassroomStudentMembership.profile_id == profile.id)
     periods = s2._validated_periods(session, anchor.id)
-    if (not sharing_allowed(session, profile.id) or s2._held(session, anchor.id)
+    if (not account_identity_allowed(session, program_id=program_id, class_id=class_id, profile_id=profile.id) or s2._held(session, anchor.id)
             or not any(p.state == 'active' and p.ended_at is None and s2.utc(p.starts_at) <= s2._now() for p in periods)):
         raise s1.ClassroomDenied(UNAVAILABLE)
     return current['actor_id'], profile

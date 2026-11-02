@@ -30,6 +30,9 @@ from .classroom_models import (
     ClassroomStudentMembership, ClassroomMembershipPeriod, ClassroomOwnershipTransfer,
     ClassroomAuditEvent,
 )
+from .classroom_guardian_models import (
+    ClassroomGuardianAuthorization, ClassroomGuardianRecipient, ClassroomGuardianAudit,
+)
 from .membership_models import (BillingAccount, Membership, MembershipSeat,
                                 MembershipSeatInvitation, ProviderSubscription,
                                 BillingProviderEvent, MembershipAuditEvent, CheckoutAttempt,
