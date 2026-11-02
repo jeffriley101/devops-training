@@ -171,7 +171,7 @@ def test_withdrawing_reporting_does_not_withdraw_student_benefits(access_web, mo
 @pytest.mark.parametrize('age,consent,allowed,exercises', [
     ('adult', False, True, True), ('13to17', False, True, True),
     ('unknown', False, False, False), ('under13', False, False, False),
-    ('under13', True, False, True), ('13to17', True, True, True),
+    ('under13', True, False, False), ('13to17', True, False, False),
 ])
 def test_age_and_consent_remain_independent_from_reporting(access_web, monkeypatch, age, consent, allowed, exercises):
     enroll(access_web)
@@ -182,6 +182,9 @@ def test_age_and_consent_remain_independent_from_reporting(access_web, monkeypat
         rule = session.get(AccountPrivacy, 1)
         rule.age_band = age
         if consent:
+            # Account consent alone is not the accepted qualified guardian
+            # authorization for this Class. Native positive cases live in
+            # test_classroom_guardian_authorization and test_classroom_student_home.
             evidence = ConsentEvidence(profile_id=1, parent_email='parent@example.test', approved_at=NOW,
                 confirmed_at=NOW, notice_version='synthetic', notice_sha256='a' * 64)
             session.add(evidence)

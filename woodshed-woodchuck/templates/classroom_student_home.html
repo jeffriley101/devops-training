@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="referrer" content="no-referrer"><title>My Classroom · Woodshed Woodchuck</title>
+  <link rel="stylesheet" href="/static/css/styles.css?v=125">
+  <link rel="stylesheet" href="/static/css/classroom-enrollment.css?v=1">
+  <link rel="stylesheet" href="/static/css/classroom-student-home.css?v=1">
+</head>
+<body class="enrollment-page student-home" data-student-account="{{ account or '' }}">
+<header class="enrollment-header"><a class="enrollment-brand" href="/home">Woodshed Woodchuck<span>CLASSROOM</span></a>
+  <nav aria-label="Classroom navigation"><a href="/classroom" aria-current="page">My Classroom</a><a href="/classroom/enrollment">Join a Class</a><a href="/classroom/enrollment/invitations">Invitations</a><a href="/home">My Woodshed</a></nav>
+</header>
+<main class="enrollment-shell" id="student-home">
+  <p class="enrollment-eyebrow">Your Classes · Your practice</p><h1>My Classroom</h1>
+  {% if not account %}
+    <section class="enrollment-card"><h2>Sign in to your student account</h2><p>See your Classes and your saved weekly Homework.</p><a class="enrollment-button" href="/classroom/enrollment">Student sign in</a></section>
+  {% else %}
+  <div data-student-private>
+    <p class="enrollment-intro">Signed in as <strong>{{ account }}</strong>. Pick up your practice where you left off.</p>
+    {% if not ready %}<p class="enrollment-notice">Account authorization is needed before learning or Homework is available. <a href="/account/age">Check age or parent authorization</a>.</p>{% endif %}
+    <div class="enrollment-grid student-grid">
+    <section class="enrollment-card" id="student-classes" aria-labelledby="classes-title">
+      <div class="enrollment-section-head"><h2 id="classes-title">Your Classes</h2><a href="/classroom">Refresh status</a></div>
+      <div class="enrollment-list">
+      {% for item in members %}
+        <article class="student-class" data-class-id="{{ item.class_id }}" data-program-id="{{ item.program_id }}">
+          <p class="enrollment-step">{{ item.program_name }}</p><h3>{{ item.class_name }}</h3>
+          <p>Membership: <strong data-membership-status>{{ item.membership.label }}</strong></p>
+          <p class="student-access" data-learning-access>{{ 'Learning access available' if item.membership.access else 'Learning access currently unavailable' }}</p>
+          {% if item.membership.access %}<a class="enrollment-button enrollment-secondary" href="/practice/skill-building">Open learning tools</a>{% endif %}
+        </article>
+      {% else %}<p>You have no Class memberships on this page. Use a Class code or accept an enrollment invitation to join.</p>{% endfor %}
+      </div>
+      {% if next_before %}<p><a class="enrollment-button enrollment-secondary" href="/classroom?before={{ next_before }}">More Classes</a></p>{% endif %}
+      <p><a href="/classroom/enrollment">Join a Class</a> · <a href="/classroom/enrollment/invitations">Open enrollment invitations</a></p>
+      <p class="enrollment-muted">Membership and learning access are separate. If access is unavailable, check account authorization or ask your director to check current Class access and required parent permission.</p>
+    </section>
+    <section class="enrollment-card" id="student-homework" aria-labelledby="homework-title">
+      <p class="enrollment-step">Weekly Loop</p><h2 id="homework-title">Your Homework</h2>
+      {% if not homework.available %}
+        <p data-homework-unavailable>Weekly Homework is currently unavailable for this account.</p>
+      {% else %}
+        <p>Your personal weekly work carries across Classes. Focus and Game Mode are saved for the week; each instrument’s Homework is saved when you start it.</p>
+        <p>Current instrument: <strong data-current-instrument>{{ homework.instrument or 'Choose a supported instrument' }}</strong><br>Current Game Mode: <strong data-current-mode>{{ homework.game_mode or 'Not selected' }}</strong></p>
+        <p><a href="/home">Change instrument or Game Mode in My Woodshed</a></p>
+        {% if not homework.plan %}
+          <p>No Focus or Homework has been saved for this week.</p>
+          {% if homework.game_mode %}
+          <form class="enrollment-form" data-homework-focus>
+            <label for="weekly-focus">Weekly Focus</label><select id="weekly-focus" name="focus" required><option value="">Choose a Focus</option>{% for focus in foci %}<option>{{ focus }}</option>{% endfor %}</select>
+            <p class="enrollment-muted">Save your Focus and current Game Mode first, then choose to start instrument work.</p>
+            <button class="enrollment-button" type="submit">Save this week’s Focus</button>
+          </form>
+          {% else %}<p>Choose a Game Mode in My Woodshed before saving your Focus.</p>{% endif %}
+        {% else %}
+          <dl class="student-plan"><dt>Week starting</dt><dd>{{ homework.plan.week_start }}</dd><dt>Saved Focus</dt><dd data-saved-focus>{{ homework.plan.focus }}</dd><dt>Issued Game Mode</dt><dd data-issued-mode>{{ homework.plan.game_mode }}</dd></dl>
+          {% for assignment in homework.assignments %}
+          <article class="student-assignment" data-homework-slot="{{ assignment.slot }}">
+            <p class="enrollment-step">Saved instrument {{ assignment.slot }} of 2 · {{ assignment.instrument }}</p>
+            <h3>{{ assignment.homework.title }}</h3>
+            <ol>{% for instruction in assignment.homework.instructions %}<li>{{ instruction }}</li>{% endfor %}</ol>
+            <p>{{ assignment.homework.suggested_blocks.count }} suggested blocks of {{ assignment.homework.suggested_blocks.minutes_each }} minutes.</p>
+            <p data-homework-progress>{{ '%g' | format(assignment.progress.practice_seconds / 60) }} / {{ '%g' | format(assignment.progress.target_seconds / 60) }} minutes of matching submitted practice.</p>
+            <p data-homework-qualification>{{ 'Weekly Loop qualification met' if assignment.progress.qualified else 'Weekly Loop qualification not yet met' }}</p>
+          </article>
+          {% else %}<p>Your Focus is saved. Instrument Homework has not been started.</p>{% endfor %}
+          {% if homework.can_start %}
+          <form class="enrollment-form" data-homework-start><input type="hidden" name="start_context" value="{{ homework.start_context }}"><p>Start {{ homework.instrument }} using the saved Focus and issued Game Mode. This uses one of your two weekly instrument slots.</p><button class="enrollment-button" type="submit">Start Homework for {{ homework.instrument }}</button></form>
+          {% elif not homework.instrument %}<p>Choose a supported instrument in My Woodshed to start Homework.</p>
+          {% elif homework.assignments | length >= 2 %}<p>Both weekly instrument slots are saved. You can keep practicing or explore another instrument.</p>
+          {% else %}<p>Homework for your current instrument is already saved.</p>{% endif %}
+          {% if homework.assignments %}<p class="enrollment-muted">Weekly Loop counts eligible matching practice submitted after this instrument assignment started. This is a submission-based qualification, not a measurement of playing or a director’s assessment.</p><a class="enrollment-button enrollment-secondary" href="/p-book">Open Practice Book</a>{% endif %}
+        {% endif %}
+        <noscript><p>Enable JavaScript to save a Focus or start Homework here. Saved work remains available to read.</p></noscript>
+        <p id="homework-action-status" role="status" aria-live="polite"></p>
+      {% endif %}
+    </section>
+    </div>
+    <section class="enrollment-card enrollment-privacy" id="student-permissions"><h2>Your sharing choices</h2><p>Joining a Class, authorizing comprehensive reporting, and sharing an individual P-Chart are separate choices. Joining or starting Homework does not grant reporting or P-Chart permission.</p><div class="enrollment-actions"><a class="enrollment-button enrollment-secondary" href="/p-book">Individual P-Chart choices</a><a class="enrollment-button enrollment-secondary" href="/classroom/reporting">Review reporting permission</a></div><p class="enrollment-muted">Existing age and parent requirements apply. Comprehensive director reporting remains unavailable under 13.</p></section>
+  </div>
+  {% endif %}
+</main>
+<script src="/static/js/classroom-student-home.js?v=1" defer></script>
+</body></html>

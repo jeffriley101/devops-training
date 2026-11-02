@@ -1,0 +1,8 @@
+.student-home .student-grid{grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);align-items:start}
+.student-home .student-class,.student-home .student-assignment{border-top:1px solid #dce2d5;padding-top:20px;margin-top:18px;overflow-wrap:anywhere}
+.student-home .student-class:first-child{border-top:0;padding-top:0;margin-top:0}
+.student-home .student-access{font-size:14px;color:#49634d}.student-home .student-plan{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px 16px;margin:24px 0}.student-home dt{font-weight:700}.student-home dd{margin:0;overflow-wrap:anywhere}
+.student-home select{font:inherit;color:inherit;background:#fff;max-width:100%;min-width:0;width:100%;min-height:48px;border:1px solid #a7b7a7;border-radius:10px;padding:12px}
+.student-home ol{padding-left:24px}.student-home li{margin:10px 0}.student-home h2{max-width:none}.student-home .enrollment-header nav a{min-height:44px;display:inline-flex;align-items:center}
+@media(max-width:800px){.student-home .student-grid{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:400px){.student-home .student-plan{grid-template-columns:minmax(0,1fr);gap:2px}.student-home dd{margin-bottom:10px}}
