@@ -29,7 +29,13 @@ def test_empty_c34_upgrade_preserves_all_prior_objects_and_operator_snapshot(mig
     with db.connect() as connection:
         assert installed_revision(connection, RuntimeError) == 'c34guardian001'
         assert set(C34) <= set(classroom_snapshot(connection, 'c34guardian001'))
-        assert compare_metadata(MigrationContext.configure(connection), Base.metadata) == []
+        # C35 has its own full-head parity check. Qualify the historical C34
+        # contract against only the schema available at that revision.
+        ctx = MigrationContext.configure(connection, opts={'include_object': lambda obj,name,kind,reflected,compare:
+            not (kind == 'table' and name == 'classroom_school_authorizations')
+            and not (kind == 'column' and name == 'guardian_permission_id')
+            and not (kind == 'foreign_key_constraint' and name == 'fk_classroom_chart_guardian_permission')})
+        assert compare_metadata(ctx, Base.metadata) == []
         for old in ('c33identity001', 'c32enroll001', 'p31pta001'):
             with connection.begin_nested() as negative:
                 connection.execute(text('UPDATE alembic_version SET version_num=:old'), {'old':old})
@@ -44,6 +50,7 @@ def test_empty_c34_upgrade_preserves_all_prior_objects_and_operator_snapshot(mig
 
 def test_qualified_evidence_cannot_be_downgraded_or_cross_scoped(guardian_data):
     refs = guardian_data
+    command.downgrade(config(), 'c34guardian001')
     fully_authorize(refs)
     db = refs.factory.engine
     before = rows(db)

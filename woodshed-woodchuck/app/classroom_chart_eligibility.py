@@ -38,7 +38,7 @@ def enrolled_recipient(session, *, student, program_id, class_id, assignment_id)
         raise classroom.ClassroomDenied("Classroom sharing unavailable.")
     try:
         _, member, entitlement, _, _, now = classroom_reporting._context(
-            session, program_id, class_id, student.profile_id, student=student)
+            session, program_id, class_id, student.profile_id, student=student, _chart_assignment_id=assignment_id)
         assignment = session.scalar(select(ClassroomTeachingAssignment).where(
             ClassroomTeachingAssignment.id == assignment_id,
             ClassroomTeachingAssignment.program_id == program_id,
@@ -82,7 +82,9 @@ def invited_context(session, *, assignment_id, profile_id, student=None, invitat
         s2._eligible_profile(session, profile_id)
     elif s2._student(session, student).id != profile_id:
         raise classroom.ClassroomDenied("Classroom sharing unavailable.")
-    rule = reporting._account_rule(session, profile_id)
+    from . import classroom_chart_consent as chart_consent
+    rule = chart_consent.account_rule(session, profile_id, lock=True)
+    chart_consent.permission(session, profile_id, assignment.id)
     anchor = s2._anchor(session, assignment.class_id, profile_id)
     if anchor is not None:
         s2._validated_periods(session, anchor.id)

@@ -77,6 +77,14 @@ def guardian_data(migrated_db, captured, monkeypatch, adult_pin_hash, request):
     options = getattr(request, 'param', {})
     child, parent, pid, wid = authorize(factory, captured, sharing=options.get('sharing', True))
     open_parent(parent, captured, wid)
+    # Comprehensive director reporting now remains unavailable under 13. The
+    # positive reporting fixture uses the existing native parent age transition,
+    # retaining its consent link. Dedicated younger cases stay under 13.
+    if not options.get('under13', False):
+        with factory() as session:
+            parent_access.confirm_age(session, parent_request(SimpleNamespace(parent=parent)),
+                explicit='yes', version=parent_access.AGE_WORDING_VERSION)
+            session.commit()
     with factory() as session:
         session.add_all(TrustedVerifier(email=f'adult{i}@example.test', display_name=f'Synthetic Adult {i}',
             pin_hash=adult_pin_hash) for i in range(1, 4))
@@ -253,8 +261,8 @@ def test_only_post_guardian_and_student_occurrence_and_submission_history_is_vis
         assert fields['current_practice_streak'] is None
         assert fields['rating_trend'] is None  # No unauthorized baseline zeros.
         assert all('PRIVATE_' not in str(value) for value in fields.values())
-        assert not can_publish(session, refs.profile_id)
-        assert session.get(AccountPrivacy, refs.profile_id).age_band == 'under13'
+        assert session.get(AccountPrivacy, refs.profile_id).age_band == '13to17'
+        assert session.get(AccountPrivacy, refs.profile_id).consent_id is not None
 
 
 def test_regrant_requires_fresh_child_choice_and_never_backfills_history(guardian_data):
@@ -374,9 +382,12 @@ def test_participation_and_its_withdrawal_do_not_depend_on_reporting_gates(guard
         assert capability_decision(session, refs.profile_id, 'personal_progress_save').allowed
 
 
+@pytest.mark.parametrize('guardian_data', [{'under13':True}], indirect=True)
 def test_native_parent_age_transition_keeps_consent_link_and_requires_fresh_class_choices(guardian_data):
     refs = guardian_data
-    fully_authorize(refs)
+    with refs.factory() as session:
+        parent_accept(session, refs, 'participation'); session.commit()
+        with pytest.raises(s1.ClassroomDenied): parent_accept(session, refs, 'reporting')
     refs.clock[0] += timedelta(minutes=1)
     with refs.factory() as session:
         parent_access.confirm_age(session, parent_request(refs), explicit='yes',
@@ -558,7 +569,7 @@ def test_http_choices_are_explicit_session_bound_and_replay_cannot_undo_withdraw
     data = parent_form(refs, 'participation')
     before = refs.parent.get('/classroom/parent')
     assert 'checked' not in before.text
-    assert all(set(choice['choice']) == {'eligible','authorized','saved'}
+    assert all(set(choice['choice']) == {'eligible','authorized','saved','under13_reporting'}
         for room in before.context['classes'] for choice in room['choices'])
     for patch, status in [({'guardian_attestation':'no'},409), ({'opt_in':'no'},409),
                           ({'notice_token':'forged'},409), ({'csrf':'bad'},403),

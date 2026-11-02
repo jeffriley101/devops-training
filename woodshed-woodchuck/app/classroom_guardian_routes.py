@@ -66,7 +66,7 @@ def _rows(request):
                     list(choice['revision']), choice['source_revision'],
                     list(choice['assignment_ids']), choice['participation_id'],
                 ]) if choice['eligible'] else None
-                public_choice = {key: choice[key] for key in ('eligible', 'authorized', 'saved')}
+                public_choice = {key: choice[key] for key in ('eligible', 'authorized', 'saved', 'under13_reporting')}
                 choices.append({'purpose': purpose, 'choice': public_choice, 'token': token,
                     'notice': service.PARTICIPATION_NOTICE if purpose == 'participation' else service.REPORTING_NOTICE})
             directors = list(session.scalars(select(TrustedVerifier.display_name).join(

@@ -258,6 +258,8 @@ def reporting_evidence(session, program_id, class_id, profile_id):
     if not enabled():
         raise s1.ClassroomDenied(UNAVAILABLE)
     context, evidence, verification = _context(session, program_id, class_id, profile_id)
+    if context[3].age_band == 'under13':
+        raise s1.ClassroomDenied(UNAVAILABLE)
     return _grants(session, context, evidence, verification, reporting=True)
 
 
@@ -309,8 +311,12 @@ def choice(session, *, parent, program_id, class_id, purpose):
     s1._lock_program(session, program_id)
     evidence = _parent(session, parent)
     row = _latest(session, program_id, class_id, parent.profile_id, purpose)
+    under13_reporting = purpose == 'reporting' and session.get(AccountPrivacy, parent.profile_id).age_band == 'under13'
     result = {'eligible': False, 'authorized': False, 'saved': bool(row and row.withdrawn_at is None),
+              'under13_reporting': under13_reporting,
               'revision': _revision(row), 'assignment_ids': (), 'source_revision': None, 'participation_id': None}
+    if under13_reporting:
+        return result
     try:
         context, evidence, verification = _context(session, program_id, class_id, parent.profile_id)
         participation = _grants(session, context, evidence, verification, reporting=False)[0] if purpose == 'reporting' else None
@@ -337,6 +343,8 @@ def accept(session, *, parent, program_id, class_id, purpose, notice_version, no
     s1._lock_program(session, program_id)
     evidence = _parent(session, parent)
     context, evidence, verification = _context(session, program_id, class_id, parent.profile_id)
+    if purpose == 'reporting' and context[3].age_band == 'under13':
+        raise s1.ClassroomDenied(UNAVAILABLE)
     from .classroom_progress_authorization import _teachers
     teachers = _teachers(session, program_id, class_id, context[-1])
     part = _grants(session, context, evidence, verification, reporting=False)[0] if purpose == 'reporting' else None
@@ -383,5 +391,5 @@ def withdraw(session, *, parent, program_id, class_id, purpose):
 
 
 def authorize_school(*args, **kwargs):
-    """No approved verifiable institutional-authority issuer/scope contract exists."""
-    raise s1.ClassroomDenied('School authorization evidence contract is unavailable.')
+    """An organizational agreement cannot substitute for child/guardian consent."""
+    raise s1.ClassroomDenied('A school agreement does not replace individual guardian authorization.')

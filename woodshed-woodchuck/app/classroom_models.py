@@ -649,6 +649,10 @@ class ClassroomChartDirectorShare(Base):
     source_audit_id: Mapped[int | None] = mapped_column(ForeignKey("classroom_s2_audit_events.id", ondelete="RESTRICT"))
     selected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     withdrawn_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # A protected student's explicit chart choice retains the exact existing
+    # named-director parent permission. Regrant cannot revive an older selection.
+    guardian_permission_id: Mapped[int | None] = mapped_column(ForeignKey(
+        'child_director_permissions.id', ondelete='RESTRICT', name='fk_classroom_chart_guardian_permission'))
 
 
 class ClassroomStudentInvitation(Base):

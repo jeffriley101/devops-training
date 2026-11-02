@@ -45,14 +45,15 @@ def student_view(session, *, actor, program_id, class_id, membership_id, selecte
     admin['student'] = member
     statistics = _statistics(False)
     shared = {'source': 'explicitly_shared_charts', 'available': False, 'students': []}
-    if member['woodchuck_id'] is not None and member['status'] == 'Member':
+    if member['status'] == 'Member':
         profile_id = session.scalar(select(ClassroomStudentMembership.profile_id).where(
             ClassroomStudentMembership.id == membership_id, ClassroomStudentMembership.class_id == class_id))
-        try:
-            statistics = reporting.report(session, actor=actor, program_id=program_id,
-                class_id=class_id, profile_id=profile_id, selected_week=selected_week)
-        except s1.ClassroomDenied:
-            pass
+        if member['woodchuck_id'] is not None:
+            try:
+                statistics = reporting.report(session, actor=actor, program_id=program_id,
+                    class_id=class_id, profile_id=profile_id, selected_week=selected_week)
+            except s1.ClassroomDenied:
+                pass
         try:
             data = charts.dashboard(session, actor=actor, program_id=program_id, class_id=class_id,
                 _profile_id=profile_id)

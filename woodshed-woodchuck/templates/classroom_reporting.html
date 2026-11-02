@@ -12,6 +12,7 @@
   {% if message %}<p role="status">{{ message }}</p>{% endif %}
   <p>Reporting is optional. Your Classroom learning benefits do not depend on this choice.</p>
   <p>Your choice controls the approved individual Classroom reporting fields. Required parent or legal-guardian permissions remain separate. Unshared P-Charts remain private.</p>
+  <p>Comprehensive director reporting is unavailable for under-13 students. Individual P-Chart sharing uses separate choices and applicable consent.</p>
   {% for room in classes %}
   <section class="classroom-panel classroom-message" aria-labelledby="class-{{ room.class_id }}">
     <h2 id="class-{{ room.class_id }}">{{ room.name }}</h2>

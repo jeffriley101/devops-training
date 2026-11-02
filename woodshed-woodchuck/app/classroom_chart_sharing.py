@@ -6,6 +6,7 @@ from sqlalchemy import func, select
 from . import classroom, classroom_director, classroom_reporting as reporting, classroom_s2 as s2
 from .age_privacy import utc
 from . import classroom_chart_eligibility as eligibility
+from . import classroom_chart_consent as chart_consent
 from .classroom_models import (ClassroomChartDirectorShare, ClassroomClass, ClassroomS2AuditEvent,
     ClassroomStudentMembership, ClassroomTeachingAssignment, ClassroomStudentInvitation, ClassroomClassState)
 from .models import PracticeChart, TrustedVerifier, WoodchuckProfile
@@ -42,10 +43,11 @@ def choices(session, student):
         ClassroomStudentInvitation.accepted_at.is_not(None),
         ClassroomStudentInvitation.revoked_at.is_(None))).all()
     s2._student(session, student)
-    reporting._account_rule(session, student.profile_id)
+    chart_consent.account_rule(session, student.profile_id)
     result = []
     for program_id, class_id, assignment_id in sorted(set(rows + invited)):
         try:
+            chart_consent.permission(session, student.profile_id, assignment_id)
             anchor = s2._anchor(session, class_id, student.profile_id)
             if anchor is not None:
                 s2._validated_periods(session, anchor.id)
@@ -108,7 +110,8 @@ def _current_source(session, share, *, profile_id, assignment, student=None):
         source_valid = eligibility.invitation_source_current(session, share, invitation, now)
     else:
         anchor, member, entitlement, rule, activation, now = reporting._context(
-            session, assignment.program_id, assignment.class_id, profile_id, student=student)
+            session, assignment.program_id, assignment.class_id, profile_id, student=student,
+            _chart_assignment_id=assignment.id)
         source = SimpleNamespace(program_id=assignment.program_id, class_id=assignment.class_id,
             membership_id=anchor.id, membership_period_id=share.membership_period_id,
             entitlement_id=share.entitlement_id, source_audit_id=share.source_audit_id,
@@ -117,7 +120,9 @@ def _current_source(session, share, *, profile_id, assignment, student=None):
     # Refresh after locks: a share withdrawal may have committed while waiting.
     session.refresh(share)
     session.refresh(assignment)
+    parent_permission = chart_consent.permission(session, profile_id, assignment.id)
     return (share.withdrawn_at is None and utc(share.selected_at) <= now
+        and share.guardian_permission_id == (parent_permission.id if parent_permission else None)
         and assignment.ended_at is None and utc(assignment.starts_at) <= now
         and entitlement.id == share.entitlement_id and utc(rule.declared_at) == utc(share.account_declared_at)
         and activation == utc(share.class_activation_at) and source_valid)
@@ -185,17 +190,20 @@ def set_sharing(session, *, student, chart_id, assignment_ids):
     session.flush()
     for assignment_id in desired:
         if decision.invitation_id is None:
-            context = reporting._context(session, target.program_id, target.class_id, profile.id, student=student)
+            context = reporting._context(session, target.program_id, target.class_id, profile.id,
+                student=student, _chart_assignment_id=target.id)
         else:
             context, _ = eligibility.invited_context(session, assignment_id=target.id,
                 profile_id=profile.id, student=student, invitation_id=decision.invitation_id)
         anchor, member, entitlement, rule, activation, now = context
+        parent_permission = chart_consent.permission(session, profile.id, assignment_id)
         session.add(ClassroomChartDirectorShare(chart_id=chart.id, class_id=target.class_id,
             assignment_id=assignment_id, membership_period_id=member.id if member else None,
             invitation_id=decision.invitation_id, entitlement_id=entitlement.id,
             account_declared_at=rule.declared_at, class_activation_at=activation,
             source_audit_id=session.scalar(select(func.max(ClassroomS2AuditEvent.id)).where(
-                ClassroomS2AuditEvent.program_id == target.program_id)), selected_at=now))
+                ClassroomS2AuditEvent.program_id == target.program_id)), selected_at=now,
+            guardian_permission_id=parent_permission.id if parent_permission else None))
     session.flush()
 
 
@@ -217,7 +225,11 @@ def _shared_chart_records(session, *, actor, program_id, class_id, _profile_id=N
     if len(assignments) != 1:
         raise classroom.ClassroomDenied(UNAVAILABLE)
     assignment = assignments[0]
-    query = select(ClassroomChartDirectorShare).where(
+    # Identify only explicitly selected subjects before taking account locks.
+    # Two Programs can share the same accounts with opposite chart insertion
+    # order. Every reader must acquire subjects in global profile order.
+    query = select(ClassroomChartDirectorShare, PracticeChart.profile_id).join(
+        PracticeChart, PracticeChart.id == ClassroomChartDirectorShare.chart_id).where(
         ClassroomChartDirectorShare.class_id == class_id,
         ClassroomChartDirectorShare.assignment_id == assignment.id,
         ClassroomChartDirectorShare.withdrawn_at.is_(None))
@@ -226,14 +238,20 @@ def _shared_chart_records(session, *, actor, program_id, class_id, _profile_id=N
         # caller-supplied account lookup. Filter before reading/projecting charts.
         if type(_profile_id) is not int or _profile_id <= 0:
             raise classroom.ClassroomDenied(UNAVAILABLE)
-        query = query.join(PracticeChart, PracticeChart.id == ClassroomChartDirectorShare.chart_id).where(
-            PracticeChart.profile_id == _profile_id)
-    rows = session.scalars(query).all()
-    output = []
-    for share in rows:
+        query = query.where(PracticeChart.profile_id == _profile_id)
+    rows = session.execute(query).all()
+    valid_subjects = set()
+    for profile_id in sorted({profile_id for _, profile_id in rows}):
         try:
-            profile_id = session.scalar(select(PracticeChart.profile_id).where(PracticeChart.id == share.chart_id))
-            if profile_id is None:
+            s2._eligible_profile(session, profile_id, require_eligibility=False)
+            valid_subjects.add(profile_id)
+        except classroom.ClassroomDenied:
+            pass
+    classroom._actor(session, actor)
+    output = []
+    for share, profile_id in sorted(rows, key=lambda item: (item[1], item[0].id)):
+        try:
+            if profile_id not in valid_subjects:
                 continue
             if not _current_source(session, share, profile_id=profile_id, assignment=assignment):
                 continue

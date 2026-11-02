@@ -1,0 +1,142 @@
+Classroom school agreement and individual sharing - local implementation
+=======================================================================
+
+This continues accepted guardian checkpoint ab03a431ea2ead669cd0eb4c71ae99a8badcb880.
+The earlier C34 document remains a historical description of that checkpoint.
+Current policy supersedes its positive under-13 comprehensive-reporting path:
+comprehensive director reporting is unavailable under 13, regardless of guardian
+or school agreement evidence. Existing records are retained, not rewritten.
+
+One school agreement, two possible approvers
+-------------------------------------------
+A band director can approve when school-granted authority has been independently
+verified. Otherwise an authorized school administrator can approve after the same
+verification. Both use the same versioned Program agreement and the same screen.
+The approver may be an existing authorized school administrator without a Program
+role. Approval does not create a role, Class, membership, entitlement or permission.
+
+The independent evidence screen requires existing site-administrator authentication
+AND a fresh PIN for an existing adult reviewer. Reviewer and approver must differ.
+An independently sourced, different official school contact confirms the named
+approver's authority for the exact Program. A school address, Program role, title
+or the approver's own assertion alone cannot create a verified record.
+
+The reviewer records school, approver's existing account, director/administrator
+capacity, specific delegated authority, official contact name/position, phone or
+verified reply address, official HTTPS directory source, contact time with zone,
+and documented call/reply evidence. The confirmation checkbox is unchecked and
+requires explicit independent verification. No call or email is made automatically.
+Tests use synthetic conversations and never claim real verification took place.
+
+The intended approver signs in with existing credentials, reviews that exact
+Program/year and checks the common agreement. No reviewer can accept on behalf of
+a different approver. Phone evidence is recorded by a trusted independent reviewer;
+the application does not automatically prove a telephone conversation occurred or
+that an arbitrary directory URL is authentic. These assurance requirements remain
+part of legal review before live use.
+
+Annual period and lifecycle
+---------------------------
+The authorization year is July 1 through June 30 in the existing America/Chicago
+calendar, ending exclusively at July 1 midnight. A midyear agreement is effective
+no earlier than its server-recorded acceptance. A next-year agreement can be
+recorded early but cannot become effective before July 1. No automatic renewal.
+
+Renewal uses the same form, with explicit annual verification and agreement
+acceptance. Prior years remain intact. One unrevoked record per Program/year
+prevents competing approvers. Replacement needs explicit revocation and fresh
+evidence. The approver, current Program Owner/Admin or authenticated independent
+staff can revoke. A teaching assignment alone cannot revoke another approver's
+agreement. Expiry, revocation, changed evidence, wrong actor/Program, stale forms
+or invalid dates cannot authorize use. Contact evidence remains on the staff
+screen; organizational status/authority is visible only within its scoped access.
+
+Legal gate stays closed
+-----------------------
+The common agreement is classroom-school-agreement-draft-v1. Its version AND
+digest have no entry in LEGALLY_APPROVED_AGREEMENTS. School records can be prepared
+and accepted locally for review, but authorized_program remains false in shipped
+code. No environment variable converts this draft to legal approval. There is no
+student-data token, implicit Class activation or automatic historical disclosure.
+
+CLASSROOM_SCHOOL_AUTHORIZATION_ENABLED defaults off and requires S1/S2. Screens:
+  /classroom/school/{program_id}       director or named school administrator
+  /admin/classroom/school/{program_id} independent staff verification/evidence
+The normal Program management screen links to the agreement only when enabled.
+All sensitive views are no-store, same-origin, CSRF protected and frame denied.
+Every change reauthenticates the current adult and rechecks Program scope after
+locks. Forms bind exact record/year/revision, actor and agreement digest.
+
+Student, parent and P-Chart permissions
+--------------------------------------
+Student enrollment Join and reporting Share choices remain explicit. Parent or
+guardian requirements remain separate. School agreement creation/acceptance never
+calls enrollment, reporting acceptance or individual chart-selection services.
+The existing individual chart invitation path remains distinct from enrollment:
+accepted invitations do not silently become a Class membership.
+
+Ordinary eligible 13+ individual chart sharing retains its accepted membership
+OR accepted exact invitation source and explicit per-chart recipient choice.
+The proposed protected-account adapter uses those same individual boundaries plus
+all valid native KWS/account evidence and the exact current parent-authorized named
+director chart-view permission and its already accepted native connection. It does
+not create or expand that permission or use comprehensive consent as chart consent.
+An unrelated teacher, future co-director, matching email, school agreement or general
+account consent cannot qualify. Each selection retains its exact native permission
+ID. Withdrawal, revocation, disconnect, changed account/recipient/source or a missing
+reference denies old selections; a replacement permission cannot revive them.
+
+This new Class use of native named-director permission is also legally unapproved:
+LEGALLY_APPROVED_POLICIES has no entry for classroom-named-guardian-pchart-draft-v1.
+CLASSROOM_GUARDIAN_PCHART_SHARING_ENABLED defaults off and cannot bypass that gate.
+Tests simulate reviewed legal acceptance only inside isolated synthetic fixtures.
+Live protected sharing remains unavailable pending that review; existing native
+private-director access continues under its original independent permission.
+
+The private practice page now provides the same explicit Send this P-Chart to my
+Band Director choice and current recipient selection through the existing sharing
+API, alongside the existing P-Book interface. Nothing is checked by default for an
+unshared chart. An expressly selected individual historical chart can be viewed
+within applicable consent, like the existing individual flow. No other chart or
+comprehensive history is disclosed. The Director Dashboard checks this source
+independently of masked administrative identity and labels its partial chart view.
+
+Comprehensive reporting retains the exact approved 41 fields and 26 exclusions.
+Its occurrence/submission bounds, unavailable values, rating curve and current
+streak limitation remain unchanged. The under-13 denial applies before practice
+queries even to pre-existing reporting receipts. Parent/consent-linked 13+ reporting
+still needs all applicable qualified parent and student authorization.
+
+Storage and concurrency
+-----------------------
+c35school001 adds one school receipt table and one nullable FK on existing chart
+selections. Prior chart choices retain NULL; no consent, roles, relationships,
+student data or historical sharing is backfilled. The school row itself retains
+reviewer, approver, dates, agreement/evidence digests and revocation provenance;
+no second approval ledger or new parent identity is introduced. Used evidence
+refuses downgrade. Frozen C35 operator validation/snapshots preserve both additions.
+
+Program-first READ COMMITTED transactions serialize school verify/accept/revoke.
+Individual readers prelock explicitly selected subjects in global profile order
+before per-chart validation. This prevents overlapping Programs with opposite
+chart order from deadlocking. Workspace subject reads remain restricted to the
+exact requested membership and their already prelocked account. Native parent
+revocation uses the existing consent fence and is rechecked after waits.
+
+Required legal review before any live authorization
+---------------------------------------------------
+Review and approve the common agreement, permitted school authority/delegation and
+Program purposes, official-contact and approver identity assurance, phone/reply
+documentation standard, effective-year rules, evidence access/retention and
+revocation/renewal obligations. School agreement must not replace individual
+student choices or required parent consent in this implementation.
+
+Separately decide whether the existing exact named-director parent notice/permission
+covers the proposed Class surface, authentication and explicitly selected historical
+P-Charts across ages. If a fresh Class-specific parent notice/receipt is required,
+implement that reviewed scope before enabling this adapter. Do not infer legal
+coverage from a passing test, school email, director role or KWS adult verification.
+
+No production migration, deployment, push or feature activation is part of this
+local implementation. Actual provider calls, real school verification and whole-
+product/legal/production acceptance are not asserted by local synthetic tests.

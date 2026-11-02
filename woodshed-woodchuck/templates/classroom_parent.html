@@ -22,9 +22,10 @@
 <label class="parent-checkbox"><input type="checkbox" name="guardian_attestation" value="yes" required><span>{{ attestation }}</span></label>
 <label class="parent-checkbox"><input type="checkbox" name="opt_in" value="yes" required><span>{{ 'I authorize Classroom participation for this Class.' if item.purpose == 'participation' else 'I authorize only the listed reporting fields for the current directors of this Class.' }}</span></label>
 <button type="submit" class="enrollment-button">{{ 'Authorize participation' if item.purpose == 'participation' else 'Authorize reporting' }}</button></form>
+{% elif item.choice.under13_reporting %}<p>Comprehensive director reporting is unavailable for under-13 students. Individual P-Chart sharing and parent permissions remain separate.</p>
 {% elif not item.choice.eligible %}<p>Current account permission, confirmed enrollment and active Classroom access are required. Reporting also needs current participation permission and an assigned director.</p>{% endif %}
 {% if item.choice.saved %}<form method="post" class="enrollment-form" action="/classroom/parent/{{ room.program_id }}/classes/{{ room.class_id }}/{{ item.purpose }}/withdraw"><input type="hidden" name="csrf" value="{{ csrf }}"><label class="parent-checkbox"><input type="checkbox" name="confirm" value="yes" required><span>Withdraw this permission for this Class.</span></label><button class="enrollment-button enrollment-secondary" type="submit">{{ 'Withdraw participation' if item.purpose == 'participation' else 'Withdraw reporting' }}</button></form>{% endif %}
 </section>{% endfor %}</section>
 {% else %}<section class="enrollment-card"><p>No confirmed Class memberships are available for your child. Class enrollment and parent permission are separate steps.</p></section>{% endfor %}
-<p>School authorization is currently unavailable. Please use the qualified parent or legal-guardian flow.</p>
+<p>School approval never replaces required parent or legal-guardian permission. Comprehensive director reporting is unavailable for under-13 students.</p>
 </main><script src="/static/js/classroom-enrollment.js?v=1"></script></body></html>

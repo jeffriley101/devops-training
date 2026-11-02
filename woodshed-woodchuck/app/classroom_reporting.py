@@ -97,7 +97,7 @@ def _activation(session, state):
     return utc(instant or state.created_at)
 
 
-def _context(session, program_id, class_id, profile_id, *, student=None, _educational=False):
+def _context(session, program_id, class_id, profile_id, *, student=None, _educational=False, _chart_assignment_id=None):
     _exact_ids(program_id, class_id, profile_id)
     s1._lock_program(session, program_id)
     state = s2._active(session, program_id, class_id)
@@ -107,6 +107,9 @@ def _context(session, program_id, class_id, profile_id, *, student=None, _educat
         raise s1.ClassroomDenied(UNAVAILABLE)
     if _educational:
         from . import classroom_guardian_authorization as guardian
+        rule = session.get(AccountPrivacy, profile_id, populate_existing=True)
+        if rule is None or rule.age_band == 'under13' or _chart_assignment_id is not None:
+            raise s1.ClassroomDenied(UNAVAILABLE)
         if guardian.required(session, profile_id):
             # Only the independently approved educational reader may use the
             # qualified parent path. S3 proofs and P-Chart readers stay separate.
@@ -114,6 +117,13 @@ def _context(session, program_id, class_id, profile_id, *, student=None, _educat
             rule = session.get(AccountPrivacy, profile_id, populate_existing=True)
         else:
             rule = _account_rule(session, profile_id)
+    elif _chart_assignment_id is not None:
+        from . import classroom_chart_consent as chart_consent
+        assignment = session.get(ClassroomTeachingAssignment, _chart_assignment_id, populate_existing=True)
+        if assignment is None or assignment.program_id != program_id or assignment.class_id != class_id:
+            raise s1.ClassroomDenied(UNAVAILABLE)
+        rule = chart_consent.account_rule(session, profile_id, lock=True)
+        chart_consent.permission(session, profile_id, _chart_assignment_id)
     else:
         rule = _account_rule(session, profile_id)
     anchor = s2._anchor(session, class_id, profile_id)

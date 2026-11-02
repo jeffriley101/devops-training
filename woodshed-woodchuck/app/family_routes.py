@@ -210,7 +210,13 @@ def practice(request:Request):
         data={'charts':charts(s,p.id),'woodchuck_id':p.woodchuck_id,'metrics':student_metrics_projection(metrics(s,p)),'director':None}
         if permission:data['director']={'name':permission.director_name,'connected':service.permission_valid(s,permission,require_connection=True),'can_review':permission.review_allowed,'connection_id':permission.connection_id}
         if request.url.path.endswith('/data'):return data
-        response = page(request,'practice',**data,submission_key=secrets.token_urlsafe(20))
+        from . import classroom_director, classroom_chart_consent
+        sharing_enabled = classroom_director.enabled()
+        if sharing_enabled:
+            try:classroom_chart_consent.account_rule(s,p.id)
+            except ValueError:sharing_enabled=False
+        response = page(request,'practice',**data,submission_key=secrets.token_urlsafe(20),
+            classroom_chart_sharing_enabled=sharing_enabled)
         from .login_streaks import stage_monday_opening, authorize_monday_opening
         if stage_monday_opening(s, request, p):
             authorize_monday_opening(s, request, p.id)
