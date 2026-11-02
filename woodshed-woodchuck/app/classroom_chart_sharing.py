@@ -235,7 +235,11 @@ def _shared_chart_records(session, *, actor, program_id, class_id):
             chart = session.get(PracticeChart, share.chart_id, populate_existing=True)
             profile = session.get(WoodchuckProfile, profile_id, populate_existing=True)
             if chart is not None and chart.profile_id == profile_id and profile is not None:
-                output.append((profile_id, profile.display_name, chart))
+                # A chart-sharing invitation is not school-identity authority.
+                # Preserve its exact existing chart boundary and use WC# as a
+                # neutral label; never infer a Program's private school name or
+                # pass the public nickname to director projections.
+                output.append((profile_id, profile.woodchuck_id, chart))
         except classroom.ClassroomDenied:
             continue
     return output

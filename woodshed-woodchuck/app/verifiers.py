@@ -40,13 +40,14 @@ def accepted_active_verifier_students(session: Session, *, verifier_id: int) -> 
     return [dict(row) for row in session.execute(select(
         StudentVerifierConnection.id.label("connection_id"),
         StudentVerifierConnection.role,
-        WoodchuckProfile.id.label("profile_id"), WoodchuckProfile.display_name,
+        WoodchuckProfile.id.label("profile_id"),
+        WoodchuckProfile.woodchuck_id.label("display_name"),
         WoodchuckProfile.instrument, WoodchuckProfile.level,
     ).join(WoodchuckProfile, WoodchuckProfile.id == StudentVerifierConnection.profile_id).where(
         StudentVerifierConnection.verifier_id == verifier_id,
         StudentVerifierConnection.status == "accepted", WoodchuckProfile.status == "active",
         StudentVerifierConnection.role == "verifier",
-    ).order_by(WoodchuckProfile.display_name, WoodchuckProfile.id)).mappings() if eligible(session,row["profile_id"])]
+    ).order_by(WoodchuckProfile.woodchuck_id, WoodchuckProfile.id)).mappings() if eligible(session,row["profile_id"])]
 
 
 def select_verifier_student(roster: list[dict], connection_id: int | None) -> dict | None:
@@ -61,11 +62,16 @@ def select_verifier_student(roster: list[dict], connection_id: int | None) -> di
 def band_director_students(
     session: Session, *, verifier_id: int
 ) -> list[dict[str, str | int]]:
-    """Return safe roster basics for this verifier's accepted director links."""
+    """Return accepted-link basics with a neutral WC# identity.
+
+    This legacy reader has no exact Program/Class context. It must not choose a
+    school name from another Program or disclose the student's public nickname.
+    Keep the existing display_name response key for callers, with WC# as value.
+    """
     rows = session.execute(
         select(
             WoodchuckProfile.id.label("profile_id"),
-            WoodchuckProfile.display_name,
+            WoodchuckProfile.woodchuck_id.label("display_name"),
             WoodchuckProfile.instrument,
             WoodchuckProfile.level,
             WoodchuckProfile.goal,
@@ -80,7 +86,7 @@ def band_director_students(
             StudentVerifierConnection.role == "band_director",
             WoodchuckProfile.status == "active",
         )
-        .order_by(WoodchuckProfile.display_name, WoodchuckProfile.id)
+        .order_by(WoodchuckProfile.woodchuck_id, WoodchuckProfile.id)
     ).mappings().all()
     from .age_privacy import ordinary_director_connection
     return [dict(row) for row in rows if ordinary_director_connection(session,row["profile_id"],verifier_id)]

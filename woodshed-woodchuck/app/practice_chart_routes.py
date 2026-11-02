@@ -465,7 +465,7 @@ def create_student_practice_chart(
             from .child_authorization import protected_child
             if created.created and not protected_child(session,profile.id):
                 delivery = EmailService().send_practice_chart(
-                    recipient=verifier.email, student_name=profile.display_name,
+                    recipient=verifier.email, student_name=profile.woodchuck_id,
                     practice_date=created.chart.practice_date.isoformat(), minutes=created.chart.minutes,
                     role=verifier_role, review_url=review_url,
                 )
@@ -565,7 +565,7 @@ def resend_practice_chart_email(request: Request, verification_id: int):
             raise HTTPException(status_code=429, detail="Please wait 60 seconds before resending.")
         review_url = public_link(f"/trusted-verifiers/dashboard#verification-{verification.id}")
         delivery = EmailService().send_practice_chart(
-            recipient=verifier.email, student_name=profile.display_name,
+            recipient=verifier.email, student_name=profile.woodchuck_id,
             practice_date=chart.practice_date.isoformat(), minutes=chart.minutes,
             role=connection.role, review_url=review_url,
         )

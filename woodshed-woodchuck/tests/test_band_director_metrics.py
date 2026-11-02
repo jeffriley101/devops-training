@@ -102,7 +102,7 @@ def test_program_baseline_recomputes_same_authorized_cohort_after_roster_change(
     only_first = metrics(roster_db)
     assert only_first["program_rating"] == 96.25
     assert only_first["program_trend"]["delta"] == 96.25 - 48.125
-    assert [row["display_name"] for row in only_first["students"]] == ["First"]
+    assert [row["display_name"] for row in only_first["students"]] == ["WC-First"]
 
 
 def test_rating_exceeds_100_and_counts_distinct_days(roster_db):

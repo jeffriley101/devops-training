@@ -4,7 +4,7 @@ import hmac
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import and_, or_, select, update
+from sqlalchemy import and_, or_, select, update, inspect
 from sqlalchemy.orm import Session
 
 from .accounts import normalize_woodchuck_id, retired_identifier_hash
@@ -30,6 +30,7 @@ from .team_authority import authority_write_time, persistent_enabled
 
 
 DELETED_PUBLIC_NAME = "Deleted Woodchuck"
+REMOVED_SCHOOL_NAME = "[removed]"
 FAILURE_WINDOW = timedelta(minutes=15)
 MAX_FAILURES = 5
 
@@ -89,6 +90,17 @@ def anonymize_woodchuck_account(
         session.scalar(select(WoodchuckProfile).where(
             WoodchuckProfile.id == profile.id
         ).with_for_update().execution_options(populate_existing=True))
+    # Private names are current PII, not immutable scoring/issuance evidence.
+    # Scrub every Program's copy even with Classroom gates OFF. Table detection
+    # preserves the existing P31/C32 deletion path before additive C33 exists.
+    # Keep scoped identities, versions and name-free audit references intact;
+    # this existing account-deletion operation is not a director name correction.
+    if inspect(session.connection()).has_table("classroom_roster_identities"):
+        from .classroom_identity_models import ClassroomRosterIdentity
+        session.execute(update(ClassroomRosterIdentity).where(
+            ClassroomRosterIdentity.profile_id == profile.id,
+            ClassroomRosterIdentity.school_name != REMOVED_SCHOOL_NAME,
+        ).values(school_name=REMOVED_SCHOOL_NAME))
     if profile.status == "deleted":
         return
     now = _utc(now)

@@ -157,6 +157,7 @@ def detail(session, *, actor, program_id, class_id=None, before=None, section='c
     room['code'] = {'generation': code.generation, 'issued': _time(code.issued_at)} if code else None
     room['roster'], room['next_roster'] = roster(session, current=current, class_id=class_id,
         before=before if section == 'roster' else None)
+    s1._actor(session, actor)  # Credentials may change while account locks wait.
     result['selected_class'] = room
     return result
 
@@ -176,17 +177,38 @@ def roster(session, *, current, class_id, before=None):
         return [], None
     query = select(ClassroomStudentMembership).where(ClassroomStudentMembership.class_id == class_id)
     anchors, next_before = _page_rows(session, query, ClassroomStudentMembership, before)
+    from . import classroom_identity
+    members = {anchor.id: _membership(session, program_id, class_id, anchor.profile_id) for anchor in anchors}
+    profiles = {}
+    if available and classroom_identity.enabled():
+        # Programs can share accounts with different enrollment order. Lock page
+        # subjects in global profile order, not local membership/cursor order.
+        for anchor in sorted(anchors, key=lambda item: item.profile_id):
+            if current['manage'] or members[anchor.id]['active']:
+                try:
+                    profiles[anchor.profile_id] = s2._eligible_profile(session, anchor.profile_id, require_eligibility=False)
+                except s1.ClassroomDenied:
+                    profiles[anchor.profile_id] = None
+        # A lock wait may cross the entitlement's ending instant.
+        available = bool(room and room.state == 'active' and s2.entitlement_decision(session, program_id).allowed)
+        if not current['manage'] and not available:
+            return [], None
     items = []
     for anchor in anchors:
-        member = _membership(session, program_id, class_id, anchor.profile_id)
+        member = members[anchor.id]
         show_identity = available and (current['manage'] or member['active'])
-        profile = session.get(WoodchuckProfile, anchor.profile_id, populate_existing=True) if show_identity else None
+        if show_identity and classroom_identity.enabled():
+            profile = profiles.get(anchor.profile_id)
+        else:
+            profile = session.get(WoodchuckProfile, anchor.profile_id, populate_existing=True) if show_identity else None
         show_identity = bool(profile and profile.status == 'active' and sharing_allowed(session, profile.id))
         # Unassigned roles cannot reach this Class projection. Former/held student
         # identities remain hidden from teachers while management keeps references.
         if not current['manage'] and not member['active']:
             continue
+        private = classroom_identity._roster_identity(session, program_id=program_id, profile_id=anchor.profile_id) if show_identity else {'school_name': None, 'identity_version': 0}
         items.append({'id': anchor.id, 'woodchuck_id': profile.woodchuck_id if show_identity else None,
+            **private, 'can_edit_identity': bool(show_identity and member['active'] and classroom_identity.enabled()),
             'instrument': profile.instrument if show_identity else None, 'status': member['label'],
             'can_suspend': current['manage'] and member['active'],
             'can_remove': current['manage'] and member['label'] != 'Removed',

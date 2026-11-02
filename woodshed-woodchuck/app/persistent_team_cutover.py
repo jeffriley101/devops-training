@@ -33,7 +33,7 @@ REVISION = "p21team001"
 # does not automatically approve continuity of existing plans or receipts.
 _REVIEWED_REVISIONS = (
     "p21team001", "c22class001", "c23class001", "c24class001", "w25weekly005",
-    "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001",
+    "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001", "c33identity001",
 )
 LEGACY = "legacy_seasonal_v1"
 PERSISTENT = "persistent_v1"
@@ -642,7 +642,7 @@ def verify_cutover(url, plan, expected_sha256, receipt):
         _plan_schema_guard(content, revision)
         if _target(connection, url) != content["target"]:
             raise CutoverError("target_mismatch")
-        if revision not in {issuance_schema.REVISION, "c32enroll001"}:
+        if revision not in {issuance_schema.REVISION, "c32enroll001", "c33identity001"}:
             raise CutoverError("trusted_receipt_issuance_required: historical_provenance_unavailable")
         issuances = Table(issuance_schema.NAME, MetaData(), autoload_with=connection, resolve_fks=False)
         issued = connection.execute(select(issuances).where(issuances.c.control_id == 1)).mappings().all()

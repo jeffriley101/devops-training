@@ -14,6 +14,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from .db import Base
 from .classroom_enrollment_models import ClassroomEnrollmentAuditEvent, ClassroomEnrollmentInvitation  # noqa: F401
+from .classroom_identity_models import ClassroomRosterIdentity, ClassroomRosterIdentityAudit  # noqa: F401
 
 
 def _now() -> datetime:

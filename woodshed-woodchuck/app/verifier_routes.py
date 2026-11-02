@@ -236,7 +236,7 @@ def create_student_invitation(
         try:
             delivery = EmailService().send_invitation(
                 recipient=created.invitation.email,
-                student_name=profile.display_name,
+                student_name=profile.woodchuck_id,
                 role=created.invitation.role,
                 acceptance_url=accept_url,
             )
@@ -433,7 +433,7 @@ def resend_student_invitation_email(request: Request, invitation_id: int):
             accept_path, local_base_url=str(request.base_url)
         )
         delivery = EmailService().send_invitation(
-            recipient=reissued.invitation.email, student_name=profile.display_name,
+            recipient=reissued.invitation.email, student_name=profile.woodchuck_id,
             role=reissued.invitation.role, acceptance_url=accept_url,
         )
         record_delivery(session, reissued.invitation, delivery)
@@ -566,7 +566,7 @@ def verifier_me(request: Request):
                     ),
                     "student": {
                         "woodchuck_id": profile.woodchuck_id,
-                        "display_name": profile.display_name,
+                        "display_name": profile.woodchuck_id,
                         "instrument": profile.instrument,
                         "level": profile.level,
                         "goal": profile.goal,
@@ -594,7 +594,7 @@ def pending_practice_chart_payload(
         "requested_at": verification.requested_at.isoformat(),
         "student": {
             "woodchuck_id": profile.woodchuck_id,
-            "display_name": profile.display_name,
+            "display_name": profile.woodchuck_id,
             "instrument": profile.instrument,
             "level": profile.level,
         },

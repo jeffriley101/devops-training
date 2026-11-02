@@ -86,7 +86,8 @@ def test_accepted_director_roster_and_safe_basics(roster_db):
         assert text in response.text
     assert '<h1>Band Director Dashboard</h1>' in response.text
     assert 'class="ww-dashboard-header"' in response.text
-    assert "WC-Musician" not in response.text
+    assert "WC-Musician Alpha" in response.text and "WC-Musician Beta" in response.text
+    assert ">Musician Alpha<" not in response.text and ">Musician Beta<" not in response.text
     assert "private-pin-hash" not in response.text
     with roster_db() as session:
         rows = band_director_students(session, verifier_id=1)
@@ -341,7 +342,7 @@ def test_current_season_team_and_emblem_without_old_team_leak(contest_roster):
     join_roster_team(contest_roster, first, "Old Team")
     response = signed_client().get("/band-director/dashboard")
     rows = response.context["students"]
-    team_row = next(row for row in rows if row["display_name"] == "Team Musician")
+    team_row = next(row for row in rows if row["display_name"] == "WC-Team Musician")
     assert team_row["team"] == {"name": "Current Team", "emblem": {
         "key": "emoji:goat", "kind": "emoji", "value": "🐐",
     }}

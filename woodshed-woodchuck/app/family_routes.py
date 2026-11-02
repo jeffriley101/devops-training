@@ -286,7 +286,7 @@ def director_view(request:Request):
         basic=rating_metrics_projection(
             private_student_metrics(s,profile_id=p.id,include_team_context=False),
             allowed=adult_rating_allowed(s,p.id,verifier_id=c.verifier_id))
-        data={'name':p.display_name,'instrument':p.instrument,'charts':charts(s,p.id),'metrics':{key:basic[key] for key in ('weekly','lifetime','rating','trend','practice_streak') if key in basic},'can_review':permission.review_allowed,'reviews':[dict(r._mapping) for r in reviews]}
+        data={'name':p.woodchuck_id,'instrument':p.instrument,'charts':charts(s,p.id),'metrics':{key:basic[key] for key in ('weekly','lifetime','rating','trend','practice_streak') if key in basic},'can_review':permission.review_allowed,'reviews':[dict(r._mapping) for r in reviews]}
         if request.url.path.endswith('/data'):return data
         return page(request,'director',**data)
 

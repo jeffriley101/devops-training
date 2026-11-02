@@ -92,7 +92,11 @@ def test_shared_totals_categories_graphs_and_submission_boundaries(v3_web):
         assert row['lifetime'] == practice_totals(charts, set(v3_web.chart_ids[:3]))
         assert session.scalar(select(ClassroomReportingPeriod.id)) is None
     encoded = json.dumps(data)
-    for secret in ('999', 'UNSHARED', 'VERIFIER RESPONSE', 'Another private student', 'WC-SYNTHETIC', 'rating', 'profile_id'):
+    assert row['name'] == 'WC-SYNTHETIC'
+    # The forbidden private chart's 999 minutes must not be projected. A bare
+    # "999" string search can randomly match an unrelated timestamp fraction.
+    assert all(chart['seconds'] != 999 * 60 for student in data['students'] for chart in student['charts'])
+    for secret in ('UNSHARED', 'VERIFIER RESPONSE', 'Another private student', 'Private Student', 'rating', 'profile_id'):
         assert secret not in encoded
     assert personal_snapshot(v3_web) == before
 

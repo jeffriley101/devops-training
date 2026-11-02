@@ -39,6 +39,7 @@ from .classroom_progress_routes import router as classroom_progress_router
 from .classroom_enrollment_routes import router as classroom_enrollment_router
 from .classroom_enrollment import enabled as classroom_enrollment_enabled
 from .classroom_management_routes import router as classroom_management_router, enabled as classroom_management_enabled
+from .classroom_identity_routes import router as classroom_identity_router
 from .classroom_progress_authorization import enabled as classroom_progress_enabled
 from .verifier_routes import (
     current_verifier,
@@ -148,6 +149,7 @@ app.include_router(classroom_student_invitation_router)
 app.include_router(classroom_progress_router)
 app.include_router(classroom_enrollment_router)
 app.include_router(classroom_management_router)
+app.include_router(classroom_identity_router)
 app.include_router(verifier_router)
 app.include_router(practice_chart_router)
 app.include_router(personal_development_router)
