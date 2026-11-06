@@ -31,7 +31,7 @@ NOW = datetime.now(timezone.utc) + timedelta(hours=1)
 
 
 @pytest.fixture
-def s2_db(classroom_db, monkeypatch):
+def s2_db(classroom_db, monkeypatch, request):
     monkeypatch.setenv("CLASSROOM_S2_ENABLED", "1")
     monkeypatch.setenv("SESSION_SECRET", "synthetic-classroom-s2-only-secret")
     monkeypatch.setenv("SITE_ADMIN_TOKEN", "synthetic-classroom-s2-admin")
@@ -40,6 +40,11 @@ def s2_db(classroom_db, monkeypatch):
         provision(session)
         provision(session, 2)
         session.commit()
+    # Preserve the positive prerequisite for the existing negative-boundary
+    # tests. School-denial tests explicitly remove/expire these real receipts.
+    from school_approval_fixture import approve_programs
+    if getattr(request, 'param', None) != 'school_approval_deferred':
+        approve_programs(classroom_db, monkeypatch)
     return classroom_db
 
 

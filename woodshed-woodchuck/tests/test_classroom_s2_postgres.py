@@ -39,6 +39,8 @@ def s2_pg(classroom_pg, monkeypatch):
         session.flush()
         session.add(AccountPrivacy(profile_id=1, age_band="13to17", declared_at=NOW, public_from=NOW))
         session.commit()
+    from school_approval_fixture import approve_programs
+    approve_programs(classroom_pg, monkeypatch)
     return classroom_pg
 
 

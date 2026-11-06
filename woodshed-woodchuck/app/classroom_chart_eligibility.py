@@ -77,6 +77,8 @@ def invited_context(session, *, assignment_id, profile_id, student=None, invitat
     if assignment is None:
         raise classroom.ClassroomDenied("Classroom sharing unavailable.")
     classroom._lock_program(session, assignment.program_id)
+    from .classroom_school_authorization import require_disclosure
+    require_disclosure(session, assignment.program_id)
     state = s2._active(session, assignment.program_id, assignment.class_id)
     if student is None:
         s2._eligible_profile(session, profile_id)
@@ -106,6 +108,7 @@ def invited_context(session, *, assignment_id, profile_id, student=None, invitat
     if row is None or not entitlement.allowed or activation > now or utc(rule.declared_at) > now:
         raise classroom.ClassroomDenied("Classroom sharing unavailable.")
     entitlement = session.get(ClassroomEntitlement, entitlement.entitlement_id, populate_existing=True)
+    require_disclosure(session, assignment.program_id)
     return (anchor, None, entitlement, rule, activation, now), row
 
 

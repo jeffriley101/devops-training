@@ -255,6 +255,8 @@ def report(session, *, actor, program_id, class_id, profile_id, selected_week=No
     values["current_practice_streak"] = None
     values.update(_homework(session, profile_id, selected_week, decision, charts, covered))
     s1._actor(session, actor)
+    from .classroom_school_authorization import require_disclosure
+    require_disclosure(session, program_id)
     return {"source": "separate_reporting_authorization", "authorization_available": True,
         "field_contract": CONTRACT_VERSION, "field_labels": FIELD_LABELS,
         "message": "Individual authorized history only. Practice uses complete eligible occurrence days; "

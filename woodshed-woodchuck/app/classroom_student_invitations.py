@@ -62,12 +62,15 @@ def issue(session, *, actor, program_id, class_id, assignment_id, profile_id):
     """Record an exact teacher's invitation to an existing eligible account."""
     reporting._exact_ids(program_id, class_id, assignment_id, profile_id)
     s1._lock_program(session, program_id)
+    from .classroom_school_authorization import require_disclosure
+    require_disclosure(session, program_id)
     issuer_id = s1._actor(session, actor)
     _assignment(session, program_id, class_id, assignment_id, issuer_id)
     s2._eligible_profile(session, profile_id)
     reporting._account_rule(session, profile_id)
     # Account locks may wait: recheck current authority/time after the wait.
     now = _assignment(session, program_id, class_id, assignment_id, s1._actor(session, actor))
+    require_disclosure(session, program_id)
     row = ClassroomStudentInvitation(program_id=program_id, class_id=class_id,
         assignment_id=assignment_id, profile_id=profile_id, issued_by_verifier_id=issuer_id,
         issued_at=now, expires_at=now + LIFETIME)
@@ -97,6 +100,8 @@ def accept(session, *, student, invitation_id):
 def revoke(session, *, actor, invitation_id):
     """The issuer can revoke retained evidence even after assignment/plan expiry."""
     row = _locked(session, invitation_id)
+    from .classroom_school_authorization import require_disclosure
+    require_disclosure(session, row.program_id)
     if s1._actor(session, actor) != row.issued_by_verifier_id:
         raise s1.ClassroomDenied(UNAVAILABLE)
     if row.revoked_at is None:
@@ -162,6 +167,8 @@ def prepare_identity(session, *, student):
 def director_assignment(session, *, actor, program_id, class_id):
     reporting._exact_ids(program_id, class_id)
     s1._lock_program(session, program_id)
+    from .classroom_school_authorization import require_disclosure
+    require_disclosure(session, program_id)
     issuer = s1._actor(session, actor)
     assignments = list(session.scalars(select(ClassroomTeachingAssignment).where(
         ClassroomTeachingAssignment.program_id == program_id,
@@ -182,6 +189,8 @@ def issue_for_identity(session, *, actor, program_id, class_id, identity):
     profile = s2._eligible_profile(session, data['student'])
     reporting._account_rule(session, profile.id)
     _parse_identity(identity)  # Expiration may pass while waiting for account locks.
+    from .classroom_school_authorization import require_disclosure
+    require_disclosure(session, program_id)
     if not hmac.compare_digest(data['binding'], _identity_binding(profile)):
         raise s1.ClassroomDenied(UNAVAILABLE)
     existing = session.scalars(select(ClassroomStudentInvitation).where(

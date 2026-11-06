@@ -281,6 +281,8 @@ def test_postgres_shared_program_pages_lock_accounts_in_global_order(s2_pg,monke
             wc=session.get(WoodchuckProfile,profile_id).woodchuck_id
             s2.join_class(session,student=s2.authenticate_student(session,woodchuck_id=wc,pin='2468'),program_id=program,code=code)
             session.commit()
+    from school_approval_fixture import approve_programs
+    approve_programs(refs.factory, monkeypatch, program_ids=(2,))
     observed=[]
     def capture(conn,cursor,statement,params,context,many):
         if 'FROM woodchuck_profiles' in statement and 'FOR UPDATE' in statement:

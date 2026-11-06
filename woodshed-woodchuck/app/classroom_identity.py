@@ -63,6 +63,8 @@ def _roster_identity(session, *, program_id, profile_id):
         return {'school_name': None, 'identity_version': 0}
     if session.info.get('classroom_write_program') != (session.get_transaction(), program_id):
         raise s1.ClassroomDenied(UNAVAILABLE)
+    from .classroom_school_authorization import require_disclosure
+    require_disclosure(session, program_id)
     row = _validated(session, session.scalar(select(Identity).where(
         Identity.program_id == program_id, Identity.profile_id == profile_id).execution_options(populate_existing=True)))
     return {'school_name': row.school_name if row else None, 'identity_version': row.version if row else 0}
@@ -73,6 +75,8 @@ def _subject(session, *, actor, program_id, class_id, woodchuck_id):
     if not enabled():
         raise s1.ClassroomDenied(UNAVAILABLE)
     current = scope(session, actor=actor, program_id=program_id, class_id=class_id)
+    from .classroom_school_authorization import require_disclosure
+    require_disclosure(session, program_id)
     s2._paid(session, program_id)
     s2._active(session, program_id, class_id)
     if not isinstance(woodchuck_id, str) or len(woodchuck_id) > 64 or not woodchuck_id.isascii():
@@ -98,6 +102,7 @@ def _subject(session, *, actor, program_id, class_id, woodchuck_id):
     if (not account_identity_allowed(session, program_id=program_id, class_id=class_id, profile_id=profile.id) or s2._held(session, anchor.id)
             or not any(p.state == 'active' and p.ended_at is None and s2.utc(p.starts_at) <= s2._now() for p in periods)):
         raise s1.ClassroomDenied(UNAVAILABLE)
+    require_disclosure(session, program_id)
     return current['actor_id'], profile
 
 

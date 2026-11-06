@@ -178,6 +178,8 @@ def _prepare(session, *, actor, program_id, class_id, action, form):
             raise s1.ClassroomDenied('Scoped teaching assignment unavailable.')
         target = views._adult(session, assignment.verifier_id)['name']
     elif action in {'suspend', 'remove', 'reinstate'}:
+        from .classroom_school_authorization import require_disclosure
+        require_disclosure(session, program_id)
         anchor = session.scalar(select(ClassroomStudentMembership).where(
             ClassroomStudentMembership.id == payload['membership_id'], ClassroomStudentMembership.class_id == class_id))
         if anchor is None:

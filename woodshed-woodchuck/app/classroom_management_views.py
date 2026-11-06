@@ -155,8 +155,19 @@ def detail(session, *, actor, program_id, class_id=None, before=None, section='c
     code = session.scalar(select(ClassroomEntryCode).where(ClassroomEntryCode.program_id == program_id,
         ClassroomEntryCode.class_id == class_id, ClassroomEntryCode.is_current.is_(True)))
     room['code'] = {'generation': code.generation, 'issued': _time(code.issued_at)} if code else None
-    room['roster'], room['next_roster'] = roster(session, current=current, class_id=class_id,
-        before=before if section == 'roster' else None)
+    from . import classroom_school_authorization as school
+    try:
+        school.require_disclosure(session, program_id)
+    except s1.ClassroomDenied:
+        if section == 'roster':
+            raise
+        # Setup remains usable without querying even membership references or
+        # cursors. The template must not imply that a withheld roster is empty.
+        room.update(roster=[], next_roster=None, roster_available=False)
+    else:
+        room['roster'], room['next_roster'] = roster(session, current=current, class_id=class_id,
+            before=before if section == 'roster' else None)
+        room['roster_available'] = True
     s1._actor(session, actor)  # Credentials may change while account locks wait.
     result['selected_class'] = room
     return result
@@ -171,6 +182,8 @@ def roster(session, *, current, class_id, before=None):
     school names, and no name collection or new consent authority is introduced.
     """
     program_id = current['program'].organization_id
+    from .classroom_school_authorization import require_disclosure
+    require_disclosure(session, program_id)
     room = s2._class_state(session, program_id, class_id)
     available = bool(room and room.state == 'active' and s2.entitlement_decision(session, program_id).allowed)
     if not current['manage'] and not available:
@@ -193,6 +206,7 @@ def roster(session, *, current, class_id, before=None):
         available = bool(room and room.state == 'active' and s2.entitlement_decision(session, program_id).allowed)
         if not current['manage'] and not available:
             return [], None
+    require_disclosure(session, program_id)
     items = []
     for anchor in anchors:
         member = members[anchor.id]
@@ -215,4 +229,5 @@ def roster(session, *, current, class_id, before=None):
             'can_suspend': current['manage'] and member['active'],
             'can_remove': current['manage'] and member['label'] != 'Removed',
             'can_reinstate': current['manage'] and member['label'] in {'Suspended', 'Removed', 'On hold'}})
+    require_disclosure(session, program_id)
     return items, next_before

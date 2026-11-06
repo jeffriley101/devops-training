@@ -138,6 +138,8 @@ async def director_manage(request: Request, program_id: int, class_id: int):
         try:
             service.reporting._exact_ids(program_id, class_id)
             classroom._lock_program(session, program_id)
+            from .classroom_school_authorization import require_disclosure
+            require_disclosure(session, program_id)
             issued = select(ClassroomStudentInvitation).where(
                 ClassroomStudentInvitation.program_id == program_id, ClassroomStudentInvitation.class_id == class_id,
                 ClassroomStudentInvitation.issued_by_verifier_id == verifier.id)

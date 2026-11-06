@@ -97,6 +97,8 @@ def director_classes(session, *, actor):
 @enrollment._operation
 def director_class(session, *, actor, program_id, class_id, before=None):
     s1._lock_program(session, program_id)
+    from .classroom_school_authorization import require_disclosure
+    require_disclosure(session, program_id)
     room = s1._class(session, program_id, class_id)
     verifier_id = s1._actor(session, actor)
     assignment = session.scalar(select(ClassroomTeachingAssignment).where(
@@ -116,9 +118,22 @@ def director_class(session, *, actor, program_id, class_id, before=None):
     if before is not None:
         query = query.where(Invitation.id < before)
     offers = list(session.scalars(query.order_by(Invitation.id.desc()).limit(PAGE_SIZE + 1)))
+    profiles = {}
+    if show_targets:
+        # Retained invitations do not preserve account permission. Recheck it
+        # under the existing global account-lock order before projecting WC#s,
+        # including when a denied issue request redisplays this list.
+        for profile_id in sorted({row.profile_id for row in offers[:PAGE_SIZE]}):
+            try:
+                profiles[profile_id] = s2._eligible_profile(session, profile_id)
+            except s1.ClassroomDenied:
+                pass
+        s1._actor(session, actor)
+        show_targets = show_targets and s2.entitlement_decision(session, program_id).allowed
+    require_disclosure(session, program_id)
     items = []
     for row in offers[:PAGE_SIZE]:
-        profile = session.get(WoodchuckProfile, row.profile_id) if show_targets else None
+        profile = profiles.get(row.profile_id) if show_targets else None
         items.append({'id': row.id, 'state': enrollment.status(row),
             'woodchuck_id': profile.woodchuck_id if profile and profile.status == 'active' else None,
             'expires': utc(row.expires_at).strftime('%b %d, %Y · %H:%M UTC'),

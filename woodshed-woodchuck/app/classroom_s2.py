@@ -608,6 +608,8 @@ def leave_class(session, *, student, program_id, class_id):
 def _managed_member(session, actor, program_id, class_id, membership_id):
     program = s1._lock_program(session, program_id)
     actor_id = s1._authority(session, program, actor, admin=True)
+    from .classroom_school_authorization import require_disclosure
+    require_disclosure(session, program_id)
     s1._class(session, program_id, class_id)
     anchor = s1._fresh(session, ClassroomStudentMembership, ClassroomStudentMembership.id == membership_id,
                        ClassroomStudentMembership.class_id == class_id)
@@ -641,6 +643,8 @@ def reinstate_member(session, *, actor, program_id, class_id, membership_id):
     _paid(session, program_id)
     _active(session, program_id, class_id)
     _eligible_profile(session, anchor.profile_id)
+    from .classroom_school_authorization import require_disclosure
+    require_disclosure(session, program_id)
     _paid(session, program_id)
     hold = _held(session, anchor.id)
     periods = _validated_periods(session, anchor.id)

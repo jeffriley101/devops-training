@@ -265,3 +265,14 @@ def authorized_program(session, *, program_id):
     s1._lock_program(session, program_id)
     row = _latest(session, program_id, school_year(s2._now()))
     return bool(row and status(row, s2._now()) == 'authorized')
+
+
+def require_disclosure(session, program_id):
+    """Fresh prerequisite, never a cached capability or student permission.
+
+    authorized_program takes the same Program lock as revocation and refreshes
+    the annual record. Callers retain their existing actor/Class/subject checks
+    and use the data inside this transaction. Recheck after other lock waits.
+    """
+    if not authorized_program(session, program_id=program_id):
+        raise s1.ClassroomDenied(UNAVAILABLE)

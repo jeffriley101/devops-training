@@ -247,6 +247,7 @@ def test_reauthorization_excludes_old_interval_and_unauthorized_gap(report_db):
 
 
 @pytest.mark.parametrize("local_start", [(2026, 11, 1), (2027, 3, 14)])
+@pytest.mark.parametrize('s2_db', ['school_approval_deferred'], indirect=True)
 def test_exact_midnight_boundaries_use_chicago_calendar_across_dst(report_db, local_start, monkeypatch):
     factory, clock = report_db
     midnight = datetime(*local_start, tzinfo=reporting.CENTRAL)
@@ -259,6 +260,10 @@ def test_exact_midnight_boundaries_use_chicago_calendar_across_dst(report_db, lo
             return clock[0].astimezone(tz) if tz else clock[0].replace(tzinfo=None)
     monkeypatch.setattr(classroom, 'datetime', Clock)
     monkeypatch.setattr(classroom_models, 'datetime', Clock)
+    # Create the real school prerequisite on this fixture's fixed DST calendar,
+    # rather than carrying an approval made later on the wall-clock calendar.
+    from school_approval_fixture import approve_programs
+    approve_programs(factory, monkeypatch)
     with factory() as session:
         class_id, _, _ = setup(session)
         grant(session, class_id)

@@ -99,6 +99,8 @@ def lock_recipient(session, student, assignment_id):
 
 def _current_source(session, share, *, profile_id, assignment, student=None):
     """Recheck the saved source only; never substitute today's eligibility."""
+    from .classroom_school_authorization import require_disclosure
+    require_disclosure(session, assignment.program_id)
     if share.class_id != assignment.class_id:
         return False
     if share.invitation_id is not None:
@@ -121,6 +123,7 @@ def _current_source(session, share, *, profile_id, assignment, student=None):
     session.refresh(share)
     session.refresh(assignment)
     parent_permission = chart_consent.permission(session, profile_id, assignment.id)
+    require_disclosure(session, assignment.program_id)
     return (share.withdrawn_at is None and utc(share.selected_at) <= now
         and share.guardian_permission_id == (parent_permission.id if parent_permission else None)
         and assignment.ended_at is None and utc(assignment.starts_at) <= now
@@ -215,6 +218,8 @@ def _shared_chart_records(session, *, actor, program_id, class_id, _profile_id=N
     """
     _enabled(session)
     classroom._lock_program(session, program_id)
+    from .classroom_school_authorization import require_disclosure
+    require_disclosure(session, program_id)
     adult_id = classroom._actor(session, actor)
     assignments = list(session.scalars(select(ClassroomTeachingAssignment).where(
         ClassroomTeachingAssignment.program_id == program_id,
@@ -268,6 +273,7 @@ def _shared_chart_records(session, *, actor, program_id, class_id, _profile_id=N
                 output.append((profile_id, profile.woodchuck_id, chart))
         except classroom.ClassroomDenied:
             continue
+    require_disclosure(session, program_id)
     return output
 
 

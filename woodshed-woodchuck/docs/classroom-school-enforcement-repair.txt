@@ -1,0 +1,73 @@
+Classroom C35 school authorization enforcement repair
+====================================================
+
+Base: c3a329913608cfe25f0e795b6c6b627dcb825755 / c35school001.
+This is a code repair, not school legal approval or production activation.
+No migration, agreement text, agreement digest, canonical school identifier,
+legal allowlist entry, reporting field, or feature-gate default is added.
+
+Disclosure prerequisite
+-----------------------
+classroom_school_authorization.require_disclosure calls the existing
+authorized_program decision on each protected operation. That decision takes
+the Program lock shared with school verification/revocation, refreshes the
+annual record and applies its exact agreement version/digest, legal allowlist,
+acceptance, year, evidence integrity and revocation requirements. It produces
+no reusable permission or session flag. Existing actor/Class/subject authority,
+student/guardian permissions, account eligibility and history checks still apply.
+
+The guard covers private management rosters, Program-private name/WC# resolution
+and edits, comprehensive reporting, individually shared P-Charts and both the
+Enrollment V2 and older sharing-invitation director paths. Membership-reference
+management actions also require it before looking up a student membership.
+Dashboard and direct endpoints reach the same guarded services. Time-sensitive
+decisions are rechecked after account-lock waits. A transaction linearizes before
+or after revocation; the next request/session transaction checks current data.
+
+Setup before approval
+---------------------
+Program/Class configuration and school verification retain their existing adult
+authority. Ordinary management detail suppresses the entire roster while school
+approval is unavailable, before membership queries, references or cursors. Its
+message says access is unavailable rather than implying there are no students.
+An explicit roster request denies. Invitation and identity lookups deny before
+student-account resolution, with the same response for existing/nonexistent WC#s.
+Retained invitation lists also recheck account eligibility under ordered account
+locks, so a denied request cannot redisplay an account whose permission ended.
+Student/parent withdrawal controls retain their independent existing paths.
+
+Independent private verifier
+----------------------------
+The old private_teacher/mentor role was consolidated into verifier by the existing
+m3/n4 migrations. The existing /trusted-verifiers/practice-charts endpoint accepts
+an independent, current verifier connection and projects only charts explicitly
+submitted to that verifier for review. It is not a Program/Class reader. The repair
+does not change or add that route, nor use it as a school-route fallback.
+Tests exercise the same adult as a Class teacher and independent verifier, then
+revoke the school agreement. Only the independently submitted review chart remains
+available on that private route; unrelated/unselected charts and school names do
+not appear. Connection loss, ineligible account, wrong reviewer and resolved review
+continue to withhold it. Other native private routes retain their original scope;
+this is not a new blanket private-teacher exception or full-history permission.
+
+Qualification
+-------------
+test_classroom_school_enforcement.py implements positive controls followed by
+same-browser/same-SQLAlchemy-session revocation, invalid school states, shipped
+empty allowlists, wrong actor/Class/account, independent reporting/chart consent,
+uniform WC# denial, preapproval setup and observed PostgreSQL waits for all five
+operation groups. The exact HTTP request is reused after revocation, including
+both invitation revocation routes and all three membership review controls.
+
+test_classroom_school_enforcement_guardian.py reuses existing guardian, history,
+under-13 and chart-permission assertions on actual disposable C35 migrations with
+the added school prerequisite. school_approval_fixture.py creates real synthetic
+verification and approval records; only the legal tuple is monkeypatched inside
+each test and restored afterward. Existing S2 fixtures supply this prerequisite
+so older negative authorization tests still reach the boundary they test.
+
+Both shipped legal allowlists remain empty, including the independent protected
+P-Chart policy. A fresh-process test verifies these constants and default OFF
+behavior. Positive legal fixtures are neither legal acceptance nor real school/
+provider verification. Live approval, deployment, production migration, recovery
+qualification and feature activation remain separate decisions.

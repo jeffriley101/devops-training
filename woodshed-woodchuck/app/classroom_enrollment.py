@@ -48,6 +48,8 @@ def _director(session, *, actor, program_id, class_id, assignment_id=None):
     """Ownership, administrative roles or another Class never imply teaching."""
     _ids(program_id, class_id)
     s1._lock_program(session, program_id)
+    from .classroom_school_authorization import require_disclosure
+    require_disclosure(session, program_id)
     s2._active(session, program_id, class_id, enrollment=True)
     issuer = s1._actor(session, actor)
     query = select(ClassroomTeachingAssignment).where(
@@ -216,6 +218,8 @@ def respond(session, *, student, invitation_id, choice):
 @_operation
 def revoke_invitation(session, *, actor, invitation_id):
     row = _locked(session, invitation_id)
+    from .classroom_school_authorization import require_disclosure
+    require_disclosure(session, row.program_id)
     issuer = s1._actor(session, actor)
     if issuer != row.issued_by_verifier_id or row.state == 'accepted':
         raise s1.ClassroomDenied(UNAVAILABLE)

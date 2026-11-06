@@ -100,6 +100,8 @@ def _activation(session, state):
 def _context(session, program_id, class_id, profile_id, *, student=None, _educational=False, _chart_assignment_id=None):
     _exact_ids(program_id, class_id, profile_id)
     s1._lock_program(session, program_id)
+    from .classroom_school_authorization import require_disclosure
+    require_disclosure(session, program_id)
     state = s2._active(session, program_id, class_id)
     if student is None:
         s2._eligible_profile(session, profile_id)
@@ -140,6 +142,7 @@ def _context(session, program_id, class_id, profile_id, *, student=None, _educat
     activation = _activation(session, state)
     if activation > now or utc(rule.declared_at) > now:
         raise s1.ClassroomDenied(UNAVAILABLE)
+    require_disclosure(session, program_id)
     return anchor, member, entitlement, rule, activation, now
 
 

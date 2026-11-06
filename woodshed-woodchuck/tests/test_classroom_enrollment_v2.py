@@ -378,7 +378,7 @@ def test_a_sharing_only_invitation_is_never_an_enrollment_offer(enrollment_db, m
         assert count(session, Invitation) == count(session, ClassroomStudentMembership) == 0
 
 
-def test_real_cross_program_and_class_substitution_is_refused(enrollment_db):
+def test_real_cross_program_and_class_substitution_is_refused(enrollment_db, monkeypatch):
     from app.models import Organization
     from app.classroom_models import ClassroomProgram
     from test_classroom_s1 import provision
@@ -394,6 +394,8 @@ def test_real_cross_program_and_class_substitution_is_refused(enrollment_db):
         classroom.assign_teacher(session, actor=actor(session), program_id=2, class_id=other.id, verifier_id=1)
         other_class = other.id
         session.commit()
+    from school_approval_fixture import approve_programs
+    approve_programs(refs.factory, monkeypatch, program_ids=(2,))
     for program_id, class_id in [(1, other_class), (2, refs.class_id)]:
         with refs.factory() as session:
             with pytest.raises(classroom.ClassroomDenied):
