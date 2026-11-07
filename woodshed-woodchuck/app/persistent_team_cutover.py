@@ -35,6 +35,14 @@ _REVIEWED_REVISIONS = (
     "p21team001", "c22class001", "c23class001", "c24class001", "w25weekly005",
     "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001", "c33identity001",
 )
+# These additive descendants extend receipt verification only. Do not enable
+# new staging on a schema where the existing P31-only ACTIVATE cannot complete.
+_REVIEWED_RECEIPT_REVISIONS = _REVIEWED_REVISIONS + ("c34guardian001", "c35school001")
+# Only these reviewed successors preserve the original P31 issuance contract.
+# This permits VERIFY of an existing issuance; ACTIVATE still requires P31.
+_REVIEWED_ISSUANCE_REVISIONS = (
+    "p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001",
+)
 LEGACY = "legacy_seasonal_v1"
 PERSISTENT = "persistent_v1"
 CONFIRMATION = "STAGE PERSISTENT TEAM AUTHORITY"
@@ -336,14 +344,15 @@ def _approved(plan, expected_sha256):
     return content
 
 
-def _plan_schema_guard(content, revision, *, staging=False):
+def _plan_schema_guard(content, revision, *, staging=False, verifying_receipt=False):
     # Only already-staged approvals survive reviewed forward additions.
     # An unstaged approval must still match a fresh plan exactly; never rewrite
     # its revision/hash/evidence to make an APPLY succeed on another schema.
     original = content["revision"]
-    if (original not in _REVIEWED_REVISIONS or revision not in _REVIEWED_REVISIONS
+    reviewed = _REVIEWED_RECEIPT_REVISIONS if verifying_receipt else _REVIEWED_REVISIONS
+    if (original not in reviewed or revision not in reviewed
             or (staging and original != revision)
-            or _REVIEWED_REVISIONS.index(original) > _REVIEWED_REVISIONS.index(revision)):
+            or reviewed.index(original) > reviewed.index(revision)):
         raise CutoverError("plan_schema_revision_changed: generate_and_review_new_plan_before_apply")
 
 
@@ -639,10 +648,10 @@ def verify_cutover(url, plan, expected_sha256, receipt):
         raise CutoverError("approved_activation_receipt_required")
     with inventory.readonly_connection(url) as connection:
         revision = _schema_guard(connection)
-        _plan_schema_guard(content, revision)
+        _plan_schema_guard(content, revision, verifying_receipt=True)
         if _target(connection, url) != content["target"]:
             raise CutoverError("target_mismatch")
-        if revision not in {issuance_schema.REVISION, "c32enroll001", "c33identity001"}:
+        if revision not in _REVIEWED_ISSUANCE_REVISIONS:
             raise CutoverError("trusted_receipt_issuance_required: historical_provenance_unavailable")
         issuances = Table(issuance_schema.NAME, MetaData(), autoload_with=connection, resolve_fks=False)
         issued = connection.execute(select(issuances).where(issuances.c.control_id == 1)).mappings().all()

@@ -604,6 +604,12 @@ def _check_sql(dialect, table, constraint, value):
         restored = POSTGRES_RESTORE_CHECK_FORMS.get((table, constraint))
         if restored is not None and normalized == _sql(restored):
             return _sql(C32[table]["pg_checks"][constraint])
+        # Six independently restored C34/C35 definitions; exact table/name and
+        # full expression matching only. Never erase casts or Boolean structure.
+        from .operator_classroom_c35_restore_forms import POSTGRES_RESTORE_CHECK_FORMS as c35_forms
+        forms = c35_forms.get((table, constraint))
+        if forms is not None and normalized == _sql(forms[1]):
+            return _sql(forms[0])
     return normalized
 
 
