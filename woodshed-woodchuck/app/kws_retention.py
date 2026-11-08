@@ -8,6 +8,7 @@ import math
 
 from sqlalchemy import and_, or_, select, text
 
+from . import models as _models  # Register referenced SQLAlchemy tables.
 from .child_models import PendingConsent
 from .db import SessionLocal
 from .kws_models import KWSEmailBudget, KWSVerification

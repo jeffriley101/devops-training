@@ -218,3 +218,28 @@ def test_cleanup_cannot_bypass_five_minute_or_hourly_email_limits(
         assert report["email_budget_rows"] == report["email_budget_timestamps"] == 1
         with pytest.raises(ValueError, match="Wait before requesting"):
             kws_verification.reserve_budget(session, "rate-limit@example.test", "production")
+
+
+def test_standalone_retention_import_resolves_foreign_keys():
+    """The scheduled job must register its models without other app imports."""
+    import subprocess
+    import sys
+
+    code = """
+from app import kws_retention
+from app.db import Base
+
+for table in Base.metadata.tables.values():
+    for fk in table.foreign_keys:
+        fk.column
+
+print("FOREIGN KEYS: OK")
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", code],
+        capture_output=True,
+        text=True,
+        timeout=20,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "FOREIGN KEYS: OK" in result.stdout
