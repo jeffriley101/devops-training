@@ -37,11 +37,11 @@ _REVIEWED_REVISIONS = (
 )
 # These additive descendants extend receipt verification only. Do not enable
 # new staging on a schema where the existing P31-only ACTIVATE cannot complete.
-_REVIEWED_RECEIPT_REVISIONS = _REVIEWED_REVISIONS + ("c34guardian001", "c35school001")
+_REVIEWED_RECEIPT_REVISIONS = _REVIEWED_REVISIONS + ("c34guardian001", "c35school001", "c36choice001")
 # Only these reviewed successors preserve the original P31 issuance contract.
 # This permits VERIFY of an existing issuance; ACTIVATE still requires P31.
 _REVIEWED_ISSUANCE_REVISIONS = (
-    "p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001",
+    "p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001", "c36choice001",
 )
 LEGACY = "legacy_seasonal_v1"
 PERSISTENT = "persistent_v1"

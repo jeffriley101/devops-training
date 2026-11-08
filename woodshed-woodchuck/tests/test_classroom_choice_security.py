@@ -33,8 +33,10 @@ def other_student(refs):
     return client
 
 
-def test_current_membership_audience_and_pchart_invitation_independence(choice_data):
+def test_current_membership_audience_and_pchart_invitation_independence(choice_data,monkeypatch):
     refs=choice_data;row=saved(refs)
+    from school_approval_fixture import approve_programs
+    approve_programs(refs.factory, monkeypatch, reviewer_id=1, approver_id=2)
     second=other_student(refs)
     url=PATH+f'/student/1/classes/{refs.class_id}'
     assert second.get(url).status_code==403

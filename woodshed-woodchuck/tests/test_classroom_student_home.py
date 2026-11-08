@@ -170,8 +170,13 @@ def test_all_existing_focus_mode_instrument_recipes_and_two_slot_limit(student_h
 
 
 @pytest.mark.parametrize('loss', ['participation', 'entitlement', 'leave', 'suspend', 'archive'])
-def test_current_class_authority_loss_preserves_membership_and_independent_homework(student_home, loss):
+def test_current_class_authority_loss_preserves_membership_and_independent_homework(student_home, loss, monkeypatch):
     refs = student_home; allowed_class(refs); issue(refs); start(refs)
+    if loss == 'suspend':
+        # C35 requires verified school authority before an adult may manage a
+        # membership. Supply the real synthetic prerequisite, not a bypass.
+        from school_approval_fixture import approve_programs
+        approve_programs(refs.factory, monkeypatch, reviewer_id=1, approver_id=2)
     assert 'Learning access available' in class_fragment(page(refs), refs.class_id)
     refs.clock[0] += timedelta(seconds=2)  # A real membership period must have positive duration.
     with refs.factory() as session:

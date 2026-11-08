@@ -69,13 +69,16 @@ def issued_c35(tmp_path_factory):
 
 def test_receipt_lineage_matches_actual_single_alembic_chain():
     scripts = ScriptDirectory.from_config(config())
-    assert scripts.get_heads() == ['c35school001']
+    # This accepted C35 prefix remains frozen when a separately qualified
+    # successor extends receipt-only verification.
+    assert scripts.get_revision('c35school001').revision == LINEAGE[-1]
     for parent, successor in zip(LINEAGE, LINEAGE[1:]):
         revision = scripts.get_revision(successor)
         assert revision.down_revision == parent
         assert not revision.dependencies and not revision.branch_labels
-    assert cutover._REVIEWED_ISSUANCE_REVISIONS == LINEAGE
-    assert tuple(cutover._REVIEWED_RECEIPT_REVISIONS[-5:]) == LINEAGE
+    assert cutover._REVIEWED_ISSUANCE_REVISIONS[:len(LINEAGE)] == LINEAGE
+    start = cutover._REVIEWED_RECEIPT_REVISIONS.index(LINEAGE[0])
+    assert cutover._REVIEWED_RECEIPT_REVISIONS[start:start + len(LINEAGE)] == LINEAGE
 
 
 @pytest.mark.parametrize('original,current', [

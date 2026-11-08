@@ -141,8 +141,11 @@ def test_class_work_survives_teacher_change_and_closed_enrollment(choice_data):
 
 
 @pytest.mark.parametrize('failure',['withdrawal','leave','hold','program','class','entitlement','archived'])
-def test_student_boundaries_do_not_leak_assignments(choice_data,failure):
+def test_student_boundaries_do_not_leak_assignments(choice_data,failure,monkeypatch):
     refs=choice_data
+    if failure == 'hold':
+        from school_approval_fixture import approve_programs
+        approve_programs(refs.factory, monkeypatch, reviewer_id=1, approver_id=2)
     saved(refs)
     refs.clock[0]+=timedelta(seconds=2)
     with refs.factory() as session:

@@ -49,3 +49,10 @@ C36 = {'classroom_choice_assignments': {'exact': True,
                                'primary_key': ('assignment_id', 'version'),
                                'unique': {},
                                'indexes': {}}}
+
+# Observed with an independent PostgreSQL dump/restore. Accept only this exact
+# expression at this exact table/constraint; retain all casts and Boolean terms.
+POSTGRES_RESTORE_CHECK_FORMS = {
+    ('classroom_choice_versions', 'ck_classroom_choice_state'):
+        "state::text = ANY (ARRAY['active'::character varying::text, 'cancelled'::character varying::text])",
+}

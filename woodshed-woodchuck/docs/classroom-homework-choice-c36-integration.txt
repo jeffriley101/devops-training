@@ -1,0 +1,133 @@
+CLASSROOM HOMEWORK / DIRECTOR'S CHOICE — LOCAL C36 INTEGRATION
+November 8, 2026 — Roger / OPS
+
+Disposition: locally integrated and qualified; independent Security acceptance
+is pending. No push, deployment, Production access, activation or legal change.
+
+Source and scope
+
+Branch: integration/classroom-homework-choice-c36-20261108
+Root: 4cbe2c989eda62ecf3a23620de39087812420f23 (accepted Production C35).
+Accepted school repair 73e0be3095a95673d151b9f1010feddd500f0da2 is an ancestor.
+
+Source commits, applied in order with their provenance retained by cherry-pick:
+7ef358320d81b509a47533eb7124250d79c19e27 — student home / personal Homework.
+9b2c88738fb15cfb617d510fabaacea26aa71ceb — saved Director's Choice.
+Their common ancestor with the accepted baseline is
+c3a329913608cfe25f0e795b6c6b627dcb825755; no intervening feature dependency.
+
+Excluded: 3e4c5cb newsletter integration, 1df66c5 Staff Duel, 1a395ad Last
+Trane, 5a05274 Saxophone Duel, ccd03a3 Aural Skills, and unfinished exercises.
+No requirements, lockfiles, existing game modules or newsletter modules changed.
+The original feature screens/services are used, not files copied from the later
+completion-worktree HEAD. Baseline and source worktrees remain clean and intact.
+
+Included behavior
+
+Owned student Classroom home; explicit Weekly Focus and up to two instrument
+Homework starts; frozen issued Game Mode and saved recipes; matching submitted
+practice progress; native account, age and guardian checks.
+
+Class-owned Director's Choice custom instructions or existing Homework recipes;
+current exact-Class teacher creation, versioned editing, cancellation, history,
+pagination and week selection; current eligible student assignment screens.
+Class instructions do not authorize roster/reporting disclosure or confer
+student-specific completion, grading, practice credit or rewards. Submitted
+practice remains an approximation, not proof of performing a specific exercise.
+Unfinished playable exercises are not dependencies of the accepted text scope.
+
+Migration and operator reconciliation
+
+Single head and exact new path: c35school001 -> c36choice001.
+The migration itself is byte-identical to 9b2c887. It adds only
+classroom_choice_assignments and classroom_choice_versions, one anchor sequence,
+scope constraints and immutable version guards. No backfill or old DDL rewrite.
+
+The accepted C34/C35 PostgreSQL restored-CHECK corrections remain intact.
+Real PostgreSQL dump/restore exposed one additional C36 restored expression:
+ck_classroom_choice_state on classroom_choice_versions. A finite, exact
+table/name/expression mapping accepts only this observed equivalent form.
+Altered literals, casts, operators, Boolean additions and wrong scopes are not
+accepted; required constraints, validation and trigger semantics stay enforced.
+
+persistent_team_cutover extends only _REVIEWED_RECEIPT_REVISIONS and
+_REVIEWED_ISSUANCE_REVISIONS through c36choice001. The STAGE revision list,
+P31-only ACTIVATE, target identity, immutable issuance, receipt-body hash and
+provenance decisions are unchanged. The C35 lineage test now freezes the C35
+prefix; the new C36 test requires the exact single head and successor.
+
+Three existing functional tests required the accepted synthetic school approval
+fixture before adult suspension or P-Chart invitation operations. Their denial
+assertions remain; no production permission or legal constant was relaxed.
+
+Qualification results
+
+Only a fresh loopback PostgreSQL 18.6 cluster was used for database and browser
+qualification. Migration/restore actors were non-superusers. Environment was
+constructed without Production credentials. Synthetic data only; no remote DB.
+Classroom activation and legal approval simulations were per-test fixtures only.
+
+Final distinct results: 169 PASS / 0 FAIL / 0 SKIP.
+  Functional/service/security cases from the original feature tests: 67 PASS.
+  Browser cases: 14 PASS (Chromium/Firefox, widths 1440, 390, 320).
+  New C35/C36 school, withdrawal, gates and shipped constants checks: 4 PASS.
+  PTA/operator/migration/restore cases: 84 PASS.
+45 SQLite variants were deliberately deselected; no SQLite fallback was used.
+One passing golden-parity case covers 768 existing Homework recipe combinations.
+
+Initial failures are retained in evidence: three missing school prerequisites
+were corrected and individually rerun; one restored C36 CHECK incompatibility
+was corrected and the complete operator matrix rerun. Passing unaffected tests
+were retained rather than repeating unrelated security or migration suites.
+
+Data qualification:
+  PTA fixture: 104 original synthetic records across 101 application tables,
+  with all 81 original sequences preserved; trusted P31 approval/receipt unchanged.
+  Native school/guardian/Homework fixture: 52 original synthetic records across
+  101 application tables and all 81 sequences preserved, including school
+  revocation, guardian withdrawal, private practice and personal Homework.
+  Both C36 tables initially empty; resulting schema 103 tables / 82 sequences.
+
+Native and independently restored C36 schema validation passed. Same-target
+restore retained trusted receipt verification; different target identities,
+forged/substituted receipts, historical unissued evidence, changed receipt
+bindings and changed protected practice were rejected. No new STAGE/ACTIVATE
+permissions. PTA and assignment trigger damage failed validation.
+
+An injected failure after C36 DDL/guard installation rolled back to validated
+C35 with identical records and sequence states. Empty C36 downgrade round trip
+passed; populated assignment-history downgrade was refused. These are disposable
+tests, not permission or a promise of safe Production downgrade.
+
+Concurrent duplicate assignment creation, edit/edit, edit/cancel, role loss, parent
+withdrawal, entitlement loss, expiry and rollback cases used observed PostgreSQL
+lock waits. Browser cases exercised authentic student/director/parent flows,
+plain-text escaping, owned views, frozen Homework, cancellation/history and
+withdrawal. School revocation still blocks protected disclosure while own
+Homework and Class instruction access remain separate capabilities.
+
+All Classroom gates remain OFF by default. Both shipped legal allowlists remain
+empty. All 23 files from the accepted school-enforcement repair are unchanged.
+The accepted C35 restore-form module is unchanged. PTA functions are unchanged;
+only the two explicitly reviewed VERIFY revision tuples gained C36.
+
+Evidence and review
+
+/home/geph/review-evidence/classroom-homework-choice-c36-integration-20261108
+  test-results-final.json — distinct-case counts, provenance and full case list.
+  source-preservation-final.json — accepted-file and source-scope comparisons.
+  integration-result.json — final local commit, branch and migration identity.
+  *-command.json, *.xml, *.log — exact test invocations and original results.
+  operator-final-tmp and security-initial-tmp — synthetic preservation/restore evidence.
+  browser-initial-tmp — browser evidence.
+
+Known implementation defects after correction: none observed in this scope.
+Evidence limits: disposable synthetic PostgreSQL qualification, not a Production
+C35 -> C36 execution or proof that a restored database inherits a receipt's old
+target identity. Older historical unissued PTA evidence remains unauthenticated.
+No Production upgrade, downtime, recovery-time or activation approval is implied.
+
+Next action: independent Security acceptance of this exact local C36 integration,
+focused on the new assignment surfaces and the narrow PTA/restore compatibility
+delta, reusing the unchanged accepted C35 repair evidence. Push and deployment
+require separate approval; Classroom/legal activation remains separate.

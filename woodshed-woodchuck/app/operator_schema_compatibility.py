@@ -610,6 +610,10 @@ def _check_sql(dialect, table, constraint, value):
         forms = c35_forms.get((table, constraint))
         if forms is not None and normalized == _sql(forms[1]):
             return _sql(forms[0])
+        from .operator_classroom_choice_contract import C36, POSTGRES_RESTORE_CHECK_FORMS as c36_forms
+        restored = c36_forms.get((table, constraint))
+        if restored is not None and normalized == _sql(restored):
+            return _sql(C36[table]['pg_checks'][constraint])
     return normalized
 
 
