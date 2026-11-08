@@ -31,6 +31,19 @@ async def handle_webhook(request: Request, environment: str):
     except KWSUnavailable:
         raise HTTPException(503, 'KWS callback is unavailable.') from None
     except kws.InvalidResult as error:
+        if error.stage == kws.RejectionStage.INVALID_TIMESTAMP:
+            timestamps = [
+                item.strip()[2:]
+                for header in request.headers.getlist('x-kws-signature')
+                for item in header.split(',')
+                if item.strip().startswith('t=')
+            ]
+            stamp = timestamps[0] if len(timestamps) == 1 else ''
+            logger.warning(
+                'kws_webhook_timestamp_shape count=%d length=%d ascii_digits=%s',
+                len(timestamps), len(stamp),
+                stamp.isascii() and stamp.isdecimal(),
+            )
         logger.warning('%s', error.stage.value)
         raise HTTPException(400, 'Invalid KWS result.') from None
     except UnicodeError:
