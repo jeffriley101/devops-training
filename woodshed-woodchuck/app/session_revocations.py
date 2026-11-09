@@ -181,6 +181,22 @@ class RevocableSessionMiddleware:
             if message["type"] == "http.response.start":
                 final_facts = auth_facts(session)
                 changed_identity = final_facts != initial_facts
+                # S4 is anonymous context, never an authentication fact. Retire
+                # its transient lease on ANY account/adult transition or clear.
+                from . import classroom_guest
+                guest_nonce = incoming.get(classroom_guest.KEY)
+                if guest_nonce and (final_facts or session.get(classroom_guest.KEY) != guest_nonce):
+                    try:
+                        await run_in_threadpool(classroom_guest.forget, guest_nonce)
+                    except Exception:
+                        scope['ww.suppress_session_cookie'] = True
+                        abort_body = True
+                        return await PlainTextResponse(
+                            'Session change could not be confirmed. Try again.', 503,
+                            headers={'Cache-Control': 'no-store'},
+                        )(scope, receive, send)
+                    if final_facts:
+                        session.pop(classroom_guest.KEY, None)
                 if initial_nonce and changed_identity:
                     try:
                         first_retirement = await run_in_threadpool(

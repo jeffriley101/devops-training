@@ -1,0 +1,131 @@
+GUEST CLASSROOM S4 — LOCAL IMPLEMENTATION
+November 9, 2026 — Roger / OPS
+
+Base: cf62d94e98cf22cc5821247709e5fac99ce5a7da.
+Branch: feature/classroom-guest-s4-20261109.
+Migration head remains c36choice001. No migration or dependency change.
+No Production operation, push, deployment or activation is included.
+
+Scope and reuse
+
+/guest/classroom uses the existing Guest document, local tools, browser session
+boundary, signed session cookie, S2 Program/Class code validator and authority
+locks. Pristine reuses the existing detector and timer through a local-only
+adapter. It never imports the account-saving Pristine adapter. General Guest
+Mode retains connect-src 'none' and its ordinary fetch prohibition.
+
+The separate CLASSROOM_GUEST_ENABLED gate defaults OFF and additionally requires
+S1/S2. Only S4's document permits same-origin connections, restricted by CSP to
+the exact admit/check/leave paths. Its forms cannot submit natively. Requests
+require bounded JSON, an exact first-party Origin and noncontradictory browser
+metadata. No codes enter URLs, account records, SQL audit rows or rate-limit keys.
+
+The signed browser cookie contains an opaque context nonce, not a student ID.
+Only the existing transient login-protection backend holds the associated
+Program/Class/code generation, random browser binding and expiration. Redis keys
+expire in 900 seconds and are HMAC-namespaced; the local memory backend is refused
+in Production. No permanent guest identity, roster, enrollment, reporting choice,
+practice chart/history, reward, rating or achievement is created. Rate counters
+also expire in 15 minutes. No per-student or practice information is stored there.
+
+Admission and lifecycle
+
+The visitor enters the Program number and current Class code. S4 checks current
+entitlement/capacity, exact Class scope, active/open Class, current code generation
+and issue/revocation state under the existing Program lock. Failures share one
+public response. It rechecks time-sensitive entitlement after lock waits. The
+response exposes only active/binding/expires_in, never Class labels, internal IDs,
+school evidence, student identity, assignment content or other protected data.
+
+Each context has a 15-minute renewable lifetime. Checks require both the existing
+signed cookie and the matching in-memory page binding. Current authority is read
+again on every server check and immediately before Pristine start. The visible
+page checks every 15 seconds; network requests time out after 8 seconds. Continuous
+local audio therefore stops on the next failed heartbeat, rather than claiming
+instant server-pushed revocation. No protected records are delivered in that gap.
+
+Redis compare-and-set renewal cannot recreate a deleted, replaced or expired
+context. Browser monotonic deadlines reject late responses and suspended-time
+expiry. Logout/account/adult transitions retire the guest context; cookie replay
+cannot recover it. Cookie-changing S4 requests share the existing browser lock
+with authentication. Turning the gate off denies admission/use but still permits
+retirement of an already issued context. No endpoint extends account permissions.
+
+Leaving, hiding, restoring a stale page, or changing accounts clears local activity
+and releases microphone resources. A late permission grant immediately releases
+its acquired tracks. Hidden pages require fresh entry after reload. Explicit exit
+retires the server context. Abrupt page closure does not depend on an unreliable
+unload request: the remaining opaque lease expires server-side. If exit cannot be
+confirmed, the UI reports that limitation instead of claiming server revocation.
+
+The local Pristine adapter requests normal browser microphone permission, detects
+playing with the existing detector/timer, displays time locally and provides Stop.
+It sends neither audio nor time to the server. It does not award credit, populate
+P-Charts, share with directors or transfer Guest activity to a later account.
+Existing Guest P-Chart tools remain separately local and explicitly user-operated.
+
+Security compatibility
+
+Guest context is excluded from authenticated session facts and accepted only as
+anonymous context. No fake student/profile, S2 enrollment intent, guardian consent,
+school permission or reporting grant is synthesized. No Homework, Director's
+Choice, roster, student identity, dashboard, private chart, PTA administration or
+unfinished Skill-Building endpoint is added. Existing protected services continue
+to require their native student/adult/guardian/school authority. Organizational
+school authorization is never converted into a guest student-data capability.
+
+C35 school/guardian/identity protections and C36 assignment authorization/history
+remain unchanged. Both shipped legal allowlists remain empty. PTA issuance,
+receipt provenance/VERIFY scope, schema/operator compatibility, migration files,
+and accepted detector/timer sources are unchanged from C36.
+
+Qualification (final runs; distinct cases, no rerun totals added)
+
+51 passed — S4 backend, real disposable Redis and migrated PostgreSQL 18 C36.
+14 passed — Chromium/Firefox workflows, including controlled microphone APIs,
+            code rotation, expiry, stale pages, account switching, permission
+            failure, late permission completion, network failure and CSP.
+108 passed — existing Guest/session boundaries and deterministic Pristine tests.
+16 passed — existing same-browser C35 school revocation/default-allowlist checks.
+2 passed — existing C36 membership/audience and native-cookie/gate checks on PG.
+31 passed — existing Guest JavaScript boundary/isolation tests.
+TOTAL: 191 pytest cases plus 31 Node cases; 0 failed, 0 errors, 0 skipped.
+17 alternate backend variants were deliberately deselected, not counted as skips.
+
+SQL fingerprints cover every mapped table before/after Guest operations. Actual
+PostgreSQL tests validate C36 before/after S4 and observe lock contention before
+revocation/expiry checks. Redis tests exercise real TTL and atomic retirement,
+including a delayed renewal after deletion. Only disposable local services and
+synthetic identities were used. Existing accepted PTA/security evidence is reused
+where its implementation is unchanged; no broad security or Arcade rerun occurred.
+
+Three old JavaScript fixture failures also reproduced on untouched C36: the mock
+Guest form still used Level instead of Game Mode, and mock browser globals omitted
+queueMicrotask. Only these mocks were corrected; all assertions are retained.
+Initial S4 fixture setup errors (transaction boundaries, constrained lifecycle
+states, UTF-8 and UTC fixture transport) were corrected before final qualification.
+
+Evidence directory:
+/home/geph/review-evidence/classroom-guest-s4-20261109
+It contains final JUnit XML/logs, Node TAP, the baseline fixture comparison,
+changed-file/source hashes and local-only execution metadata.
+
+Operational limits and next action
+
+This is a local review candidate. Activation still requires separate approval.
+Before any later activation, verify the existing Redis endpoint and ACL permit
+GET/SET/DEL/EVAL and TTL operations for the S4 namespace, current trusted-proxy
+configuration, and capacity for the shared-network admission limit (100 attempts
+per IP per 15 minutes; checks/exit use separately bounded transient counters).
+Missing/off/unavailable transient protection fails closed. No new backend or paid
+resource was provisioned. General local Guest tools remain available on failure.
+
+S4 requires a secure browser with Web Locks, working origin-local session-boundary
+storage, and microphone support for Pristine. Controlled browser audio tests do
+not certify physical microphones or every mobile browser. Backgrounding ends the
+local S4 session; server revocation during continuous local practice is detected
+by the bounded heartbeat, not push. There is no persistent resume or saved history.
+
+Next action: independent Phil/Security review of the local candidate, concentrating
+on anonymous admission, transient context retirement, CSP/CSRF boundaries, scope
+isolation and the new Pristine lifecycle. Push/deployment/activation remain separate.

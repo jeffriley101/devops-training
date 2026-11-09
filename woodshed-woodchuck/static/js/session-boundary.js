@@ -219,6 +219,29 @@
       } catch (_error) { stop(); }
     }
   });
+
+  async function guestClassroomFetch(action, data) {
+    // General Guest fetch remains prohibited. Only S4 can use these exact
+    // JSON endpoints, ordered with account changes by the existing Web Lock.
+    check();
+    if (!localGuest || document.body.dataset.guestClassroom !== "true" ||
+        !["admit", "check", "leave"].includes(action) || epoch === null ||
+        document.hidden || guestPageLeaving || !navigator.locks?.request) {
+      throw new Error("Reload Guest Classroom before continuing.");
+    }
+    const expected = epoch;
+    return navigator.locks.request("woodshed-account-transition", async function () {
+      check(expected);
+      if (document.hidden || guestPageLeaving) throw new Error("Guest Classroom stopped.");
+      const response = await nativeFetch("/guest/classroom/" + action, {
+        method: "POST", credentials: "same-origin", cache: "no-store", redirect: "error",
+        headers: {"Content-Type": "application/json"}, body: JSON.stringify(data),
+        signal: AbortSignal.timeout(8000),
+      });
+      check(expected);
+      return guardedResponse(response, expected);
+    });
+  }
   window.addEventListener("pageshow", function (event) {
     if (event.persisted) stop();
     else isCurrent();
@@ -285,6 +308,6 @@
   const ready = startAccountPage();
   window.WWSessionBoundary = Object.freeze({
     isCurrent, ready, accountId: () => accountId, epoch: () => epoch,
-    binding, matchesBinding, clearAccountProductCaches, submitGuestForm,
+    binding, matchesBinding, clearAccountProductCaches, submitGuestForm, guestClassroomFetch,
   });
 })();

@@ -6,7 +6,7 @@
   <title>Guest exploration · Woodshed Woodchuck</title>
   <link rel="stylesheet" href="/static/css/styles.css?v=124" />
 </head>
-<body data-guest="{{ 'local' if not blocked and not signing_in else 'transition' }}" data-account-id="{{ account_id }}" data-page-generation="{{ request.session.get('woodchuck_page_generation', '') if account_id else '' }}" data-authenticated="{{ 'true' if account_id else 'false' }}" data-c001-context="{{ 'true' if c001_registration else 'false' }}" data-prebeta-context="{{ 'true' if registration_cohort else 'false' }}" data-prebeta-cohort="{{ registration_cohort or '' }}">
+<body data-guest-classroom="{{ 'true' if guest_classroom else 'false' }}" data-guest="{{ 'local' if not blocked and not signing_in else 'transition' }}" data-account-id="{{ account_id }}" data-page-generation="{{ request.session.get('woodchuck_page_generation', '') if account_id else '' }}" data-authenticated="{{ 'true' if account_id else 'false' }}" data-c001-context="{{ 'true' if c001_registration else 'false' }}" data-prebeta-context="{{ 'true' if registration_cohort else 'false' }}" data-prebeta-cohort="{{ registration_cohort or '' }}">
 <div class="app-shell"{% if account_id %} hidden{% endif %}><main class="content-wrap">
 <section class="card">
   <p class="chip">Guest exploration</p>
@@ -31,6 +31,8 @@
   {% if secret_feedback %}<p id="guest-secret-feedback" role="status">{{ secret_feedback }}</p>{% elif prebeta_symbol_recognized %}<p role="status">{{ registration_cohort }} Pre-Beta recognized.</p>{% endif %}
   <p>No account needed. Your setup, chart and game score last only while this page is open. Reloading or leaving clears them. The tuner processes microphone audio on your device. Browsing makes ordinary web requests that may appear in operational logs.</p>
   <noscript><p>Enable JavaScript to use these local practice tools.</p></noscript>
+  {% if guest_classroom %}{% include "_guest_classroom.html" %}
+  {% elif guest_classroom_available %}<p><a href="/guest/classroom">Enter Guest Classroom with a Class code</a></p>{% endif %}
   <form id="guest-setup-form" class="stack-form" method="dialog" autocomplete="off">
     <fieldset id="guest-setup-fields" class="stack-form" disabled>
     {% for field, label, choices in [('instrument', 'Instrument', instruments), ('game_mode', 'Game Mode', game_modes), ('goal', 'Practice goal', goals)] %}
@@ -48,10 +50,10 @@
     <p>Try the tuner, metronome, a one-session P-Chart and Plunge Burrow. Share, download or copy your chart when you choose. Guest activity does not transfer to an account.</p>
     <div class="button-row">
       <button id="metronome-open-button" class="btn" type="button" aria-controls="metronome-panel" aria-expanded="false">Metronome</button>
-      <button id="shed-secret-button" class="btn" type="button" aria-controls="shed-secret-panel" aria-expanded="false">Secret Symbol</button>
+      {% if not guest_classroom %}<button id="shed-secret-button" class="btn" type="button" aria-controls="shed-secret-panel" aria-expanded="false">Secret Symbol</button>{% endif %}
       <button id="tuner-open-button" class="btn" type="button" aria-controls="tuner-panel" aria-expanded="false">Tuner</button>
     </div>
-  {% include "_shed_secret.html" %}
+  {% if not guest_classroom %}{% include "_shed_secret.html" %}{% endif %}
   <section
     id="metronome-panel"
     class="metronome-panel hidden"
@@ -215,7 +217,7 @@
   <a class="btn btn-secondary" href="/setup?from=guest" data-guest-account-entry>Create an account</a>
   <a class="btn btn-secondary" href="/">Exit to welcome</a>
   <h2>Account required</h2>
-  <p>Saved practice history, the Practice Book, Pristine Practice, other Arcade games, contests, rewards, inventory/shop and teams need an account.</p>
+  <p>Saved practice history, the Practice Book, saved Pristine Practice, other Arcade games, contests, rewards, inventory/shop and teams need an account.</p>
   {% endif %}
   <p id="guest-feedback" class="body-copy" role="status" aria-live="polite"></p>
   {% if registration_cohort %}
@@ -231,7 +233,7 @@
 <script src="/static/js/shared-ui.js?v=5"></script>
 <script src="/static/js/recovery.js?v=1"></script>
 {% if account_id %}<template id="account-scripts">{% else %}
-<script src="/static/js/session-boundary.js?v=wl2-04"></script>{% endif %}
+<script src="/static/js/session-boundary.js?v=s4-01"></script>{% endif %}
 {% if signing_in %}
 <script src="/static/js/state.js?v=wl2-05"></script>
 <script src="/static/js/account.js?v=wl2-04"></script>
@@ -243,9 +245,14 @@
 <script src="/static/js/guest-chart.js?v=1"></script>
 <script src="/static/js/plunge-burrow.js?v=9"></script>
 <script src="/static/js/guest-plunge.js?v=1"></script>
+{% if guest_classroom %}
+<script src="/static/js/pristine-timer.js?v=2"></script>
+<script src="/static/js/pristine-detector.js?v=1"></script>
+<script src="/static/js/guest-classroom.js?v=1"></script>
+{% endif %}
 {% endif %}
 {% if blocked or signing_in %}<script src="/static/js/guest.js?v=wl2-05"></script>{% endif %}
 {% if account_id %}</template>
-<script src="/static/js/session-boundary.js?v=wl2-04"></script>{% endif %}
+<script src="/static/js/session-boundary.js?v=s4-01"></script>{% endif %}
 </body>
 </html>

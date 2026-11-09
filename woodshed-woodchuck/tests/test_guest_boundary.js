@@ -40,7 +40,7 @@ function browser({shared = new Map(), account='WC-A', guest='transition', genera
     alert:m=>alerts.push(m),setTimeout(){},clearTimeout(){},
   };
   const context={window,document:{body,getElementById:id=>ids.get(id)||null,querySelector:selector=>selector==='.app-shell'?shell:null,querySelectorAll:()=>[],createElement:element},
-    navigator:{locks:{request:async (_name,options,fn)=>(fn || options)()}},URL,Headers,Response,console,
+    navigator:{locks:{request:async (_name,options,fn)=>(fn || options)()}},URL,Headers,Response,console,queueMicrotask,
     CustomEvent:class {constructor(type,init={}){this.type=type;this.detail=init.detail;}},
   };
   context.fetch=(...args)=>window.fetch(...args);
@@ -54,7 +54,7 @@ test('Guest setup uses memory; reload and discard forget it and retire old Guest
   function setup() {
     const b=browser({shared,account:'',guest:'local'});
     const form=element();form.elements={};
-    for(const [key,value] of [['instrument','Flute'],['level','Beginner'],['goal','Daily']]) {
+    for(const [key,value] of [['instrument','Flute'],['game_mode','Challenge'],['goal','Daily']]) {
       form.elements[key]={value:'',options:[{value:''},{value}]};
     }
     form.reset=()=>Object.values(form.elements).forEach(e=>e.value='');

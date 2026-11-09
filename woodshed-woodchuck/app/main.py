@@ -41,6 +41,7 @@ from .classroom_school_routes import router as classroom_school_router
 from .classroom_enrollment_routes import router as classroom_enrollment_router
 from .classroom_student_home import router as classroom_student_home_router
 from .classroom_choice_routes import router as classroom_choice_router
+from . import classroom_guest
 from .classroom_enrollment import enabled as classroom_enrollment_enabled
 from .classroom_management_routes import router as classroom_management_router, enabled as classroom_management_enabled
 from .classroom_identity_routes import router as classroom_identity_router
@@ -157,6 +158,7 @@ app.include_router(classroom_school_router)
 app.include_router(classroom_enrollment_router)
 app.include_router(classroom_student_home_router)
 app.include_router(classroom_choice_router)
+app.include_router(classroom_guest.router)
 app.include_router(classroom_management_router)
 app.include_router(classroom_identity_router)
 app.include_router(classroom_workspace_router)
@@ -479,7 +481,11 @@ def trusted_verifiers_page(request: Request):
 
 @app.get("/guest")
 @app.get("/guest/login")
+@app.get("/guest/classroom")
 def guest_page(request: Request):
+    guest_classroom = request.url.path == '/guest/classroom'
+    if guest_classroom and not classroom_guest.enabled():
+        classroom_guest.deny(404)
     # Read the existing account and its page-freshness marker only. Do not
     # bootstrap account state or observe Guest activity.
     with SessionLocal() as session:
@@ -490,13 +496,15 @@ def guest_page(request: Request):
     # The signed Pre-Beta claim is registration context, not authentication. All
     # other account/adult/admin session state still requires explicit logout.
     tester_claim = registration_context(request)
-    context_only = set(request.session) <= {SESSION_REGISTRATION_CONTEXT, BROWSER_KEY, FLASH_KEY}
+    context_only = set(request.session) <= classroom_guest.ALLOWED_SESSION
     blocked = bool(profile is not None or (request.session and not context_only))
-    registration_cohort = tester_claim if not blocked else None
+    registration_cohort = tester_claim if not blocked and not guest_classroom else None
     signing_in = request.url.path == "/guest/login" and not blocked
     response = templates.TemplateResponse(
         request=request, name="guest.html",
         context={"blocked": blocked, "signing_in": signing_in,
+                 "guest_classroom": guest_classroom and not blocked,
+                 "guest_classroom_available": classroom_guest.enabled(),
                  "account_id": account_id, "instruments": INSTRUMENT_OPTIONS,
                  "game_modes": GAME_MODES, "goals": GOAL_OPTIONS,
                  "secret_feedback": request.session.pop(FLASH_KEY, "") if not blocked else "",
@@ -512,6 +520,14 @@ def guest_page(request: Request):
         + ("'self'" if blocked or signing_in else "'none'")
         + "; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"
     )
+    if guest_classroom and not blocked:
+        origin = str(request.base_url).rstrip('/')
+        endpoints = ' '.join(origin + '/guest/classroom/' + action
+                             for action in ('admit', 'check', 'leave'))
+        response.headers['Content-Security-Policy'] = (
+            "default-src 'self'; connect-src " + endpoints
+            + "; form-action 'none'; frame-ancestors 'none'; base-uri 'none'")
+        response.headers['Permissions-Policy'] = 'microphone=(self), camera=()'
     return response
 
 

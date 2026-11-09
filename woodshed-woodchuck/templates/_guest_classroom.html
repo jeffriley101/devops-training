@@ -1,0 +1,22 @@
+<section id="guest-classroom" class="notice-card" aria-labelledby="guest-classroom-title">
+  <h2 id="guest-classroom-title">Guest Classroom</h2>
+  <p>A current Class code opens temporary local practice tools. This does not enroll you or provide access to student records, assignments or reporting.</p>
+  <form id="guest-classroom-entry" class="stack-form" method="dialog" autocomplete="off">
+    <label for="guest-program">Music Program number</label>
+    <input id="guest-program" type="number" min="1" max="2147483647" required />
+    <label for="guest-class-code">Class code</label>
+    <input id="guest-class-code" type="password" maxlength="24" required autocomplete="off" />
+    <button id="guest-classroom-admit" class="btn" type="submit" disabled>Enter Guest Classroom</button>
+  </form>
+  <p id="guest-classroom-status" role="status">Loading Guest Classroom…</p>
+  <section id="guest-pristine" hidden>
+    <h3>Local Pristine Practice</h3>
+    <p>Your microphone detects playing on this device. Audio and practice time are never uploaded or saved to an account. Leaving or ending Guest Classroom clears this activity.</p>
+    <output id="guest-pristine-time" aria-label="Local detected playing time">00:00</output>
+    <p id="guest-pristine-status" role="status">Microphone not started</p>
+    <button id="guest-pristine-start" class="btn" type="button">Enable microphone &amp; start</button>
+    <button id="guest-pristine-stop" class="btn" type="button" disabled>Stop local practice</button>
+  </section>
+  <button id="guest-classroom-leave" class="btn" type="button" disabled>End Guest Classroom</button>
+  <a href="/guest" id="guest-classroom-back">Back to general Guest Mode</a>
+</section>

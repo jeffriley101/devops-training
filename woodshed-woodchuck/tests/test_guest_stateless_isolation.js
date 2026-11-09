@@ -92,7 +92,7 @@ async function browser({account = '', generation = '', guest = 'transition',
   const document = events({body, hidden: false, getElementById: id => ids.get(id) || null,
     querySelector: selector => selector === '.app-shell' ? shell : null,
     querySelectorAll: () => [], createElement: element});
-  const context = {window, document, navigator: {locks},
+  const context = {window, document, navigator: {locks}, queueMicrotask,
     URL, Headers, Response, console, performance: {now: () => clock},
     CustomEvent: class {constructor(type, init = {}) {this.type = type; this.detail = init.detail;}}};
   context.fetch = (...args) => window.fetch(...args);
