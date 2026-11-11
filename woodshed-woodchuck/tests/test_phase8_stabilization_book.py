@@ -105,25 +105,21 @@ def test_submission_keeps_warnings_confirmation_and_single_clipboard_attempt() -
     assert "No duplicate actions were performed." in script
 
 
-def test_book_uses_responsive_metallic_spiral_layout_and_scoped_controls() -> None:
+def test_book_retains_controls_without_decorative_binding() -> None:
     template = (ROOT / "templates/p_book.html").read_text(encoding="utf-8")
-    css = (ROOT / "static/css/styles.css").read_text(encoding="utf-8")
+    css = (ROOT / "static/css/practice-book.css").read_text(encoding="utf-8")
     assert 'class="card p-book-page"' in template
     assert 'class="p-book-notebook"' in template
-    assert 'class="p-book-spiral" aria-hidden="true"' in template
-    assert "grid-template-columns: minmax(0, 1fr) 46px minmax(0, 1fr)" in css
-    assert "@media (max-width: 760px)" in css
-    assert ".p-book-spiral { min-height: 42px" in css
-    assert ".p-book-page .practice-stat-stone" in css
-    assert ".p-book-page .pirate-logbook" in css
-    assert ".p-book-page .btn" in css
-    assert ".p-book-page #p-book-team-shed-link" in css
-    assert ".p-book-page .p-book-verifier-manage" in css
-    assert ".p-book-page #submit-p-chart-btn" in css
-    assert "border-radius: 50%" in css
-    assert ".p-book-page #submit-p-chart-btn.p-book-submit-gold" in css
-    assert "@media (prefers-reduced-motion: reduce)" in css
-    assert "body .btn" not in css
+    assert 'class="p-book-spiral"' not in template
+    for control in ("practice-timer-toggle-btn", "practice-timer-start-btn",
+                    "practice-timer-stop-btn", "p-book-minutes", "submit-p-chart-btn",
+                    "p-book-verifier-manage", "p-book-entries"):
+        assert template.count(f'id="{control}"') == 1
+    assert template.count('href="/practice/pristine"') == 1
+    assert 'href="/personal-development"' in template
+    assert 'href="/home"' in template
+    # Layout, focus, touch targets and actual computed styles are browser-tested.
+    assert "linear-gradient(" not in css and "radial-gradient(" not in css
 
 
 def test_book_history_uses_accessible_verified_and_pristine_badges() -> None:
@@ -151,13 +147,21 @@ def test_book_history_shows_bounded_pagination_and_positive_practice_days() -> N
     assert 'id="p-book-show-less"' in template
 
 
-def test_book_asset_versions_are_advanced() -> None:
+def test_book_loads_versioned_local_assets_in_cascade_order() -> None:
+    import re
+    from urllib.parse import urlsplit, parse_qs
+
     base = (ROOT / "templates/base.html").read_text(encoding="utf-8")
-    assert "/static/css/styles.css?v=120" in base
-    assert "/static/js/character-reaction.js?v=3" in base
-    assert "/static/js/app.js?v=85" in base
-    assert "styles.css?v=68" not in base
-    assert "app.js?v=34" not in base
+    book = (ROOT / "templates/p_book.html").read_text(encoding="utf-8")
+    # Check actual local assets and cache keys, not unrelated historical versions.
+    for path in ("css/styles.css", "js/character-reaction.js", "js/app.js",
+                 "css/personal-development.css", "css/practice-book.css"):
+        matches = re.findall(r'["\'](/static/' + re.escape(path) + r'\?[^"\']+)["\']', base + book)
+        assert len(matches) == 1
+        assert parse_qs(urlsplit(matches[0]).query).get("v")
+        assert (ROOT / "static" / path).is_file()
+    assert base.index("css/styles.css") < base.index("{% block dashboard_styles %}")
+    assert book.index("css/personal-development.css") < book.index("css/practice-book.css")
 
 
 def test_timer_status_and_history_have_independent_full_width_rows() -> None:

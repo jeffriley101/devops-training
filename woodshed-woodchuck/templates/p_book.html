@@ -1,8 +1,11 @@
 {% extends "base.html" %}
-{% block dashboard_styles %}<link rel="stylesheet" href="/static/css/personal-development.css?v=1">{% endblock %}
+{% block dashboard_styles %}
+<link rel="stylesheet" href="/static/css/personal-development.css?v=1">
+<link rel="stylesheet" href="/static/css/practice-book.css?v=1">
+{% endblock %}
 
 {% block content %}
-<a class="room-return" href="/home">← Back to SHED</a>
+<a class="room-return p-book-return" href="/home">← Back to SHED</a>
 <section class="card p-book-page">
   <div class="p-book-notebook">
   <div class="p-book-page-sheet p-book-page-left">
@@ -16,6 +19,7 @@
         Start Timer
       </button>
 
+      <a class="btn btn-secondary p-book-pristine" href="/practice/pristine">Pristine P-Chart</a>
       <p id="practice-timer-display">00:00</p>
     </div>
 
@@ -143,8 +147,6 @@
     </div>
   </dialog>
   </div>
-
-  <div class="p-book-spiral" aria-hidden="true"></div>
 
   <div class="p-book-page-sheet p-book-page-right">
   <div class="p-book-lower-region">

@@ -1,0 +1,162 @@
+BOOK appearance redesign — Roger / OPS — November 11, 2026
+
+Implementation is prepared for Leadership visual approval. Production deployment
+and pushing the feature branch are not authorized.
+
+Checkout verified before editing
+  /home/geph/Training_scripts-shop-book-cleanup-20261111
+  feature/shop-book-cleanup-20261111
+  Clean starting commit: 44a59ea2a353ca91d2dccbdac6f40e0f36852920
+  Production reference: c36choice001 (no migration in this change).
+
+Appearance and preserved workflow
+  BOOK alone loads static/css/practice-book.css after its existing dashboard CSS.
+  Ivory/white surfaces, charcoal text, forest green, flat borders, visible focus,
+  16px form text, 44px controls, two desktop columns and one mobile column replace
+  the metallic treatment. The spiral element is removed. Expanded practice details
+  use two columns when their own container is wide enough; mobile uses one.
+  The timer stays first and minutes stays the first editable field. Existing field
+  IDs/names, dialogs, history pagination, statistics, rating/dashboard navigation,
+  Whistler reaction, green success feedback and SHED return remain present.
+  The new stylesheet respects hidden controls and removes inherited grid styling
+  that constrained the practice-details summary. No shared stylesheet was edited.
+
+  Baseline inspection found ZERO Pristine shortcuts on BOOK. One semantic link was
+  added beside Start Timer to the existing /practice/pristine route, as authorized
+  by the original cleanup scope. The existing SHOP link is unchanged. No duplicate
+  shortcut, route, microphone handler or permission check was introduced.
+
+  The exact baseline uses a single confirmed Submit workflow: saving, optional
+  verification email, automatic clipboard export and Whistler follow the save.
+  Separate Email/Copy buttons were already absent and existing regression tests
+  explicitly prohibit restoring them. This change preserves the integrated flow.
+  No new export action or navigation system was introduced.
+
+Changed files
+  templates/p_book.html
+  static/css/practice-book.css (new)
+  tests/test_phase8_stabilization_book.py
+  tests/test_book_cleanup_browser.py (new)
+  docs/book-appearance-redesign.txt (this report)
+
+Three pre-existing failures, investigated before implementation
+  Reproduction at untouched 44a59ea: 46 PASS / 3 FAIL / 0 SKIP, equivalent to
+  BOOK 22/1 and Motion + Pristine + SHOP 24/2.
+
+  1. test_phase8_stabilization_book.py::test_book_asset_versions_are_advanced
+     Hardcodes styles.css?v=120 and app.js?v=85. The deployed source already uses
+     v125 and wl2-17c-classroom1. Test-only correction replaces historical version
+     equality with existing local asset, nonempty version and cascade-order checks.
+     No asset version was rolled back. This failure predates the redesign.
+
+  2. test_phase6b_shop.py::test_share_uses_one_canonical_url_and_accessible_qr
+     The test sets PUBLIC_BASE_URL to a URL containing a path/query/fragment.
+     conftest uses that value as TestClient.base_url, producing this request:
+       https://woodshed.example/public/?profile=private/store#session
+     It never reaches /store, returns 404, and never calls qr_data_uri. A focused
+     diagnostic using https://woodshed.example as client origin returns 200 and
+     passes https://woodshed-woodchuck.onrender.com/ to the QR helper.
+     This is a pre-existing test configuration defect, unrelated to BOOK. Deferred;
+     neither SHOP code nor its tests were edited.
+
+  3. test_phase6b_shop.py::test_mobile_shop_keeps_both_vertical_columns_over_the_scene
+     Requires the retired equal-sized 2x5 grid. The deployed source already has
+     individually positioned percentage rectangles. This stale assertion predates
+     BOOK and does not affect its scoped CSS. Deferred; no SHOP change made.
+
+  One formerly passing BOOK test explicitly required metallic spiral decoration.
+  Its expected result was deliberately updated for the authorized redesign while
+  retaining control uniqueness/navigation checks. This is an acceptance change,
+  not a new functional regression or a suppressed failure.
+
+Final qualification results
+  Focused Python BOOK/practice/rating tests: 89 PASS / 0 FAIL / 0 SKIP.
+  One historical migration test deliberately deselected: no migration execution
+  is needed for this presentation change.
+  Dedicated PostgreSQL browser/API qualification: 3 PASS / 0 FAIL / 0 SKIP.
+  JavaScript verifier/duration/insights tests: 12 PASS / 0 FAIL / 0 SKIP.
+  Total in final acceptance groups: 104 PASS / 0 FAIL / 0 SKIP; 1 deselected.
+  The two documented SHOP failures remain outside the BOOK acceptance groups.
+
+  An early optional student-rating-privacy suite could not initialize 22 fixture
+  cases because its newsletter fixture was unconfigured. Inspection showed that
+  fixture runs historical migrations. It was excluded under the no-migrations
+  scope, rather than altering unrelated infrastructure. Focused personal-dashboard
+  authorization tests and the new PostgreSQL account-boundary case provide the
+  privacy/access coverage for this change. No Classroom security suite was rerun.
+
+Disposable PostgreSQL and behavioral evidence
+  PostgreSQL 18.6, dedicated local UTF8 test database, Unix socket only; TCP disabled.
+  Tests create isolated schemas from existing model metadata, seed only synthetic
+  accounts and practice records, then remove their own schemas. No Alembic upgrade,
+  Production data, Production connection or deployed configuration was used.
+  This is focused BOOK qualification, not a rerun of C36 migration qualification.
+  Schema column/index definitions are identical before and after each case.
+
+  Chrome and Firefox each exercised 1440x900, 390x844, 320x740, 430x932, 768x1024
+  and 844x390 layouts. No horizontal document overflow or browser JS errors.
+  Browser tests cover keyboard activation, mobile touch, all 23 practice choices,
+  10-to-13 history pagination, the rating link, SHED navigation and Pristine.
+  Pristine opens without starting the microphone or creating a record; a running
+  BOOK timer survives the navigation and return. 91 seconds still rounds to two
+  manual minutes; manual override to seven minutes submits exactly seven.
+
+  Each browser preserves every pre-existing practice row, saves one new chart,
+  retains pending verification and zero unapproved rewards, makes one verification
+  email call and one clipboard export call, and ignores an identical retry.
+  Credited duration changes from 4739 to 5159 seconds, exactly +420. Historical
+  rating, credits and rewards remain unchanged. Reload retains the saved chart.
+  Chrome verifies its native clipboard contents. Firefox captures the clipboard
+  boundary. Email transport is intercepted locally; no external message is sent.
+  The Whistler reaction and green saved/copied confirmation are exercised and
+  captured from the application.
+
+  API qualification verifies open/full access, no cross-account history exposure,
+  anonymous and cross-origin write denial, under-13 denial, exact 59-second Pristine
+  persistence and retry protection, all on disposable PostgreSQL.
+
+  Source audit confirms that all existing BOOK IDs and field names are unchanged.
+  Backend source, JavaScript, migrations, shared base/styles, Privacy, SHOP and SHED
+  have no diff against 44a59ea. Classroom gates and legal allowlists were not edited.
+
+Evidence and reproduction
+  Evidence directory: /home/geph/review-evidence/book-redesign-20261111/
+  baseline.log; baseline-qr-diagnostic.json; source-boundary.json;
+  focused-regression-final.log; javascript-regression.log;
+  book-qualification-fourth.log; fourth-browser/*/results.json; screenshots/.
+  The handoff manifest records the final local commit and artifact hashes.
+
+  Focused Python command (from woodshed-woodchuck, isolated test environment):
+    pytest -q -p no:cacheprovider tests/test_phase8_book.py
+      tests/test_book_board_polish.py tests/test_phase8_stabilization_book.py
+      tests/test_pristine_practice.py tests/test_practice_time_precision.py
+      tests/test_personal_development.py tests/test_practice_insights.py
+      -k 'not additive_migration'
+  JavaScript:
+    node --test tests/test_book_verifiers.js tests/test_practice_duration.js
+      tests/test_practice_insights.js
+  PostgreSQL/browser:
+    pytest -q -p no:cacheprovider tests/test_book_cleanup_browser.py
+  Set WW_BOOK_TEST_POSTGRES_URL explicitly to a dedicated book_*_test database on
+  a /tmp/book-* Unix socket. The fixture rejects remote/default database targets.
+  Browser prerequisites: local Chrome and Playwright Firefox.
+
+Visual acceptance and limitations
+  screenshots/desktop-book.png and mobile-book.png show the actual application.
+  Full mobile history, expanded details, timer/manual entry, confirmation, Whistler
+  and success screenshots are included. Screenshots were inspected for clipping,
+  overlap, legibility, controls and scrolling. Long history retains its existing
+  pagination; the 23-option details list is expanded only on request.
+  Browser mobile touch is emulated; physical iPhone/Safari was not qualified here.
+  Live SMTP delivery and real microphone capture were not attempted. Their code
+  and permissions are unchanged. Historical sub-minute entries keep their existing
+  minute-based row label while precise aggregate totals remain preserved.
+
+Recommendation and next action
+  GO for Leadership visual approval of this local BOOK candidate.
+  Production deployment remains NOT AUTHORIZED. No push or deployment performed.
+  Single next action: Leadership reviews the screenshots and approves or requests
+  adjustments to this exact local implementation.
+  A future release still requires separate Production authorization. The known
+  application rollback reference is 44a59ea2a353ca91d2dccbdac6f40e0f36852920; this
+  change requires no database downgrade or historical-data restore.
