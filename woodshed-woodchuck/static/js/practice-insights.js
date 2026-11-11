@@ -13,6 +13,16 @@
     content.replaceChildren();
   }
 
+  function metric(list, label, value) {
+    const group = document.createElement("div");
+    const term = document.createElement("dt");
+    const detail = document.createElement("dd");
+    term.textContent = label;
+    detail.textContent = value;
+    group.append(term, detail);
+    list.append(group);
+  }
+
   async function refresh() {
     clear();
     const requestGeneration = generation;
@@ -34,12 +44,22 @@
       locked.hidden = true;
       active.hidden = false;
       for (const week of data.weeks) {
-        const row = document.createElement("p");
-        row.textContent = `${week.week_start} – ${week.week_end}: ${window.WWPracticeDuration.seconds(week.seconds)} · ${week.days} practice days · ${window.WWPracticeDuration.seconds(week.verified_seconds)} verified · ${window.WWPracticeDuration.seconds(week.pristine_seconds)} Pristine`;
+        const row = document.createElement("section");
+        row.className = "practice-insights-week";
+        const heading = document.createElement("h3");
+        heading.textContent = `${week.week_start} – ${week.week_end}`;
+        const values = document.createElement("dl");
+        metric(values, "Reported practice", window.WWPracticeDuration.seconds(week.seconds));
+        metric(values, "Practice days", String(week.days));
+        metric(values, "Verified", window.WWPracticeDuration.seconds(week.verified_seconds));
+        metric(values, "Pristine", window.WWPracticeDuration.seconds(week.pristine_seconds));
+        row.append(heading, values);
         content.append(row);
       }
-      const summary = document.createElement("p");
-      summary.textContent = `Four-week total: ${window.WWPracticeDuration.seconds(data.total_seconds)} · Weekly average: ${window.WWPracticeDuration.seconds(data.average_weekly_seconds)}`;
+      const summary = document.createElement("dl");
+      summary.className = "practice-insights-summary";
+      metric(summary, "Four-week total", window.WWPracticeDuration.seconds(data.total_seconds));
+      metric(summary, "Weekly average", window.WWPracticeDuration.seconds(data.average_weekly_seconds));
       content.append(summary);
       status.textContent = "";
     } catch (_) {

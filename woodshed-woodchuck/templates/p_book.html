@@ -1,7 +1,8 @@
 {% extends "base.html" %}
+{% block app_version %}wl2-17c-classroom1-book-polish1{% endblock %}
 {% block dashboard_styles %}
 <link rel="stylesheet" href="/static/css/personal-development.css?v=1">
-<link rel="stylesheet" href="/static/css/practice-book.css?v=1">
+<link rel="stylesheet" href="/static/css/practice-book.css?v=2">
 {% endblock %}
 
 {% block content %}
@@ -19,7 +20,8 @@
         Start Timer
       </button>
 
-      <a class="btn btn-secondary p-book-pristine" href="/practice/pristine">Pristine P-Chart</a>
+      <a class="btn btn-secondary p-book-pristine" href="/practice/pristine" aria-describedby="p-book-pristine-description">Pristine P-Chart</a>
+      <p id="p-book-pristine-description">Practice with your microphone and create a P-Chart automatically.</p>
       <p id="practice-timer-display">00:00</p>
     </div>
 
@@ -77,7 +79,7 @@
 
     <label class="contest-opt-in-control p-book-option-card" for="p-book-include-team">
       <input id="p-book-include-team" name="include-team" type="checkbox" checked />
-      <span><strong>Include this chart in the Team Competition</strong><small>Uncheck to prevent being added to this contest.</small></span>
+      <span><strong>Include this chart in the Team Competition</strong><small>Uncheck to prevent being added to this contest. If checked with no team selected, Submit will ask you to choose a team or continue without Team Competition.</small></span>
     </label>
     <section id="p-book-team-selector" class="p-book-option-detail p-book-team-summary" aria-label="Current team">
       <p id="p-book-current-team" class="body-copy">Loading current team…</p>
@@ -214,6 +216,6 @@
 {% endblock %}
 
 {% block page_scripts %}
-<script src="/static/js/practice-insights.js?v=2"></script>
+<script src="/static/js/practice-insights.js?v=3"></script>
 <script src="/static/js/personal-development.js?v=1"></script>
 {% endblock %}

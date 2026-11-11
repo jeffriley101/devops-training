@@ -5,18 +5,25 @@ const vm = require('node:vm');
 const source = fs.readFileSync('static/js/practice-insights.js', 'utf8');
 const settle = () => new Promise(resolve => setImmediate(resolve));
 
+function element() {
+  let ownText = '';
+  return {children: [], className: '',
+    get textContent() { return ownText + this.children.map(child => child.textContent).join(' '); },
+    set textContent(value) { ownText = String(value); this.children = []; },
+    replaceChildren() { ownText = ''; this.children = []; },
+    append(...children) { this.children.push(...children); }};
+}
+
 function boot(enabled = true) {
   const elements = {};
   for (const key of ['locked', 'active', 'content', 'status']) {
-    elements[key] = {hidden: key === 'locked' ? enabled : !enabled,
-      children: [], textContent: '', replaceChildren() { this.children = []; },
-      append(child) { this.children.push(child); }};
+    elements[key] = Object.assign(element(), {hidden: key === 'locked' ? enabled : !enabled});
   }
   const events = {}, pending = [];
   const document = {hidden: false,
     getElementById: () => ({dataset: {enabled: String(enabled)},
       querySelector: selector => elements[selector.slice(15, -1)]}),
-    createElement: () => ({textContent: ''}),
+    createElement: element,
     addEventListener: (event, fn) => { events[event] = fn; }};
   const window = {addEventListener: (event, fn) => { events[event] = fn; }};
   vm.runInNewContext(fs.readFileSync("static/js/practice-duration.js", "utf8"), {window});
@@ -41,8 +48,11 @@ test('Full panel renders isolated aggregate via no-store request', async () => {
   ui.pending[0].resolve(response);
   await settle();
   assert.equal(ui.elements.content.children.length, 2);
-  assert.match(ui.elements.content.children[1].textContent, /Weekly average: 30s/);
+  assert.match(ui.elements.content.children[1].textContent, /Weekly average 30s/);
   assert.match(ui.elements.content.children[0].textContent, /1m 58s/);
+  const metrics = ui.elements.content.children[0].children[1].children;
+  assert.deepEqual(metrics.map(group => group.textContent), [
+    'Reported practice 1m 58s', 'Practice days 1', 'Verified 0m', 'Pristine 1m 58s']);
   assert.equal(ui.elements.locked.hidden, true);
 });
 

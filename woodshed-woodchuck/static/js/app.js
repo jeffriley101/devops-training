@@ -5188,7 +5188,12 @@
     function renderEntries(s) {
       if (!entriesEl) return;
 
-      const allEntries = Array.isArray(s.practiceLog) ? s.practiceLog : [];
+      // Match the server's practice-date / ID order without changing the saved log.
+      const allEntries = Array.isArray(s.practiceLog) ? [...s.practiceLog].sort((left, right) =>
+        String(right.dateKey || "").localeCompare(String(left.dateKey || "")) ||
+        (Number(right.serverChartId) || 0) - (Number(left.serverChartId) || 0) ||
+        String(right.loggedAt || "").localeCompare(String(left.loggedAt || ""))
+      ) : [];
       const entries = allEntries.slice(0, visibleEntryCount);
 
       if (!entries.length) {

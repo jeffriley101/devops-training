@@ -73,3 +73,21 @@ test('management separates relationships and submits both forms through invitati
   for (const form of [verifier, director]) await form.events.submit({currentTarget: form, preventDefault() {}});
   assert.deepEqual(posted.map(row => row.role), ['verifier', 'band_director']);
 });
+
+test('BOOK renders date and ID order without mutating cached records', () => {
+  const source = app.slice(app.indexOf('    function renderEntries(s)'),
+                           app.indexOf('    if (showMoreEl) showMoreEl.addEventListener'));
+  const input = {practiceLog: [
+    {dateKey: '2026-11-09', serverChartId: 8, loggedAt: '2026-11-11', note: 'older practice saved later'},
+    {dateKey: '2026-11-10', serverChartId: 3, loggedAt: '2026-11-10', note: 'same day lower ID'},
+    {dateKey: '2026-11-10', serverChartId: 4, loggedAt: '2026-11-10', note: 'same day higher ID'},
+  ]};
+  const before = JSON.stringify(input), entries = {};
+  vm.runInNewContext(source + '\nrenderEntries(input)', {
+    input, entriesEl: entries, visibleEntryCount: 10,
+    shareChoices: [], hasShares: false, historyControlsEl: null,
+    formatEntry: entry => entry.note,
+  });
+  assert.equal(entries.innerHTML, '<p>same day higher ID</p><p>same day lower ID</p><p>older practice saved later</p>');
+  assert.equal(JSON.stringify(input), before);
+});

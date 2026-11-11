@@ -1,4 +1,4 @@
-BOOK appearance redesign — Roger / OPS — November 11, 2026
+BOOK appearance redesign and final polish — Roger / OPS — November 11, 2026
 
 Implementation is prepared for Leadership visual approval. Production deployment
 and pushing the feature branch are not authorized.
@@ -7,6 +7,7 @@ Checkout verified before editing
   /home/geph/Training_scripts-shop-book-cleanup-20261111
   feature/shop-book-cleanup-20261111
   Clean starting commit: 44a59ea2a353ca91d2dccbdac6f40e0f36852920
+  Final-polish starting commit: cb15be9dc56ab5922d4cb4fec8cf265d0e1e5211 (clean).
   Production reference: c36choice001 (no migration in this change).
 
 Appearance and preserved workflow
@@ -21,6 +22,24 @@ Appearance and preserved workflow
   The new stylesheet respects hidden controls and removes inherited grid styling
   that constrained the practice-details summary. No shared stylesheet was edited.
 
+  Final polish restores yellow Submit styling using the original #fff2a5,
+  #d5a52c and #302309 palette, with a flat finish and unchanged submit behavior.
+  Normal text contrast is 13.50:1; the existing checkbox-driven gold state is
+  6.75:1. Hover is also verified above 4.5:1. Green success confirmation remains.
+  The existing Pristine label is followed by the exact approved explanation:
+    Practice with your microphone and create a P-Chart automatically.
+  This description is connected to the shortcut with aria-describedby.
+  Headphones and their open settings panel now occupy normal page flow below BOOK
+  rather than covering mobile fields. Weekly Insights use date headings and
+  labelled definition lists; API durations and entitlement handling are unchanged.
+  Team Competition guidance explains the existing no-team submission choice.
+
+  History verification found a pre-existing display mismatch: the server orders
+  practice_date DESC, id DESC, but the local cache was displayed by save time.
+  renderEntries now sorts a COPY by practice date and server ID. The underlying
+  cache, persisted rows, submission data, totals and export behavior are unchanged.
+  Tests verify same-day ties, pagination, reload and no input-array mutation.
+
   Baseline inspection found ZERO Pristine shortcuts on BOOK. One semantic link was
   added beside Start Timer to the existing /practice/pristine route, as authorized
   by the original cleanup scope. The existing SHOP link is unchanged. No duplicate
@@ -34,10 +53,17 @@ Appearance and preserved workflow
 
 Changed files
   templates/p_book.html
-  static/css/practice-book.css (new)
-  tests/test_phase8_stabilization_book.py
-  tests/test_book_cleanup_browser.py (new)
+  templates/base.html (BOOK-specific app-version override; other pages retain
+    their existing rendered script URL)
+  static/css/practice-book.css
+  static/js/app.js (BOOK history presentation only)
+  static/js/practice-insights.js (labelled aggregate presentation only)
+  tests/test_book_cleanup_browser.py
+  tests/test_book_verifiers.js
+  tests/test_practice_insights.js
   docs/book-appearance-redesign.txt (this report)
+  The initial redesign's test_phase8_stabilization_book.py correction remains
+  committed in cb15be9; it required no additional edit for final polish.
 
 Three pre-existing failures, investigated before implementation
   Reproduction at untouched 44a59ea: 46 PASS / 3 FAIL / 0 SKIP, equivalent to
@@ -74,8 +100,8 @@ Final qualification results
   One historical migration test deliberately deselected: no migration execution
   is needed for this presentation change.
   Dedicated PostgreSQL browser/API qualification: 3 PASS / 0 FAIL / 0 SKIP.
-  JavaScript verifier/duration/insights tests: 12 PASS / 0 FAIL / 0 SKIP.
-  Total in final acceptance groups: 104 PASS / 0 FAIL / 0 SKIP; 1 deselected.
+  JavaScript verifier/duration/insights tests: 13 PASS / 0 FAIL / 0 SKIP.
+  Total in final acceptance groups: 105 PASS / 0 FAIL / 0 SKIP; 1 deselected.
   The two documented SHOP failures remain outside the BOOK acceptance groups.
 
   An early optional student-rating-privacy suite could not initialize 22 fixture
@@ -96,7 +122,11 @@ Disposable PostgreSQL and behavioral evidence
   Chrome and Firefox each exercised 1440x900, 390x844, 320x740, 430x932, 768x1024
   and 844x390 layouts. No horizontal document overflow or browser JS errors.
   Browser tests cover keyboard activation, mobile touch, all 23 practice choices,
-  10-to-13 history pagination, the rating link, SHED navigation and Pristine.
+  10-to-13 history pagination and date order, the rating link, SHED navigation
+  and Pristine. All widths verify readable button contrast and that headphones
+  are below the BOOK rectangle. Desktop/mobile tests also open the audio panel
+  and confirm it cannot cover BOOK. Revised weekly Insights match API week dates
+  and day counts and preserve the tested exact-duration formatter.
   Pristine opens without starting the microphone or creating a record; a running
   BOOK timer survives the navigation and return. 91 seconds still rounds to two
   manual minutes; manual override to seven minutes submits exactly seven.
@@ -115,15 +145,18 @@ Disposable PostgreSQL and behavioral evidence
   anonymous and cross-origin write denial, under-13 denial, exact 59-second Pristine
   persistence and retry protection, all on disposable PostgreSQL.
 
-  Source audit confirms that all existing BOOK IDs and field names are unchanged.
-  Backend source, JavaScript, migrations, shared base/styles, Privacy, SHOP and SHED
+  Source audit confirms that all existing BOOK IDs and field names are retained.
+  Backend source, migrations, shared styles, Privacy, SHOP and SHED templates
   have no diff against 44a59ea. Classroom gates and legal allowlists were not edited.
+  The only app.js change is BOOK's copied display-array sort; the shared base
+  provides a version block overridden solely by BOOK for cache invalidation.
 
 Evidence and reproduction
-  Evidence directory: /home/geph/review-evidence/book-redesign-20261111/
-  baseline.log; baseline-qr-diagnostic.json; source-boundary.json;
-  focused-regression-final.log; javascript-regression.log;
-  book-qualification-fourth.log; fourth-browser/*/results.json; screenshots/.
+  Final-polish evidence: /home/geph/review-evidence/book-final-polish-20261111/
+  python.log; javascript.log; postgres-browser-final.log;
+  final-browser/*/results.json; screenshots/; handoff-manifest.json; SHA256SUMS.
+  Original baseline evidence remains under book-redesign-20261111/:
+  baseline.log; baseline-qr-diagnostic.json; source-boundary.json.
   The handoff manifest records the final local commit and artifact hashes.
 
   Focused Python command (from woodshed-woodchuck, isolated test environment):
@@ -143,6 +176,8 @@ Evidence and reproduction
 
 Visual acceptance and limitations
   screenshots/desktop-book.png and mobile-book.png show the actual application.
+  Yellow Submit buttons, Pristine explanation, weekly Insights, date-ordered
+  history and the in-flow audio settings are captured on desktop and mobile.
   Full mobile history, expanded details, timer/manual entry, confirmation, Whistler
   and success screenshots are included. Screenshots were inspected for clipping,
   overlap, legibility, controls and scrolling. Long history retains its existing

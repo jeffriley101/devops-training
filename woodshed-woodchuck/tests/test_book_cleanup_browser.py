@@ -30,6 +30,15 @@ from app.security import hash_pin
 from test_age_screening import age_db, login
 
 
+def contrast(colors):
+    def luminance(rgb):
+        channels = [int(value) / 255 for value in rgb.removeprefix('rgb(').removesuffix(')').split(',')]
+        linear = [value / 12.92 if value <= .04045 else ((value + .055) / 1.055) ** 2.4 for value in channels]
+        return sum(value * weight for value, weight in zip(linear, (.2126, .7152, .0722)))
+    values = sorted(luminance(value) for value in colors)
+    return (values[1] + .05) / (values[0] + .05)
+
+
 def chart_rows(factory):
     with factory() as session:
         return {r.id: dict(r._mapping) for r in session.execute(
@@ -158,6 +167,8 @@ def test_book_layout_navigation_timer_submission_and_history(book_site, tmp_path
         assert response.status == 200
         totals = context.request.get('/practice-charts/totals').json()
         rating = context.request.get('/personal-development/rating').json()
+        history = context.request.get('/practice-charts').json()['charts']
+        insights = context.request.get('/practice-charts/insights').json()
         assert totals['career_seconds'] == sum(range(1, 13)) * 60 + 59
         page = context.new_page()
         page.set_default_timeout(15000)
@@ -171,13 +182,29 @@ def test_book_layout_navigation_timer_submission_and_history(book_site, tmp_path
             shortcut = page.get_by_role('link', name='Pristine P-Chart', exact=True)
             expect(shortcut).to_have_count(1)
             expect(shortcut).to_have_attribute('href', '/practice/pristine')
+            expect(page.locator('#p-book-pristine-description')).to_have_text(
+                'Practice with your microphone and create a P-Chart automatically.')
+            expect(shortcut).to_have_attribute('aria-describedby', 'p-book-pristine-description')
+            expect(page.locator('.practice-insights-week')).to_have_count(4)
+            for index, week in enumerate(insights['weeks']):
+                row = page.locator('.practice-insights-week').nth(index)
+                expect(row.locator('h3')).to_have_text(f"{week['week_start']} – {week['week_end']}")
+                expect(row.locator('dt')).to_have_text(['Reported practice', 'Practice days', 'Verified', 'Pristine'])
+                expect(row.locator('dd').nth(1)).to_have_text(str(week['days']))
+            expect(page.locator('#p-book-current-team')).to_contain_text('No team selected')
+            expect(page.locator('label[for="p-book-include-team"] small')).to_contain_text(
+                'If checked with no team selected, Submit will ask you to choose a team or continue without Team Competition.')
             assert page.locator('link[href*="practice-book.css"]').count() == 1
+            assert page.locator('script[src="/static/js/app.js?v=wl2-17c-classroom1-book-polish1"]').count() == 1
             dimensions = page.evaluate('''() => {
                 const rect = s => document.querySelector(s).getBoundingClientRect().toJSON();
                 const timer = rect('.practice-timer-metal'), minutes = rect('#p-book-minutes');
                 return {width: innerWidth, scroll: document.documentElement.scrollWidth,
                     timer, minutes, shortcut: rect('.p-book-pristine'),
                     submit: rect('#submit-p-chart-btn'),
+                    description: rect('#p-book-pristine-description'),
+                    descriptionFont: getComputedStyle(document.querySelector('#p-book-pristine-description')).fontSize,
+                    headphones: rect('.sound-effects-controls'), book: rect('.p-book-page'),
                     inputFont: getComputedStyle(document.querySelector('#p-book-minutes')).fontSize,
                     timerBackground: getComputedStyle(document.querySelector('#practice-timer-toggle-btn')).backgroundImage,
                     background: getComputedStyle(document.querySelector('.p-book-page')).backgroundImage};
@@ -189,17 +216,46 @@ def test_book_layout_navigation_timer_submission_and_history(book_site, tmp_path
             assert dimensions['background'] == 'none'
             assert dimensions['timerBackground'] == 'none'
             assert float(dimensions['inputFont'].removesuffix('px')) >= 16
+            assert float(dimensions['descriptionFont'].removesuffix('px')) >= 14
+            assert dimensions['description']['top'] >= dimensions['shortcut']['bottom']
+            assert dimensions['headphones']['top'] >= dimensions['book']['bottom']
             evidence['layouts'].append(dimensions)
+            # The yellow palette must stay readable in both checkbox-driven states.
+            button = page.locator('#submit-p-chart-btn')
+            button_colors = []
+            for included in (True, False):
+                page.locator('#p-book-include-team').set_checked(included)
+                colors = button.evaluate('(e) => [getComputedStyle(e).color, getComputedStyle(e).backgroundColor]')
+                assert contrast(colors) >= 4.5
+                button_colors.append({'included': included, 'colors': colors, 'contrast': contrast(colors)})
+            page.locator('#p-book-include-team').check()
+            button.hover()
+            colors = button.evaluate('(e) => [getComputedStyle(e).color, getComputedStyle(e).backgroundColor]')
+            assert contrast(colors) >= 4.5
+            evidence['layouts'][-1]['submit_states'] = button_colors
+            page.mouse.move(0, 0)
             page.screenshot(path=str(tmp_path / f'book-{width}x{height}.png'), full_page=True)
             if width not in (1440, 390):
                 continue
-            page.screenshot(path=str(tmp_path / f'book-viewport-{width}.png'))
             touch = width == 390
+            button.scroll_into_view_if_needed()
+            page.screenshot(path=str(tmp_path / f'actions-{width}.png'))
+            button.screenshot(path=str(tmp_path / f'submit-{width}.png'))
+            page.locator('.practice-timer-metal').scroll_into_view_if_needed()
+            page.screenshot(path=str(tmp_path / f'book-viewport-{width}.png'))
+            activate(page.locator('#sound-effects-button'), touch)
+            expect(page.locator('#sound-effects-panel')).to_be_visible()
+            assert page.locator('#sound-effects-panel').evaluate(
+                '(e) => e.getBoundingClientRect().top >= document.querySelector(".p-book-page").getBoundingClientRect().bottom')
+            page.screenshot(path=str(tmp_path / f'audio-{width}.png'))
+            activate(page.locator('#sound-effects-button'), touch)
+            expect(page.locator('#sound-effects-panel')).to_be_hidden()
             activate(shortcut, touch)
             page.wait_for_url(origin + '/practice/pristine')
             expect(page.get_by_role('heading', name='Pristine Practice', exact=True)).to_be_visible()
             expect(page.locator('[data-pristine-microphone]')).to_have_text('Microphone not started')
             assert page.locator('link[href*="practice-book.css"]').count() == 0
+            assert page.locator('script[src="/static/js/app.js?v=wl2-17c-classroom1"]').count() == 1
             page.go_back(); ready(page)
             activate(page.locator('.pdd-book-rating'), touch)
             page.wait_for_url(origin + '/personal-development')
@@ -207,6 +263,9 @@ def test_book_layout_navigation_timer_submission_and_history(book_site, tmp_path
             page.go_back(); ready(page)
             activate(page.locator('#p-book-show-more'), touch)
             expect(page.locator('#p-book-entries > p')).to_have_count(13)
+            for rendered, chart in zip(page.locator('#p-book-entries > p').all_text_contents(), history):
+                assert rendered.startswith(chart['practice_date'] + ' — ')
+                assert f" — {chart['note']}" in rendered
             activate(page.locator('#p-book-show-less'), touch)
             expect(page.locator('#p-book-entries > p')).to_have_count(10)
             activate(page.locator('.p-book-work-field > summary'), touch)
@@ -285,6 +344,7 @@ def test_book_layout_navigation_timer_submission_and_history(book_site, tmp_path
         activate(page.get_by_role('link', name='Back to SHED'), touch)
         page.wait_for_url(origin + '/home')
         evidence.update({'prior_records_unchanged': True, 'new_charts': 1,
+                         'history_order': 'practice_date descending, server ID descending on equal dates',
                          'email_calls': len(emails), 'copy_calls': len(copied),
                          'career_seconds_before': totals['career_seconds'],
                          'career_seconds_after': expected_total,
