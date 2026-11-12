@@ -153,7 +153,8 @@ def test_compact_controls_close_navigation_and_success_popup(book_site, tmp_path
             activate(page.locator('#p-book-confirm-submit'), touch)
         assert saved.value.json()['created'] is True
         popup = page.locator('.ww-character-reaction'); expect(popup).to_be_visible()
-        expect(popup.locator('img')).to_have_attribute('src', '/static/img/characters/whistler.png')
+        expect(popup.locator('img')).to_have_attribute('src',
+            f'/static/img/characters/coach_whistler_book_play_once.gif?play={saved.value.json()["chart"]["id"]}')
         page.wait_for_function('document.querySelector(".ww-character-reaction img").naturalWidth > 0')
         expect(page.locator('#sound-effects-enabled')).not_to_be_checked()
         expect(page.locator('#sound-effects-volume')).to_have_value('20')

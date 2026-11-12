@@ -334,6 +334,12 @@ body:has(.p-book-page) .ww-character-reaction-dismiss:focus-visible {
   background: #fffef9; font-size: .9rem; line-height: 1.5;
 }
 /* One close treatment, scoped to BOOK and its existing event popup. */
+body:has(.p-book-page) .ww-character-reaction {
+  background: #21180f;
+  opacity: 1;
+  transform: none;
+  transition: none;
+}
 .p-book-page .p-book-close,
 body:has(.p-book-page) .ww-character-reaction-dismiss {
   box-sizing: border-box; display: grid; place-items: center;

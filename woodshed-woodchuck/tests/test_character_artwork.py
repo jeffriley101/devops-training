@@ -33,7 +33,7 @@ def test_whistler_and_john_are_reactions_not_static_page_art() -> None:
     assert '/static/img/characters/john.png' not in BOARD
     assert 'bonus-challenge-john-art' not in bonus
 
-    assert 'imageUrl: "/static/img/characters/whistler.png"' in APP
+    assert 'imageUrl: `/static/img/characters/coach_whistler_book_play_once.gif?play=${serverChart.id}`' in APP
     assert 'characterName: "Coach Whistler"' in APP
     assert 'message: "Whee-oo-wheet! ... Good job!"' in APP
     assert 'imageUrl: "/static/img/characters/john.png"' in APP

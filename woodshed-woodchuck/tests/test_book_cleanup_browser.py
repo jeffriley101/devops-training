@@ -197,7 +197,7 @@ def test_book_layout_navigation_timer_submission_and_history(book_site, tmp_path
             expect(page.locator('label[for="p-book-include-team"] strong')).to_have_text('Include in Team Standings')
             expect(page.locator('label[for="p-book-include-contests"] strong')).to_have_text('Include in Leaderboards')
             assert page.locator('link[href*="practice-book.css"]').count() == 1
-            assert page.locator('script[src="/static/js/app.js?v=wl2-17c-classroom1-book-refinement1"]').count() == 1
+            assert page.locator('script[src="/static/js/app.js?v=wl2-17c-classroom1-book-whistler1"]').count() == 1
             dimensions = page.evaluate('''() => {
                 const rect = s => document.querySelector(s).getBoundingClientRect().toJSON();
                 const timer = rect('.practice-timer-metal'), minutes = rect('#p-book-minutes');

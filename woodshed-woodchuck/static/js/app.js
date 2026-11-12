@@ -5624,7 +5624,9 @@
         if (createdPayload.created === true) {
           showCharacterReaction({
             characterName: "Coach Whistler",
-            imageUrl: "/static/img/characters/whistler.png",
+            // The supplied GIF has no loop extension. A distinct URL for each
+            // newly saved chart restarts native playback even with a warm cache.
+            imageUrl: `/static/img/characters/coach_whistler_book_play_once.gif?play=${serverChart.id}`,
             message: "Whee-oo-wheet! ... Good job!",
           });
         }

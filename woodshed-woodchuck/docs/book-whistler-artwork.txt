@@ -1,0 +1,119 @@
+BOOK Whistler artwork — local Leadership review
+November 12, 2026
+
+Branch and scope
+  Worktree: /home/geph/Training_scripts-shop-book-cleanup-20261111
+  Branch: feature/shop-book-cleanup-20261111
+  Verified starting commit: f1788c2841384fafc72373568164a03124b22dd9
+  Starting working tree: clean. No branch or worktree switch.
+  Leadership explicitly approved Phoebe's coach_whistler_book_play_once.gif in
+  Downloads as BOOK's submission-success replacement. This resolves the artwork
+  decision left open in the November 11 book-refinement report.
+  Local implementation/commit only. No GitHub push or Production deployment.
+
+Exact supplied asset
+  Source: /home/geph/Downloads/coach_whistler_book_play_once.gif
+  Runtime copy: static/img/characters/coach_whistler_book_play_once.gif
+  Size: 938,854 bytes; 252x380 pixels; 21 frames; 5,630ms total duration.
+  SHA-256 (both files):
+    203909f47e7ec810670ed8f4acab898088bc16413d81c78e1a397ba5d63005b9
+  The supplied GIF contains no animation-loop extension and therefore plays once.
+  It is copied byte-for-byte, without regeneration, re-encoding, resizing or editing.
+  The original static/img/characters/whistler.png is retained unchanged for rollback.
+
+Integration
+  Only the existing BOOK success reaction's image URL changes in app.js. It still
+  executes exclusively when the persisted response has created === true. The
+  confirmation message remains "Whee-oo-wheet! ... Good job!" and the existing
+  personalized popup text is unchanged.
+
+  The URL includes ?play=<new chart ID>. Each newly saved chart therefore has a
+  distinct image URL, restarting the browser's native GIF playback with a warm
+  image cache. The query does not request another submission or affect the GIF
+  bytes. Failed saves and created=false idempotent responses never open a reaction.
+  At completion, the GIF holds its final frame and the popup waits for dismissal.
+
+  BOOK-only CSS supplies an opaque #21180f background and removes the popup's
+  initial fade/scale, ensuring underlying form text cannot show through. Existing
+  speech styling, responsive image containment and the 44px top-right X remain.
+  The existing X, card/background and Escape dismissal paths are preserved.
+  BOOK's app/CSS version strings are advanced for cache refresh.
+
+  A source-boundary comparison proves that the remainder of app.js is byte-identical
+  to the starting commit, including submission, verification, confirmation, timer,
+  draft, rewards and clipboard handling. Shared character-reaction.js and audio.js
+  are unchanged; sound/mute/volume handling is preserved. No backend, migration,
+  permissions, Classroom, SHOP, Privacy, SHED inventory or INC005 changes.
+
+Qualification
+  Results: 61 PASS / 0 FAIL / 0 SKIP, with 2 intentional deselections.
+    Focused Python: 44 PASS; 2 deselected (historical migration and SHOP artwork).
+    Node: 7 PASS.
+    Exact-asset/native-animation qualification: 5 PASS (110.66 seconds).
+    Existing PostgreSQL/browser regressions: 5 PASS (94.07 seconds).
+  JavaScript syntax, source-boundary and git diff whitespace checks pass.
+  Exact commands are recorded in handoff-manifest.json and test logs.
+  Focused Python and Node suites cover BOOK form/confirmation behavior, saved
+  practice time, verifier handling, reaction lifecycle and existing audio calls.
+  The exact GIF hash, format, dimensions and absence of loop extensions are tested.
+
+  Native Chromium and Firefox cases each run at 1440px desktop and 390px mobile
+  widths. Each performs two genuine saved submissions on the real local app with
+  synthetic accounts. No mock animation, fake image or fake animation clock is used.
+  Actual rendered image captures differ between the start/moving frames, match
+  between the completed/held frames, and restart for the second successful save.
+  Both image URLs return the approved exact-byte GIF with image/gif content type.
+
+  Each case verifies:
+    - unchanged successful-submission and pending-verification text/behavior;
+    - one HTTP save for rapid repeated confirmation clicks;
+    - opaque readable popup, contained art and accessible 44px top-right X;
+    - completion holds the final frame until dismissal;
+    - keyboard X/Escape and touch X/background dismissal;
+    - one whistle call per newly saved chart with existing preferences respected:
+      first muted, then enabled, retaining 20% volume;
+    - an idempotent UI replay causes no popup, whistle, email or additional record;
+    - exactly two new charts, two local email-service calls, unchanged old records,
+      and unchanged credited rewards/balance after authentication.
+
+  Existing Chromium/Firefox BOOK regression scenarios additionally cover invalid
+  and failed saves, no-team choices, history, date/drafts, timer/Pristine navigation,
+  statistic panels, Email/Copy, ratings, account boundaries and reward safeguards.
+  They exercise 320/390/430px mobile, 768px tablet, 844px landscape and 1440px desktop
+  BOOK layouts. Test schemas are isolated in a disposable PostgreSQL 18.6 database
+  using a Unix socket under /tmp/book-interaction-pg-k93l28uz; TCP is disabled.
+  The fixture checks schema shape before/after. No migration runner is used.
+  The historical migration test and unrelated SHOP artwork assertion are excluded;
+  no unrelated Classroom security suite is run.
+
+Files changed
+  static/img/characters/coach_whistler_book_play_once.gif (exact approved asset)
+  static/js/app.js
+  static/css/practice-book.css
+  templates/p_book.html
+  tests/test_book_whistler_browser.py
+  tests/test_book_cleanup_browser.py (BOOK cache version)
+  tests/test_book_refinement_browser.py (approved media URL expectation)
+  tests/test_character_artwork.py (approved media URL expectation)
+  docs/book-whistler-artwork.txt
+
+Evidence
+  /home/geph/review-evidence/book-whistler-20261112/
+    asset-provenance.json, source-boundary.json
+    python.log, javascript.log, animation-browser.log, regression-browser.log
+    animation-browser/*/whistler-results.json, regression-browser/*/*results.json
+    screenshots/index.html, handoff-manifest.json, SHA256SUMS
+  Screenshot gallery includes actual desktop/mobile popups during motion and at
+  completion, second-success playback, existing BOOK/confirmation screens, native
+  frame samples and a separate exact copy of the approved GIF.
+
+Limits and recommendation
+  Browser mobile testing uses touch emulation, not a physical iPhone/Safari device.
+  Audio call/preferences are verified; physical speaker output and live SMTP are
+  not qualified. Verification messages are captured locally without external mail.
+  The supplied 252x380 artwork uses existing responsive image containment; it is
+  not sharpened, resampled or replaced with another image.
+  Recommend Leadership review of the exact local commit and screenshots.
+  The prior commit above is the rollback reference; the original PNG remains
+  available. No database rollback is needed. Production deployment remains
+  unauthorized.
