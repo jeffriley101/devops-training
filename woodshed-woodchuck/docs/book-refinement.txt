@@ -1,0 +1,148 @@
+BOOK refinement — local Leadership review
+November 11, 2026
+
+Verified starting point
+  Worktree: /home/geph/Training_scripts-shop-book-cleanup-20261111
+  Branch: feature/shop-book-cleanup-20261111
+  Starting HEAD: 9c21806317e1c0cd99b80a33823fba18a661fd29
+  Starting status: clean. No branch/worktree switch was performed.
+  The final exact local SHA and clean status are in handoff-manifest.json in the
+  evidence directory below. No push, deployment or Production access is authorized
+  or performed. INC001 and Classroom worktrees were not modified.
+
+Changes
+  Stopwatch and its elapsed clock occupy the first compact row. The existing
+  Pristine link fills the second row on mobile and desktop. The visible "or" is
+  removed. Separate information controls are now 28px, with temporary hover/focus
+  and touch help that does not move content or cover BOOK's close control.
+  BOOK does not request microphone access or start Pristine recording. The existing
+  start/stop/resume, pause-on-switch confirmation and account-bound cross-tab
+  coordination are unchanged.
+
+  BOOK's obsolete Back to SHED row is removed. A 44px top-right X has the accessible
+  name "Close BOOK and return to SHED" and retains href=/home. It saves the current
+  account-bound draft before normal navigation, including a previously restored
+  draft with no intervening input event. Storage failure prevents navigation and
+  retains the existing error. The running Stopwatch retains its original timestamp
+  across SHED navigation, as before; this close action does not stop it, fill minutes,
+  save practice, or change duration calculations.
+
+  The requested statistics explanation paragraph is removed. The four card totals,
+  datasets, history inclusion, authorization and chart calculations are unchanged.
+  All four statistic visuals share the same dialog and 44px top-right X. The existing
+  dialog close handler retains Escape, return focus to the originating card and
+  unchanged form/timer/scroll. No statistic JavaScript was changed.
+
+  The same X appearance applies to the existing Whistler event popup through
+  BOOK-only CSS. Its visible dismiss control, popup click/Escape dismissal, sound
+  call, mute/volume settings, success-only trigger and persistent lifetime are
+  unchanged. Submission/selection dialogs were not refactored.
+
+  The accepted ivory/green appearance, yellow Submit button, notes/date/checklists,
+  verifier workflow, completed-week Insights, saved-history ordering, Email/Copy,
+  dashboard/rating access, authorization and reward behavior remain intact.
+
+Whistler identity and outstanding artwork decision
+  The reviewed evidence file:
+    /home/geph/review-evidence/book-interaction-20261111/screenshots/whistler.png
+  is a 390x900 application SCREENSHOT, not an artwork asset.
+
+  The runtime artwork:
+    static/img/characters/whistler.png
+  is a separate 1122x1402 PNG, 2,457,628 bytes, SHA-256:
+    6bed573485b1d0e03312d326d2458eb1c986cc98e1196cfe6d2ce7aaf1eee771
+  Its current branch history traces to 122af7a6e7f871dc53fff4e0a47241968ab89f03
+  (September 1, 2026, "Add instrument and character artwork"). This identifies the
+  currently installed file; it does not establish approval for a new replacement.
+
+  Runtime path: wirePBook's completed /practice-charts response checks
+  createdPayload.created === true, then calls showCharacterReaction with
+  /static/img/characters/whistler.png. static/js/character-reaction.js creates the
+  image, speech and dismiss button and calls WoodshedAudio.play("characterWhistle").
+  Failure and idempotent created=false responses do not show Whistler.
+
+  Search leads whistler_pixel_background.png and
+  Woodshed_Cameos_Pixel_Background_Staging_v1.zip were not found among accessible
+  local files, the repository's artwork handoff/history, or connected Pages/Gmail.
+  A directory-entry inspection of 243 local ZIP files found only a packaged copy
+  of the current runtime image. The core-character reference sheet is a reference
+  sheet, not evidence of an approved replacement popup. No image was generated,
+  extracted from a screenshot, substituted, or changed in the repository.
+  Leadership's newer candidate and its approval remain unresolved. The handoff
+  location/asset is needed to select a replacement; the current image stays in use.
+
+Qualification
+  Final results: 117 distinct checks PASS / 0 FAIL / 0 SKIP.
+    Focused Python: 94 PASS / 0 FAIL / 0 SKIP / 2 deliberately deselected.
+    Node: 16 PASS / 0 FAIL / 0 SKIP.
+    PostgreSQL/browser: 7 PASS / 0 FAIL / 0 SKIP (159.54 seconds).
+  Two additional Chromium/Firefox refinement scenario rechecks passed after the
+  test economy baseline was tightened to immediately after login (59.06 seconds).
+  Those repeat checks are reported separately, not added to the distinct total.
+  JavaScript syntax, source-boundary and git diff whitespace checks also passed.
+  Exact commands, files and hashes are in handoff-manifest.json and test logs.
+  Tests use synthetic accounts, local HTTP and an explicitly selected PostgreSQL
+  18.6 Unix-socket database under /tmp/book-interaction-pg-k93l28uz. TCP is disabled.
+  Existing model metadata initializes disposable test schemas; no migration runner
+  is used. Schema columns/indexes are compared before and after the browser cases.
+
+  Focused Python and Node suites cover BOOK rendering, submissions, time precision,
+  Pristine, ratings, Insights, verifier selection, chart aggregation and reactions.
+  Browser qualification uses Chromium and Firefox, keyboard and touch emulation,
+  320/390/430px mobile, 768px tablet, 844px landscape and 1440px desktop layouts.
+  New acceptance checks cover the stacked geometry, non-shifting help, close-target
+  dimensions, BOOK X round trips, all four chart X controls and Escape, unchanged
+  form/timer/totals/scroll, failed-save popup exclusion, successful-save popup,
+  idempotent replay exclusion, mute/volume persistence and popup dismissal.
+  Existing matrix cases cover method switching, cross-tab locks, full-history
+  chart accuracy beyond 100 cached rows, checkbox choices, verifier return,
+  no-team selection flow, clipboard/email export and account boundaries.
+
+  Prior saved rows remain byte-for-value unchanged; each browser scenario creates
+  exactly its one explicitly submitted chart. Pending verification produces no
+  extra credits/rewards. Replay sends no duplicate email or popup. No schema changes.
+  The historical migration test and unrelated SHOP artwork assertion are deliberately
+  deselected. Previously documented SHOP baseline failures remain outside scope;
+  no SHOP or Classroom security suite is repeated.
+
+  Initial development browser failures were test assumptions: focus-visible after
+  touch without entering keyboard mode, fractional Firefox pixel coordinates, and
+  the existing checked defaults after a successful submission. The tests now use
+  actual keyboard modality, pixel tolerance and explicit choices for the replay.
+  An economy assertion also initially compared authenticated actions to the seed
+  balance before sign-in. The existing login-streak grant adds one dandelion at
+  sign-in; the corrected baseline is taken immediately after login and must remain
+  unchanged across BOOK X navigation, failure, save and replay.
+  Visual inspection also found tooltip overlap with BOOK's X; its positioning was
+  corrected within BOOK CSS and is covered by geometry assertions.
+
+Evidence and screenshots
+  /home/geph/review-evidence/book-refinement-20261111/
+    python.log, javascript.log, final-browser.log, final-browser/*/*results.json
+    close-browser.log, close-browser/*/refinement-results.json
+    source-boundary.json, whistler-provenance.json, archive-search.json
+    handoff-manifest.json, SHA256SUMS, screenshots/index.html
+  Actual application captures show desktop/mobile stacked controls and BOOK X,
+  statistic X panels, cleaned statistics and Whistler over BOOK. The separate
+  whistler-runtime-artwork.png is an exact copy of the runtime asset, not a screenshot.
+
+Changed files
+  templates/p_book.html
+  static/css/practice-book.css
+  static/js/app.js (BOOK close/draft listener only)
+  tests/test_book_cleanup_browser.py
+  tests/test_book_interaction_browser.py
+  tests/test_book_refinement_browser.py
+  docs/book-refinement.txt
+
+Limits and recommendation
+  Touch is browser emulation, not a physical iPhone/Safari qualification. Existing
+  Pristine capture tests feed synthetic samples; real microphone permission/hardware
+  and live SMTP delivery are not tested. The existing secure-context Web Locks
+  requirement and account-bound draft lifetime remain unchanged.
+  No backend, migrations, shared styles, audio, character artwork or shared reaction
+  code changed. No Production, Classroom gates/allowlists, SHOP V3, Privacy, SHED
+  inventory or INC005 work was performed.
+  Recommend Leadership visual review of this local commit and evidence. Deployment
+  remains unauthorized. Rollback for this revision is the exact starting commit
+  above, or a reviewed revert of this revision; no database rollback is required.

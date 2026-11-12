@@ -1,29 +1,28 @@
 {% extends "base.html" %}
-{% block app_version %}wl2-17c-classroom1-book-interaction1{% endblock %}
+{% block app_version %}wl2-17c-classroom1-book-refinement1{% endblock %}
 {% block practice_method_scripts %}<script src="/static/js/practice-methods.js?v=1"></script>{% endblock %}
 {% block dashboard_styles %}
 <link rel="stylesheet" href="/static/css/personal-development.css?v=1">
-<link rel="stylesheet" href="/static/css/practice-book.css?v=3">
+<link rel="stylesheet" href="/static/css/practice-book.css?v=4">
 {% endblock %}
 
 {% block content %}
-<a class="room-return p-book-return" href="/home">← Back to SHED</a>
 <section class="card p-book-page">
+  <a class="p-book-close p-book-return" href="/home" aria-label="Close BOOK and return to SHED"><span aria-hidden="true">×</span></a>
   <div class="p-book-notebook">
   <div class="p-book-page-sheet p-book-page-left">
   <article class="mentor-card practice-timer-metal" aria-label="Practice timer">
     <div class="practice-timer-row p-book-methods">
       <div class="p-book-method" data-method-help>
-        <div class="p-book-method-control">
+        <div class="p-book-method-control p-book-stopwatch">
           <button id="practice-timer-toggle-btn" class="btn btn-secondary" type="button" aria-describedby="stopwatch-help">Stopwatch</button>
+          <p id="practice-timer-display" aria-label="Stopwatch elapsed time">00:00</p>
           <button class="p-book-info" type="button" aria-label="About Stopwatch" aria-controls="stopwatch-help" aria-expanded="false">i</button>
         </div>
-        <p id="practice-timer-display" aria-label="Stopwatch elapsed time">00:00</p>
         <p id="stopwatch-help" class="p-book-help" role="tooltip" hidden>Start and stop your practice timer.</p>
       </div>
-      <span class="p-book-method-or">or</span>
       <div class="p-book-method" data-method-help>
-        <div class="p-book-method-control">
+        <div class="p-book-method-control p-book-pristine-control">
           <a class="btn btn-secondary p-book-pristine" href="/practice/pristine" aria-describedby="pristine-help">Pristine P-Chart</a>
           <button class="p-book-info" type="button" aria-label="About Pristine P-Chart" aria-controls="pristine-help" aria-expanded="false">i</button>
         </div>
@@ -182,11 +181,10 @@
     </button>
   </div>
   <dialog id="p-book-stat-dialog" aria-labelledby="p-book-stat-title">
-    <div class="p-book-stat-head"><h2 id="p-book-stat-title"></h2><button type="button" class="btn" data-book-stat-close>Close chart</button></div>
+    <div class="p-book-stat-head"><h2 id="p-book-stat-title"></h2><button type="button" class="p-book-close" data-book-stat-close aria-label="Close chart"><span aria-hidden="true">×</span></button></div>
     <p data-book-stat-status role="status"></p>
     <div data-book-stat-content></div>
   </dialog>
-  <p class="muted">Totals use saved charts. Pristine and ordinary charts may credit the same practice. Browser-local legacy entries are shown in history but excluded from these totals.</p>
 
   <section class="mentor-card mt-md" id="practice-insights" aria-labelledby="practice-insights-title" data-enabled="{{ 'true' if feature_access.practice_insights else 'false' }}">
     <h2 id="practice-insights-title">Practice Insights</h2>

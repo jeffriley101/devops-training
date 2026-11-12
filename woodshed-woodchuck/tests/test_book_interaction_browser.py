@@ -105,6 +105,10 @@ def test_methods_drafts_verifiers_and_stat_charts(book_site, tmp_path, browser_n
                     assert sum(int(value) for value in body.locator('tbody td').all_text_contents()) == 124
                 page.screenshot(path=str(tmp_path / f'stat-{key}-{width}.png'))
                 assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+                activate(dialog.get_by_role('button', name='Close chart'), touch)
+                expect(dialog).to_be_hidden(); expect(card).to_be_focused()
+                # Native overlay dismissal remains available for every visual.
+                activate(card, touch)
                 page.keyboard.press('Escape'); expect(dialog).to_be_hidden(); expect(card).to_be_focused()
         assert chart_rows(factory) == original
         page.set_viewport_size({'width':390 if browser_name == 'chromium' else 1440,'height':950})

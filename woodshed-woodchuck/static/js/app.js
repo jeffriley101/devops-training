@@ -4648,6 +4648,11 @@
     });
     form.addEventListener("input", saveVerifierDraft);
     form.addEventListener("change", saveVerifierDraft);
+    document.querySelector(".p-book-return")?.addEventListener("click", event => {
+      // Keep the native SHED destination and running timer semantics. Refresh a
+      // restored draft even when the user leaves again without editing a field.
+      if (!saveVerifierDraft()) event.preventDefault();
+    });
     if (confirmSubmitBtn && finalDialog) confirmSubmitBtn.addEventListener("click", function () {
       confirmationApproved = true;
       finalDialog.close();

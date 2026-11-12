@@ -197,7 +197,7 @@ def test_book_layout_navigation_timer_submission_and_history(book_site, tmp_path
             expect(page.locator('label[for="p-book-include-team"] strong')).to_have_text('Include in Team Standings')
             expect(page.locator('label[for="p-book-include-contests"] strong')).to_have_text('Include in Leaderboards')
             assert page.locator('link[href*="practice-book.css"]').count() == 1
-            assert page.locator('script[src="/static/js/app.js?v=wl2-17c-classroom1-book-interaction1"]').count() == 1
+            assert page.locator('script[src="/static/js/app.js?v=wl2-17c-classroom1-book-refinement1"]').count() == 1
             dimensions = page.evaluate('''() => {
                 const rect = s => document.querySelector(s).getBoundingClientRect().toJSON();
                 const timer = rect('.practice-timer-metal'), minutes = rect('#p-book-minutes');
@@ -343,7 +343,7 @@ def test_book_layout_navigation_timer_submission_and_history(book_site, tmp_path
         assert {key: after[key] for key in original_charts} == original_charts
         assert len(after) == len(original_charts) + 1
         assert context.request.get('/personal-development/rating').json() == rating
-        activate(page.get_by_role('link', name='Back to SHED'), touch)
+        activate(page.get_by_role('link', name='Close BOOK and return to SHED'), touch)
         page.wait_for_url(origin + '/home')
         evidence.update({'prior_records_unchanged': True, 'new_charts': 1,
                          'history_order': 'practice_date descending, server ID descending on equal dates',
