@@ -7,7 +7,7 @@ from sqlalchemy import select
 
 from app.models import RewardGrant, WoodchuckState
 from test_age_screening import age_db
-from test_book_cleanup_browser import book_db, book_site, chart_rows, ready, activate
+from test_book_cleanup_browser import book_db, book_site, chart_rows, ready, activate, contrast
 
 
 def draft(page):
@@ -52,31 +52,61 @@ def test_compact_controls_close_navigation_and_success_popup(book_site, tmp_path
             page.evaluate('scrollTo(0, 0)'); page.mouse.move(0, 0)
             rects = page.evaluate(geometry)
             button, clock, pristine, close = [rects[s] for s in ('#practice-timer-toggle-btn', '#practice-timer-display', '.p-book-pristine', '.p-book-return')]
-            assert button['right'] <= clock['left'] <= button['right'] + 10
-            assert abs((button['top'] + button['bottom']) - (clock['top'] + clock['bottom'])) <= 2
+            assert button['right'] == pytest.approx(clock['left'])
+            assert button['top'] == pytest.approx(clock['top'])
+            assert button['height'] == pytest.approx(clock['height'])
+            assert page.locator('#practice-timer-display').evaluate('e => e.tagName === "P" && e.tabIndex === -1')
             assert pristine['top'] >= max(button['bottom'], clock['bottom'])
-            assert pristine['width'] == rects['.p-book-methods']['width']
-            assert close['width'] >= 44 and close['height'] >= 44 and close['bottom'] <= button['top']
+            assert pristine['left'] == pytest.approx(button['left'])
+            assert pristine['right'] == pytest.approx(clock['right'])
+            assert close['width'] >= 44 and close['height'] >= 44
+            assert close['top'] <= button['top'] < close['bottom']  # No dedicated close row.
             assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+            info_rects = []
             for info, tooltip in [('About Stopwatch','#stopwatch-help'), ('About Pristine P-Chart','#pristine-help')]:
                 control = page.get_by_role('button', name=info, exact=True)
-                assert 24 <= control.bounding_box()['width'] <= 32
+                bounds = control.bounding_box(); info_rects.append(bounds)
+                # Firefox can report 44 CSS px as 43.999998 after viewport scaling.
+                assert bounds['width'] == pytest.approx(44) and bounds['height'] == pytest.approx(44)
+                assert bounds['x'] >= pristine['right'] + 3
+                assert bounds['x'] + bounds['width'] <= close['left']
+                if width == 1440:
+                    control.hover(); expect(page.locator(tooltip)).to_be_visible()
+                    page.mouse.move(0, 0); page.locator('#p-book-minutes').focus()
+                    expect(page.locator(tooltip)).to_be_hidden()
+                    control.focus(); expect(page.locator(tooltip)).to_be_visible()
+                    page.keyboard.press('Escape'); expect(page.locator(tooltip)).to_be_hidden()
                 activate(control, width != 1440)
                 expect(page.locator(tooltip)).to_be_visible()
                 assert page.evaluate(geometry) == rects  # Help never reflows the form.
                 help_box = page.locator(tooltip).bounding_box()
                 assert help_box['y'] >= 0
-                assert help_box['y'] + help_box['height'] <= button['top']
-                assert help_box['x'] + help_box['width'] <= close['left']
+                assert help_box['y'] >= rects['.p-book-methods']['bottom']
+                assert help_box['y'] + help_box['height'] <= 900
+                assert help_box['x'] + help_box['width'] <= width
                 assert page.url == origin + '/p-book' and page.evaluate('mediaRequests') == 0
                 expect(page.locator('#practice-timer-toggle-btn')).to_have_text('Stopwatch')
                 page.keyboard.press('Escape'); expect(page.locator(tooltip)).to_be_hidden()
+            assert info_rects[0]['x'] == pytest.approx(info_rects[1]['x'])
+            assert info_rects[0]['width'] == info_rects[1]['width']
+            # Sample rendered text against its opaque surface at each review width.
+            colors = page.locator('.p-book-page').evaluate('''root => [...root.querySelectorAll(
+              'h2,h3,p,label,dt,dd,strong,summary,button,a,input,textarea,select,.p-book-stat-label')]
+              .filter(e => e.getClientRects().length).map(e => {
+                let bg = e;
+                while (bg && getComputedStyle(bg).backgroundColor === 'rgba(0, 0, 0, 0)') bg = bg.parentElement;
+                return [getComputedStyle(e).color, getComputedStyle(bg).backgroundColor];
+              })''')
+            minimum_contrast = min(contrast(pair) for pair in colors)
+            assert minimum_contrast >= 4.5
             page.keyboard.press('Tab'); close_book.focus()
             assert close_book.evaluate('e => getComputedStyle(e).outlineStyle') == 'solid'
+            close_book.evaluate('e => e.blur()'); page.mouse.move(0, 0)
             page.screenshot(path=str(tmp_path / f'stacked-controls-{width}.png'))
-            evidence['layouts'].append({'width':width,'rectangles':rects,'help_no_reflow':True})
+            evidence['layouts'].append({'width':width,'rectangles':rects,'help_no_reflow':True,
+                                       'minimum_text_contrast':minimum_contrast})
 
-        width = 390 if browser_name == 'chromium' else 1440
+        width = 320 if browser_name == 'chromium' else 1440
         touch = browser_name == 'chromium'
         page.set_viewport_size({'width':width,'height':900})
         page.locator('#p-book-minutes').fill('9'); page.locator('#p-book-note').fill('Retained through close controls')
@@ -88,6 +118,10 @@ def test_compact_controls_close_navigation_and_success_popup(book_site, tmp_path
         activate(page.locator('#practice-timer-toggle-btn'), touch)
         expect(page.locator('#practice-timer-toggle-btn')).to_have_text('Stop Stopwatch')
         page.clock.fast_forward(65000)
+        expect(page.locator('#practice-timer-display')).to_have_text('01:05')
+        running = page.evaluate(geometry)
+        assert running['#practice-timer-toggle-btn']['height'] == pytest.approx(running['#practice-timer-display']['height'])
+        assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
         timer = page.evaluate('sessionStorage.getItem("woodshed:practice-timer-started-at")')
         for key in ('week', 'career', 'days', 'charts'):
             card = page.locator(f'[data-book-stat="{key}"]')

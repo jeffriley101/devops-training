@@ -3,7 +3,7 @@
 {% block practice_method_scripts %}<script src="/static/js/practice-methods.js?v=1"></script>{% endblock %}
 {% block dashboard_styles %}
 <link rel="stylesheet" href="/static/css/personal-development.css?v=1">
-<link rel="stylesheet" href="/static/css/practice-book.css?v=6">
+<link rel="stylesheet" href="/static/css/practice-book.css?v=7">
 {% endblock %}
 
 {% block content %}
@@ -17,14 +17,14 @@
         <div class="p-book-method-control p-book-stopwatch">
           <button id="practice-timer-toggle-btn" class="btn btn-secondary" type="button" aria-describedby="stopwatch-help">Stopwatch</button>
           <p id="practice-timer-display" aria-label="Stopwatch elapsed time">00:00</p>
-          <button class="p-book-info" type="button" aria-label="About Stopwatch" aria-controls="stopwatch-help" aria-expanded="false">i</button>
+          <button class="p-book-info" type="button" aria-label="About Stopwatch" aria-controls="stopwatch-help" aria-expanded="false"><span aria-hidden="true">i</span></button>
         </div>
         <p id="stopwatch-help" class="p-book-help" role="tooltip" hidden>Start and stop your practice timer.</p>
       </div>
       <div class="p-book-method" data-method-help>
         <div class="p-book-method-control p-book-pristine-control">
           <a class="btn btn-secondary p-book-pristine" href="/practice/pristine" aria-describedby="pristine-help">Pristine P-Chart</a>
-          <button class="p-book-info" type="button" aria-label="About Pristine P-Chart" aria-controls="pristine-help" aria-expanded="false">i</button>
+          <button class="p-book-info" type="button" aria-label="About Pristine P-Chart" aria-controls="pristine-help" aria-expanded="false"><span aria-hidden="true">i</span></button>
         </div>
         <p id="pristine-help" class="p-book-help" role="tooltip" hidden>Use your microphone to track practice.</p>
       </div>

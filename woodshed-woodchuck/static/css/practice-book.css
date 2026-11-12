@@ -45,7 +45,7 @@ body:has(.p-book-page) .sound-effects-panel[hidden] { display: none; }
   line-height: 1.5;
 }
 .p-book-page .p-book-notebook {
-  padding-top: 2.5rem;
+  padding-top: 0;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   align-items: start;
   gap: clamp(1.25rem, 3vw, 2.5rem);
@@ -57,6 +57,12 @@ body:has(.p-book-page) .sound-effects-panel[hidden] { display: none; }
   border: 0;
   border-radius: 0;
   box-shadow: none;
+}
+.p-book-page .p-book-page-right {
+  padding: 1rem;
+  background: var(--book-section);
+  border-left: 2px solid var(--book-green);
+  border-radius: 8px;
 }
 .p-book-page :is(.mentor-card, .practice-stat-stone, .pirate-logbook) {
   padding: 1rem;
@@ -86,8 +92,9 @@ body:has(.p-book-page) .sound-effects-panel[hidden] { display: none; }
 .p-book-page h3 { font-size: 1rem; line-height: 1.4; }
 .p-book-page .practice-timer-metal {
   gap: .5rem;
-  background: var(--book-sage);
-  border-color: #a9bdaa;
+  padding: 0;
+  background: transparent;
+  border: 0;
 }
 .p-book-page .practice-timer-row {
   display: grid;
@@ -99,9 +106,16 @@ body:has(.p-book-page) .sound-effects-panel[hidden] { display: none; }
 .p-book-page #practice-timer-display {
   margin: 0;
   min-width: 5ch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: .25rem .4rem;
+  border: 1px solid #8c9d8e;
+  border-radius: 0 6px 6px 0;
+  background: var(--book-sage);
   color: var(--book-green);
   font-family: ui-monospace, monospace;
-  font-size: 1.65rem;
+  font-size: 1.25rem;
   font-variant-numeric: tabular-nums;
   font-weight: 650;
   letter-spacing: 0;
@@ -249,7 +263,7 @@ body:has(.p-book-page) .ww-character-reaction-dismiss:focus-visible {
 .p-book-page .pdd-book-rating { color: var(--book-green); background: var(--book-sage); border: 2px solid #456d50; }
 .p-book-page .pdd-book-entry p { font-size: 1rem; }
 .p-book-page .practice-total-cards { gap: .65rem; }
-.p-book-page .practice-stat-stone { padding: .85rem; background: var(--book-sage); }
+.p-book-page .practice-stat-stone { padding: .85rem; background: var(--book-surface); }
 .p-book-page .practice-stat-stone h3 { color: var(--book-muted); font-size: .9rem; font-weight: 500; }
 .p-book-page .practice-stat-stone p { color: var(--book-green); font-size: 1.1rem; }
 .p-book-page #practice-insights { display: block; }
@@ -307,12 +321,14 @@ body:has(.p-book-page) .ww-character-reaction-dismiss:focus-visible {
 }
 @media (max-width: 960px) {
   .p-book-page .p-book-notebook { grid-template-columns: minmax(0, 1fr); gap: 1.5rem; }
-  .p-book-page .p-book-page-right { padding-top: 1.5rem; border-top: 1px solid var(--book-border); }
+  .p-book-page .p-book-methods { margin-right: 44px; }
+}
+@media (min-width: 961px) {
+  .p-book-page .pdd-book-entry { padding-right: 1.5rem; }
 }
 @media (max-width: 360px) {
   .p-book-page { padding: .75rem; }
   .p-book-page .practice-timer-row { gap: .5rem; }
-  .p-book-page .practice-timer-metal { padding: .65rem; }
   .p-book-page .practice-timer-row .btn { padding-inline: .5rem; font-size: .9rem; }
   .p-book-page .pdd-book-entry { flex-wrap: wrap; }
 }
@@ -320,19 +336,25 @@ body:has(.p-book-page) .ww-character-reaction-dismiss:focus-visible {
 /* Two compact methods; the elapsed clock belongs only to Stopwatch. */
 .p-book-page .p-book-methods { position: relative; }
 .p-book-page .p-book-method { min-width: 0; }
-.p-book-page .p-book-stopwatch { display: grid; grid-template-columns: minmax(0, 1fr) auto 28px; align-items: center; gap: .5rem; }
-.p-book-page .p-book-pristine-control { position: relative; }
-.p-book-page .p-book-pristine { box-sizing: border-box; display: block; width: 100%; padding-inline: 2.5rem; }
-.p-book-page .p-book-pristine-control .p-book-info { position: absolute; right: .4rem; top: 50%; transform: translateY(-50%); }
+.p-book-page .p-book-stopwatch { display: grid; grid-template-columns: minmax(0, 1fr) auto 48px; align-items: stretch; }
+.p-book-page .p-book-stopwatch #practice-timer-toggle-btn { border-right: 0; border-radius: 6px 0 0 6px; }
+.p-book-page .p-book-pristine-control { display: grid; grid-template-columns: minmax(0, 1fr) 48px; align-items: center; }
+.p-book-page .p-book-pristine { box-sizing: border-box; display: block; width: 100%; }
 .p-book-page .p-book-info {
-  width: 28px; height: 28px; padding: 0; border: 0;
+  width: 44px; height: 44px; margin-left: 4px; align-self: center;
+  display: grid; place-items: center; padding: 0; border: 0;
   border-radius: 50%; background: transparent; color: var(--book-green);
   font: inherit; font-size: .85rem; font-weight: 700; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.p-book-page .p-book-info span {
+  display: grid; place-items: center; width: 18px; height: 18px;
+  border: 1px solid currentColor; border-radius: 50%; line-height: 1;
 }
 .p-book-page .p-book-info:hover { background: #dce9dc; }
 .p-book-page .p-book-help {
-  position: absolute; z-index: 5; bottom: 100%; left: 0; margin: 0 0 .25rem;
-  box-sizing: border-box; width: calc(100% - 3rem); min-width: 0; padding: .65rem;
+  position: absolute; z-index: 5; top: 100%; left: 0; margin: .25rem 0 0;
+  box-sizing: border-box; width: 100%; min-width: 0; padding: .65rem;
   border: 1px solid #8c9d8e; border-radius: 6px; color: #29332d;
   background: #fffef9; font-size: .9rem; line-height: 1.5;
 }
@@ -353,6 +375,7 @@ body:has(.p-book-page) .ww-character-reaction-dismiss {
 }
 .p-book-page .p-book-close:hover,
 body:has(.p-book-page) .ww-character-reaction-dismiss:hover { background: #e8f0e6; }
+.p-book-page .p-book-return { border: 0; background: transparent; font-size: 1.2rem; }
 .p-book-page .practice-stat-stone {
   display: grid; gap: .3rem; min-height: 90px;
   font: inherit; text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent;
