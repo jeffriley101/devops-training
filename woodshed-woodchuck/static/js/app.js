@@ -4568,7 +4568,8 @@
     let shareCsrf = "";
     let editingShareId = null;
     let previousShareId = null;
-    const verifierManageLink = document.getElementById("p-book-verifier-manage");
+    const ADD_VERIFIER = "add-verifier";
+    let selectedVerifier = "";
     const submitBtn = form.querySelector("button[type='submit']");
     const missingDialog = document.getElementById("p-book-missing-selection");
     const finalDialog = document.getElementById("p-book-final-confirmation");
@@ -4627,16 +4628,26 @@
         practiceDetails: practiceDetailEls.filter((item) => item.checked).map((item) => item.value),
         includeContests: includeContestsEl?.checked === true,
         includeTeam: includeTeamEl?.checked === true,
-        verifierId: verifierSelectEl?.value || "",
+        verifierId: verifierSelectEl?.value === ADD_VERIFIER ? selectedVerifier : (verifierSelectEl?.value || ""),
         teamId: currentTeam?.id || null,
       };
       try {
         window.sessionStorage.setItem(P_BOOK_DRAFT_KEY, JSON.stringify(safeDraft));
+        return true;
       } catch (_draftWriteError) {
-        // Draft persistence is optional and must never block navigation.
+        errorEl.textContent = "Your draft could not be kept in this browser. Stay here and save or copy your details before leaving.";
+        return false;
       }
     }
-    verifierManageLink?.addEventListener("click", saveVerifierDraft);
+    verifierSelectEl?.addEventListener("change", () => {
+      if (verifierSelectEl.value !== ADD_VERIFIER) { selectedVerifier = verifierSelectEl.value; return; }
+      verifierSelectEl.value = selectedVerifier;
+      if (!saveVerifierDraft()) return;
+      if (!pausePracticeTimer()) return;
+      window.location.assign("/trusted-verifiers?return_to=p-book");
+    });
+    form.addEventListener("input", saveVerifierDraft);
+    form.addEventListener("change", saveVerifierDraft);
     if (confirmSubmitBtn && finalDialog) confirmSubmitBtn.addEventListener("click", function () {
       confirmationApproved = true;
       finalDialog.close();
@@ -4715,8 +4726,10 @@
           );
         });
 
+        verifierSelectEl.appendChild(new Option("Add verifier…", ADD_VERIFIER));
         verifierSelectEl.disabled = false;
-        if (restoredDraft?.verifierId) verifierSelectEl.value = String(restoredDraft.verifierId);
+        if (restoredDraft?.verifierId && restoredDraft.verifierId !== ADD_VERIFIER) verifierSelectEl.value = String(restoredDraft.verifierId);
+        selectedVerifier = verifierSelectEl.value;
 
       } catch (error) {
         verifierSelectEl.replaceChildren(
@@ -4977,32 +4990,59 @@
 
     let practiceTimerStartedAt = null;
     let practiceTimerInterval = null;
+    let practiceTimerPausedSeconds = null;
     const PRACTICE_TIMER_LIMIT_SECONDS = 120 * 60;
     const PRACTICE_TIMER_STORAGE_KEY = "woodshed:practice-timer-started-at";
 
-    function persistPracticeTimerStart(startedAt) {
+    function persistPracticeTimerStart(startedAt, pausedSeconds = null) {
       if (!practiceSessionCurrent()) return;
       try {
-        window.sessionStorage.setItem(PRACTICE_TIMER_STORAGE_KEY, JSON.stringify({startedAt, binding: practiceBinding}));
+        window.sessionStorage.setItem(PRACTICE_TIMER_STORAGE_KEY, JSON.stringify({startedAt, pausedSeconds, binding: practiceBinding}));
+        return true;
       } catch (_storageError) {
-        // The timer still works in-page when browser storage is unavailable.
+        // The timer still works in-page; switching must explicitly retain its time.
+        return false;
       }
     }
 
     function readPracticeTimerStart() {
-      if (!practiceSessionCurrent()) return 0;
+      if (!practiceSessionCurrent()) return null;
       try {
         const saved = JSON.parse(window.sessionStorage.getItem(PRACTICE_TIMER_STORAGE_KEY) || "null");
-        if (window.WWSessionBoundary.matchesBinding(saved?.binding) &&
-            Number.isFinite(saved.startedAt) && saved.startedAt > 0 && saved.startedAt <= Date.now()) {
-          return saved.startedAt;
+        if (window.WWSessionBoundary.matchesBinding(saved?.binding)) {
+          if (Number.isFinite(saved.startedAt) && saved.startedAt > 0 && saved.startedAt <= Date.now()) return saved;
+          if (Number.isFinite(saved.pausedSeconds) && saved.pausedSeconds >= 0 && saved.pausedSeconds <= PRACTICE_TIMER_LIMIT_SECONDS) return saved;
         }
         clearPracticeTimerStart();
-        return 0;
-      } catch (_storageError) {
-        return 0;
-      }
+      } catch (_storageError) {}
+      return null;
     }
+
+    function pausePracticeTimer() {
+      if (!practiceTimerStartedAt) return true;
+      practiceTimerPausedSeconds = Math.min(PRACTICE_TIMER_LIMIT_SECONDS,
+        Math.max(0, (Date.now() - practiceTimerStartedAt) / 1000));
+      stopPracticeTimerInterval();
+      practiceTimerStartedAt = null;
+      const kept = persistPracticeTimerStart(null, practiceTimerPausedSeconds);
+      window.WWPracticeMethods?.release();
+      timerDisplayEl.textContent = formatTimerSeconds(practiceTimerPausedSeconds);
+      timerToggleBtn.textContent = "Resume Stopwatch";
+      timerToggleBtn.classList.remove("btn-red");
+      timerToggleBtn.classList.add("btn-secondary");
+      timerFeedbackEl.textContent = kept
+        ? "Stopwatch paused. Your elapsed time is kept; resume when ready. No practice has been saved."
+        : "Stopwatch paused here, but this browser could not keep its time for navigation. Stay here and enter your minutes before leaving.";
+      return kept;
+    }
+    document.querySelector(".p-book-pristine")?.addEventListener("click", event => {
+      event.preventDefault();
+      if (!practiceSessionCurrent()) return;
+      if (practiceTimerStartedAt && !window.confirm("Pause Stopwatch and open Pristine P-Chart? Your elapsed time and form details will be kept. No practice will be saved or merged automatically.")) return;
+      if (!saveVerifierDraft()) return;
+      if (!pausePracticeTimer()) return;
+      window.location.assign("/practice/pristine");
+    });
 
     function clearPracticeTimerStart() {
       try {
@@ -5014,7 +5054,7 @@
 
     function formatTimerSeconds(totalSeconds) {
       const minutes = Math.floor(totalSeconds / 60);
-      const seconds = totalSeconds % 60;
+      const seconds = Math.floor(totalSeconds % 60);
       return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
     }
 
@@ -5031,12 +5071,13 @@
         stopPracticeTimerInterval();
         practiceTimerStartedAt = null;
         clearPracticeTimerStart();
+        window.WWPracticeMethods?.release();
         minutesEl.value = "120";
         if (timerFeedbackEl) timerFeedbackEl.textContent =
           "Timer stopped at 2 hours. You can adjust your minutes before submitting.";
         const toggle = document.getElementById("practice-timer-toggle-btn");
         if (toggle) {
-          toggle.textContent = "Start Timer";
+          toggle.textContent = "Stopwatch";
           toggle.classList.remove("btn-red");
           toggle.classList.add("btn-secondary");
         }
@@ -5054,17 +5095,24 @@
       if (!timerDisplayEl || !timerToggleBtn || !timerStartBtn || !timerStopBtn || !minutesEl) return;
 
       function renderTimerRunning(running) {
-        timerToggleBtn.textContent = running ? "Stop Timer" : "Start Timer";
+        timerToggleBtn.textContent = running ? "Stop Stopwatch" : "Stopwatch";
         timerToggleBtn.classList.toggle("btn-red", running);
         timerToggleBtn.classList.toggle("btn-secondary", !running);
       }
 
-      timerStartBtn.addEventListener("click", function () {
-        if (!practiceSessionCurrent()) return;
-        practiceTimerStartedAt = Date.now();
+      timerStartBtn.addEventListener("click", async function () {
+        if (!practiceSessionCurrent() || timerToggleBtn.disabled) return;
+        timerToggleBtn.disabled = true;
+        const acquired = await window.WWPracticeMethods?.acquire("stopwatch");
+        timerToggleBtn.disabled = false;
+        if (!acquired) { timerFeedbackEl.textContent = window.WWPracticeMethods?.unavailable || "Practice tools are unavailable. Reload to try again."; return; }
+        if (!practiceSessionCurrent()) { window.WWPracticeMethods.release(); return; }
+        practiceTimerStartedAt = Date.now() - (practiceTimerPausedSeconds || 0) * 1000;
+        practiceTimerPausedSeconds = null;
         persistPracticeTimerStart(practiceTimerStartedAt);
         stopPracticeTimerInterval();
-        timerDisplayEl.textContent = "00:00";
+        updatePracticeTimerDisplay();
+        if (!practiceTimerStartedAt) return;
         practiceTimerInterval = window.setInterval(updatePracticeTimerDisplay, 1000);
 
         if (timerFeedbackEl) {
@@ -5089,6 +5137,7 @@
         timerDisplayEl.textContent = formatTimerSeconds(elapsedSeconds);
         practiceTimerStartedAt = null;
         clearPracticeTimerStart();
+        window.WWPracticeMethods?.release();
         renderTimerRunning(false);
 
         const shouldFillMinutes = window.confirm(`Do you want to enter ${elapsedMinutes} practice minute${elapsedMinutes === 1 ? "" : "s"}?`);
@@ -5107,12 +5156,19 @@
         else timerStartBtn.click();
       });
 
-      function restorePracticeTimer() {
+      async function restorePracticeTimer() {
         if (!practiceSessionCurrent()) return;
-        const restoredStart = readPracticeTimerStart();
-        if (!Number.isFinite(restoredStart) || restoredStart <= 0) return;
-
-        practiceTimerStartedAt = restoredStart;
+        const restored = readPracticeTimerStart();
+        if (!restored) return;
+        if (Number.isFinite(restored.pausedSeconds)) {
+          practiceTimerPausedSeconds = restored.pausedSeconds;
+          timerDisplayEl.textContent = formatTimerSeconds(practiceTimerPausedSeconds);
+          timerToggleBtn.textContent = "Resume Stopwatch";
+          timerFeedbackEl.textContent = "Stopwatch paused. Your elapsed time is kept; resume when ready. No practice has been saved.";
+          return;
+        }
+        practiceTimerStartedAt = restored.startedAt;
+        if (!await window.WWPracticeMethods?.acquire("stopwatch")) { pausePracticeTimer(); return; }
         updatePracticeTimerDisplay();
         if (practiceTimerStartedAt) {
           stopPracticeTimerInterval();
@@ -5435,7 +5491,7 @@
         dateKey
       );
 
-      const verifierId = verifierSelectEl
+      const verifierId = verifierSelectEl && verifierSelectEl.value !== ADD_VERIFIER
         ? Number(verifierSelectEl.value)
         : 0;
 

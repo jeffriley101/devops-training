@@ -43,13 +43,13 @@
       if (requestGeneration !== generation) return;
       locked.hidden = true;
       active.hidden = false;
-      for (const week of data.weeks) {
+      for (const [index, week] of [...data.weeks].sort((a, b) => b.week_start.localeCompare(a.week_start)).entries()) {
         const row = document.createElement("section");
         row.className = "practice-insights-week";
         const heading = document.createElement("h3");
-        heading.textContent = `${week.week_start} – ${week.week_end}`;
+        heading.textContent = ["Last week", "2 weeks ago", "3 weeks ago", "4 weeks ago"][index];
         const values = document.createElement("dl");
-        metric(values, "Reported practice", window.WWPracticeDuration.seconds(week.seconds));
+        metric(values, "Practice", window.WWPracticeDuration.seconds(week.seconds));
         metric(values, "Practice days", String(week.days));
         metric(values, "Verified", window.WWPracticeDuration.seconds(week.verified_seconds));
         metric(values, "Pristine", window.WWPracticeDuration.seconds(week.pristine_seconds));

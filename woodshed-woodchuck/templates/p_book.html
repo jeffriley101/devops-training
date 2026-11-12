@@ -1,8 +1,9 @@
 {% extends "base.html" %}
-{% block app_version %}wl2-17c-classroom1-book-polish1{% endblock %}
+{% block app_version %}wl2-17c-classroom1-book-interaction1{% endblock %}
+{% block practice_method_scripts %}<script src="/static/js/practice-methods.js?v=1"></script>{% endblock %}
 {% block dashboard_styles %}
 <link rel="stylesheet" href="/static/css/personal-development.css?v=1">
-<link rel="stylesheet" href="/static/css/practice-book.css?v=2">
+<link rel="stylesheet" href="/static/css/practice-book.css?v=3">
 {% endblock %}
 
 {% block content %}
@@ -11,18 +12,23 @@
   <div class="p-book-notebook">
   <div class="p-book-page-sheet p-book-page-left">
   <article class="mentor-card practice-timer-metal" aria-label="Practice timer">
-    <div class="practice-timer-row">
-      <button
-        id="practice-timer-toggle-btn"
-        class="btn btn-secondary"
-        type="button"
-      >
-        Start Timer
-      </button>
-
-      <a class="btn btn-secondary p-book-pristine" href="/practice/pristine" aria-describedby="p-book-pristine-description">Pristine P-Chart</a>
-      <p id="p-book-pristine-description">Practice with your microphone and create a P-Chart automatically.</p>
-      <p id="practice-timer-display">00:00</p>
+    <div class="practice-timer-row p-book-methods">
+      <div class="p-book-method" data-method-help>
+        <div class="p-book-method-control">
+          <button id="practice-timer-toggle-btn" class="btn btn-secondary" type="button" aria-describedby="stopwatch-help">Stopwatch</button>
+          <button class="p-book-info" type="button" aria-label="About Stopwatch" aria-controls="stopwatch-help" aria-expanded="false">i</button>
+        </div>
+        <p id="practice-timer-display" aria-label="Stopwatch elapsed time">00:00</p>
+        <p id="stopwatch-help" class="p-book-help" role="tooltip" hidden>Start and stop your practice timer.</p>
+      </div>
+      <span class="p-book-method-or">or</span>
+      <div class="p-book-method" data-method-help>
+        <div class="p-book-method-control">
+          <a class="btn btn-secondary p-book-pristine" href="/practice/pristine" aria-describedby="pristine-help">Pristine P-Chart</a>
+          <button class="p-book-info" type="button" aria-label="About Pristine P-Chart" aria-controls="pristine-help" aria-expanded="false">i</button>
+        </div>
+        <p id="pristine-help" class="p-book-help" role="tooltip" hidden>Use your microphone to track practice.</p>
+      </div>
     </div>
 
     <button
@@ -54,15 +60,12 @@
     <label for="p-book-minutes">Minutes practiced</label>
     <input id="p-book-minutes" name="p-book-minutes" type="number" min="1" step="1" required />
 
-    <label for="p-book-date">Practice date</label>
-    <input id="p-book-date" name="p-book-date" type="date" required />
+    <input id="p-book-date" name="p-book-date" aria-label="Practice date" type="date" required />
 
-    <label for="p-book-note">Short note (optional)</label>
-    <textarea id="p-book-note" class="p-book-warm-field" name="p-book-note" rows="3" maxlength="180" placeholder="Scales, band music, rhythm work..."></textarea>
+    <textarea id="p-book-note" class="p-book-warm-field" name="p-book-note" rows="3" maxlength="180" aria-label="Notes (optional)" placeholder="Notes."></textarea>
 
-    <label id="p-book-work-label" class="p-book-work-label">What did you work on?</label>
-    <details class="mentor-card p-book-work-field" aria-labelledby="p-book-work-label">
-      <summary>Check anything that fits this practice chart.</summary>
+    <details class="mentor-card p-book-work-field" >
+      <summary>What did you work on?</summary>
 
       <div class="practice-detail-grid">
         {% for category in practice_categories %}
@@ -74,12 +77,12 @@
     <section class="p-book-option-group p-book-team-option-group">
       <label class="contest-opt-in-control p-book-option-card" for="p-book-include-contests">
         <input id="p-book-include-contests" name="include-contests" type="checkbox" checked />
-        <span><strong>Include this chart in Band Camp contests</strong><small>Uncheck to keep it in your Log Book without adding it to Open or Verified standings.</small></span>
+        <span><strong>Include in Leaderboards</strong></span>
       </label>
 
     <label class="contest-opt-in-control p-book-option-card" for="p-book-include-team">
       <input id="p-book-include-team" name="include-team" type="checkbox" checked />
-      <span><strong>Include this chart in the Team Competition</strong><small>Uncheck to prevent being added to this contest. If checked with no team selected, Submit will ask you to choose a team or continue without Team Competition.</small></span>
+      <span><strong>Include in Team Standings</strong></span>
     </label>
     <section id="p-book-team-selector" class="p-book-option-detail p-book-team-summary" aria-label="Current team">
       <p id="p-book-current-team" class="body-copy">Loading current team…</p>
@@ -103,7 +106,7 @@
       <select id="p-book-verifier" name="p-book-verifier" aria-label="Verifier" disabled>
         <option value="">No verification request</option>
       </select>
-      <a id="p-book-verifier-manage" class="btn btn-secondary p-book-verifier-manage" href="/trusted-verifiers?return_to=p-book">Manage Verifiers</a>
+
     </div>
 
     </section>
@@ -161,23 +164,28 @@
   </section>
   {% endif %}
   <div class="stats-grid mt-md practice-total-cards" aria-label="Persisted practice totals">
-    <article class="stat-card practice-stat-stone">
-      <h3>This Week’s Reported Practice</h3>
-      <p id="p-book-week-practice">0 minutes</p>
-    </article>
-    <article class="stat-card practice-stat-stone">
-      <h3>Career Reported Practice</h3>
-      <p id="p-book-career-practice">0 minutes</p>
-    </article>
-    <article class="stat-card practice-stat-stone">
-      <h3>Saved Practice Days</h3>
-      <p id="p-book-practice-days">0</p>
-    </article>
-    <article class="stat-card practice-stat-stone">
-      <h3>Saved Charts</h3>
-      <p id="p-book-pages-count">0</p>
-    </article>
+    <button type="button" class="stat-card practice-stat-stone" data-book-stat="week" aria-haspopup="dialog">
+      <span class="p-book-stat-label">This Week’s Reported Practice</span>
+      <strong id="p-book-week-practice">0 minutes</strong>
+    </button>
+    <button type="button" class="stat-card practice-stat-stone" data-book-stat="career" aria-haspopup="dialog">
+      <span class="p-book-stat-label">Career Reported Practice</span>
+      <strong id="p-book-career-practice">0 minutes</strong>
+    </button>
+    <button type="button" class="stat-card practice-stat-stone" data-book-stat="days" aria-haspopup="dialog">
+      <span class="p-book-stat-label">Saved Practice Days</span>
+      <strong id="p-book-practice-days">0</strong>
+    </button>
+    <button type="button" class="stat-card practice-stat-stone" data-book-stat="charts" aria-haspopup="dialog">
+      <span class="p-book-stat-label">Saved Charts</span>
+      <strong id="p-book-pages-count">0</strong>
+    </button>
   </div>
+  <dialog id="p-book-stat-dialog" aria-labelledby="p-book-stat-title">
+    <div class="p-book-stat-head"><h2 id="p-book-stat-title"></h2><button type="button" class="btn" data-book-stat-close>Close chart</button></div>
+    <p data-book-stat-status role="status"></p>
+    <div data-book-stat-content></div>
+  </dialog>
   <p class="muted">Totals use saved charts. Pristine and ordinary charts may credit the same practice. Browser-local legacy entries are shown in history but excluded from these totals.</p>
 
   <section class="mentor-card mt-md" id="practice-insights" aria-labelledby="practice-insights-title" data-enabled="{{ 'true' if feature_access.practice_insights else 'false' }}">
@@ -216,6 +224,7 @@
 {% endblock %}
 
 {% block page_scripts %}
-<script src="/static/js/practice-insights.js?v=3"></script>
+<script src="/static/js/book-interactions.js?v=1"></script>
+<script src="/static/js/practice-insights.js?v=4"></script>
 <script src="/static/js/personal-development.js?v=1"></script>
 {% endblock %}

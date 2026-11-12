@@ -12,9 +12,8 @@ def test_book_has_contest_team_and_verification_controls() -> None:
     ):
         assert f'id="{control}"' in html
         assert f'id="{control}"' in html
-    assert "Include this chart in Band Camp contests" in html
-    assert "Include this chart in the Team Competition" in html
-    assert "Uncheck to prevent being added to this contest." in html
+    assert "Include in Leaderboards" in html
+    assert "Include in Team Standings" in html
     assert "Email your Practice Book" not in html
     assert "Verification (optional)" in html
     assert "No verification request" in html

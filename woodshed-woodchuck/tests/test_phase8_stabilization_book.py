@@ -49,8 +49,7 @@ def test_book_loaders_resolve_empty_and_failure_states() -> None:
 def test_book_team_section_is_compact_and_shed_owned() -> None:
     template = (ROOT / "templates/p_book.html").read_text(encoding="utf-8")
     script = (ROOT / "static/js/app.js").read_text(encoding="utf-8")
-    assert "Include this chart in the Team Competition" in template
-    assert "Uncheck to prevent being added to this contest." in template
+    assert "Include in Team Standings" in template
     assert 'id="p-book-current-team"' in template
     assert 'id="p-book-team-shed-link"' not in template
     assert "Choose or Change Team in SHED" not in template + script
@@ -84,10 +83,9 @@ def test_practice_book_title_and_work_disclosure_copy() -> None:
     assert '<h2 class="p-book-title">Practice Book</h2>' in template
     assert "Captain's Practice Log" not in template
     assert "Captain’s Practice Log" not in template + css
-    label_at = template.index('class="p-book-work-label">What did you work on?</label>')
     details_at = template.index('class="mentor-card p-book-work-field"')
-    summary_at = template.index("<summary>Check anything that fits this practice chart.</summary>")
-    assert label_at < details_at < summary_at
+    summary_at = template.index("<summary>What did you work on?</summary>")
+    assert details_at < summary_at
     assert template.count("What did you work on?") == 1
     assert rendered_work_options(template).count('name="practice-detail"') == 23
     assert "practiceDetailEls" in (ROOT / "static/js/app.js").read_text(encoding="utf-8")
@@ -113,7 +111,7 @@ def test_book_retains_controls_without_decorative_binding() -> None:
     assert 'class="p-book-spiral"' not in template
     for control in ("practice-timer-toggle-btn", "practice-timer-start-btn",
                     "practice-timer-stop-btn", "p-book-minutes", "submit-p-chart-btn",
-                    "p-book-verifier-manage", "p-book-entries"):
+                    "p-book-verifier", "p-book-entries"):
         assert template.count(f'id="{control}"') == 1
     assert template.count('href="/practice/pristine"') == 1
     assert 'href="/personal-development"' in template
@@ -167,7 +165,7 @@ def test_book_loads_versioned_local_assets_in_cascade_order() -> None:
 def test_timer_status_and_history_have_independent_full_width_rows() -> None:
     template = (ROOT / "templates/p_book.html").read_text(encoding="utf-8")
     css = (ROOT / "static/css/styles.css").read_text(encoding="utf-8")
-    timer_row = template.index('class="practice-timer-row"')
+    timer_row = template.index('class="practice-timer-row p-book-methods"')
     status_row = template.index('class="body-copy practice-timer-status"')
     assert timer_row < status_row
     assert ".p-book-page .practice-timer-status" in css
@@ -212,7 +210,7 @@ def test_work_options_use_bounded_grid_without_compression() -> None:
     css = (ROOT / "static/css/styles.css").read_text(encoding="utf-8")
     choices = rendered_work_options(template)
     assert choices.count('class="practice-work-option"') == choices.count('name="practice-detail"') == 23
-    assert '<summary>Check anything that fits this practice chart.</summary>' in template
+    assert '<summary>What did you work on?</summary>' in template
     final_rules = css[css.index("/* Clean, left-aligned practice checkbox list */"):]
     assert "grid-template-columns: repeat(2, minmax(0, 1fr))" in final_rules
     assert "@container (max-width: 30rem)" in final_rules

@@ -109,6 +109,7 @@
   let captureGeneration = 0;
   async function stopMicrophone() {
     captureGeneration++;
+    window.WWPracticeMethods?.release();
     if (frameId !== null) window.cancelAnimationFrame(frameId);
     frameId = null;
     if (stream) stream.getTracks().forEach(function (track) { track.stop(); });
@@ -149,6 +150,10 @@
     retryButton.hidden = true;
     feedback.textContent = "";
     try {
+      if (!await window.WWPracticeMethods?.acquire("pristine")) {
+        throw new Error(window.WWPracticeMethods?.unavailable || "Practice tools are unavailable. Reload to try again.");
+      }
+      if (generation !== captureGeneration || document.hidden) { window.WWPracticeMethods.release(); return; }
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         throw new Error("This browser cannot use a microphone for Pristine Practice.");
       }

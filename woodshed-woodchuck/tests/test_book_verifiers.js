@@ -22,11 +22,11 @@ test('BOOK lists only accepted Verifiers and defaults to no request', async () =
   connections.push({role: 'verifier', status: 'pending', verifier: {id: 99}});
   const source = app.slice(app.indexOf('    async function loadVerifierOptions()'), app.indexOf('    async function loadTeams()'));
   await vm.runInNewContext(source + '\nloadVerifierOptions()', {
-    verifierSelectEl: select, restoredDraft: null, verifierRoleLabel: role => role,
+    ADD_VERIFIER: 'add-verifier', selectedVerifier: '', verifierSelectEl: select, restoredDraft: null, verifierRoleLabel: role => role,
     Option: function(text, value) { this.text = text; this.value = value; },
     fetch: async () => ({ok: true, json: async () => ({connections})}),
   });
-  assert.deepEqual(select.children.map(option => option.value), ['', '1']);
+  assert.deepEqual(select.children.map(option => option.value), ['', '1', 'add-verifier']);
   assert.equal(select.children[0].text, 'No verification request');
   assert.equal(select.disabled, false);
 });

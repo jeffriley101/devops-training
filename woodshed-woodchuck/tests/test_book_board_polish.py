@@ -27,7 +27,6 @@ def test_book_option_groups_enclose_their_existing_controls() -> None:
         assert f'id="{control}"' in team
     for control in (
         "p-book-verifier",
-        "p-book-verifier-manage",
     ):
         assert f'id="{control}"' in verification
 
@@ -41,7 +40,7 @@ def test_book_option_groups_enclose_their_existing_controls() -> None:
 def test_verification_section_has_compact_copy_and_manager() -> None:
     verification = group("p-book-verification-option-group")
     assert "Verification (optional)" in verification
-    assert "Manage Verifiers" in verification
+    assert "Manage Verifiers" not in verification
     assert "No verification request" in BOOK
     management = (ROOT / "templates/trusted_verifiers.html").read_text()
     warning = "Please discuss with your Band Director"

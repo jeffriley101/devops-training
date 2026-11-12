@@ -1,3 +1,6 @@
+Historical appearance/polish report through 41c1d220ae713b3cb24846d7d584f1ecc657197b.
+For the subsequent interaction revision, see book-interaction-revision.txt.
+
 BOOK appearance redesign and final polish — Roger / OPS — November 11, 2026
 
 Implementation is prepared for Leadership visual approval. Production deployment

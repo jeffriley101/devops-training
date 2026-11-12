@@ -181,29 +181,29 @@ def test_book_layout_navigation_timer_submission_and_history(book_site, tmp_path
             assert page.locator('.p-book-spiral').count() == 0
             shortcut = page.get_by_role('link', name='Pristine P-Chart', exact=True)
             expect(shortcut).to_have_count(1)
+            expect(page.locator('#p-book-note')).to_have_attribute('placeholder', 'Notes.')
+            expect(page.locator('.p-book-work-field summary')).to_have_text('What did you work on?')
             expect(shortcut).to_have_attribute('href', '/practice/pristine')
-            expect(page.locator('#p-book-pristine-description')).to_have_text(
-                'Practice with your microphone and create a P-Chart automatically.')
-            expect(shortcut).to_have_attribute('aria-describedby', 'p-book-pristine-description')
+            expect(page.locator('#stopwatch-help')).to_have_text('Start and stop your practice timer.')
+            expect(page.locator('#pristine-help')).to_have_text('Use your microphone to track practice.')
+            expect(shortcut).to_have_attribute('aria-describedby', 'pristine-help')
             expect(page.locator('.practice-insights-week')).to_have_count(4)
-            for index, week in enumerate(insights['weeks']):
+            for index, week in enumerate(reversed(insights['weeks'])):
                 row = page.locator('.practice-insights-week').nth(index)
-                expect(row.locator('h3')).to_have_text(f"{week['week_start']} – {week['week_end']}")
-                expect(row.locator('dt')).to_have_text(['Reported practice', 'Practice days', 'Verified', 'Pristine'])
+                expect(row.locator('h3')).to_have_text(['Last week', '2 weeks ago', '3 weeks ago', '4 weeks ago'][index])
+                expect(row.locator('dt')).to_have_text(['Practice', 'Practice days', 'Verified', 'Pristine'])
                 expect(row.locator('dd').nth(1)).to_have_text(str(week['days']))
             expect(page.locator('#p-book-current-team')).to_contain_text('No team selected')
-            expect(page.locator('label[for="p-book-include-team"] small')).to_contain_text(
-                'If checked with no team selected, Submit will ask you to choose a team or continue without Team Competition.')
+            expect(page.locator('label[for="p-book-include-team"] strong')).to_have_text('Include in Team Standings')
+            expect(page.locator('label[for="p-book-include-contests"] strong')).to_have_text('Include in Leaderboards')
             assert page.locator('link[href*="practice-book.css"]').count() == 1
-            assert page.locator('script[src="/static/js/app.js?v=wl2-17c-classroom1-book-polish1"]').count() == 1
+            assert page.locator('script[src="/static/js/app.js?v=wl2-17c-classroom1-book-interaction1"]').count() == 1
             dimensions = page.evaluate('''() => {
                 const rect = s => document.querySelector(s).getBoundingClientRect().toJSON();
                 const timer = rect('.practice-timer-metal'), minutes = rect('#p-book-minutes');
                 return {width: innerWidth, scroll: document.documentElement.scrollWidth,
                     timer, minutes, shortcut: rect('.p-book-pristine'),
                     submit: rect('#submit-p-chart-btn'),
-                    description: rect('#p-book-pristine-description'),
-                    descriptionFont: getComputedStyle(document.querySelector('#p-book-pristine-description')).fontSize,
                     headphones: rect('.sound-effects-controls'), book: rect('.p-book-page'),
                     inputFont: getComputedStyle(document.querySelector('#p-book-minutes')).fontSize,
                     timerBackground: getComputedStyle(document.querySelector('#practice-timer-toggle-btn')).backgroundImage,
@@ -216,8 +216,6 @@ def test_book_layout_navigation_timer_submission_and_history(book_site, tmp_path
             assert dimensions['background'] == 'none'
             assert dimensions['timerBackground'] == 'none'
             assert float(dimensions['inputFont'].removesuffix('px')) >= 16
-            assert float(dimensions['descriptionFont'].removesuffix('px')) >= 14
-            assert dimensions['description']['top'] >= dimensions['shortcut']['bottom']
             assert dimensions['headphones']['top'] >= dimensions['book']['bottom']
             evidence['layouts'].append(dimensions)
             # The yellow palette must stay readable in both checkbox-driven states.
@@ -238,6 +236,7 @@ def test_book_layout_navigation_timer_submission_and_history(book_site, tmp_path
             if width not in (1440, 390):
                 continue
             touch = width == 390
+            page.locator('#practice-insights').screenshot(path=str(tmp_path / f'insights-{width}.png'))
             button.scroll_into_view_if_needed()
             page.screenshot(path=str(tmp_path / f'actions-{width}.png'))
             button.screenshot(path=str(tmp_path / f'submit-{width}.png'))
@@ -284,13 +283,16 @@ def test_book_layout_navigation_timer_submission_and_history(book_site, tmp_path
             rewards = list(session.execute(select(RewardGrant.__table__)))
         page.clock.install()
         activate(page.locator('#practice-timer-toggle-btn'), touch)
-        expect(page.locator('#practice-timer-toggle-btn')).to_have_text('Stop Timer')
+        expect(page.locator('#practice-timer-toggle-btn')).to_have_text('Stop Stopwatch')
         page.clock.fast_forward(91000)
         expect(page.locator('#practice-timer-display')).to_have_text('01:31')
+        page.once('dialog', lambda dialog: dialog.accept())
         activate(page.get_by_role('link', name='Pristine P-Chart', exact=True), touch)
         page.wait_for_url(origin + '/practice/pristine')
         page.go_back(); ready(page)
-        expect(page.locator('#practice-timer-toggle-btn')).to_have_text('Stop Timer')
+        expect(page.locator('#practice-timer-toggle-btn')).to_have_text('Resume Stopwatch')
+        activate(page.locator('#practice-timer-toggle-btn'), touch)
+        expect(page.locator('#practice-timer-toggle-btn')).to_have_text('Stop Stopwatch')
         page.once('dialog', lambda dialog: dialog.accept())
         activate(page.locator('#practice-timer-toggle-btn'), touch)
         expect(page.locator('#p-book-minutes')).to_have_value('2')

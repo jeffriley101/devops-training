@@ -1,0 +1,172 @@
+BOOK interaction and copy revision — Roger / OPS — November 11, 2026
+
+Status: local implementation for Leadership review. Design is not frozen.
+No push, deployment, Production access/change, migration, Classroom gate, SHOP,
+Privacy, SHED inventory or INC005 change is part of this work.
+
+Verified checkout
+  /home/geph/Training_scripts-shop-book-cleanup-20261111
+  feature/shop-book-cleanup-20261111
+  Starting HEAD: 41c1d220ae713b3cb24846d7d584f1ecc657197b; clean before editing.
+  The final exact SHA and clean status are recorded in the evidence manifest.
+
+Delivered behavior
+  The ivory/green surfaces and yellow Submit button remain. Idle timer label is
+  Stopwatch, active label Stop Stopwatch, and retained time uses Resume Stopwatch.
+  Stopwatch and Pristine P-Chart are alternatives separated by a small “or”. The
+  elapsed-time display is within Stopwatch's group and has its own accessible name.
+  The shared Pristine description is removed. Each method instead has hover/focus
+  help and a separate 44px information button which never starts that method:
+    Stopwatch: Start and stop your practice timer.
+    Pristine P-Chart: Use your microphone to track practice.
+  These descriptions match existing elapsed timing and microphone activity detection.
+  Open help stays within its method group so it does not cover the alternative.
+  Help supports touch toggle, keyboard focus, Escape, focus departure and outside
+  activation. It does not rely on title attributes.
+
+  Switching from an active Stopwatch to Pristine explicitly asks to pause. Cancel
+  keeps Stopwatch running. Continue retains elapsed time and the form draft, then
+  opens the existing Pristine experience; it does not fill minutes, save a chart,
+  or merge credited time. Retained time includes fractional seconds internally;
+  display and existing credited-minute rounding remain unchanged.
+  Pristine still uses explicit Enable Microphone & Start, Pause, Save & Finish,
+  unsaved-work confirmation and Leave Without Saving. Background capture is stopped
+  through its existing lifecycle handling. A same-origin, account-bound Web Lock
+  prevents concurrent practice methods in different tabs. Locks are released on
+  stopping, leaving, background microphone shutdown and account changes.
+  Current secure-context Web Locks support is required to start these methods.
+  If coordination is unavailable or another method holds the lock, an explicit
+  message is shown; manual entry and the draft remain available.
+
+  What did you work on? is the details control's sole summary/heading. All 23
+  checklist values remain. Notes uses the exact placeholder "Notes." and an accessible
+  optional label. The visible date heading is removed; the picker retains its
+  accessible label, original today default, allowed dates and validation. Existing
+  date and duration calculation functions and server validation are unchanged.
+
+  Checkbox labels are exactly Include in Leaderboards and Include in Team Standings.
+  Both default to checked for a new form. Existing names, submitted Boolean values,
+  eligibility and no-team choose/continue behavior are unchanged. Long explanatory
+  paragraphs are removed; actual team-status feedback remains. A checked option
+  makes no promise of rewards or competitive credit.
+
+  The separate Manage Verifiers button is removed. Add verifier… is an action
+  option in the existing select, never a recipient. Selecting it first restores
+  the prior verifier value, saves the existing account-bound draft, pauses/retains
+  Stopwatch, and opens /trusted-verifiers?return_to=p-book. Focus alone does not
+  navigate. Returning restores minutes, chosen date, notes, checklist, both Boolean
+  choices, verifier and elapsed time. A failed draft/time write blocks navigation
+  with feedback instead of silently discarding work. Drafts retain the existing
+  account/session binding and 30-minute lifetime. Submission excludes the action
+  marker explicitly, in addition to the unchanged server recipient validation.
+
+  All four statistics are native buttons opening one compact native dialog:
+    This Week’s Reported Practice: seven Monday–Sunday time bars.
+    Career Reported Practice: cumulative reported-time line over all saved history.
+    Saved Practice Days: month calendar, positive saved-time days, all-time count.
+    Saved Charts: P-Chart counts by practice week, including empty intervening weeks.
+  The whole card supports keyboard/touch and cannot submit the form. The dialog
+  focuses Close chart; Escape/Close returns focus to its opener. Exact-value tables
+  supply text alternatives and keyboard scrolling. The calendar explicitly labels
+  its selected month; all-time totals stay separately labelled. Charts do not animate.
+
+  Sources are existing authorized /practice-charts and /practice-charts/totals,
+  fetched fresh with no-store. The former returns the full authorized saved dataset,
+  not the visible ten rows or the 100-entry client cache. Career/weekly totals are
+  checked against the authoritative totals response before rendering. Positive
+  duration_seconds defines practice days; all records, including historical zero-time
+  charts, define chart count. Practice dates define days/weeks. Existing exact-seconds
+  formatter is reused. Charts are not represented as distinct sessions, do not invent
+  category minutes, and do not deduplicate potentially overlapping credited practice.
+  Fetch generations and account/session checks discard stale/private responses on
+  close, hidden page, navigation or account change. No new endpoint or permission
+  grant was added. Open-account raw statistics remain open through their existing
+  source permissions; gated rating/Insights access remains gated.
+
+  Practice Insights now shows the four completed weeks newest first: Last week,
+  2 weeks ago, 3 weeks ago, 4 weeks ago. Compact rows retain reported practice,
+  practice days, Verified and Pristine. Total and average remain server-calculated.
+  Absolute ranges are absent from these summaries; the current incomplete week
+  is not added. Dates remain available in the separate statistic visualizations.
+
+Qualification
+  Focused Python regression suite: 89 PASS / 0 FAIL / 0 SKIP; one historical
+  migration test deliberately deselected, preserving the no-migrations restriction.
+  JavaScript regression/aggregation tests: 16 PASS / 0 FAIL / 0 SKIP.
+  Disposable PostgreSQL/browser suite: 5 PASS / 0 FAIL / 0 SKIP, recorded in final-acceptance.log and
+  handoff-manifest.json. This includes existing BOOK regression flows plus the
+  expanded interaction matrix in both Chromium and Firefox.
+  Total final acceptance: 110 PASS / 0 FAIL / 0 SKIP; 1 intentional migration
+  deselection. The two previously documented unrelated SHOP baseline failures remain separate.
+  Two additional Chromium scenario reruns verify the final exact placeholder and
+  recapture the separate Insights and method/chart screenshots. Both pass and are
+  recorded separately rather than counted again among the 110 unique checks.
+  No unrelated Classroom security or migration qualification was repeated.
+
+  Local PostgreSQL 18.6: UTF8, Unix socket only, TCP disabled, disposable schemas
+  initialized from existing model metadata with synthetic data only. Schema column
+  and index definitions are compared before/after. No migration runner is used.
+  Existing practice records remain byte-for-value unchanged. Explicit submission
+  creates exactly one new chart; no switching or chart navigation saves/merges time.
+
+  Browser coverage includes desktop 1440px, mobile 320/390/430px, tablet 768px and
+  844px landscape; keyboard and touch; help with no activation; exact copy; account
+  and age boundaries; checkbox defaults and preserved false choices; selected date
+  on failed validation; verifier action/return; method cancellation and retained
+  elapsed time; cross-tab exclusion and existing microphone background stop;
+  all four charts and their text alternatives; 124 saved charts beyond the client
+  cache; exact 59-second contributions, zero-time records and same-date charts;
+  history order and pagination; and the existing submission, pending email, native
+  Chromium Copy/export, Whistler, rating, credit, reward and duplicate protections.
+  Node aggregation tests separately cover 153 rows, Monday boundaries at DST/year
+  changes, empty histories, zero-duration records and input immutability.
+
+  Early runs identified two stale markup/version assertions and a microphone test
+  stub that interfered with the shared sound library. Native Firefox Web Audio
+  remained suspended on this host even with an autoplay preference. The fixture
+  therefore feeds synthetic analyser samples while preserving native node
+  interfaces for the shared sound library. Product capture behavior was not changed.
+  These issues were corrected in tests. A timing assertion was changed to compare the retained actual elapsed value
+  rather than assume no real second passes during navigation. Production sound
+  behavior and duration formulas were not modified to accommodate test fixtures.
+
+Evidence
+  /home/geph/review-evidence/book-interaction-20261111/
+    python.log, javascript.log, final-acceptance.log, final-evidence-browser/*/results.json,
+    final-evidence-browser/*/interaction-results.json, screenshots/, source-boundary.json,
+    handoff-manifest.json, SHA256SUMS.
+  Screenshots represent the running app with synthetic accounts, including desktop
+  BOOK, mobile BOOK/actions, help on desktop and touch, the native verifier dropdown
+  with Add verifier…, each statistic chart and compact completed-week Insights.
+
+Files changed for this revision
+  templates/p_book.html
+  templates/base.html (loads coordinator only for the two practice tools)
+  templates/pristine_practice.html
+  static/css/practice-book.css
+  static/js/app.js (BOOK timer, draft and verifier UI; no submission calculations)
+  static/js/book-interactions.js (new; help, statistics presentation)
+  static/js/practice-methods.js (new; account-bound browser coordination)
+  static/js/pristine-practice.js (coordination at existing capture start/stop)
+  static/js/practice-insights.js
+  tests/test_book_cleanup_browser.py
+  tests/test_book_interaction_browser.py (new)
+  tests/test_book_stats.js (new)
+  tests/test_book_verifiers.js
+  tests/test_practice_insights.js
+  tests/test_book_board_polish.py
+  tests/test_phase8_book.py
+  tests/test_phase8_stabilization_book.py
+  tests/test_pristine_practice.py (version expectation)
+  docs/book-interaction-revision.txt (this report)
+  docs/book-appearance-redesign.txt (historical report cross-reference)
+
+Limitations and review
+  Physical iPhone/Safari and real microphone hardware were not exercised. Capture
+  tests feed synthetic samples at the analyser boundary while retaining the actual
+  application RMS/detector/timer and explicit save/discard paths. Email transport is captured locally, with no
+  external message sent. Web Locks and a secure browser context are required for
+  reliable cross-tab method coordination; unavailable coordination fails visibly.
+  Existing raw-history limits and all server policies remain unchanged.
+  Recommendation: Leadership reviews the exact local commit and screenshots.
+  The design remains open for revision. No Production release is authorized.

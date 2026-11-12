@@ -52,7 +52,7 @@ test('Full panel renders isolated aggregate via no-store request', async () => {
   assert.match(ui.elements.content.children[0].textContent, /1m 58s/);
   const metrics = ui.elements.content.children[0].children[1].children;
   assert.deepEqual(metrics.map(group => group.textContent), [
-    'Reported practice 1m 58s', 'Practice days 1', 'Verified 0m', 'Pristine 1m 58s']);
+    'Practice 1m 58s', 'Practice days 1', 'Verified 0m', 'Pristine 1m 58s']);
   assert.equal(ui.elements.locked.hidden, true);
 });
 
