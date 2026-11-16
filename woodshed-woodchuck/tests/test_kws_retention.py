@@ -99,12 +99,13 @@ def test_old_expired_failed_cancelled_nonactivated_flows_are_eligible(retention_
 
 def test_recent_current_and_still_valid_verified_flows_remain(retention_db):
     with retention_db() as session:
-        recent = pending(session, "a", expires_at=NOW - timedelta(days=29))
+        recent = pending(session, "a", expires_at=NOW - kws_retention.RETENTION_DELAY + timedelta(seconds=1))
         verification(session, recent, "b", "cancelled")
         current = pending(session, "c", expires_at=NOW + timedelta(hours=1))
         verification(session, current, "d", "accepted")
         failed = pending(session, "e", expires_at=NOW - timedelta(days=31))
-        verification(session, failed, "f", "failed", completed_at=NOW - timedelta(days=29))
+        verification(session, failed, "f", "failed",
+                     completed_at=NOW - kws_retention.RETENTION_DELAY + timedelta(seconds=1))
         verified = pending(session, "g", expires_at=NOW + timedelta(hours=72))
         verification(session, verified, "h", "verified", completed_at=NOW)
         session.commit()
@@ -221,25 +222,37 @@ def test_cleanup_cannot_bypass_five_minute_or_hourly_email_limits(
 
 
 def test_standalone_retention_import_resolves_foreign_keys():
-    """The scheduled job must register its models without other app imports."""
+    """Preserve the scheduled-service import fix from 4069207 in a fresh process."""
     import subprocess
     import sys
 
-    code = """
+    result = subprocess.run([sys.executable, '-B', '-c', '''
 from app import kws_retention
 from app.db import Base
-
 for table in Base.metadata.tables.values():
     for fk in table.foreign_keys:
         fk.column
-
-print("FOREIGN KEYS: OK")
-"""
-    result = subprocess.run(
-        [sys.executable, "-c", code],
-        capture_output=True,
-        text=True,
-        timeout=20,
-    )
+print('FOREIGN KEYS: OK')
+'''], capture_output=True, text=True, timeout=20)
     assert result.returncode == 0, result.stderr
-    assert "FOREIGN KEYS: OK" in result.stdout
+    assert 'FOREIGN KEYS: OK' in result.stdout
+
+
+@pytest.mark.parametrize('failed', [False, True])
+def test_daily_cleanup_has_a_window_before_the_30_day_maximum(retention_db, failed):
+    # Recorded schedule: 15 9 * * * (UTC). Expiry just after that run is the
+    # worst phase: the next eligible daily run must still be before day 30.
+    expiry = NOW.replace(hour=9, minute=15) + timedelta(seconds=1)
+    eligible = expiry + timedelta(days=29)
+    daily_run = (expiry + timedelta(days=30)).replace(second=0)
+    with retention_db() as session:
+        row = pending(session, 'z', expires_at=expiry + (timedelta(days=2) if failed else timedelta()))
+        if failed:
+            verification(session, row, 'y', 'failed', completed_at=expiry)
+        session.commit()
+        assert kws_retention.cleanup(session, now=eligible - timedelta(microseconds=1))['pending_consents'] == 0
+        assert kws_retention.cleanup(session, now=eligible)['pending_consents'] == 1
+        assert daily_run < expiry + timedelta(days=30)
+        assert kws_retention.cleanup(session, now=daily_run, apply=True)['pending_consents'] == 1
+        session.commit()
+        assert count(session, PendingConsent) == count(session, KWSVerification) == 0
