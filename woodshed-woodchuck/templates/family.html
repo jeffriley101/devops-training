@@ -2,7 +2,7 @@
 <h1 class="family-title">Private practice</h1>
 {% macro csrf_field() %}<input type="hidden" name="csrf" value="{{ csrf }}">{% endmacro %}
 {% if kind == 'message' %}<p role="status">{{ message }}</p>{% if woodchuck_id %}<p>Your Woodchuck ID: <strong>{{ woodchuck_id }}</strong></p>{% endif %}
-{% elif kind == 'notice' %}<pre class="family-notice">{{ notice }}</pre>
+{% elif kind == 'notice' %}<p><a href="/privacy">Privacy Policy</a></p><pre class="family-notice">{{ notice }}</pre>
 {% elif kind == 'request' %}
 {% if consent_status == 'pending_parent' %}<p>A parent permission request has already been sent. Ask your parent to use the existing Woodshed email.</p>
 {% elif consent_status == 'kws_pending' %}<p>Parent verification is being prepared or is in progress. Your account is saved. If your parent has a KWS message, they should complete it. If no message arrived, use <a href="/account/help">Help</a> rather than starting repeated requests.</p>
@@ -41,6 +41,7 @@
 <li>Epic Kids Web Services (KWS) handles adult verification. Woodshed does not receive card details.</li>
 <li>You can later withdraw permission or request access, correction, or deletion.</li>
 </ul>
+<p><a href="/privacy">Privacy Policy</a></p>
 <details class="family-notice-details">
 <summary>Read the full Parent Notice</summary>
 <div class="family-notice">{{ notice }}</div>

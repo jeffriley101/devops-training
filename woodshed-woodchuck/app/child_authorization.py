@@ -24,7 +24,7 @@ This isolated Test integration uses Epic Kids Web Services (KWS) to verify an ad
 Proposed timings: unverified requests expire after 48 hours; activation expires 72 hours after verification. Signed results have a local 24-hour freshness limit with five minutes of clock skew. These are tested technical settings, not approved retention periods. This candidate does not run deletion/anonymization or retention cleanup. A reviewed retention/deletion procedure and scheduler are required before production activation.
 Contact Woodshed Woodchuck LLC. Phone (314) 514-5611; email woodshedwoodchuck@gmail.com. Request access, correction, withdrawal or deletion through support. This draft and the authorization method require review before launch.'''
 NOTICE_SHA256 = hashlib.sha256(NOTICE.encode()).hexdigest()
-PRODUCTION_NOTICE_VERSION = 'private-practice-kws-production-v3'
+PRODUCTION_NOTICE_VERSION = 'private-practice-kws-production-v4'
 PRODUCTION_NOTICE = """Parent permission for private Woodshed practice
 Your child may use Free private practice: save practice charts and revisit their history. Full membership is optional and controls existing Insights; permission does not buy or grant access.
 After authorization we store their chosen name, account ID, hashed PIN, instrument, level, goal, private practice dates/durations/details/notes, progress, game results, rewards and account activity. Guest microphone processing is local. Guest history is not imported. Under-13 individual results remain excluded from public and other-student standings.
@@ -32,9 +32,23 @@ Account permission covers Free private practice. Director sharing is optional an
 You receive private parent access through an expiring emailed link. It covers only your child and their membership-appropriate metrics. Matching an email, paying for membership or holding a verifier PIN does not substitute for authorization. After your explicit declaration that your child is 13 or older, future qualifying activity may become public; earlier private history remains private. Existing parent/director permissions retain their scope and withdrawal controls. Your student may then establish new ordinary director connections without new parent permission; those new directors receive only qualifying practice after the transition, not earlier private charts or cumulative history. The transition day is excluded because practice dates have day-level precision.
 Render hosts the application and database. Configured Gmail SMTP processes recipient addresses, message contents and private links used for Woodshed email delivery.
 Woodshed uses Epic Kids Web Services (KWS) to verify an adult. KWS receives the parent email, configured location/language and an opaque request reference. Card verification occurs with KWS; Woodshed does not receive card details. Adult verification alone does not establish guardianship or consent: you must separately attest that you are this child's parent or legal guardian and explicitly accept this notice and selected permissions. Verification does not log you in as a parent, require Full membership or grant every permission.
-Unverified requests expire after 48 hours. The Woodshed activation link expires 72 hours after verification. Signed verification results have a local 24-hour freshness limit with five minutes of clock skew.
+Unanswered parent-permission requests expire after 48 hours.
+
+Woodshed collects the parent's contact information to request parental permission. If permission is not granted, Woodshed deletes unnecessary parent contact information and related request records within 30 days after the request expires.
+
+Expiration ends the permission request but does not immediately delete its records.
+
+This cleanup does not delete valid consent evidence associated with activated accounts. Such evidence is governed by Woodshed's separate consent-retention policy.
+The Woodshed activation link expires 72 hours after verification. Signed verification results have a local 24-hour freshness limit with five minutes of clock skew.
+Privacy Policy: https://woodshed-woodchuck.onrender.com/privacy
 Contact Woodshed Woodchuck LLC. Phone (314) 514-5611; email woodshedwoodchuck@gmail.com. Request access, correction, withdrawal or deletion through support."""
 PRODUCTION_NOTICE_SHA256 = hashlib.sha256(PRODUCTION_NOTICE.encode()).hexdigest()
+# Frozen original Production notice, accepted only for already activated consent.
+# Never use this pair to start, verify or activate a pending request under v4.
+ACTIVATED_V3_NOTICE = (
+    'private-practice-kws-production-v3',
+    '9024057b4a48a5743a43fb277aff95d84b082d02f2951d17c7179646d4c6e00a',
+)
 PENDING_TTL=timedelta(hours=48)
 CONFIRMATION_DELAY=timedelta(hours=24)
 APPROVED_TTL=timedelta(hours=72)
@@ -65,8 +79,11 @@ def consent_active(session,rule):
     if not under13_available() or not e:return False
     try:version,_,digest=notice_policy()
     except (ValueError, RuntimeError):return False
+    accepted_notices = {(version, digest)}
+    if (version, digest) == (PRODUCTION_NOTICE_VERSION, PRODUCTION_NOTICE_SHA256):
+        accepted_notices.add(ACTIVATED_V3_NOTICE)
     return bool(e.profile_id==rule.profile_id and e.parent_email and e.approved_at and e.confirmed_at
-                and not e.withdrawn_at and e.notice_version==version and e.notice_sha256==digest)
+                and not e.withdrawn_at and (e.notice_version,e.notice_sha256) in accepted_notices)
 def protected_child(session,pid):
     rule=session.get(AccountPrivacy,pid,populate_existing=True)
     return bool(rule and (rule.age_band=='under13' or rule.consent_id))
@@ -86,6 +103,7 @@ def parent_permission_html(notice,director,approve_url,withdraw_url):
           '<h2 style="font-size:22px;margin:0 0 16px">'+html.escape(paragraphs[0])+'</h2>']
     body.extend('<p style="margin:0 0 14px">'+html.escape(paragraph)+'</p>' for paragraph in paragraphs[1:])
     body.extend([
+        '<p style="margin:0 0 14px"><a href="'+html.escape(public_link('/privacy'),quote=True)+'">Privacy Policy</a></p>',
         '<p style="margin:18px 0;padding:12px;background:#f3f4f6;border-radius:6px">'+html.escape(director)+'</p>',
         '<p style="margin:22px 0"><a href="'+html.escape(approve_url,quote=True)+'" style="display:inline-block;background:#2457a7;color:#fff;text-decoration:none;font-weight:bold;padding:12px 18px;border-radius:6px">Review and choose permissions</a></p>',
         '<p style="margin:0"><a href="'+html.escape(withdraw_url,quote=True)+'" style="color:#555;text-decoration:underline">Withdraw this request</a></p>',

@@ -1,0 +1,95 @@
+INC001 PARENT NOTICE v4 — APPROVED LOCAL TRANSITION
+Karen wording/transition approval: November 16, 2026, as supplied by Leadership.
+Local implementation/testing only. Production publication/deployment NOT authorized.
+Base: 57d29d9c5593717bb238fa84b2249187c5d42980
+Version: private-practice-kws-production-v4
+Exact UTF-8 notice SHA-256 (without this review wrapper): 74ab1d02fa766a7c819aaec42f4b595e2baf91204f9b1c08a19b1a334ccd369f
+
+BEGIN EXACT PARENT NOTICE
+Parent permission for private Woodshed practice
+Your child may use Free private practice: save practice charts and revisit their history. Full membership is optional and controls existing Insights; permission does not buy or grant access.
+After authorization we store their chosen name, account ID, hashed PIN, instrument, level, goal, private practice dates/durations/details/notes, progress, game results, rewards and account activity. Guest microphone processing is local. Guest history is not imported. Under-13 individual results remain excluded from public and other-student standings.
+Account permission covers Free private practice. Director sharing is optional and separately selectable: declining it does not prevent Free private practice. Only if selected, you authorize the specific named director to see your child's identity, instrument, practice charts, dates, durations, details/notes and basic practice metrics. The director must accept the connection and verify private access. If you separately check chart review, that director may approve/reject submitted charts and return a review note. Approval is per connection; it does not make results public. You can withdraw director sharing without ending private practice, or withdraw account permission. Your child may disconnect the director.
+You receive private parent access through an expiring emailed link. It covers only your child and their membership-appropriate metrics. Matching an email, paying for membership or holding a verifier PIN does not substitute for authorization. After your explicit declaration that your child is 13 or older, future qualifying activity may become public; earlier private history remains private. Existing parent/director permissions retain their scope and withdrawal controls. Your student may then establish new ordinary director connections without new parent permission; those new directors receive only qualifying practice after the transition, not earlier private charts or cumulative history. The transition day is excluded because practice dates have day-level precision.
+Render hosts the application and database. Configured Gmail SMTP processes recipient addresses, message contents and private links used for Woodshed email delivery.
+Woodshed uses Epic Kids Web Services (KWS) to verify an adult. KWS receives the parent email, configured location/language and an opaque request reference. Card verification occurs with KWS; Woodshed does not receive card details. Adult verification alone does not establish guardianship or consent: you must separately attest that you are this child's parent or legal guardian and explicitly accept this notice and selected permissions. Verification does not log you in as a parent, require Full membership or grant every permission.
+Unanswered parent-permission requests expire after 48 hours.
+
+Woodshed collects the parent's contact information to request parental permission. If permission is not granted, Woodshed deletes unnecessary parent contact information and related request records within 30 days after the request expires.
+
+Expiration ends the permission request but does not immediately delete its records.
+
+This cleanup does not delete valid consent evidence associated with activated accounts. Such evidence is governed by Woodshed's separate consent-retention policy.
+The Woodshed activation link expires 72 hours after verification. Signed verification results have a local 24-hour freshness limit with five minutes of clock skew.
+Privacy Policy: https://woodshed-woodchuck.onrender.com/privacy
+Contact Woodshed Woodchuck LLC. Phone (314) 514-5611; email woodshedwoodchuck@gmail.com. Request access, correction, withdrawal or deletion through support.
+END EXACT PARENT NOTICE
+
+Version and permission boundaries
+New Production-mode requests and KWS verification/activation remain bound to the
+current v4 notice and exact digest. The four approved cleanup paragraphs replace
+only the November 15 interim disclosure. The isolated KWS Test notice is unchanged.
+
+Only already activated consent may also match the frozen original Production pair:
+ private-practice-kws-production-v3
+ 9024057b4a48a5743a43fb277aff95d84b082d02f2951d17c7179646d4c6e00a
+Existing profile/rule ownership, current consent, approval/confirmation, withdrawal,
+account-state, private access expiry and director revocation safeguards remain.
+ConsentEvidence is created by the existing activation transaction; the legacy
+exception does not authorize pending requests. No consent row, permission, version
+or digest is migrated, overwritten or reissued. The expired request/activation link
+is not an expiration of established valid consent.
+
+Pending v3 links cannot start/complete fresh verification or activate under v4.
+Families must explicitly initiate a fresh v4 request and complete fresh attestation,
+notice acceptance and KWS verification. No automatic resend or reuse of old KWS
+verification as v4 consent. A duplicate old verified/activated callback remains a
+no-op under existing terminal-state protections, not a fresh authorization.
+
+Privacy links
+The public notice and approval screen link directly to /privacy. Plain email has
+the complete public Privacy Policy URL within the exact signed notice; HTML email
+also has a labeled public_link('/privacy') link. Local tests open /privacy without
+login. No parent email/token is needed to view the policy. PUBLIC_BASE_URL must
+remain the correct approved public origin in any later qualified deployment.
+
+Existing cleanup command and bounded correction
+Command: python -m app.kws_retention --apply
+Recorded schedule: 15 9 * * * (daily, UTC).
+Evidence: /home/geph/review-evidence/book-release-qualification-20261112/production-observations.json
+Corroboration: /home/geph/review-evidence/book-polish-production-release-20261112/release-report.txt
+These are historical local records, not a new observation of Production.
+
+The old minimum age of 30 days made the daily job capable of running after the
+approved maximum. Eligibility now begins 29 days after expiry (or the existing,
+earlier failed-result completion clock), giving the daily job a window before day
+30. The maximum remains 30 days. Existing 48h unanswered-request expiry, 72h
+verified activation expiry, 1h email-budget pruning, throttling and locked state
+rechecks are preserved. Activated state OR activated-consent linkage prevents
+request-chain deletion; unknown/corrupt states remain fail-closed for review.
+
+Reuses the exact standalone model import from scheduled-service fix 4069207.
+This current web-derived base lacked that import and a fresh-process inspection
+reproduced NoReferencedTableError. No migration, privilege or new scheduler is
+required. Dry-run remains read-only; apply commits deletions and prints counts only.
+A nonzero exit reports failure; it must not be counted as completed cleanup.
+
+Production gate — BLOCKED / NOT VERIFIED
+The local qualification exercises the actual module in a fresh process against
+synthetic PostgreSQL and daily-boundary cases. It does not prove live execution,
+continuous scheduling, provider/backups cleanup or retention of activated consent.
+The existing retention service was recorded at 4069207, whose 30-day eligibility
+alone does not meet the revised maximum under a daily schedule. Publishing the
+approved deadline requires separately authorized deployment/qualification of BOTH
+the v4 web candidate and this existing cleanup service's corrected code; simply
+changing the web notice leaves the pinned scheduled artifact unchanged.
+
+Before publication, OPS must reconfirm the live service identity, exact command and
+schedule, correct target/permissions, successful execution/affected counts and
+operational monitoring/escalation for late or failed runs. Day29 eligibility is a
+scheduling window, not a guarantee under outages. An overdue/backlogged or corrupt
+flow needs resolution under existing safeguards; no new blanket purge is approved.
+Keep activated consent subject to the separate approved consent-retention policy.
+No Production access, scheduling change, email, KWS request or deployment was
+performed for this local assignment. Contest scheduling, gates and other services
+remain outside scope.

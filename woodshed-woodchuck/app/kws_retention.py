@@ -1,4 +1,4 @@
-"""Delete expired, non-activated KWS flows after the approved retention delay."""
+"""Delete expired, non-activated KWS flows within the approved retention limit."""
 from __future__ import annotations
 
 import argparse
@@ -8,12 +8,18 @@ import math
 
 from sqlalchemy import and_, or_, select, text
 
+from . import models as _models  # Register referenced SQLAlchemy tables (4069207).
 from .child_models import PendingConsent
 from .db import SessionLocal
 from .kws_models import KWSEmailBudget, KWSVerification
 
 
-RETENTION_DELAY = timedelta(days=30)
+# The existing daily job needs an execution window BEFORE the 30-day maximum.
+# A healthy daily run deletes eligible rows at age 29--30 days, not 30--31 days.
+# Missed/failed runs still require operational monitoring; no scheduler lives here.
+RETENTION_LIMIT = timedelta(days=30)
+SCHEDULE_INTERVAL = timedelta(days=1)
+RETENTION_DELAY = RETENTION_LIMIT - SCHEDULE_INTERVAL
 EMAIL_BUDGET_WINDOW = timedelta(hours=1)
 REMOVABLE_STATES = {
     "reserved", "accepted", "delivery_unknown", "verified", "failed", "cancelled",
