@@ -68,7 +68,7 @@ function guestForm(action = '/guest/discard') {
 const nextTurn = () => new Promise(resolve => setImmediate(resolve));
 async function browser({account = '', generation = '', guest = 'transition',
   shared = new Map(), session = new Map(), unavailable = false,
-  locks = {request: async (_name, options, fn) => (fn || options)()}} = {}) {
+  locks = {request: async (name, options, fn) => (fn || options)({name})}} = {}) {
   const ids = new Map(), requests = [], intervals = new Map();
   let timerNumber = 0, clock = 1000;
   const body = element(), shell = element();
@@ -108,15 +108,22 @@ function accountState(id) {
     profile: {woodchuckName: id, instrument: 'Flute', level: 'Beginner', goal: 'Daily'},
     progress: {credits: 37}, practiceLog: [{note: 'Saved account history'}]};
 }
-function wirePBook(b) {
+async function wirePBook(b) {
   for (const id of ['p-book-form', 'p-book-date', 'p-book-minutes', 'p-book-note', 'p-book-error',
-    'p-book-feedback', 'p-book-verifier-manage', 'practice-timer-display', 'practice-timer-toggle-btn',
-    'practice-timer-start-btn', 'practice-timer-stop-btn']) b.ids.set(id, element());
-  b.ids.get('p-book-form').querySelector = () => element();
+    'p-book-feedback', 'submit-p-chart-btn', 'practice-timer-display', 'practice-timer-toggle-btn',
+    'practice-timer-start-btn', 'practice-timer-stop-btn', 'practice-timer-feedback']) b.ids.set(id, element());
+  b.ids.get('p-book-form').querySelector = selector =>
+    selector === "button[type='submit']" ? b.ids.get('submit-p-chart-btn') : null;
+  for (const id of ['practice-timer-start-btn', 'practice-timer-stop-btn']) {
+    const button = b.ids.get(id);
+    button.click = () => button.dispatchEvent({type: 'click'});
+  }
+  b.load('practice-methods.js');
   b.context.stateApi = b.window.WWState;
   const app = source('app.js');
   vm.runInContext(app.slice(app.indexOf('  function wirePBook('), app.indexOf('  const state = ensureTodayQuest(')) +
     '\nwirePBook(stateApi.getState());', b.context);
+  await nextTurn();
 }
 
 test('anonymous welcome and setup state never reads prior account products or writes a scaffold', async () => {
@@ -196,7 +203,7 @@ test('P-Book keeps a same-session draft but rejects other accounts and earlier s
     const shared = new Map([[EPOCH, epoch], [STATE, JSON.stringify(accountState(account))]]);
     const session = new Map([[DRAFT, JSON.stringify({binding: storedBinding, savedAt: Date.now(), minutes: '25', note: 'A private note'})],
       [TIMER, JSON.stringify({binding: storedBinding, startedAt: Date.now() - 60000})]]);
-    const b = await browser({account, generation, shared, session}); b.load('state.js'); wirePBook(b);
+    const b = await browser({account, generation, shared, session}); b.load('state.js'); await wirePBook(b);
     assert.equal(b.ids.get('p-book-note').value, expected);
     assert.equal(b.intervals.size, expected ? 1 : 0);
     assert.equal(b.session.has(TIMER), Boolean(expected));
@@ -205,16 +212,22 @@ test('P-Book keeps a same-session draft but rejects other accounts and earlier s
 
 test('P-Book pagehide and delayed callbacks cannot recreate A draft or timer after another account signs in', async () => {
   const shared = new Map([[STATE, JSON.stringify(accountState('WC-A'))]]);
-  const b = await browser({account: 'WC-A', generation: 'A-session', shared}); b.load('state.js'); wirePBook(b);
+  const b = await browser({account: 'WC-A', generation: 'A-session', shared}); b.load('state.js'); await wirePBook(b);
+  const form = b.ids.get('p-book-form');
+  const toggle = b.ids.get('practice-timer-toggle-btn');
   b.ids.get('p-book-note').value = 'A private note';
-  b.ids.get('p-book-verifier-manage').dispatchEvent({type: 'click'});
-  b.ids.get('practice-timer-start-btn').dispatchEvent({type: 'click'});
+  form.dispatchEvent({type: 'input'});
+  toggle.dispatchEvent({type: 'click'});
+  await nextTurn();
   assert.equal(b.session.has(DRAFT), true); assert.equal(b.session.has(TIMER), true);
+  const [delayedTick] = b.intervals.values();
   shared.set(EPOCH, '1');
   b.window.dispatchEvent({type: 'pagehide'});
-  b.ids.get('p-book-verifier-manage').dispatchEvent({type: 'click'});
-  b.ids.get('practice-timer-start-btn').dispatchEvent({type: 'click'});
+  form.dispatchEvent({type: 'input'});
+  toggle.dispatchEvent({type: 'click'});
+  delayedTick();
   b.window.dispatchEvent({type: 'pageshow', persisted: true});
+  await nextTurn();
   assert.equal(b.session.has(DRAFT), false); assert.equal(b.session.has(TIMER), false);
   assert.equal(b.intervals.size, 0);
 });

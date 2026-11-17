@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from copy import deepcopy
 from datetime import datetime, timezone
+import hashlib
+import hmac
 import json
 import re
 import secrets
@@ -20,6 +22,7 @@ from .accounts import (
     ProfileChangeCooldown,
     authenticate_woodchuck,
     create_woodchuck_profile,
+    normalize_woodchuck_id,
     update_profile_instrument,
     update_profile_display_name,
     update_profile_level,
@@ -33,6 +36,7 @@ from .login_limits import enforce_login_limit
 from .models import RewardGrant, WoodchuckProfile, WoodchuckState
 from .login_streaks import apply_daily_login
 from .weekly_rewards import streak_request_authorizer
+from .session_config import session_secret
 from .account_deletion import (
     DeletionCredentialsError,
     DeletionDataConflict,
@@ -48,6 +52,11 @@ router = APIRouter(prefix="/account", tags=["account"])
 SESSION_PROFILE_ID = "woodchuck_profile_id"
 SESSION_PROFILE_VERSION = "woodchuck_session_version"
 SESSION_PAGE_GENERATION = "woodchuck_page_generation"
+DELETION_BROWSER_RECEIPT = "deletion_browser_receipt"
+
+
+def world_entry_scope(profile_id: int) -> str:
+    return hmac.new(session_secret().encode(), f"world-entry:daily:v2:{profile_id}".encode(), hashlib.sha256).hexdigest()
 
 
 def page_generation(request: Request) -> str:
@@ -404,6 +413,12 @@ def delete_account(
                 profile, woodchuck_id=woodchuck_id, pin=pin,
                 confirmation=confirmation, now=now,
             )
+            salt = secrets.token_hex(16)
+            browser_receipt = {
+                "salt": salt,
+                "account": hashlib.sha256(f"{salt}:{normalize_woodchuck_id(profile.woodchuck_id)}".encode()).hexdigest(),
+                "entry": hashlib.sha256(f"{salt}:{world_entry_scope(profile.id)}".encode()).hexdigest(),
+            }
             anonymize_woodchuck_account(session, profile=profile, now=now)
         except DeletionDataConflict as error:
             raise HTTPException(
@@ -420,6 +435,7 @@ def delete_account(
         session.commit()
     request.session.clear()
     request.session["deletion_confirmed"] = True
+    request.session[DELETION_BROWSER_RECEIPT] = browser_receipt
     return RedirectResponse(url="/", status_code=303, headers={"Cache-Control": "no-store"})
 
 

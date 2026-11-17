@@ -8,6 +8,7 @@
 {% if deletion_confirmed %}
 <p class="flash-message" role="status">Your Woodchuck sign-in is disabled. Your saved preferences and practice notes have been removed.
   <a href="/privacy#retention-and-deletion">See which records may remain.</a></p>
+{% if deletion_browser_receipt %}<script type="application/json" id="deletion-browser-receipt">{{ deletion_browser_receipt | tojson }}</script>{% endif %}
 {% endif %}
 <section
   class="card hero-card welcome-hero"

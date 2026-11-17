@@ -233,7 +233,7 @@
 <script src="/static/js/shared-ui.js?v=5"></script>
 <script src="/static/js/recovery.js?v=1"></script>
 {% if account_id %}<template id="account-scripts">{% else %}
-<script src="/static/js/session-boundary.js?v=s4-01"></script>{% endif %}
+<script src="/static/js/session-boundary.js?v=deletion-1"></script>{% endif %}
 {% if signing_in %}
 <script src="/static/js/state.js?v=wl2-05"></script>
 <script src="/static/js/account.js?v=wl2-04"></script>
@@ -253,6 +253,6 @@
 {% endif %}
 {% if blocked or signing_in %}<script src="/static/js/guest.js?v=wl2-05"></script>{% endif %}
 {% if account_id %}</template>
-<script src="/static/js/session-boundary.js?v=s4-01"></script>{% endif %}
+<script src="/static/js/session-boundary.js?v=deletion-1"></script>{% endif %}
 </body>
 </html>

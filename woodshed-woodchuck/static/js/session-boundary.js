@@ -3,6 +3,9 @@
   // An origin-local change counter, not a visitor identifier. No value is sent
   // to the server. Keep it outside the discardable Guest preference namespace.
   const KEY = "woodshed:session-change:v1";
+  const DELETION_KEY = "woodshed:account-deletion:v1";
+  const STATE_KEY = "woodshedWoodchuckState.v1";
+  const DRAFT_KEYS = ["woodshed:p-book:verifier-draft:v1", "woodshed:practice-timer-started-at"];
   const nativeFetch = window.fetch.bind(window);
   let accountId = document.body.dataset.accountId || "";
   let pageGeneration = document.body.dataset.pageGeneration || "";
@@ -22,10 +25,10 @@
   }
   let epoch = readEpoch();
 
-  function stop() {
+  function stop(clearTabDrafts = true) {
     if (stopped) return;
     stopped = true;
-    clearDrafts();
+    if (clearTabDrafts) clearDrafts();
     window.dispatchEvent(new CustomEvent("ww:session-changed"));
     const shell = document.querySelector(".app-shell");
     if (shell) shell.hidden = true;
@@ -53,9 +56,105 @@
     }
   }
   function clearDrafts() {
-    for (const key of ["woodshed:p-book:verifier-draft:v1", "woodshed:practice-timer-started-at"]) {
+    for (const key of DRAFT_KEYS) {
       try { window.sessionStorage.removeItem(key); } catch (_error) {}
     }
+  }
+
+  function parseStored(raw) {
+    try { return JSON.parse(raw); } catch (_error) { return null; }
+  }
+
+  function wheelRequest(db, mode, action) {
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction("pending-actions", mode);
+      const request = action(tx.objectStore("pending-actions"));
+      tx.oncomplete = () => resolve(request.result);
+      tx.onabort = () => reject(tx.error);
+    });
+  }
+
+  async function removeWheelAction(matchesAccount) {
+    if (!window.indexedDB) return;
+    const db = await new Promise((resolve, reject) => {
+      const request = window.indexedDB.open("woodshed-prize-wheel-recovery");
+      // Opening an absent database would create it. There is nothing to clean.
+      request.onupgradeneeded = () => request.transaction.abort();
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    try {
+      if (!db.objectStoreNames.contains("pending-actions")) return;
+      const keys = await wheelRequest(db, "readonly", store => store.getAllKeys());
+      for (const id of keys) {
+        if (!await matchesAccount(id)) continue;
+        const remove = () => wheelRequest(db, "readwrite", store => store.delete(id));
+        if (navigator.locks?.request) await navigator.locks.request(`woodshed:prize-wheel:request:${id}`, remove);
+        else await remove();
+      }
+    } finally { db.close(); }
+  }
+
+  async function removeDeletedAccount(raw, publish = false) {
+    const receipt = parseStored(raw);
+    if (!receipt || !/^[a-f0-9]{32}$/.test(receipt.salt) || !/^[a-f0-9]{64}$/.test(receipt.account)
+        || !/^[a-f0-9]{64}$/.test(receipt.entry) || !window.crypto?.subtle || typeof TextEncoder !== "function") return;
+    if (publish) {
+      try {
+        // Wake open tabs without leaving an account identifier or a persistent marker.
+        window.localStorage.setItem(DELETION_KEY, raw);
+        if (window.localStorage.getItem(DELETION_KEY) === raw) window.localStorage.removeItem(DELETION_KEY);
+      } catch (_error) {}
+    }
+    const encoder = new TextEncoder();
+    const digests = new Map();
+    function matches(value, expected) {
+      if (typeof value !== "string" || !value || value.length > 64) return false;
+      if (!digests.has(value)) {
+        digests.set(value, window.crypto.subtle.digest("SHA-256", encoder.encode(`${receipt.salt}:${value}`))
+          .then(result => Array.from(new Uint8Array(result), byte => byte.toString(16).padStart(2, "0")).join("")));
+      }
+      return digests.get(value).then(digest => digest === expected);
+    }
+    const matchesAccount = id => matches(typeof id === "string" ? id.trim().toUpperCase() : null, receipt.account);
+    const matchesEntry = id => matches(id, receipt.entry);
+    if (await matchesAccount(accountId)) stop(false);
+
+    for (const area of ["localStorage", "sessionStorage"]) {
+      try {
+        const storage = window[area];
+        for (const key of Object.keys(storage)) {
+          let original;
+          const read = () => parseStored(original = storage.getItem(key));
+          let owned = false;
+          if (area === "localStorage") {
+            if (key === STATE_KEY || key.startsWith("woodshedWoodchuckConflictBackup.")) {
+              owned = await matchesAccount(read()?.account?.woodchuckId);
+            } else if (key === "woodshed.plungeBurrow.bestScore") {
+              owned = await matchesAccount(read()?.binding?.accountId);
+            } else if (key === "woodshed:game-mode-entry:session:v1") {
+              const marker = read();
+              owned = Array.isArray(marker) && await matchesAccount(marker[0]);
+            } else {
+              const clover = "woodshed:clover-caper:request:";
+              const daily = ["woodshed:arcade-entry:daily:v2:", "woodshed:streak-popup:daily:v1:"].find(prefix => key.startsWith(prefix));
+              if (key.startsWith(clover)) owned = await matchesAccount(key.slice(clover.length));
+              else if (daily) owned = await matchesEntry(key.slice(daily.length));
+            }
+          } else if (DRAFT_KEYS.includes(key)) {
+            owned = await matchesAccount(read()?.binding?.accountId);
+          } else if (key === "woodshed:world-entry-arrival:v1") {
+            owned = await matchesEntry(read()?.account);
+          } else if (key.startsWith("woodshed:arcade-start:")) {
+            const owner = parseStored(key.slice("woodshed:arcade-start:".length, key.lastIndexOf(":")));
+            owned = Array.isArray(owner) && owner[1] === true && await matchesAccount(owner[0]);
+          }
+          // A different account may have replaced the shared slot while the hash was pending.
+          if (owned && (original === undefined || storage.getItem(key) === original)) storage.removeItem(key);
+        }
+      } catch (_error) {}
+    }
+    if (publish) await removeWheelAction(matchesAccount).catch(() => {});
   }
   function removeAccountProductCaches() {
     // Exact product keys only; the session epoch and security cookies survive.
@@ -212,10 +311,15 @@
       if (localGuest && epoch === null) stop();
       else isCurrent();
     }
-    if (event.key === "woodshedWoodchuckState.v1" && accountId) {
+    if (event.key === DELETION_KEY && event.newValue) {
+      void removeDeletedAccount(event.newValue).catch(() => {});
+    }
+    if (event.key === STATE_KEY && accountId) {
       try {
+        // Scoped deletion of another student's cache must not stop this tab.
+        if (event.newValue === null && parseStored(event.oldValue)?.account?.woodchuckId !== accountId) return;
         const state = JSON.parse(event.newValue);
-        if (state?.account?.woodchuckId !== accountId || !state?.account?.authenticated) stop();
+        if (state?.account?.woodchuckId !== accountId || !state?.account?.authenticated) stop(event.newValue !== null);
       } catch (_error) { stop(); }
     }
   });
@@ -306,6 +410,8 @@
     }
   }
   const ready = startAccountPage();
+  const deletionReceipt = document.getElementById("deletion-browser-receipt");
+  if (deletionReceipt) void removeDeletedAccount(deletionReceipt.textContent, true).catch(() => {});
   window.WWSessionBoundary = Object.freeze({
     isCurrent, ready, accountId: () => accountId, epoch: () => epoch,
     binding, matchesBinding, clearAccountProductCaches, submitGuestForm, guestClassroomFetch,

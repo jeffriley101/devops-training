@@ -1,8 +1,6 @@
 import os
 import logging
 import base64
-import hashlib
-import hmac
 from datetime import date, datetime
 from io import BytesIO
 from pathlib import Path
@@ -25,9 +23,11 @@ from .session_revocations import RevocableSessionMiddleware as SessionMiddleware
 from .practice_duration import format_minutes
 from .game_modes import GAME_MODES, mode_state
 from .account_routes import (
+    DELETION_BROWSER_RECEIPT,
     current_profile,
     page_generation,
     router as account_router,
+    world_entry_scope,
 )
 from .membership_routes import router as membership_router
 from .classroom_invitation_routes import router as classroom_invitation_router
@@ -210,11 +210,7 @@ def _render(request: Request, template_name: str, *, analytics_event: str | None
             page_generation(request)
             authenticated_profile = {
                 # Presentation-only account scope for the daily Arcade entrance.
-                "world_entry_account": hmac.new(
-                    SESSION_SECRET.encode(),
-                    f"world-entry:daily:v2:{profile.id}".encode(),
-                    hashlib.sha256,
-                ).hexdigest(),
+                "world_entry_account": world_entry_scope(profile.id),
                 "display_name": profile.display_name,
                 "woodchuck_id": profile.woodchuck_id,
                 "band_director": has_band_director_capability(
@@ -306,8 +302,10 @@ def art_submission_mailto() -> str:
 
 @app.get("/")
 def welcome(request: Request):
-    return _render(request, "welcome.html", title="Woodshed Woodchuck",
-                   deletion_confirmed=request.session.pop("deletion_confirmed", False))
+    confirmed = request.session.pop("deletion_confirmed", False)
+    browser_receipt = request.session.pop(DELETION_BROWSER_RECEIPT, None)
+    return _render(request, "welcome.html", title="Woodshed Woodchuck", deletion_confirmed=confirmed,
+                   deletion_browser_receipt=browser_receipt if confirmed else None)
 
 
 @app.get("/privacy")
