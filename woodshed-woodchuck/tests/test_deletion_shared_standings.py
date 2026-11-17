@@ -10,12 +10,14 @@ from app.contests import contest_results_payload, ensure_band_camp_data, finaliz
 from app.models import ContestResult, ContestWeek, PracticeChart, RewardGrant, Season, Team, TeamReport, WoodchuckProfile
 from app.parent_deletion_support import PRIOR_ACTION
 from app.teams import create_and_join_team, select_team
+from tests.test_associated_disposal_support import qualify_student_disposal
 from tests.test_parent_deletion_support import support_case
 from tests.test_team_contests import FINAL_NOW, NOW, add_chart
 
 
 def test_student_deletion_and_prior_cleanup_preserve_shared_standings(play_pg, support_case):
     run, publish, case, register, teammate_id, role = support_case
+    qualify_student_disposal(play_pg, role)
     profile_id = case["profile_id"]
     with play_pg() as session:
         season, _, week = ensure_band_camp_data(session, now=NOW)
@@ -49,6 +51,7 @@ def test_student_deletion_and_prior_cleanup_preserve_shared_standings(play_pg, s
     assert baseline[1]["team-weekly-practice"]["open"][0]["score"] == 75
     assert baseline[2]
     original = run()
+    assert set(original["disposal"].values()) == {"verified"}
     assert read_standings() == baseline
 
     # An older generation can have private notes alongside correct, finalized scores.

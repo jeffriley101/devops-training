@@ -29,6 +29,7 @@ from .account_deletion import (
     ordinary_deletion_complete,
 )
 from .accounts import retired_identifier_hash
+from .deletion_disposal import associated_disposal, valid_disposal_record
 from .adult_account_deletion import (
     AdultDeletionHold,
     adult_deletion_complete,
@@ -52,7 +53,8 @@ ACTION = "DELETE THIS ACCOUNT"
 ADULT_ACTION = "DELETE MY ADULT ACCOUNT"
 PRIOR_ACTION = "CLEAN UP PREVIOUS STUDENT DELETION"
 PRIOR_ADULT_ACTION = "CLEAN UP PREVIOUS ADULT DELETION"
-RETENTION_SCOPE = "ordinary-invitation-disposal-v2"
+INVITATION_SCOPE = "ordinary-invitation-disposal-v2"
+RETENTION_SCOPE = "associated-data-disposal-v3"
 PRIOR_CASE_FIELDS = {
     "case", "status", "action", "profile_id", "woodchuck_id", "profile_created_at", "deleted_at",
     "deletion_evidence_ref", "evidence_kind", "verified_by", "verified_at",
@@ -288,17 +290,22 @@ def _original_intent(register, case, target, *, adult):
     subject_id = "verifier_id" if adult else "profile_id"
     fields = {"case", subject_id, "role", "database", "database_oid", "approval_sha256", "restriction_sha256", "deleted_at"}
     hashes = {"approval_sha256", "restriction_sha256"}
+    expected_receipt = {"case": source, "status": "adult_deletion_applied" if adult else "deletion_applied"}
+    if type(intent) is dict and intent.get("retention_scope") == RETENTION_SCOPE:
+        if not valid_disposal_record(intent.get("disposal"), adult=adult):
+            raise SupportDenied("support_prior_receipt_mismatch")
+        fields.add("disposal")
+        expected_receipt["disposal"] = intent["disposal"]
     if adult:
         fields.add("invitation_key")
         hashes.add("invitation_key")
     if (type(intent) is not dict or set(intent) not in (fields, fields | {"retention_scope"})
-            or ("retention_scope" in intent and intent["retention_scope"] != RETENTION_SCOPE)
+            or ("retention_scope" in intent and intent["retention_scope"] not in (INVITATION_SCOPE, RETENTION_SCOPE))
             or any(not isinstance(intent[key], str) or re.fullmatch(r"[0-9a-f]{64}", intent[key]) is None for key in hashes)
             or (intent["case"], intent["database"], intent["database_oid"], intent["role"], intent[subject_id])
             != (source, target.database, target.database_oid, target.role, case[subject_id])
             or _time(intent["deleted_at"]) != _time(case["deleted_at"])
-            or receipt != {"case": source, "status": "adult_deletion_applied" if adult else "deletion_applied",
-                           "deleted_at": intent["deleted_at"], "intent_sha256": _digest(intent)}):
+            or receipt != {**expected_receipt, "deleted_at": intent["deleted_at"], "intent_sha256": _digest(intent)}):
         raise SupportDenied("support_prior_receipt_mismatch")
     return intent
 
@@ -346,7 +353,9 @@ def _apply_deletion(session, case, reference, clock, *, adult, prior, original):
             clear_adult_spent_invitations(session, verifier.id)
             if not adult_spent_invitations_complete(session, verifier.id):
                 raise SupportDenied("support_prior_cleanup_postcondition_failed")
-            return _utc(verifier.updated_at), restriction
+            coverage = associated_disposal(session, verifier.id, adult_key=original["invitation_key"],
+                                           deleted_at=verifier.updated_at)
+            return _utc(verifier.updated_at), restriction, coverage
         if (verifier is None or normalize_email(verifier.email) != case["email"]
                 or _utc(verifier.created_at) != created_at):
             raise SupportDenied("support_adult_mismatch_or_unavailable")
@@ -354,7 +363,8 @@ def _apply_deletion(session, case, reference, clock, *, adult, prior, original):
         if (_utc(verifier.updated_at) != _utc(moment) or not adult_deletion_complete(session, verifier)
                 or not adult_spent_invitations_complete(session, verifier.id)):
             raise SupportDenied("support_deletion_postcondition_failed")
-        return moment, _adult_restriction_digest(verifier)
+        coverage = associated_disposal(session, verifier.id, adult_key=invitation_key(case["email"]), deleted_at=moment)
+        return moment, _adult_restriction_digest(verifier), coverage
 
     profile, _ = lock_account_for_deletion(session, case["profile_id"])
     moment = clock()
@@ -373,17 +383,17 @@ def _apply_deletion(session, case, reference, clock, *, adult, prior, original):
         session.flush()
         if not ordinary_deletion_complete(session, profile) or _restriction_digest(profile) != restriction:
             raise SupportDenied("support_prior_cleanup_postcondition_failed")
-        return _utc(profile.deleted_at), restriction
+        return _utc(profile.deleted_at), restriction, associated_disposal(session, profile.id)
     if (profile is None or profile.status != "active" or profile.woodchuck_id != case["woodchuck_id"]
             or _utc(profile.created_at) != created_at):
         raise SupportDenied("support_child_mismatch_or_unavailable")
     previous_version = profile.session_version
-    anonymize_woodchuck_account(session, profile=profile, now=moment)
+    coverage = anonymize_woodchuck_account(session, profile=profile, now=moment)
     restriction = _restriction_digest(profile)
     if (restriction is None or _utc(profile.deleted_at) != _utc(moment)
             or profile.session_version != previous_version + 1):
         raise SupportDenied("support_deletion_postcondition_failed")
-    return moment, restriction
+    return moment, restriction, coverage
 
 
 def _check_register(directory):
@@ -420,14 +430,14 @@ def fulfill(factory, *, target, approval_directory, approval_uid, register, refe
                     case = _read_json(stream)
                 _authority(case, reference, clock(), adult=adult, prior=prior)
                 original = _original_intent(register, case, target, adult=adult) if prior else None
-                moment, restriction = _apply_deletion(session, case, reference, clock, adult=adult, prior=prior,
-                                                      original=original)
+                moment, restriction, coverage = _apply_deletion(session, case, reference, clock, adult=adult,
+                                                                prior=prior, original=original)
                 subject_id = "verifier_id" if adult else "profile_id"
                 intent = {
                     "case": reference, subject_id: case[subject_id], "role": target.role,
                     "database": target.database, "database_oid": target.database_oid,
                     "approval_sha256": _digest(case), "restriction_sha256": restriction,
-                    "deleted_at": _utc(moment).isoformat(), "retention_scope": RETENTION_SCOPE,
+                    "deleted_at": _utc(moment).isoformat(), "retention_scope": RETENTION_SCOPE, "disposal": coverage,
                 }
                 if prior:
                     intent["cleanup_action"] = PRIOR_ADULT_ACTION if adult else PRIOR_ACTION
@@ -461,8 +471,13 @@ def _reconcile(factory, target, reference, intent, result_path, *, adult, prior,
     current_scope = isinstance(intent, dict) and "retention_scope" in intent
     if current_scope:
         fields.add("retention_scope")
+    extended = current_scope and intent["retention_scope"] == RETENTION_SCOPE
+    if extended:
+        fields.add("disposal")
     if (type(intent) is not dict or set(intent) != fields or intent["case"] != reference
-            or (prior and not current_scope) or (current_scope and intent["retention_scope"] != RETENTION_SCOPE)
+            or (prior and not current_scope)
+            or (current_scope and intent["retention_scope"] not in (INVITATION_SCOPE, RETENTION_SCOPE))
+            or (extended and not valid_disposal_record(intent["disposal"], adult=adult))
             or (intent["database"], intent["database_oid"], intent["role"])
             != (target.database, target.database_oid, target.role)
             or type(intent[subject_id]) is not int or intent[subject_id] <= 0
@@ -488,11 +503,19 @@ def _reconcile(factory, target, reference, intent, result_path, *, adult, prior,
             complete = ordinary_deletion_complete(session, subject, current_scope=current_scope)
         if not complete:
             raise SupportDenied("support_ordinary_cleanup_incomplete")
+        if extended:
+            try:
+                associated_disposal(session, subject.id, adult_key=intent.get("invitation_key"),
+                                    deleted_at=_time(intent["deleted_at"]), recorded=intent["disposal"])
+            except DeletionDataConflict as error:
+                raise SupportDenied("support_associated_cleanup_unverified") from error
         if adult and not adult_invitation_cutoff_complete(session, intent["invitation_key"],
                                                          subject.updated_at, clock()):
             raise SupportDenied("support_ordinary_cleanup_incomplete")
     result = {"case": reference, "status": "adult_deletion_applied" if adult else "deletion_applied",
               "deleted_at": intent["deleted_at"]}
+    if extended:
+        result["disposal"] = intent["disposal"]
     if prior:
         result.update(status="prior_adult_spent_invitations_verified" if adult else "prior_ordinary_cleanup_verified",
                       cleanup_at=intent["cleanup_at"])

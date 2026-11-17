@@ -118,7 +118,8 @@ def test_clears_ordinary_data_while_preserving_provenance_and_shared_records(pla
     for row in protected_invitations:
         expected = {**invitation_fields(row), 'last_email_error_code': None}
         if row.status in ('accepted', 'expired', 'revoked'):
-            expected.update(email='deleted@invalid.local', token_hash=f'retired:{row.id}')
+            expected.update(email='deleted@invalid.local', token_hash=f'retired:{row.id}',
+                            last_email_attempt_at=None, last_email_sent_at=None, email_attempt_count=0)
         expected_history[row.id] = expected
     with play_pg() as stale:
         stale_invite = stale.get(TrustedVerifierInvitation, invite.id)
@@ -136,7 +137,7 @@ def test_clears_ordinary_data_while_preserving_provenance_and_shared_records(pla
         assert (deleted.instrument, deleted.level, deleted.goal) == ('[deleted]',) * 3
         assert deleted.first_choice_instrument is deleted.game_mode is None
         assert deleted.display_name_changed_at is deleted.level_changed_at is None
-        assert deleted.plunge_best_score == 27
+        assert deleted.plunge_best_score == 0
         saved_chart = session.get(PracticeChart, chart.id)
         assert (saved_chart.ordinary_email_error_code, saved_chart.note, saved_chart.practice_details) == (None, None, [])
         saved_verification = session.get(PracticeChartVerification, verification.id)
@@ -155,8 +156,7 @@ def test_clears_ordinary_data_while_preserving_provenance_and_shared_records(pla
         assert session.get(TrustedVerifier, verifier.id).email == verifier.email
         assert list(session.scalars(select(AnalyticsEvent.profile_id))) == [other.id]
         assert list(session.scalars(select(PracticeEmailPreset.id))) == [other_preset.id]
-        streak = session.get(LoginStreak, student.id)
-        assert (streak.current_days, streak.last_login_date, streak.updated_at) == (0, None, NOW)
+        assert session.get(LoginStreak, student.id) is None
         assert session.get(LoginStreak, other.id).last_login_date == NOW.date()
         assert session.scalar(select(RewardGrant).where(RewardGrant.contest_result_id == result.id)) is not None
 

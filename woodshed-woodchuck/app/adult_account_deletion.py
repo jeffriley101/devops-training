@@ -1,7 +1,5 @@
 """Ordinary adult account deletion. The caller locks the verified adult and owns the transaction."""
 from datetime import timezone
-import hashlib
-import hmac
 import re
 import secrets
 
@@ -17,9 +15,8 @@ from .membership_models import (
     Membership, MembershipSeat, MembershipSeatInvitation, ProviderSubscription,
 )
 from .models import StudentVerifierConnection, TrustedVerifier, TrustedVerifierInvitation, WoodchuckProfile
-from .session_config import session_secret
 from .session_revocations import RevokedBrowserSession
-from .verifier_invitation_disposal import accepted_invitation, retired_invitation_token
+from .verifier_invitation_disposal import accepted_invitation, invitation_key, retired_invitation_token
 
 
 def _invitation_lifetime():
@@ -31,12 +28,6 @@ def _invitation_lifetime():
 
 class AdultDeletionHold(ValueError):
     """Accountable preflight hold. Its code is safe for the external Support case."""
-
-
-def invitation_key(email):
-    return hmac.new(session_secret().encode(),
-                    ("adult-invitation-retirement:v1:" + email.strip().lower()).encode(),
-                    hashlib.sha256).hexdigest()
 
 
 def _utc(value):

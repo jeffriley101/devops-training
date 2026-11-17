@@ -8,6 +8,7 @@ from sqlalchemy import and_, delete, inspect, or_, select, update
 from sqlalchemy.orm import Session
 
 from .accounts import normalize_woodchuck_id, retired_identifier_hash
+from .deletion_disposal import DeletionDataConflict, associated_disposal
 from .child_models import ConsentEvidence, DirectorPermission, ParentAccess
 from .models import (
     AnalyticsEvent,
@@ -50,10 +51,6 @@ class DeletionCredentialsError(ValueError):
 
 
 class DeletionRateLimited(ValueError):
-    pass
-
-
-class DeletionDataConflict(ValueError):
     pass
 
 
@@ -275,7 +272,7 @@ def clear_student_ordinary_data(session: Session, profile: WoodchuckProfile, *, 
 
 def anonymize_woodchuck_account(
     session: Session, *, profile: WoodchuckProfile, now: datetime
-) -> None:
+) -> dict[str, str] | None:
     """Disable one profile and clear ordinary account data within the caller's transaction."""
     profile, now = lock_account_for_deletion(session, profile.id, now=now)
     if profile is None:
@@ -327,3 +324,4 @@ def anonymize_woodchuck_account(
     session.flush()
     if not ordinary_deletion_complete(session, profile):
         raise DeletionDataConflict("Ordinary account cleanup could not be verified.")
+    return associated_disposal(session, profile.id)

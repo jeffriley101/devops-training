@@ -20,7 +20,9 @@ Old Program invitations can create a new sign-in for the same mailbox. Deletion 
 
 ## Previously deleted adults
 
-Use `cleanup-prior-adult` for accepted invitation tokens still linked to an already-deleted verifier. Open a new case under the same adult approval and register custody. Require the original adult deletion intent and receipt in that register. The executor checks the recorded database and role against its configuration, then verifies the receipt digest, account creation and deletion times, committed tombstone and any still-required invitation cutoff. Leave cases with a missing original record open.
+Use `cleanup-prior-adult` for spent tokens and attributable invitation contacts still linked to an already-deleted verifier. Open a new case under the same adult approval and register custody. Require the original adult deletion intent and receipt in that register. The executor checks the recorded database and role against its configuration, then verifies the receipt digest, account creation and deletion times, committed tombstone and any still-required invitation cutoff. Leave cases with a missing original record open.
+
+The `accepted_invitation_contacts` result covers the recorded accepting adult, consistent acceptance dates through deletion, and addresses matching the original verified mailbox digest. `contact_review_required` means an actor-linked address remains after eligible matches were removed. This can happen when a prior mailbox key cannot be verified after rotation. `access_required` means the role could not complete disposal. Keep those cases open for the assigned reviewer. Student-owned recipient presets require independent attribution.
 
 The independent approver publishes `case`, `status` (`approved`), `action` (`CLEAN UP PREVIOUS ADULT DELETION`), `verifier_id`, `verifier_created_at`, original `deleted_at`, `evidence_kind` (`support_receipt`), `deletion_evidence_ref` (the original case reference), `verified_by` and timezone-aware `verified_at`. Verify the original record within 24 hours of executing cleanup. The individual executor runs:
 

@@ -191,7 +191,7 @@ def create_store_purchase(request: Request, submitted: StorePurchaseSubmission):
             )
             state_revision = lock_state(session, profile.id).revision
             session.commit()
-        except StoreItemUnavailableError as error:
+        except (StoreItemUnavailableError, OwnedItemAccessError) as error:
             session.rollback()
             raise HTTPException(status_code=400, detail=str(error)) from error
         except InsufficientDandelionsError as error:

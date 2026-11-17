@@ -419,7 +419,7 @@ def delete_account(
                 "account": hashlib.sha256(f"{salt}:{normalize_woodchuck_id(profile.woodchuck_id)}".encode()).hexdigest(),
                 "entry": hashlib.sha256(f"{salt}:{world_entry_scope(profile.id)}".encode()).hexdigest(),
             }
-            anonymize_woodchuck_account(session, profile=profile, now=now)
+            disposal = anonymize_woodchuck_account(session, profile=profile, now=now)
         except DeletionDataConflict as error:
             raise HTTPException(
                 status_code=409, detail="Deletion needs review. Contact support@woodshedwoodchuck.com.",
@@ -435,6 +435,8 @@ def delete_account(
         session.commit()
     request.session.clear()
     request.session["deletion_confirmed"] = True
+    if disposal and "access_required" in disposal.values():
+        request.session["deletion_cleanup_pending"] = True
     request.session[DELETION_BROWSER_RECEIPT] = browser_receipt
     return RedirectResponse(url="/", status_code=303, headers={"Cache-Control": "no-store"})
 

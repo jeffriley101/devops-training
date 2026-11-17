@@ -303,9 +303,10 @@ def art_submission_mailto() -> str:
 @app.get("/")
 def welcome(request: Request):
     confirmed = request.session.pop("deletion_confirmed", False)
+    pending = request.session.pop("deletion_cleanup_pending", False)
     browser_receipt = request.session.pop(DELETION_BROWSER_RECEIPT, None)
     return _render(request, "welcome.html", title="Woodshed Woodchuck", deletion_confirmed=confirmed,
-                   deletion_browser_receipt=browser_receipt if confirmed else None)
+                   deletion_browser_receipt=browser_receipt if confirmed else None, deletion_cleanup_pending=pending)
 
 
 @app.get("/privacy")

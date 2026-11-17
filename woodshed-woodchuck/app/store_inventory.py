@@ -299,10 +299,10 @@ def _normalized_size(value: str) -> str:
     return value
 
 
-def _lock_placement_profile(session: Session, *, profile_id: int) -> None:
+def _lock_inventory_profile(session: Session, *, profile_id: int) -> None:
     locked_profile_id = session.scalar(
         select(WoodchuckProfile.id)
-        .where(WoodchuckProfile.id == profile_id)
+        .where(WoodchuckProfile.id == profile_id, WoodchuckProfile.status == "active")
         .with_for_update()
     )
     if locked_profile_id is None:
@@ -346,7 +346,7 @@ def place_traveling_cup_inventory_item(
     x = _normalized_coordinate(placement_x)
     y = _normalized_coordinate(placement_y)
     size = _normalized_size(placement_size)
-    _lock_placement_profile(session, profile_id=profile_id)
+    _lock_inventory_profile(session, profile_id=profile_id)
     _traveling_cup_definition_for_entitled_profile(
         session, profile_id=profile_id, inventory_key=inventory_key
     )
@@ -373,7 +373,7 @@ def place_traveling_cup_inventory_item(
 def remove_traveling_cup_inventory_placement(
     session: Session, *, profile_id: int, inventory_key: str
 ) -> dict[str, object]:
-    _lock_placement_profile(session, profile_id=profile_id)
+    _lock_inventory_profile(session, profile_id=profile_id)
     _traveling_cup_definition_for_entitled_profile(
         session, profile_id=profile_id, inventory_key=inventory_key
     )
@@ -395,7 +395,7 @@ def update_traveling_cup_inventory_size(
     placement_size: str,
 ) -> dict[str, object]:
     size = _normalized_size(placement_size)
-    _lock_placement_profile(session, profile_id=profile_id)
+    _lock_inventory_profile(session, profile_id=profile_id)
     _traveling_cup_definition_for_entitled_profile(
         session, profile_id=profile_id, inventory_key=inventory_key
     )
@@ -429,7 +429,7 @@ def place_owned_item_copy(
     x = _normalized_coordinate(placement_x)
     y = _normalized_coordinate(placement_y)
     size = _normalized_size(placement_size)
-    _lock_placement_profile(session, profile_id=profile_id)
+    _lock_inventory_profile(session, profile_id=profile_id)
     owned = session.scalar(
         select(OwnedItemCopy)
         .where(
@@ -454,7 +454,7 @@ def remove_owned_item_copy_placement(
     profile_id: int,
     owned_item_id: int,
 ) -> OwnedItemCopy:
-    _lock_placement_profile(session, profile_id=profile_id)
+    _lock_inventory_profile(session, profile_id=profile_id)
     owned = session.scalar(
         select(OwnedItemCopy)
         .where(
@@ -502,7 +502,7 @@ def place_crown_inventory_item(
     x = _normalized_coordinate(placement_x)
     y = _normalized_coordinate(placement_y)
     size = _normalized_size(placement_size)
-    _lock_placement_profile(session, profile_id=profile_id)
+    _lock_inventory_profile(session, profile_id=profile_id)
     award = _earned_crown_for_key(
         session, profile_id=profile_id, inventory_key=inventory_key
     )
@@ -531,7 +531,7 @@ def place_crown_inventory_item(
 def remove_crown_inventory_placement(
     session: Session, *, profile_id: int, inventory_key: str
 ) -> dict[str, object]:
-    _lock_placement_profile(session, profile_id=profile_id)
+    _lock_inventory_profile(session, profile_id=profile_id)
     award = _earned_crown_for_key(
         session, profile_id=profile_id, inventory_key=inventory_key
     )
@@ -583,7 +583,7 @@ def place_earned_reward_inventory_item(
     x = _normalized_coordinate(placement_x)
     y = _normalized_coordinate(placement_y)
     size = _normalized_size(placement_size)
-    _lock_placement_profile(session, profile_id=profile_id)
+    _lock_inventory_profile(session, profile_id=profile_id)
     grant, ordinal = _earned_reward_for_key(
         session, profile_id=profile_id, inventory_key=inventory_key
     )
@@ -620,7 +620,7 @@ def remove_earned_reward_inventory_placement(
     profile_id: int,
     inventory_key: str,
 ) -> dict[str, object]:
-    _lock_placement_profile(session, profile_id=profile_id)
+    _lock_inventory_profile(session, profile_id=profile_id)
     grant, ordinal = _earned_reward_for_key(
         session, profile_id=profile_id, inventory_key=inventory_key
     )
@@ -729,7 +729,7 @@ def update_inventory_item_size(
             inventory_key=inventory_id,
             placement_size=size,
         )
-    _lock_placement_profile(session, profile_id=profile_id)
+    _lock_inventory_profile(session, profile_id=profile_id)
     crown_award_id = crown_award_id_from_inventory_key(inventory_id)
     if crown_award_id is not None:
         award = _earned_crown_for_key(
@@ -850,6 +850,7 @@ def purchase_catalog_item(
     if item is None:
         raise StoreItemUnavailableError("That item is not available in today's catalog.")
 
+    _lock_inventory_profile(session, profile_id=profile_id)
     state = lock_state(session, profile_id)
     balance = _credits(state)
     if balance < item.price:
@@ -899,6 +900,7 @@ def grant_owned_item(
     if not normalized_key or len(normalized_key) > 100:
         raise ValueError("The grant key must be between 1 and 100 characters.")
 
+    _lock_inventory_profile(session, profile_id=profile_id)
     existing = session.scalar(select(OwnedItemCopy).where(
         OwnedItemCopy.profile_id == profile_id,
         OwnedItemCopy.acquisition_key == normalized_key,

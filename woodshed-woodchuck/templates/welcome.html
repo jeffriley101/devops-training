@@ -7,6 +7,8 @@
 {% block content %}
 {% if deletion_confirmed %}
 <p class="flash-message" role="status">Your Woodchuck sign-in is disabled. Your saved preferences and practice notes have been removed.
+  {% if deletion_cleanup_pending %}Some private data still needs an authorized cleanup. Contact
+  <a href="mailto:support@woodshedwoodchuck.com?subject=Account%20Deletion%20Request">Woodshed Support</a> for follow-up.{% endif %}
   <a href="/privacy#retention-and-deletion">See which records may remain.</a></p>
 {% if deletion_browser_receipt %}<script type="application/json" id="deletion-browser-receipt">{{ deletion_browser_receipt | tojson }}</script>{% endif %}
 {% endif %}
