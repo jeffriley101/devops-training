@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt
 from sqlalchemy import distinct, func, select
 
 from .account_routes import current_profile
+from .accounts import lock_active_profile_id
 from .db import SessionLocal
 from .economy import lock_state, economy_payload
 from .email_service import DeliveryResult, EmailService, public_link
@@ -49,6 +50,9 @@ def _aware(value: datetime | None) -> datetime | None:
 
 
 def record_verification_delivery(session, verification, result: DeliveryResult) -> None:
+    profile_id = session.scalar(select(PracticeChart.profile_id).where(PracticeChart.id == verification.practice_chart_id))
+    if profile_id is None or lock_active_profile_id(session, profile_id) is None:
+        return
     now = datetime.now(timezone.utc)
     previous = _aware(verification.last_email_attempt_at)
     verification.email_attempt_count = (verification.email_attempt_count or 0) + 1 if previous and previous.date() == now.date() else 1
@@ -58,6 +62,14 @@ def record_verification_delivery(session, verification, result: DeliveryResult) 
     session.commit(); session.refresh(verification)
     if not result.sent:
         logger.warning("pchart_email_failed record_id=%s code=%s", verification.id, result.code)
+
+
+def _authorize_chart_delivery(session, request, profile):
+    if lock_active_profile_id(session, profile.id) is None:
+        raise HTTPException(status_code=401, detail="Student sign-in is required.")
+    session.refresh(profile)
+    if current_profile(request, session) is None:
+        raise HTTPException(status_code=401, detail="Student sign-in is required.")
 
 
 def email_delivery_payload(result: DeliveryResult, email: str) -> dict[str, object]:
@@ -329,7 +341,7 @@ def list_practice_email_presets(request: Request):
 def create_practice_email_preset(request: Request, submitted: PracticeEmailPresetCreate):
     with SessionLocal() as session:
         profile = current_profile(request, session)
-        if profile is None:
+        if profile is None or lock_active_profile_id(session, profile.id) is None:
             raise HTTPException(status_code=401, detail="Student sign-in is required.")
         try:
             email = validate_email(submitted.email)
@@ -437,6 +449,11 @@ def create_student_practice_chart(
                 ),
             ) from error
 
+        if created.verification is not None:
+            # The chart service may have committed. Lock the account again
+            # before any verifier email or delivery metadata is produced.
+            _authorize_chart_delivery(session, request, profile)
+            session.refresh(created.verification)
         verifier = (
             session.get(
                 TrustedVerifier,
@@ -463,7 +480,8 @@ def create_student_practice_chart(
                 local_base_url=str(request.base_url),
             )
             from .child_authorization import protected_child
-            if created.created and not protected_child(session,profile.id):
+            if (created.created and created.verification.status == "pending"
+                    and not protected_child(session,profile.id)):
                 delivery = EmailService().send_practice_chart(
                     recipient=verifier.email, student_name=profile.woodchuck_id,
                     practice_date=created.chart.practice_date.isoformat(), minutes=created.chart.minutes,
@@ -540,6 +558,7 @@ def resend_practice_chart_email(request: Request, verification_id: int):
         profile = current_profile(request, session)
         if profile is None:
             raise HTTPException(status_code=401, detail="Student sign-in is required.")
+        _authorize_chart_delivery(session, request, profile)
         row = session.execute(
             select(PracticeChartVerification, PracticeChart, TrustedVerifier, StudentVerifierConnection)
             .join(PracticeChart, PracticeChart.id == PracticeChartVerification.practice_chart_id)

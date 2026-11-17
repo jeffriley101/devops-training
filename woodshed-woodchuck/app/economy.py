@@ -3,7 +3,8 @@ from copy import deepcopy
 
 from sqlalchemy import JSON, String, and_, case, cast, func, literal, or_, select
 
-from .models import WoodchuckProfile, WoodchuckState
+from .accounts import lock_active_profile_id
+from .models import WoodchuckState
 
 
 def lock_state(session, profile_id):
@@ -12,12 +13,11 @@ def lock_state(session, profile_id):
     Refresh cached JSON after waiting for another writer. Flush our own pending
     state first so multiple rewards in one transaction keep their accumulated sum.
     """
-    from .age_privacy import require_eligible
-    require_eligible(session,profile_id)
+    from .age_privacy import AgeScreenRequired, require_eligible
     with session.no_autoflush:
-        session.execute(select(WoodchuckProfile.id).where(
-            WoodchuckProfile.id == profile_id,
-        ).with_for_update())
+        if lock_active_profile_id(session, profile_id) is None:
+            raise AgeScreenRequired()
+    require_eligible(session, profile_id)
     pending = next((row for row in session.new if isinstance(row, WoodchuckState)
                     and row.profile_id == profile_id), None)
     cached = pending if pending is not None else session.get(WoodchuckState, profile_id)

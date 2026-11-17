@@ -306,12 +306,18 @@ def art_submission_mailto() -> str:
 
 @app.get("/")
 def welcome(request: Request):
-    return _render(request, "welcome.html", title="Woodshed Woodchuck")
+    return _render(request, "welcome.html", title="Woodshed Woodchuck",
+                   deletion_confirmed=request.session.pop("deletion_confirmed", False))
 
 
 @app.get("/privacy")
 def privacy_policy(request: Request):
-    return _render(request, "privacy.html", title="Privacy Policy")
+    return templates.TemplateResponse(
+        request=request,
+        name="privacy.html",
+        context={"title": "Privacy Policy"},
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @app.get("/login")

@@ -9,6 +9,7 @@ import secrets
 from sqlalchemy import select
 from . import child_authorization as consent
 from .child_models import PendingConsent
+from .accounts import lock_active_profile_id
 from .age_models import AccountPrivacy
 from .models import WoodchuckProfile
 from .kws_models import KWSVerification, KWSEmailBudget
@@ -249,18 +250,23 @@ def start(session, token, fields):
 
 
 def deliver(session, verification_id, payload):
-    v = session.get(KWSVerification, verification_id)
-    row = session.get(PendingConsent, v.pending_id)
+    pending_id = session.scalar(select(KWSVerification.pending_id).where(KWSVerification.id == verification_id))
+    # The reservation is already committed. Use the callback/activation lock
+    # order and recheck the bound account before sending contact data to KWS.
+    row = session.scalar(select(PendingConsent).where(PendingConsent.id == pending_id)
+                         .with_for_update().execution_options(populate_existing=True))
+    v = session.scalar(select(KWSVerification).where(KWSVerification.id == verification_id,
+                                                     KWSVerification.pending_id == pending_id)
+                       .with_for_update().execution_options(populate_existing=True))
+    if row is None or v is None or (row.profile_id is not None
+                                  and lock_active_profile_id(session, row.profile_id) is None):
+        raise ValueError('The permission request is unavailable.')
     try:
         cfg = Config.load(v.environment)
         client.send_email(cfg, row.parent_email, payload)
         outcome = 'accepted'
     except KWSUnavailable:
         outcome = 'delivery_unknown'
-    row = session.scalar(select(PendingConsent).where(PendingConsent.id == v.pending_id)
-                         .with_for_update().execution_options(populate_existing=True))
-    v = session.scalar(select(KWSVerification).where(KWSVerification.id == verification_id)
-                       .with_for_update().execution_options(populate_existing=True))
     if v.state not in TERMINAL:
         v.state = outcome
     session.commit()

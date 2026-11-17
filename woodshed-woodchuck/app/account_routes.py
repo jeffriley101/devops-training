@@ -35,8 +35,10 @@ from .login_streaks import apply_daily_login
 from .weekly_rewards import streak_request_authorizer
 from .account_deletion import (
     DeletionCredentialsError,
+    DeletionDataConflict,
     DeletionRateLimited,
     anonymize_woodchuck_account,
+    lock_account_for_deletion,
     verify_deletion_confirmation,
 )
 
@@ -394,14 +396,19 @@ def delete_account(
         profile = current_profile(request, session)
         if profile is None:
             raise HTTPException(status_code=401, detail="Student sign-in is required.")
-        from .team_authority import lock_authority
-        lock_authority(session)
-        now = datetime.now(timezone.utc)
         try:
+            profile, now = lock_account_for_deletion(session, profile.id)
+            if profile is None or current_profile(request, session) is None:
+                raise HTTPException(status_code=401, detail="Student sign-in is required.")
             verify_deletion_confirmation(
                 profile, woodchuck_id=woodchuck_id, pin=pin,
                 confirmation=confirmation, now=now,
             )
+            anonymize_woodchuck_account(session, profile=profile, now=now)
+        except DeletionDataConflict as error:
+            raise HTTPException(
+                status_code=409, detail="Deletion needs review. Contact support@woodshedwoodchuck.com.",
+            ) from error
         except DeletionRateLimited as error:
             raise HTTPException(status_code=429, detail=str(error)) from error
         except DeletionCredentialsError as error:
@@ -410,10 +417,10 @@ def delete_account(
                 status_code=400,
                 detail="Woodchuck ID, PIN, or confirmation did not match.",
             ) from error
-        anonymize_woodchuck_account(session, profile=profile, now=now)
         session.commit()
     request.session.clear()
-    return RedirectResponse(url="/?account_deleted=1", status_code=303)
+    request.session["deletion_confirmed"] = True
+    return RedirectResponse(url="/", status_code=303, headers={"Cache-Control": "no-store"})
 
 
 @router.post("/daily-secret")
@@ -634,6 +641,11 @@ def load_account_state(request: Request):
             )
 
         saved_state = session.get(WoodchuckState, profile.id)
+        # A deletion can commit between the initial profile lookup and the
+        # state read. Do not return an authenticated envelope in that case.
+        session.refresh(profile)
+        if current_profile(request, session) is None:
+            raise HTTPException(status_code=401, detail="Sign in is required.")
 
         return JSONResponse({
             "authenticated": True,

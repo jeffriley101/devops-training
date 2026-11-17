@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 import sys
 
@@ -16,7 +16,8 @@ from sqlalchemy.pool import StaticPool
 from starlette.requests import Request
 
 from app import account_routes
-from app.contests import normalize_instrument
+from app.age_privacy import declare_age
+from app.contests import CENTRAL, normalize_instrument
 from app.account_routes import InstrumentUpdate, change_profile_instrument
 from app.accounts import create_woodchuck_profile, update_profile_instrument
 from app.db import Base
@@ -90,6 +91,7 @@ def test_instrument_change_preserves_account_state_and_history(
     )
     session.add(profile)
     session.flush()
+    declare_age(session, profile.id, "13to17")
     saved_state = {
         "profile": {"instrument": "Saxophone", "level": "Advanced"},
         "progress": {"credits": 321, "streak": 14, "level": 8},
@@ -151,7 +153,8 @@ def test_instrument_change_preserves_account_state_and_history(
         session,
         profile=profile,
         verifier_id=verifier.id,
-        practice_date=date(2026, 8, 4),
+        submission_key="updated-instrument-chart",
+        practice_date=datetime.now(CENTRAL).date(),
         minutes=20,
     )
     assert future.chart.instrument == "Clarinet"
@@ -216,7 +219,7 @@ def test_historical_hand_percussion_p_chart_remains_readable(
     session: Session,
 ) -> None:
     profile = WoodchuckProfile(
-        woodchuck_id="WC-LEGACY-HAND-PERCUSSION",
+        woodchuck_id="WC-LEGACY-HAND",
         display_name="Legacy Player",
         pin_hash="legacy-pin-hash",
         instrument="Hand Percussion",
@@ -224,13 +227,16 @@ def test_historical_hand_percussion_p_chart_remains_readable(
         goal="Keep practicing",
     )
     session.add(profile)
+    session.flush()
+    declare_age(session, profile.id, "13to17")
     session.commit()
 
     created = create_practice_chart_verification_request(
         session,
         profile=profile,
         verifier_id=None,
-        practice_date=date(2026, 8, 31),
+        submission_key="legacy-instrument-chart",
+        practice_date=datetime.now(CENTRAL).date(),
         minutes=20,
     )
 
@@ -298,6 +304,8 @@ def test_authenticated_instrument_api_returns_only_public_instrument_data(
             goal="Practice",
         )
         session.add(profile)
+        session.flush()
+        declare_age(session, profile.id, "13to17")
         session.commit()
         profile_id = profile.id
 

@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from .age_privacy import sharing_allowed as eligible, ordinary_director_connection, director_chart_visible
 from .account_routes import current_profile
+from .accounts import lock_active_profile_id
 from .db import SessionLocal
 from .login_limits import enforce_login_limit
 from .security import hash_invitation_token
@@ -55,6 +56,9 @@ def _aware(value: datetime | None) -> datetime | None:
 
 
 def record_delivery(session: Session, record, result: DeliveryResult) -> None:
+    if lock_active_profile_id(session, record.profile_id) is None:
+        session.refresh(record)
+        return
     now = datetime.now(timezone.utc)
     previous = _aware(record.last_email_attempt_at)
     record.email_attempt_count = (record.email_attempt_count or 0) + 1 if previous and previous.date() == now.date() else 1
@@ -65,6 +69,20 @@ def record_delivery(session: Session, record, result: DeliveryResult) -> None:
     session.refresh(record)
     if not result.sent:
         logger.warning("invitation_email_failed record_id=%s code=%s", record.id, result.code)
+
+
+def _authorize_invitation_delivery(session, request, profile, issuance):
+    # Issuing/reissuing commits the token before email. The delivery transaction
+    # must still confirm the account and token are current after that commit.
+    if lock_active_profile_id(session, profile.id) is None:
+        raise HTTPException(status_code=401, detail="Student sign-in is required.")
+    session.refresh(profile)
+    if current_profile(request, session) is None:
+        raise HTTPException(status_code=401, detail="Student sign-in is required.")
+    session.refresh(issuance.invitation)
+    if (issuance.invitation.status != "pending"
+            or issuance.invitation.token_hash != hash_invitation_token(issuance.token)):
+        raise HTTPException(status_code=409, detail="That invitation has changed.")
 
 
 def delivery_payload(result: DeliveryResult, email: str) -> dict[str, object]:
@@ -228,6 +246,7 @@ def create_student_invitation(
                 detail=str(error),
             ) from error
 
+        _authorize_invitation_delivery(session, request, profile, created)
         token = created.token
         accept_path = f"/trusted-verifiers/accept/{token}"
         accept_url = public_link(
@@ -428,6 +447,7 @@ def resend_student_invitation_email(request: Request, invitation_id: int):
         if previous and now - previous < RESEND_COOLDOWN:
             raise HTTPException(status_code=429, detail="Please wait 60 seconds before resending.")
         reissued = reissue_trusted_verifier_invitation(session, profile=profile, invitation_id=invitation_id)
+        _authorize_invitation_delivery(session, request, profile, reissued)
         accept_path = f"/trusted-verifiers/accept/{reissued.token}"
         accept_url = public_link(
             accept_path, local_base_url=str(request.base_url)

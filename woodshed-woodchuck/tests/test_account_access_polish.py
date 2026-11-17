@@ -6,7 +6,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app import account_routes, main as main_module
+from app import account_routes, age_routes, main as main_module, session_revocations
+from app.age_privacy import declare_age
 from app.db import Base
 from app.main import app
 from app.models import WoodchuckProfile, WoodchuckState
@@ -27,6 +28,8 @@ def access_db(monkeypatch: pytest.MonkeyPatch):
     factory = sessionmaker(bind=engine, expire_on_commit=False)
     monkeypatch.setattr(account_routes, "SessionLocal", factory)
     monkeypatch.setattr(main_module, "SessionLocal", factory)
+    monkeypatch.setattr(age_routes, "SessionLocal", factory)
+    monkeypatch.setattr(session_revocations, "SessionLocal", factory)
     with factory() as session:
         for woodchuck_id, name in ((OWN_ID, "Current Student"), (OTHER_ID, "Other Student")):
             profile = WoodchuckProfile(
@@ -34,6 +37,7 @@ def access_db(monkeypatch: pytest.MonkeyPatch):
                 instrument="Flute", level="Beginner", goal="Practice",
             )
             session.add(profile); session.flush()
+            declare_age(session, profile.id, "13to17")
             session.add(WoodchuckState(
                 profile_id=profile.id,
                 state_json={

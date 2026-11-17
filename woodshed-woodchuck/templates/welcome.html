@@ -5,8 +5,9 @@
 {% endblock %}
 
 {% block content %}
-{% if request.query_params.get('account_deleted') == '1' %}
-<p class="flash-message" role="status">Your Woodchuck account has been deleted.</p>
+{% if deletion_confirmed %}
+<p class="flash-message" role="status">Your Woodchuck sign-in is disabled. Your saved preferences and practice notes have been removed.
+  <a href="/privacy#retention-and-deletion">See which records may remain.</a></p>
 {% endif %}
 <section
   class="card hero-card welcome-hero"

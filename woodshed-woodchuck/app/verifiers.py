@@ -7,6 +7,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from .accounts import lock_active_profile_id
 from .models import (
     StudentVerifierConnection,
     TrustedVerifier,
@@ -224,6 +225,8 @@ def create_trusted_verifier_invitation(
 
     normalized_email = validate_email(email)
     normalized_role = validate_role(role)
+    if lock_active_profile_id(session, profile.id) is None:
+        raise ValueError("The student account is unavailable.")
     from .child_authorization import protected_child
     from .age_privacy import ordinary_director_allowed
     if protected_child(session,profile.id) and commit and (normalized_role!='band_director' or not ordinary_director_allowed(session,profile.id)):
@@ -317,12 +320,14 @@ def reissue_trusted_verifier_invitation(
 ) -> CreatedInvitation:
     if profile.id is None:
         raise ValueError("The student account must be saved first.")
+    if lock_active_profile_id(session, profile.id) is None:
+        raise ValueError("That trusted-verifier invitation is invalid.")
 
     invitation = session.scalar(
         select(TrustedVerifierInvitation).where(
             TrustedVerifierInvitation.id == invitation_id,
             TrustedVerifierInvitation.profile_id == profile.id,
-        )
+        ).execution_options(populate_existing=True)
     )
 
     if invitation is None:
@@ -376,12 +381,13 @@ def accept_trusted_verifier_invitation(
     if not raw_token:
         raise ValueError("The invitation token is required.")
 
-    invitation = session.scalar(
-        select(TrustedVerifierInvitation).where(
-            TrustedVerifierInvitation.token_hash
-            == hash_invitation_token(raw_token)
-        )
-    )
+    by_token = select(TrustedVerifierInvitation).where(
+        TrustedVerifierInvitation.token_hash == hash_invitation_token(raw_token)
+    ).execution_options(populate_existing=True)
+    invitation = session.scalar(by_token)
+    if invitation is None or lock_active_profile_id(session, invitation.profile_id) is None:
+        raise ValueError("That trusted-verifier invitation is invalid.")
+    invitation = session.scalar(by_token)
 
     if invitation is None:
         raise ValueError("That trusted-verifier invitation is invalid.")

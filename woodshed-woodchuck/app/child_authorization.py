@@ -157,6 +157,11 @@ def pending_from_token(session,token,*,purpose='approve',lock=False):
     row=session.scalar((q.with_for_update() if lock else q).execution_options(populate_existing=True))
     version,_,_=notice_policy()
     if not row or utc(row.expires_at)<=clock() or row.notice_version!=version:raise ValueError('Invalid, expired or superseded notice link.')
+    if row.profile_id is not None:
+        from .models import WoodchuckProfile
+        target=select(WoodchuckProfile.id).where(WoodchuckProfile.id==row.profile_id,WoodchuckProfile.status=='active')
+        if session.scalar(target.with_for_update() if lock else target) is None:
+            raise ValueError('Invalid, expired or superseded notice link.')
     return row
 
 def approve(session,token,*,explicit,notice_version,review_allowed):
@@ -228,7 +233,7 @@ def permission_valid(session,p,*,require_connection=False):
     from .models import WoodchuckProfile,StudentVerifierConnection,TrustedVerifier
     if not p or p.revoked_at:return False
     rule=session.get(AccountPrivacy,p.profile_id,populate_existing=True)
-    profile=session.get(WoodchuckProfile,p.profile_id)
+    profile=session.get(WoodchuckProfile,p.profile_id,populate_existing=True)
     if not profile or profile.status!='active' or not rule or rule.consent_id!=p.consent_id or not consent_active(session,rule):return False
     if p.connection_id:
         c=session.get(StudentVerifierConnection,p.connection_id,populate_existing=True)
@@ -236,7 +241,16 @@ def permission_valid(session,p,*,require_connection=False):
         return bool(c and c.status=='accepted' and c.profile_id==p.profile_id and c.role=='band_director' and v and v.email.casefold()==p.email.casefold())
     return not require_connection
 
+def _lock_director_permission(session, permission):
+    # Consent first, shared with deletion and authenticated director access.
+    session.scalar(select(ConsentEvidence.id).where(ConsentEvidence.id==permission.consent_id).with_for_update())
+    return session.scalar(select(DirectorPermission).where(DirectorPermission.id==permission.id)
+                          .with_for_update().execution_options(populate_existing=True))
+
+
 def send_director_link(session,p):
+    if p is not None:
+        p=_lock_director_permission(session,p)
     if not permission_valid(session,p):raise ValueError('Director permission is unavailable or disconnected.')
     now=clock()
     if p.requested_at and utc(p.requested_at)+REQUEST_INTERVAL>now:raise ValueError('Wait five minutes before requesting another link.')
@@ -248,8 +262,11 @@ def consume_director_link(session,token,*,pin,name,accept):
     from .models import TrustedVerifier,StudentVerifierConnection,WoodchuckProfile,TrustedVerifierInvitation
     from .security import verify_pin
     from .verifiers import create_trusted_verifier_invitation,accept_trusted_verifier_invitation,reissue_trusted_verifier_invitation
-    p=session.scalar(select(DirectorPermission).where(DirectorPermission.link_hash==hash_invitation_token(token)).with_for_update().execution_options(populate_existing=True))
-    if not permission_valid(session,p) or not p.link_expires_at or utc(p.link_expires_at)<=clock():raise ValueError('Verify director access using a current emailed link.')
+    token_hash=hash_invitation_token(token)
+    p=session.scalar(select(DirectorPermission).where(DirectorPermission.link_hash==token_hash))
+    if p is not None:
+        p=_lock_director_permission(session,p)
+    if not permission_valid(session,p) or p.link_hash!=token_hash or not p.link_expires_at or utc(p.link_expires_at)<=clock():raise ValueError('Verify director access using a current emailed link.')
     v=session.scalar(select(TrustedVerifier).where(TrustedVerifier.email==p.email))
     existing=session.scalar(select(StudentVerifierConnection).where(StudentVerifierConnection.profile_id==p.profile_id,StudentVerifierConnection.verifier_id==v.id,StudentVerifierConnection.status=='accepted',StudentVerifierConnection.role=='band_director')) if v else None
     if existing:

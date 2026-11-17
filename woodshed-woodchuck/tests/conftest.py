@@ -9,6 +9,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import pytest
 
+pytest_plugins = ["tests.play_pg"]
+
 
 @pytest.fixture(autouse=True)
 def first_party_test_clients(monkeypatch):

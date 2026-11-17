@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
 import hashlib
+import os
 
 import pytest
 from fastapi.testclient import TestClient
@@ -11,10 +12,11 @@ from sqlalchemy.pool import StaticPool
 
 from tests.team_factory import make_team
 
-from app import account_routes, main as main_module, session_revocations, verifier_routes
+from app import account_routes, age_routes, main as main_module, session_revocations, verifier_routes
 from app.account_deletion import DELETED_PUBLIC_NAME, anonymize_woodchuck_account
 from app.accounts import create_woodchuck_profile, normalize_woodchuck_id, retired_identifier_hash
 from app.account_routes import SESSION_PROFILE_ID, SESSION_PROFILE_VERSION
+from app.age_privacy import declare_age
 from app.db import Base
 from app.main import app
 from app.models import (
@@ -30,14 +32,21 @@ from app.verifiers import accept_trusted_verifier_invitation
 NOW = datetime(2026, 8, 3, 20, tzinfo=timezone.utc)
 
 
-@pytest.fixture
-def deletion_db(monkeypatch: pytest.MonkeyPatch):
+def utc_time(stamp: datetime) -> datetime:
+    return stamp.replace(tzinfo=timezone.utc) if stamp.tzinfo is None else stamp.astimezone(timezone.utc)
+
+
+@pytest.fixture(params=["sqlite", "postgresql"] if os.getenv("WW_PLAY_DELETION_PG") == "1" else ["sqlite"])
+def deletion_db(request, monkeypatch: pytest.MonkeyPatch):
+    if request.param == "postgresql":
+        return request.getfixturevalue("play_pg")
     engine = create_engine(
         "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
     )
     Base.metadata.create_all(engine)
     factory = sessionmaker(bind=engine, expire_on_commit=False)
     monkeypatch.setattr(account_routes, "SessionLocal", factory)
+    monkeypatch.setattr(age_routes, "SessionLocal", factory)
     monkeypatch.setattr(main_module, "SessionLocal", factory)
     monkeypatch.setattr(verifier_routes, "SessionLocal", factory)
     monkeypatch.setattr(session_revocations, "SessionLocal", factory)
@@ -179,7 +188,7 @@ def test_anonymization_preserves_history_and_removes_private_data(deletion_db) -
 
         deleted = session.get(WoodchuckProfile, deleted.id)
         assert deleted.status == "deleted"
-        assert deleted.deleted_at.replace(tzinfo=timezone.utc) == NOW
+        assert utc_time(deleted.deleted_at) == NOW
         assert deleted.display_name == DELETED_PUBLIC_NAME
         assert deleted.woodchuck_id.startswith("WD-") and deleted.session_version == 1
         chart = session.get(PracticeChart, chart.id)
@@ -195,9 +204,9 @@ def test_anonymization_preserves_history_and_removes_private_data(deletion_db) -
         assert session.get(Team, team.id).creator_profile_id is None
         assert session.get(Team, team.id).family_id == original["family_id"]
         assert session.get(TeamFamily, original["family_id"]) is not None
-        assert session.scalar(select(TeamMembership).where(
+        assert utc_time(session.scalar(select(TeamMembership).where(
             TeamMembership.profile_id == deleted.id
-        )).ended_at.replace(tzinfo=timezone.utc) == NOW
+        )).ended_at) == NOW
         assert session.scalar(select(TeamMembership).where(
             TeamMembership.profile_id == teammate.id
         )).ended_at is None
@@ -228,6 +237,52 @@ def test_anonymization_preserves_history_and_removes_private_data(deletion_db) -
         assert session.get(WoodchuckState, other.id).state_json == other_balance
 
 
+def test_signed_out_privacy_policy_offers_email_deletion_request(deletion_db) -> None:
+    response = TestClient(app).get("/privacy#account-deletion", follow_redirects=False)
+    assert response.status_code == 200
+    assert 'href="#account-deletion"' in response.text
+    heading = '<h2 id="account-deletion">Request Account Deletion</h2>'
+    assert response.text.index(heading) < response.text.index("Information we collect")
+    request_section = response.text.split(heading, 1)[1].split("</section>", 1)[0]
+    request_link = 'href="mailto:support@woodshedwoodchuck.com?subject=Account%20Deletion%20Request"'
+    assert request_link in request_section
+    assert "without signing in or reinstalling the app" in request_section
+    assert "A parent or legal guardian" in request_section
+    assert "The child's PIN is unnecessary." in request_section
+    assert 'href="#retention-and-deletion"' in request_section
+    assert 'id="retention-and-deletion"' in response.text
+
+
+def test_under13_student_can_read_public_policy_and_delete_without_parent_permission(deletion_db) -> None:
+    with deletion_db() as session:
+        student = profile(session, 9)
+        woodchuck_id = student.woodchuck_id
+        declare_age(session, student.id, "under13")
+        session.commit()
+
+    client = TestClient(app)
+    credentials = {"woodchuck_id": woodchuck_id, "pin": "1234"}
+    login = client.post("/account/login", data=credentials)
+    assert login.status_code == 200 and login.json()["age_screen_required"] is True
+    assert 'href="/account/privacy"' in client.get("/account/age").text
+    assert client.get("/account/privacy").status_code == 200
+
+    policy = client.get(
+        "/privacy#account-deletion", headers={"Accept": "text/html"}, follow_redirects=False,
+    )
+    assert policy.status_code == 200
+    assert policy.headers["Cache-Control"] == "no-store"
+    assert 'id="account-deletion"' in policy.text
+    assert woodchuck_id not in policy.text
+    assert 'id="account-state-bootstrap" type="application/json">null</script>' in policy.text
+
+    response = client.post(
+        "/account/delete", data={**credentials, "confirmation": "DELETE"}, follow_redirects=False,
+    )
+    assert response.status_code == 303
+    assert client.get("/account/me").json()["authenticated"] is False
+
+
 def test_delete_route_requires_exact_credentials_and_revokes_cookie(deletion_db) -> None:
     with deletion_db() as session:
         deleted = profile(session, 10)
@@ -235,6 +290,8 @@ def test_delete_route_requires_exact_credentials_and_revokes_cookie(deletion_db)
         session.commit()
         profile_id = deleted.id
     client = TestClient(app)
+    receipt_text = "Your Woodchuck sign-in is disabled. Your saved preferences and practice notes have been removed."
+    assert receipt_text not in client.get("/?account_deleted=1").text
     assert client.get("/account/delete").status_code == 405
     assert client.post("/account/delete", data={
         "woodchuck_id": old_id, "pin": "1234", "confirmation": "DELETE",
@@ -244,6 +301,9 @@ def test_delete_route_requires_exact_credentials_and_revokes_cookie(deletion_db)
     privacy = client.get("/account/privacy")
     assert privacy.status_code == 200
     assert "Delete Your Woodchuck Account" in privacy.text
+    assert 'href="/privacy#account-deletion"' in privacy.text
+    assert 'href="/privacy#retention-and-deletion"' in privacy.text
+    assert "Some records may remain linked" in privacy.text
     assert 'name="pin"' in privacy.text and 'name="pin" value=' not in privacy.text
     second = TestClient(app)
     assert second.post("/account/login", data={"woodchuck_id": old_id, "pin": "1234"}).status_code == 200
@@ -257,7 +317,8 @@ def test_delete_route_requires_exact_credentials_and_revokes_cookie(deletion_db)
         "woodchuck_id": old_id, "pin": "1234", "confirmation": "DELETE",
     }, follow_redirects=True)
     assert response.status_code == 200
-    assert "Your Woodchuck account has been deleted." in response.text
+    assert receipt_text in response.text
+    assert receipt_text not in client.get("/").text
     assert client.get("/account/me").json()["authenticated"] is False
     assert second.get("/account/me").json()["authenticated"] is False
     assert client.post("/account/login", data={
@@ -266,6 +327,25 @@ def test_delete_route_requires_exact_credentials_and_revokes_cookie(deletion_db)
     with deletion_db() as session:
         row = session.get(WoodchuckProfile, profile_id)
         assert row.status == "deleted" and row.retired_woodchuck_id_hash
+
+
+def test_confirmation_failures_are_counted_and_rate_limited(deletion_db) -> None:
+    with deletion_db() as session:
+        student = profile(session, 12)
+        session.commit()
+        login_id = student.woodchuck_id
+        sid = student.id
+    client = TestClient(app)
+    assert client.post("/account/login", data={"woodchuck_id": login_id, "pin": "1234"}).status_code == 200
+    for phrase in ("delete", "DELÉTE", "no", "Remove", "Confirm"):
+        response = client.post("/account/delete", data={"woodchuck_id": login_id, "pin": "1234", "confirmation": phrase})
+        assert response.status_code == 400
+    assert client.post("/account/delete", data={
+        "woodchuck_id": login_id, "pin": "1234", "confirmation": "DELETE",
+    }).status_code == 429
+    with deletion_db() as session:
+        account = session.get(WoodchuckProfile, sid)
+        assert account.status == "active" and account.deletion_failed_attempts == 5
 
 
 def test_deleted_invitation_token_is_invalid(deletion_db) -> None:
@@ -288,7 +368,7 @@ def test_retired_identifier_uses_stable_keyed_reservation(
     deletion_db, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture,
 ) -> None:
     monkeypatch.setenv("SESSION_SECRET", "stable-test-session-secret")
-    old_id = "WC-RETIRED-PRIVATE"
+    old_id = "WC-PRIVATE-01"
     with deletion_db() as session:
         deleted = WoodchuckProfile(
             woodchuck_id=old_id, display_name="Private Student",
@@ -308,11 +388,11 @@ def test_retired_identifier_uses_stable_keyed_reservation(
         assert deleted.retired_woodchuck_id_hash != plain_sha
         assert old_id not in deleted.woodchuck_id
 
-        generated = iter([old_id.lower(), "WC-DIFFERENT-AVAILABLE"])
+        generated = iter([old_id.lower(), "WC-AVAILABLE-02"])
         monkeypatch.setattr("app.accounts.generate_woodchuck_id", lambda: next(generated))
         replacement = create_woodchuck_profile(
             session, display_name="Replacement", pin="5678", instrument="Flute",
             level="Beginner", goal="Practice",
         )
-        assert replacement.woodchuck_id == "WC-DIFFERENT-AVAILABLE"
+        assert replacement.woodchuck_id == "WC-AVAILABLE-02"
         assert old_id not in caplog.text

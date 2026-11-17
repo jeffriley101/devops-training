@@ -19,6 +19,13 @@ def normalize_woodchuck_id(woodchuck_id: str) -> str:
     return woodchuck_id.strip().upper()
 
 
+def lock_active_profile_id(session: Session, profile_id: int) -> int | None:
+    """Fence writes against account deletion and recheck status after the lock."""
+    return session.scalar(select(WoodchuckProfile.id).where(
+        WoodchuckProfile.id == profile_id, WoodchuckProfile.status == "active",
+    ).with_for_update())
+
+
 def retired_identifier_hash(woodchuck_id: str) -> str:
     """Return a stable, non-enumerable reservation for a retired login ID.
 
@@ -101,6 +108,8 @@ def update_profile_instrument(
     instrument: str,
 ) -> WoodchuckProfile:
     normalized_instrument = normalize_supported_instrument(instrument)
+    if lock_active_profile_id(session, profile.id) is None:
+        raise ValueError("The account is unavailable.")
     profile.instrument = normalized_instrument
 
     try:
@@ -141,10 +150,12 @@ def _update_profile_field(
 ) -> WoodchuckProfile:
     now = _utc(now or datetime.now(timezone.utc))
     locked = session.scalar(
-        select(WoodchuckProfile).where(WoodchuckProfile.id == profile.id).with_for_update()
+        select(WoodchuckProfile).where(
+            WoodchuckProfile.id == profile.id, WoodchuckProfile.status == "active",
+        ).with_for_update().execution_options(populate_existing=True)
     )
     if locked is None:
-        raise RuntimeError("The profile could not be changed.")
+        raise ValueError("The account is unavailable.")
     if getattr(locked, field) == value:
         return locked
     changed_at = getattr(locked, timestamp_field)

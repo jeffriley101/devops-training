@@ -14,15 +14,23 @@
       Your Woodchuck ID: <strong>{{ profile.woodchuck_id }}</strong>
       <span>Use this as a reference; enter it manually below.</span>
     </p>
-    <p><strong>This is immediate and permanent. Your account cannot be recovered.</strong></p>
+    <p><strong>Deleting your account ends your access to it.</strong></p>
     <ul>
       <li>You will be signed out everywhere.</li>
-      <li>Your public identity will become Deleted Woodchuck.</li>
-      <li>Your current team membership will end.</li>
-      <li>Existing team and contest history will be preserved anonymously.</li>
-      <li>Saved email addresses and pending private links will be removed.</li>
+      <li>Your public display name will become “Deleted Woodchuck.”</li>
+      <li>Your current team membership and private connections will end.</li>
+      <li>Saved practice notes, checklist details, and practice-email presets will be removed.</li>
+      <li>Pending verifier invitations will be revoked.</li>
       <li>If you are a team captain, the team will remain temporarily without a captain.</li>
     </ul>
+    <p>
+      Some records may remain linked to your account after deletion.
+      <a href="/privacy#retention-and-deletion">See what Woodshed retains</a>.
+    </p>
+    <p>
+      <a href="/privacy#account-deletion">Request deletion without signing in</a>
+      or see how a parent or guardian can request deletion for their child.
+    </p>
     <form method="post" action="/account/delete" class="stack-form">
       <label for="delete-woodchuck-id">Woodchuck ID</label>
       <input id="delete-woodchuck-id" name="woodchuck_id" required autocomplete="off" />

@@ -72,6 +72,7 @@ def test_home_get_and_catalog_never_become_a_roster_or_connected_students(worksp
     assert opened.status_code==200 and 'Concert Band' in opened.text
     assert 'SCHOOL_ADMIN_SENTINEL' not in opened.text and 'EXPLICIT_CHART' not in opened.text
     assert '/band-director/dashboard' in opened.text
+    assert 'href="/privacy#adult-account-deletion"' in opened.text
     connected=client.get('/band-director/dashboard')
     assert 'WC-TEST0002' in connected.text and 'SCHOOL_ADMIN_SENTINEL' not in connected.text
 

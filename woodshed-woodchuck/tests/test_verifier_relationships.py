@@ -61,6 +61,9 @@ def test_invite_accept_login_and_role_specific_dashboard(roster_db, role):
             profile=session.get(WoodchuckProfile, student), email="adult@example.com", role=role)
         token = invitation.token
     client = TestClient(main.app)
+    invitation_page = client.get(f"/trusted-verifiers/accept/{token}")
+    assert invitation_page.status_code == 200
+    assert 'id="trusted-verifier-accept-form"' in invitation_page.text
     response = client.post(f"/trusted-verifiers/invitations/{token}/accept",
                            data={"display_name": "Adult", "pin": "1357"})
     assert response.status_code == 200
@@ -71,8 +74,22 @@ def test_invite_accept_login_and_role_specific_dashboard(roster_db, role):
     assert (page.context["student"] is not None) == (role == "verifier")
     director = client.get("/band-director/dashboard")
     assert ("Invitee" in director.text) == (role == "band_director")
+    adult_deletion = "/privacy#adult-account-deletion"
+    for dashboard in (page, director):
+        assert f'href="{adult_deletion}"' in dashboard.text
+    policy = client.get(adult_deletion, follow_redirects=False)
+    assert policy.status_code == 200
+    assert 'id="adult-account-deletion"' in policy.text
+    assert "adult@example.com" not in policy.text
+    with roster_db() as session:
+        connection = session.scalar(select(StudentVerifierConnection).where(
+            StudentVerifierConnection.profile_id == student,
+        ))
+        assert connection.status == "accepted"
     if role == "verifier":
-        assert {"rating", "trend", "lifetime", "season", "achievements"} <= page.context["student"].keys()
+        snapshot = page.context["student"]
+        assert {"lifetime", "season", "achievements"} <= snapshot.keys()
+        assert {"rating", "trend"}.isdisjoint(snapshot)
 
 @pytest.mark.parametrize("role", ["band_director", "parent", "mentor", "unknown"])
 def test_other_roles_cannot_select_verifier_snapshot(roster_db, role):

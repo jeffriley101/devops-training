@@ -18,6 +18,7 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import SQLAlchemyError
 from starlette.background import BackgroundTask
 
+from .accounts import lock_active_profile_id
 from .models import (
     AnalyticsEvent, ArcadePlaySession, CampPointAward, ContestResult,
     DailyTriviaAttempt, OwnedItemCopy, PracticeChart, QuestCompletion,
@@ -67,9 +68,7 @@ def record_event(session_factory, *, profile_id, event_type, occurred_at):
         with session_factory() as session:
             from .age_privacy import eligible, can_publish
             if not eligible(session,profile_id) or not can_publish(session,profile_id,at=instant):return
-            if session.scalar(select(WoodchuckProfile.id).where(
-                WoodchuckProfile.id == profile_id, WoodchuckProfile.status == "active",
-            )) is None:
+            if lock_active_profile_id(session, profile_id) is None:
                 return
             duplicate = select(AnalyticsEvent.id).where(
                 AnalyticsEvent.profile_id == profile_id,
