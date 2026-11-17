@@ -15,13 +15,14 @@ from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from .adult_account_deletion import active_verifier, invitation_is_current
 from .models import Organization, TrustedVerifier
 from .classroom_models import (
     ClassroomProgram, ClassroomRoleGrant, ClassroomClass,
     ClassroomTeachingAssignment, ClassroomOwnershipTransfer, ClassroomAuditEvent,
 )
 from .security import hash_pin, is_valid_pin
-from .verifiers import authenticate_trusted_verifier, validate_email
+from .verifiers import authenticate_trusted_verifier, lock_mailbox_adult, validate_email
 
 
 ROLES = frozenset({"head_director", "admin", "code_manager", "billing"})
@@ -56,10 +57,6 @@ def _require_enabled():
 
 
 def authenticate_adult(session: Session, *, email: str, pin: str) -> AdultAuthentication:
-    # Avoid an identity-map credential value surviving a previous read.
-    session.execute(select(TrustedVerifier).where(
-        TrustedVerifier.email == validate_email(email)
-    ).execution_options(populate_existing=True)).all()
     verifier = authenticate_trusted_verifier(session, email=email, pin=pin)
     if verifier is None:
         raise ClassroomDenied("Adult credentials are required.")
@@ -171,12 +168,10 @@ def _lock_program(session, program_id):
 
 
 def _require_adults(session, *verifier_ids):
-    # No adult row update locks: these operations never mutate credentials, and
-    # shared adults must not introduce cross-Program lock inversions. Foreign
-    # keys retain identity evidence; _actor rereads credentials after lock waits.
+    # Shared key locks allow unrelated Program work and serialize against
+    # deletion of the actual adult identity.
     for verifier_id in sorted(set(verifier_ids)):
-        if type(verifier_id) is not int or session.scalar(select(TrustedVerifier.id).where(
-                TrustedVerifier.id == verifier_id)) is None:
+        if type(verifier_id) is not int or active_verifier(session, verifier_id) is None:
             raise ClassroomDenied("Adult unavailable.")
 
 
@@ -303,7 +298,8 @@ def accept_program_invitation(session, *, token, pin, display_name=None):
         raise ClassroomDenied("PIN must contain exactly four digits.")
 
     _lock_organization_for_provision(session, organization_id)
-    # A competing acceptance may hold this lock until the invitation expires.
+    existing = lock_mailbox_adult(session, email)
+    # A competing acceptance or deletion may hold a lock until the invitation expires.
     # Recheck server time at the actual authority decision point.
     try:
         current_invitation = parse_program_invitation(token)
@@ -316,9 +312,9 @@ def accept_program_invitation(session, *, token, pin, display_name=None):
               ClassroomProgram.organization_id == organization_id) is not None:
         raise ClassroomDenied("Program already provisioned.")
 
-    existing_id = session.scalar(select(TrustedVerifier.id).where(
-        TrustedVerifier.email == email))
-    if existing_id is None:
+    if not invitation_is_current(session, email, current_invitation.issued_at):
+        raise ClassroomDenied("Program invitation unavailable.")
+    if existing is None:
         name = _name(display_name, 100)
         adult = TrustedVerifier(email=email, display_name=name, pin_hash=hash_pin(pin))
         try:

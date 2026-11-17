@@ -247,9 +247,11 @@ def admin_page(request: Request, q: str = "", membership_id: int | None = None):
             students = session.scalars(select(WoodchuckProfile).where(WoodchuckProfile.status == "active", or_(
                 WoodchuckProfile.display_name.icontains(query, autoescape=True),
                 WoodchuckProfile.woodchuck_id.icontains(query, autoescape=True))).limit(25)).all()
-            adults = session.scalars(select(TrustedVerifier).where(or_(
-                TrustedVerifier.display_name.icontains(query, autoescape=True),
-                TrustedVerifier.email.icontains(query, autoescape=True))).limit(25)).all()
+            adults = session.scalars(select(TrustedVerifier).where(
+                TrustedVerifier.pin_hash.not_like("deleted$%"),
+                or_(TrustedVerifier.display_name.icontains(query, autoescape=True),
+                    TrustedVerifier.email.icontains(query, autoescape=True)),
+            ).limit(25).with_for_update(read=True, key_share=True)).all()
         rows = session.scalars(select(Membership).order_by(Membership.id.desc()).limit(50)).all()
         try:
             selected = service.owned_membership(session, membership_id, service.Actor("admin")) if membership_id else None

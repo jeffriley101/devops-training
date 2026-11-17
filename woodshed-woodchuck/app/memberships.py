@@ -11,6 +11,7 @@ from .models import (BillingAccount, Membership, MembershipSeat, MembershipSeatI
                      MembershipAuditEvent, WoodchuckProfile, TrustedVerifier)
 from .security import generate_invitation_token, hash_invitation_token
 from .accounts import normalize_woodchuck_id
+from .adult_account_deletion import active_verifier
 from .verifiers import accepted_active_verifier_students, band_director_students, normalize_email, validate_email
 
 
@@ -37,7 +38,7 @@ def billing_account(session, actor, *, create=False):
     if actor.kind not in {"student", "adult"} or actor.id is None:
         raise ValueError("An account owner is required.")
     model = WoodchuckProfile if actor.kind == "student" else TrustedVerifier
-    owner = session.get(model, actor.id)
+    owner = active_verifier(session, actor.id) if actor.kind == "adult" else session.get(model, actor.id)
     if owner is None or (actor.kind == "student" and owner.status != "active"):
         raise ValueError("Account not found.")
     column = BillingAccount.profile_id if actor.kind == "student" else BillingAccount.verifier_id
@@ -49,7 +50,7 @@ def billing_account(session, actor, *, create=False):
         # If a concurrent creator wins, release this savepoint's identity lock
         # before taking its existing account lock (account -> member -> student).
         creation = session.begin_nested() if session.get_bind().dialect.name == "postgresql" else None
-        session.execute(update(model).where(model.id == actor.id).values(id=model.id, updated_at=model.updated_at))
+        session.execute(update(model).where(model.id == actor.id).values(updated_at=model.updated_at))
         account = session.scalar(select(BillingAccount).where(column == actor.id))
         if account is not None:
             account_id = account.id
@@ -130,7 +131,14 @@ def connected_students(session, actor):
                    for row in rows}.values(), key=lambda row: (row["display_name"], row["profile_id"]))
 
 
+def _require_seat_owner(session, membership):
+    account = session.get(BillingAccount, membership.billing_account_id)
+    if account.verifier_id is not None and active_verifier(session, account.verifier_id) is None:
+        raise ValueError("The membership owner is unavailable.")
+
+
 def _add_seat(session, membership, profile_id, actor, at):
+    _require_seat_owner(session, membership)
     if not membership_is_active(membership, at):
         raise ValueError("This membership is not active.")
     session.execute(update(WoodchuckProfile).where(WoodchuckProfile.id == profile_id).values(
@@ -249,6 +257,7 @@ def revoke_complimentary_membership(session, membership_id, actor, at=None):
 
 def invite_student(session, membership_id, email, actor, at=None):
     membership = owned_membership(session, membership_id, actor, lock=True)
+    _require_seat_owner(session, membership)
     at = utc(at or clock())
     if not membership_is_active(membership, at) or len(active_seats(session, membership_id)) >= 5:
         raise ValueError("An active membership with a free student spot is required.")

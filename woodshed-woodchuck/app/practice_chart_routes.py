@@ -13,6 +13,7 @@ from sqlalchemy import distinct, func, select
 
 from .account_routes import current_profile
 from .accounts import lock_active_profile_id
+from .adult_account_deletion import active_verifier
 from .db import SessionLocal
 from .economy import lock_state, economy_payload
 from .email_service import DeliveryResult, EmailService, public_link
@@ -455,10 +456,7 @@ def create_student_practice_chart(
             _authorize_chart_delivery(session, request, profile)
             session.refresh(created.verification)
         verifier = (
-            session.get(
-                TrustedVerifier,
-                created.verification.verifier_id,
-            )
+            active_verifier(session, created.verification.verifier_id)
             if created.verification is not None
             and created.verification.verifier_id is not None
             else None
@@ -472,16 +470,18 @@ def create_student_practice_chart(
                 StudentVerifierConnection.profile_id == profile.id,
                 StudentVerifierConnection.verifier_id == verifier.id,
                 StudentVerifierConnection.status == "accepted",
-                StudentVerifierConnection.role == "verifier",
+                StudentVerifierConnection.role.in_(("verifier", "band_director")),
             ))
             verifier_role = connection.role if connection else "trusted_verifier"
             review_url = public_link(
                 f"/trusted-verifiers/dashboard#verification-{created.verification.id}",
                 local_base_url=str(request.base_url),
             )
+            from .age_privacy import ordinary_director_connection
             from .child_authorization import protected_child
-            if (created.created and created.verification.status == "pending"
-                    and not protected_child(session,profile.id)):
+            if (created.created and created.verification.status == "pending" and connection is not None
+                    and not protected_child(session, profile.id)
+                    and (connection.role == "verifier" or ordinary_director_connection(session, profile.id, verifier.id))):
                 delivery = EmailService().send_practice_chart(
                     recipient=verifier.email, student_name=profile.woodchuck_id,
                     practice_date=created.chart.practice_date.isoformat(), minutes=created.chart.minutes,
@@ -575,6 +575,9 @@ def resend_practice_chart_email(request: Request, verification_id: int):
         if row is None:
             raise HTTPException(status_code=404, detail="Verification request was not found.")
         verification, chart, verifier, connection = row
+        verifier = active_verifier(session, verifier.id)
+        if verifier is None:
+            raise HTTPException(status_code=404, detail="Verification request was not found.")
         if verification.status != "pending":
             raise HTTPException(status_code=400, detail="Only pending requests can be resent.")
         now = datetime.now(timezone.utc); previous = _aware(verification.last_email_attempt_at)

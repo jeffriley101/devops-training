@@ -180,8 +180,11 @@ def test_invitation_without_smtp_persists_and_local_link_accepts(
 
 
 def test_invitation_and_pchart_send_after_persistence_and_resend_without_duplicates(mail_database, monkeypatch) -> None:
-    with TestClient(app) as student:
-        profile_id = create_student(student)
+    # Mount the browser at the app's root. Outbound mail has its own configured URL.
+    origin = "https://woodshed.example"
+    with TestClient(app, base_url=origin) as student:
+        create_student(student)
+        woodchuck_id = student.get("/account/me").json()["profile"]["woodchuck_id"]
         invitation_response = student.post("/trusted-verifiers/invitations", data={"email": "adult+music@example.test", "role": "verifier"})
         assert invitation_response.status_code == 200
         invitation_payload = invitation_response.json()
@@ -189,7 +192,7 @@ def test_invitation_and_pchart_send_after_persistence_and_resend_without_duplica
         assert invitation_payload["accept_url"].startswith("https://woodshed.example/")
         invitation_id = invitation_payload["invitation"]["id"]
         assert student.post(f"/trusted-verifiers/invitations/{invitation_id}/resend-email").status_code == 429
-        with TestClient(app) as other_student:
+        with TestClient(app, base_url=origin) as other_student:
             create_student(other_student)
             assert other_student.post(f"/trusted-verifiers/invitations/{invitation_id}/resend-email").status_code == 404
 
@@ -204,7 +207,7 @@ def test_invitation_and_pchart_send_after_persistence_and_resend_without_duplica
             invitation = session.get(TrustedVerifierInvitation, invitation_id)
             assert invitation.last_email_sent_at and invitation.email_attempt_count == 2
 
-        with TestClient(app) as verifier:
+        with TestClient(app, base_url=origin) as verifier:
             accepted = verifier.post(
                 f"/trusted-verifiers/invitations/{resend.json()['invitation_token']}/accept",
                 data={"display_name": "Director", "pin": "1357"},
@@ -248,7 +251,6 @@ def test_invitation_and_pchart_send_after_persistence_and_resend_without_duplica
             assert session.scalar(select(func.count()).select_from(PracticeChartVerification)) == 2
 
     assert len(CapturingSMTP.messages) == 4
-    combined = "\n".join(message.as_string() for message in CapturingSMTP.messages)
     human_visible = "\n".join(
         [
             str(message.get(header, ""))
@@ -263,7 +265,8 @@ def test_invitation_and_pchart_send_after_persistence_and_resend_without_duplica
         ]
     )
     assert "2468" not in human_visible and "1357" not in human_visible
-    assert "Alex &lt;Woodchuck&gt;" in combined
+    assert woodchuck_id in human_visible
+    assert "Alex" not in human_visible
     assert CapturingSMTP.tls == 4
 
 

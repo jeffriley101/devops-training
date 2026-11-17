@@ -16,7 +16,7 @@ import re
 import stat
 import sys
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, select, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker
 
@@ -26,21 +26,33 @@ from .account_deletion import (
     lock_account_for_deletion,
     ordinary_deletion_complete,
 )
-from .models import WoodchuckProfile
+from .adult_account_deletion import (
+    AdultDeletionHold,
+    adult_deletion_complete,
+    adult_invitation_cutoff_complete,
+    delete_adult_account,
+    invitation_key,
+)
+from .models import TrustedVerifier, WoodchuckProfile
 from .session_config import DEVELOPMENT_SECRET, session_secret
+from .verifiers import normalize_email, validate_email
 
 
 CONFIG_DIR = Path("/etc/woodshed/parent-deletion-support")
+ADULT_CONFIG_DIR = Path("/etc/woodshed/adult-deletion-support")
 REVISION = "c36choice001"
 AUTHORITY_WINDOW = timedelta(hours=24)
 CONFIRMATION_WINDOW = timedelta(minutes=30)
 ACTION = "DELETE THIS ACCOUNT"
+ADULT_ACTION = "DELETE MY ADULT ACCOUNT"
 REFERENCE = re.compile(r"[A-Za-z0-9_-]{8,64}")
 CASE_FIELDS = {
     "case", "status", "profile_id", "woodchuck_id", "profile_created_at",
     "requester_ref", "identity_ref", "authority_ref", "verified_by", "verified_at",
     "confirmation", "disputed", "reviewed_by",
 }
+ADULT_CASE_FIELDS = ((CASE_FIELDS - {"profile_id", "woodchuck_id", "profile_created_at"})
+                     | {"verifier_id", "email", "verifier_created_at"})
 
 
 class SupportDenied(ValueError):
@@ -100,9 +112,7 @@ def _read_json(stream):
         raise SupportDenied("support_record_invalid") from None
 
 
-@contextmanager
-def _protected_file(path, owner):
-    """Read a regular file whose custody is controlled by the configured owner."""
+def _check_parent_directories(path, owner):
     if not path.is_absolute():
         raise SupportDenied("support_private_path_required")
     for directory in path.parents:
@@ -110,6 +120,12 @@ def _protected_file(path, owner):
         if (not stat.S_ISDIR(info.st_mode) or info.st_uid not in {0, owner}
                 or (info.st_mode & 0o022 and not (info.st_uid == 0 and info.st_mode & stat.S_ISVTX))):
             raise SupportDenied("support_private_path_required")
+
+
+@contextmanager
+def _protected_file(path, owner):
+    """Read a regular file whose custody is controlled by the configured owner."""
+    _check_parent_directories(path, owner)
     fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     with os.fdopen(fd, "rb") as stream:
         info = os.fstat(stream.fileno())
@@ -160,7 +176,8 @@ class SupportTarget:
             "WHERE (rolsuper OR rolcreaterole OR rolcreatedb OR rolreplication OR rolbypassrls) "
             "AND pg_has_role(oid, 'MEMBER')) OR EXISTS (SELECT FROM pg_catalog.pg_database "
             "WHERE datname = current_database() AND pg_has_role(datdba, 'MEMBER')) OR EXISTS "
-            "(SELECT FROM pg_catalog.pg_class WHERE oid = 'public.woodchuck_profiles'::regclass "
+            "(SELECT FROM pg_catalog.pg_class WHERE oid IN "
+            "('public.woodchuck_profiles'::regclass, 'public.trusted_verifiers'::regclass) "
             "AND pg_has_role(relowner, 'MEMBER'))"
         ))
         if administrative:
@@ -171,30 +188,44 @@ class SupportTarget:
         session.execute(text("SET LOCAL search_path TO public, pg_catalog, pg_temp"))
 
 
-def _authority(case, reference, now):
-    if (type(case) is not dict or set(case) != CASE_FIELDS or case["case"] != reference
+def _authority(case, reference, now, *, adult):
+    subject_id = "verifier_id" if adult else "profile_id"
+    if (type(case) is not dict or set(case) != (ADULT_CASE_FIELDS if adult else CASE_FIELDS)
+            or case["case"] != reference
             or case["status"] != "approved"
-            or type(case["profile_id"]) is not int or case["profile_id"] <= 0
-            or type(case["disputed"]) is not bool
-            or not isinstance(case["woodchuck_id"], str)
-            or re.fullmatch(r"WC-[A-Z0-9-]{1,29}", case["woodchuck_id"]) is None):
+            or type(case[subject_id]) is not int or case[subject_id] <= 0
+            or type(case["disputed"]) is not bool):
+        raise SupportDenied("support_case_invalid")
+    if adult:
+        if not isinstance(case["email"], str):
+            raise SupportDenied("support_case_invalid")
+        try:
+            email = validate_email(case["email"])
+        except ValueError:
+            raise SupportDenied("support_case_invalid") from None
+        if email != case["email"]:
+            raise SupportDenied("support_case_invalid")
+    elif (not isinstance(case["woodchuck_id"], str)
+          or re.fullmatch(r"WC-[A-Z0-9-]{1,29}", case["woodchuck_id"]) is None):
         raise SupportDenied("support_case_invalid")
     confirmation = case["confirmation"]
     if (type(confirmation) is not dict
-            or set(confirmation) != {"case", "profile_id", "requester_ref", "action", "reference", "at"}
-            or confirmation["case"] != reference or type(confirmation["profile_id"]) is not int
-            or confirmation["profile_id"] != case["profile_id"] or confirmation["action"] != ACTION
+            or set(confirmation) != {"case", subject_id, "requester_ref", "action", "reference", "at"}
+            or confirmation["case"] != reference or type(confirmation[subject_id]) is not int
+            or confirmation[subject_id] != case[subject_id]
+            or confirmation["action"] != (ADULT_ACTION if adult else ACTION)
             or confirmation["requester_ref"] != case["requester_ref"]):
         raise SupportDenied("support_confirmation_mismatch")
     references = [case[key] for key in ("requester_ref", "identity_ref", "authority_ref")] + [confirmation["reference"]]
     if not all(_reference(value) for value in references) or len(set(references)) != len(references):
         raise SupportDenied("support_distinct_evidence_required")
     if (not _reference(case["verified_by"])
+            or (adult and case["requester_ref"] in (case["verified_by"], case["reviewed_by"]))
             or case["reviewed_by"] is not None and (
                 not _reference(case["reviewed_by"]) or case["reviewed_by"] == case["verified_by"])
             or case["disputed"] and case["reviewed_by"] is None):
         raise SupportDenied("support_independent_review_required")
-    created_at = _time(case["profile_created_at"])
+    created_at = _time(case["verifier_created_at"] if adult else case["profile_created_at"])
     verified_at = _time(case["verified_at"])
     confirmed_at = _time(confirmation["at"])
     if (not created_at <= verified_at <= confirmed_at <= now
@@ -220,16 +251,55 @@ def _restriction_digest(profile):
     })
 
 
+def _adult_restriction_digest(verifier):
+    if verifier is None:
+        return None
+    return _digest({
+        "verifier_id": verifier.id, "created_at": _utc(verifier.created_at).isoformat(),
+        "updated_at": _utc(verifier.updated_at).isoformat(), "email": verifier.email,
+        "display_name": verifier.display_name, "pin_hash": verifier.pin_hash,
+    })
+
+
+def _apply_deletion(session, case, reference, clock, *, adult):
+    if adult:
+        verifier = session.scalar(select(TrustedVerifier).where(
+            TrustedVerifier.id == case["verifier_id"]
+        ).with_for_update().execution_options(populate_existing=True))
+        moment = clock()
+        created_at = _authority(case, reference, moment, adult=True)
+        if (verifier is None or normalize_email(verifier.email) != case["email"]
+                or _utc(verifier.created_at) != created_at):
+            raise SupportDenied("support_adult_mismatch_or_unavailable")
+        delete_adult_account(session, verifier, now=moment)
+        if _utc(verifier.updated_at) != _utc(moment) or not adult_deletion_complete(session, verifier):
+            raise SupportDenied("support_deletion_postcondition_failed")
+        return moment, _adult_restriction_digest(verifier)
+
+    profile, _ = lock_account_for_deletion(session, case["profile_id"])
+    moment = clock()
+    created_at = _authority(case, reference, moment, adult=False)
+    if (profile is None or profile.status != "active" or profile.woodchuck_id != case["woodchuck_id"]
+            or _utc(profile.created_at) != created_at):
+        raise SupportDenied("support_child_mismatch_or_unavailable")
+    previous_version = profile.session_version
+    anonymize_woodchuck_account(session, profile=profile, now=moment)
+    restriction = _restriction_digest(profile)
+    if (restriction is None or _utc(profile.deleted_at) != _utc(moment)
+            or profile.session_version != previous_version + 1):
+        raise SupportDenied("support_deletion_postcondition_failed")
+    return moment, restriction
+
+
 def _check_register(directory):
-    if not directory.is_absolute():
-        raise SupportDenied("support_private_register_required")
+    _check_parent_directories(directory, os.geteuid())
     info = directory.lstat()
     if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.geteuid() or info.st_mode & 0o077:
         raise SupportDenied("support_private_register_required")
 
 
 def fulfill(factory, *, target, approval_directory, approval_uid, register, reference,
-            status_only=False, clock=lambda: datetime.now(timezone.utc)):
+            status_only=False, adult=False, clock=lambda: datetime.now(timezone.utc)):
     """Execute only the exact authorized account; reconcile a known case without mutating it."""
     if not _reference(reference):
         raise SupportDenied("support_case_invalid")
@@ -243,7 +313,7 @@ def fulfill(factory, *, target, approval_directory, approval_uid, register, refe
         if intent_path.exists():
             with _protected_file(intent_path, os.geteuid()) as stream:
                 intent = _read_json(stream)
-            return _reconcile(factory, target, reference, intent, result_path)
+            return _reconcile(factory, target, reference, intent, result_path, adult=adult, clock=clock)
         with factory() as session:
             target.require(session)
             if status_only:
@@ -253,57 +323,63 @@ def fulfill(factory, *, target, approval_directory, approval_uid, register, refe
                 approval_path = approval_directory / (reference + ".json")
                 with _protected_file(approval_path, approval_uid) as stream:
                     case = _read_json(stream)
-                _authority(case, reference, clock())
-                profile, _ = lock_account_for_deletion(session, case["profile_id"])
-                moment = clock()
-                created_at = _authority(case, reference, moment)
-                if (profile is None or profile.status != "active" or profile.woodchuck_id != case["woodchuck_id"]
-                        or _utc(profile.created_at) != created_at):
-                    raise SupportDenied("support_child_mismatch_or_unavailable")
-                previous_version = profile.session_version
-                anonymize_woodchuck_account(session, profile=profile, now=moment)
-                restriction = _restriction_digest(profile)
-                if (restriction is None or _utc(profile.deleted_at) != _utc(moment)
-                        or profile.session_version != previous_version + 1):
-                    raise SupportDenied("support_deletion_postcondition_failed")
+                _authority(case, reference, clock(), adult=adult)
+                moment, restriction = _apply_deletion(session, case, reference, clock, adult=adult)
+                subject_id = "verifier_id" if adult else "profile_id"
                 intent = {
-                    "case": reference, "profile_id": profile.id, "role": target.role,
+                    "case": reference, subject_id: case[subject_id], "role": target.role,
                     "database": target.database, "database_oid": target.database_oid,
                     "approval_sha256": _digest(case), "restriction_sha256": restriction,
-                    "deleted_at": _utc(profile.deleted_at).isoformat(),
+                    "deleted_at": _utc(moment).isoformat(),
                 }
+                if adult:
+                    key = invitation_key(case["email"])
+                    if not adult_invitation_cutoff_complete(session, key, moment, moment):
+                        raise SupportDenied("support_deletion_postcondition_failed")
+                    intent["invitation_key"] = key
                 _write_new(intent_path, intent)
                 with _protected_file(approval_path, approval_uid) as stream:
                     if _digest(_read_json(stream)) != intent["approval_sha256"]:
                         raise SupportDenied("support_approval_changed")
-                _authority(case, reference, clock())
+                _authority(case, reference, clock(), adult=adult)
                 session.commit()
-        return _reconcile(factory, target, reference, intent, result_path)
+        return _reconcile(factory, target, reference, intent, result_path, adult=adult, clock=clock)
 
 
-def _reconcile(factory, target, reference, intent, result_path):
+def _reconcile(factory, target, reference, intent, result_path, *, adult, clock):
+    subject_id = "verifier_id" if adult else "profile_id"
     fields = {
-        "case", "profile_id", "role", "database", "database_oid",
+        "case", subject_id, "role", "database", "database_oid",
         "approval_sha256", "restriction_sha256", "deleted_at",
     }
+    hashes = {"approval_sha256", "restriction_sha256"}
+    if adult:
+        fields.add("invitation_key")
+        hashes.add("invitation_key")
     if (type(intent) is not dict or set(intent) != fields or intent["case"] != reference
             or (intent["database"], intent["database_oid"], intent["role"])
             != (target.database, target.database_oid, target.role)
-            or type(intent["profile_id"]) is not int
+            or type(intent[subject_id]) is not int or intent[subject_id] <= 0
             or any(not isinstance(intent[key], str) or re.fullmatch(r"[0-9a-f]{64}", intent[key]) is None
-                   for key in ("approval_sha256", "restriction_sha256"))):
+                   for key in hashes)):
         raise SupportDenied("support_record_mismatch")
     with factory() as session:
         # Read both the tombstone and ordinary cleanup from one committed snapshot.
         session.execute(text("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY"))
         target.require(session)
-        profile = session.get(WoodchuckProfile, intent["profile_id"])
-        if (_restriction_digest(profile) != intent["restriction_sha256"]
-                or _utc(profile.deleted_at) != _time(intent["deleted_at"])):
+        subject = session.get(TrustedVerifier if adult else WoodchuckProfile, intent[subject_id])
+        digest = _adult_restriction_digest(subject) if adult else _restriction_digest(subject)
+        if (digest != intent["restriction_sha256"]
+                or _utc(subject.updated_at if adult else subject.deleted_at) != _time(intent["deleted_at"])):
             raise SupportDenied("support_execution_unreconciled")
-        if not ordinary_deletion_complete(session, profile):
+        complete = adult_deletion_complete if adult else ordinary_deletion_complete
+        if not complete(session, subject):
             raise SupportDenied("support_ordinary_cleanup_incomplete")
-    result = {"case": reference, "status": "deletion_applied", "deleted_at": intent["deleted_at"]}
+        if adult and not adult_invitation_cutoff_complete(session, intent["invitation_key"],
+                                                         subject.updated_at, clock()):
+            raise SupportDenied("support_ordinary_cleanup_incomplete")
+    result = {"case": reference, "status": "adult_deletion_applied" if adult else "deletion_applied",
+              "deleted_at": intent["deleted_at"]}
     receipt = {**result, "intent_sha256": _digest(intent)}
     if result_path.exists():
         with _protected_file(result_path, os.geteuid()) as stream:
@@ -316,14 +392,16 @@ def _reconcile(factory, target, reference, intent, result_path):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("execute", "status"))
+    parser.add_argument("action", choices=("execute", "status", "execute-adult", "status-adult"))
     parser.add_argument("case", help="Opaque Support case reference")
     args = parser.parse_args(argv)
     engine = None
     try:
         if os.geteuid() == 0:
             raise SupportDenied("support_named_executor_required")
-        with _protected_file(CONFIG_DIR / (str(os.geteuid()) + ".json"), 0) as stream:
+        adult = args.action in {"execute-adult", "status-adult"}
+        config_directory = ADULT_CONFIG_DIR if adult else CONFIG_DIR
+        with _protected_file(config_directory / (str(os.geteuid()) + ".json"), 0) as stream:
             config = _read_json(stream)
         _require_application_secret(config.get("session_secret_sha256"))
         approval_uid = config["approval_uid"]
@@ -343,7 +421,7 @@ def main(argv=None):
         result = fulfill(sessionmaker(engine, autoflush=False), target=target,
                          approval_directory=Path(config["approval_directory"]), approval_uid=approval_uid,
                          register=Path(config["register"]), reference=args.case,
-                         status_only=args.action == "status")
+                         status_only=args.action in {"status", "status-adult"}, adult=adult)
         print(json.dumps(result, sort_keys=True))
         return 0
     except SupportDenied as error:
@@ -351,6 +429,9 @@ def main(argv=None):
         return 1
     except DeletionDataConflict:
         print("support_account_data_conflict", file=sys.stderr)
+        return 1
+    except AdultDeletionHold as error:
+        print(str(error), file=sys.stderr)
         return 1
     except Exception:
         print("support_operation_unavailable_or_uncertain", file=sys.stderr)

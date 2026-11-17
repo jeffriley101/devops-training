@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .accounts import lock_active_profile_id
+from .adult_account_deletion import invitation_is_current
 from .models import (
     StudentVerifierConnection,
     TrustedVerifier,
@@ -104,6 +105,21 @@ class AcceptedInvitation:
     invitation: TrustedVerifierInvitation
     verifier: TrustedVerifier
     connection: StudentVerifierConnection
+
+
+def lock_mailbox_adult(session, email, *, for_login=False):
+    query = select(TrustedVerifier).where(TrustedVerifier.email == email)
+    adult = session.scalar(query.with_for_update(read=True, key_share=True)
+                           .execution_options(populate_existing=True))
+    if adult is None and not for_login:
+        # An old account can store the same mailbox with different spacing or case.
+        # Serialize its deletion against issuance and acceptance, while keeping
+        # the existing exact-email requirement for using someone's credentials.
+        legacy = select(TrustedVerifier.id).where(
+            func.lower(func.trim(TrustedVerifier.email)) == normalize_email(email),
+        ).order_by(TrustedVerifier.id).with_for_update(read=True, key_share=True)
+        session.scalars(legacy).all()
+    return adult
 
 
 def normalize_email(email: str) -> str:
@@ -231,6 +247,7 @@ def create_trusted_verifier_invitation(
     from .age_privacy import ordinary_director_allowed
     if protected_child(session,profile.id) and commit and (normalized_role!='band_director' or not ordinary_director_allowed(session,profile.id)):
         raise ValueError('Only a new ordinary director connection is available after the protected 13+ transition.')
+    lock_mailbox_adult(session, normalized_email)
     now = _utc_now()
 
     existing_connection = session.scalar(
@@ -346,6 +363,7 @@ def reissue_trusted_verifier_invitation(
     from .age_privacy import ordinary_director_allowed
     if protected_child(session,profile.id) and commit and (invitation.role!='band_director' or not ordinary_director_allowed(session,profile.id)):
         raise ValueError('Only ordinary director invitations are available after the protected transition.')
+    lock_mailbox_adult(session, invitation.email)
     token = generate_invitation_token()
     now = _utc_now()
 
@@ -412,25 +430,23 @@ def accept_trusted_verifier_invitation(
                   and rule.public_from and _as_utc(invitation.created_at)>=_as_utc(rule.public_from))
         if not ordinary and (not permission_valid(session,private_permission) or private_permission.profile_id!=profile.id or private_permission.email!=invitation.email or invitation.role!='band_director'):
             raise ValueError('Verify the parent-authorized director connection using its current emailed link.')
+    verifier = lock_mailbox_adult(session, invitation.email)
+    # The deletion transaction may have rotated the bearer during the lock wait.
+    invitation = session.scalar(by_token)
+    if invitation is None:
+        raise ValueError("That trusted-verifier invitation is invalid.")
     now = _utc_now()
-
     if _as_utc(invitation.expires_at) <= now:
         invitation.status = "expired"
         session.commit() if commit else session.flush()
-        raise ValueError(
-            "That trusted-verifier invitation has expired."
-        )
+        raise ValueError("That trusted-verifier invitation has expired.")
+    if not invitation_is_current(session, invitation.email, _as_utc(invitation.expires_at) - INVITATION_LIFETIME):
+        raise ValueError("That trusted-verifier invitation is invalid.")
 
     if not is_valid_pin(pin):
         raise ValueError("PIN must contain exactly four digits.")
 
     normalized_name = display_name.strip()
-
-    verifier = session.scalar(
-        select(TrustedVerifier).where(
-            TrustedVerifier.email == invitation.email
-        )
-    )
 
     if verifier is None:
         if not normalized_name:
@@ -535,11 +551,7 @@ def authenticate_trusted_verifier(
     except ValueError:
         return None
 
-    verifier = session.scalar(
-        select(TrustedVerifier).where(
-            TrustedVerifier.email == normalized_email
-        )
-    )
+    verifier = lock_mailbox_adult(session, normalized_email, for_login=True)
 
     if verifier is None:
         return None

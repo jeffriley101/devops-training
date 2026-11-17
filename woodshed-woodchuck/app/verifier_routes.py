@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from .age_privacy import sharing_allowed as eligible, ordinary_director_connection, director_chart_visible
 from .account_routes import current_profile
 from .accounts import lock_active_profile_id
+from .adult_account_deletion import active_verifier
 from .db import SessionLocal
 from .login_limits import enforce_login_limit
 from .security import hash_invitation_token
@@ -34,6 +35,7 @@ from .verifiers import (
     authenticate_trusted_verifier,
     count_reserved_verifier_slots,
     create_trusted_verifier_invitation,
+    lock_mailbox_adult,
     reissue_trusted_verifier_invitation,
 )
 
@@ -79,6 +81,7 @@ def _authorize_invitation_delivery(session, request, profile, issuance):
     session.refresh(profile)
     if current_profile(request, session) is None:
         raise HTTPException(status_code=401, detail="Student sign-in is required.")
+    lock_mailbox_adult(session, issuance.invitation.email)
     session.refresh(issuance.invitation)
     if (issuance.invitation.status != "pending"
             or issuance.invitation.token_hash != hash_invitation_token(issuance.token)):
@@ -135,7 +138,7 @@ def current_verifier(
     if not isinstance(verifier_id, int):
         return None
 
-    verifier = session.get(TrustedVerifier, verifier_id)
+    verifier = active_verifier(session, verifier_id)
 
     if verifier is None:
         request.session.pop(SESSION_VERIFIER_ID, None)

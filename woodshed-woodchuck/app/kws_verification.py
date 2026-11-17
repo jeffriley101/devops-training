@@ -214,12 +214,13 @@ def start(session, token, fields):
     if (fields.get('guardian_attestation') != 'yes' or fields.get('notice_accepted') != 'yes'
             or fields.get('notice_version') != notice_version):
         raise ValueError('Guardian attestation and explicit acceptance of the current notice are required.')
-    from .verifiers import validate_email
+    from .verifiers import lock_mailbox_adult, validate_email
     share = fields.get('director_allowed') == 'yes'
     if fields.get('review_allowed') == 'yes' and not share:
         raise ValueError('Chart review requires separately authorized director sharing.')
     if share:
         row.director_email = validate_email(fields.get('director_email', ''))
+        lock_mailbox_adult(session, row.director_email)
         row.director_name = str(fields.get('director_name', '')).strip()
         if not 1 <= len(row.director_name) <= 80 or re.search(r'[\x00-\x1f\x7f]', row.director_name):
             raise ValueError('Enter the specific director name without control characters.')
