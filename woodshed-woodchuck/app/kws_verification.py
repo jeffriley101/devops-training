@@ -259,8 +259,9 @@ def deliver(session, verification_id, payload):
     v = session.scalar(select(KWSVerification).where(KWSVerification.id == verification_id,
                                                      KWSVerification.pending_id == pending_id)
                        .with_for_update().execution_options(populate_existing=True))
-    if row is None or v is None or (row.profile_id is not None
-                                  and lock_active_profile_id(session, row.profile_id) is None):
+    if (row is None or v is None or v.state != 'reserved' or v.activated_consent_id is not None
+            or consent.utc(row.expires_at) <= consent.clock()
+            or (row.profile_id is not None and lock_active_profile_id(session, row.profile_id) is None)):
         raise ValueError('The permission request is unavailable.')
     try:
         cfg = Config.load(v.environment)
@@ -268,8 +269,7 @@ def deliver(session, verification_id, payload):
         outcome = 'accepted'
     except KWSUnavailable:
         outcome = 'delivery_unknown'
-    if v.state not in TERMINAL:
-        v.state = outcome
+    v.state = outcome
     session.commit()
     return outcome
 
@@ -304,6 +304,8 @@ def complete(session, cfg, payload, status, timestamp, parent_email=None):
                 or (v.state in {'verified', 'activated'}) != status['verified']):
             fail(RejectionStage.COMPLETION_REJECTED)
         return None
+    if v.state not in {'reserved', 'accepted', 'delivery_unknown'} or v.activated_consent_id is not None:
+        fail(RejectionStage.COMPLETION_REJECTED)
     current_binding(session, row, v, cfg)
     if consent.utc(row.expires_at) <= consent.clock() or consent.utc(v.expires_at) <= consent.clock():
         v.state = 'cancelled'
@@ -341,7 +343,11 @@ def verified_for_activation(session, row):
 def cancel(session, row):
     v = session.scalar(select(KWSVerification).where(KWSVerification.pending_id == row.id)
                        .with_for_update().execution_options(populate_existing=True))
-    if v and v.state != 'activated':
+    if v and (v.state == 'activated' or v.activated_consent_id is not None):
+        return
+    if v and v.state in {'reserved', 'accepted', 'delivery_unknown', 'verified'}:
         v.state = 'cancelled'
-    row.expires_at = consent.clock()
+    # Reusing a withdrawal link cannot move an earlier expiry or failure
+    # deadline forward, or convert unknown historical evidence into a purgeable state.
+    row.expires_at = min(consent.utc(row.expires_at), consent.clock())
     session.flush()

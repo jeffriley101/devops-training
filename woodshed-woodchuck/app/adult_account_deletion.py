@@ -19,6 +19,7 @@ from .membership_models import (
 from .models import StudentVerifierConnection, TrustedVerifier, TrustedVerifierInvitation, WoodchuckProfile
 from .session_config import session_secret
 from .session_revocations import RevokedBrowserSession
+from .verifier_invitation_disposal import accepted_invitation, retired_invitation_token
 
 
 def _invitation_lifetime():
@@ -129,6 +130,23 @@ def _bound_credentials(adult_id):
                 DirectorPermission.session_hash.is_not(None), DirectorPermission.session_expires_at.is_not(None)))
 
 
+def _spent_adult_invitations(adult_id):
+    return (accepted_invitation(), TrustedVerifierInvitation.accepted_verifier_id == adult_id,
+            TrustedVerifierInvitation.token_hash != retired_invitation_token())
+
+
+def clear_adult_spent_invitations(session, adult_id):
+    # The original actor, contact and clocks belong to the student's invitation history.
+    session.execute(update(TrustedVerifierInvitation).where(*_spent_adult_invitations(adult_id)).values(
+        token_hash=retired_invitation_token(), updated_at=TrustedVerifierInvitation.updated_at,
+    ).execution_options(synchronize_session=False))
+
+
+def adult_spent_invitations_complete(session, adult_id):
+    pending = select(TrustedVerifierInvitation.id).where(*_spent_adult_invitations(adult_id)).limit(1)
+    return session.scalar(pending) is None
+
+
 def delete_adult_account(session, adult, *, now):
     if adult.pin_hash.startswith("deleted$"):
         raise AdultDeletionHold("adult_already_deleted")
@@ -152,6 +170,7 @@ def delete_adult_account(session, adult, *, now):
         session.add(marker)
     marker.revoked_at = now
     marker.expires_at = now + _invitation_lifetime()
+    clear_adult_spent_invitations(session, adult.id)
 
     # The ordinary invitation token survives a signing-key rotation. Remove its
     # bearer capability but preserve the issuing student's row and ability to reissue.

@@ -6,10 +6,10 @@ from datetime import datetime, timedelta, timezone
 import json
 import math
 
-from sqlalchemy import and_, or_, select, text
+from sqlalchemy import and_, func, or_, select, text
 
 from . import models as _models  # Register referenced SQLAlchemy tables (4069207).
-from .child_models import PendingConsent
+from .child_models import ConsentEvidence, PendingConsent
 from .db import SessionLocal
 from .kws_models import KWSEmailBudget, KWSVerification
 
@@ -49,6 +49,32 @@ def _valid_budget_history(value) -> bool:
             and all(type(item) in (int, float) and math.isfinite(item) for item in value))
 
 
+def _can_check_legacy_consent(session):
+    if session.get_bind().dialect.name != "postgresql":
+        return True
+    return session.scalar(text(
+        "SELECT has_column_privilege('child_consent_evidence', 'profile_id', 'SELECT')"
+        " AND has_column_privilege('child_consent_evidence', 'parent_email', 'SELECT')"
+        " AND NOT row_security_active('child_consent_evidence')"
+    ))
+
+
+def _possible_legacy_consent(session, row):
+    # An orphaned pending request can still supply a withdrawal link. Neither a
+    # current signing secret nor absent approval fields can disprove that link.
+    if any(value is not None for value in (row.approved_at, row.confirmation_due, row.confirmed_at, row.activation_hash)):
+        return True
+    if row.profile_id is not None:
+        subject = ConsentEvidence.profile_id == row.profile_id
+    else:
+        mailbox = row.parent_email.strip().lower()
+        if not mailbox:
+            return True
+        evidence_mailbox = func.nullif(func.lower(func.trim(ConsentEvidence.parent_email)), "")
+        subject = or_(evidence_mailbox.is_(None), evidence_mailbox == mailbox)
+    return session.scalar(select(select(1).select_from(ConsentEvidence).where(subject).exists()))
+
+
 def cleanup(session, *, now: datetime | None = None, apply: bool = False) -> dict[str, int]:
     """Count or remove eligible flows and stale email-budget history.
 
@@ -78,6 +104,7 @@ def cleanup(session, *, now: datetime | None = None, apply: bool = False) -> dic
         ))
         .order_by(PendingConsent.id)
     ).all()
+    can_check_consent = None
     for pending_id in candidate_ids:
         row = session.scalar(
             select(PendingConsent).where(PendingConsent.id == pending_id)
@@ -91,6 +118,12 @@ def cleanup(session, *, now: datetime | None = None, apply: bool = False) -> dic
         )
         if not _flow_expired(row, verification, cutoff):
             continue
+        if verification is None:
+            if can_check_consent is None:
+                can_check_consent = _can_check_legacy_consent(session)
+            if not can_check_consent or _possible_legacy_consent(session, row):
+                counts["unresolved_legacy_requests"] = counts.get("unresolved_legacy_requests", 0) + 1
+                continue
         counts["pending_consents"] += 1
         counts["kws_verifications"] += int(verification is not None)
         if apply:

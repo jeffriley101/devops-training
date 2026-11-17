@@ -21,15 +21,20 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker
 
 from .account_deletion import (
+    DELETED_PUBLIC_NAME,
     DeletionDataConflict,
+    clear_student_ordinary_data,
     anonymize_woodchuck_account,
     lock_account_for_deletion,
     ordinary_deletion_complete,
 )
+from .accounts import retired_identifier_hash
 from .adult_account_deletion import (
     AdultDeletionHold,
     adult_deletion_complete,
     adult_invitation_cutoff_complete,
+    adult_spent_invitations_complete,
+    clear_adult_spent_invitations,
     delete_adult_account,
     invitation_key,
 )
@@ -45,6 +50,16 @@ AUTHORITY_WINDOW = timedelta(hours=24)
 CONFIRMATION_WINDOW = timedelta(minutes=30)
 ACTION = "DELETE THIS ACCOUNT"
 ADULT_ACTION = "DELETE MY ADULT ACCOUNT"
+PRIOR_ACTION = "CLEAN UP PREVIOUS STUDENT DELETION"
+PRIOR_ADULT_ACTION = "CLEAN UP PREVIOUS ADULT DELETION"
+RETENTION_SCOPE = "ordinary-invitation-disposal-v2"
+PRIOR_CASE_FIELDS = {
+    "case", "status", "action", "profile_id", "woodchuck_id", "profile_created_at", "deleted_at",
+    "deletion_evidence_ref", "evidence_kind", "verified_by", "verified_at",
+}
+PRIOR_ADULT_FIELDS = (PRIOR_CASE_FIELDS - {"profile_id", "profile_created_at", "woodchuck_id"}) | {
+    "verifier_id", "verifier_created_at",
+}
 REFERENCE = re.compile(r"[A-Za-z0-9_-]{8,64}")
 CASE_FIELDS = {
     "case", "status", "profile_id", "woodchuck_id", "profile_created_at",
@@ -188,8 +203,27 @@ class SupportTarget:
         session.execute(text("SET LOCAL search_path TO public, pg_catalog, pg_temp"))
 
 
-def _authority(case, reference, now, *, adult):
+def _authority(case, reference, now, *, adult, prior=False):
     subject_id = "verifier_id" if adult else "profile_id"
+    if prior:
+        # The independent custodian verifies the original deletion record and its date.
+        if (type(case) is not dict or set(case) != (PRIOR_ADULT_FIELDS if adult else PRIOR_CASE_FIELDS)
+                or case["case"] != reference
+                or case["status"] != "approved" or case["action"] != (PRIOR_ADULT_ACTION if adult else PRIOR_ACTION)
+                or type(case[subject_id]) is not int or case[subject_id] <= 0
+                or (not adult and (not isinstance(case["woodchuck_id"], str)
+                    or re.fullmatch(r"WC-[A-Z0-9-]{1,29}", case["woodchuck_id"]) is None))
+                or (adult and case["evidence_kind"] != "support_receipt")
+                or case["evidence_kind"] not in ("support_receipt", "verified_deletion_record")
+                or not _reference(case["deletion_evidence_ref"]) or not _reference(case["verified_by"])
+                or case["deletion_evidence_ref"] in (reference, case["verified_by"])):
+            raise SupportDenied("support_prior_case_invalid")
+        created_at, deleted_at, verified_at = (_time(case[key]) for key in (
+            "verifier_created_at" if adult else "profile_created_at", "deleted_at", "verified_at",
+        ))
+        if not created_at <= deleted_at <= verified_at <= now or now - verified_at >= AUTHORITY_WINDOW:
+            raise SupportDenied("support_prior_case_dates_invalid")
+        return created_at
     if (type(case) is not dict or set(case) != (ADULT_CASE_FIELDS if adult else CASE_FIELDS)
             or case["case"] != reference
             or case["status"] != "approved"
@@ -235,6 +269,40 @@ def _authority(case, reference, now, *, adult):
     return created_at
 
 
+def _original_intent(register, case, target, *, adult):
+    """Check the original Support receipt and target before certifying later cleanup."""
+    source = case["deletion_evidence_ref"]
+    intent_path = register / (source + ".intent.json")
+    result_path = register / (source + ".result.json")
+    if case["evidence_kind"] == "verified_deletion_record" and not (intent_path.exists() or result_path.exists()):
+        # Signed-in self-deletion has no Support receipt. The custodian must
+        # inspect an independent original record before approving this reference.
+        return None
+    try:
+        with _protected_file(intent_path, os.geteuid()) as stream:
+            intent = _read_json(stream)
+        with _protected_file(result_path, os.geteuid()) as stream:
+            receipt = _read_json(stream)
+    except FileNotFoundError:
+        raise SupportDenied("support_prior_receipt_unavailable") from None
+    subject_id = "verifier_id" if adult else "profile_id"
+    fields = {"case", subject_id, "role", "database", "database_oid", "approval_sha256", "restriction_sha256", "deleted_at"}
+    hashes = {"approval_sha256", "restriction_sha256"}
+    if adult:
+        fields.add("invitation_key")
+        hashes.add("invitation_key")
+    if (type(intent) is not dict or set(intent) not in (fields, fields | {"retention_scope"})
+            or ("retention_scope" in intent and intent["retention_scope"] != RETENTION_SCOPE)
+            or any(not isinstance(intent[key], str) or re.fullmatch(r"[0-9a-f]{64}", intent[key]) is None for key in hashes)
+            or (intent["case"], intent["database"], intent["database_oid"], intent["role"], intent[subject_id])
+            != (source, target.database, target.database_oid, target.role, case[subject_id])
+            or _time(intent["deleted_at"]) != _time(case["deleted_at"])
+            or receipt != {"case": source, "status": "adult_deletion_applied" if adult else "deletion_applied",
+                           "deleted_at": intent["deleted_at"], "intent_sha256": _digest(intent)}):
+        raise SupportDenied("support_prior_receipt_mismatch")
+    return intent
+
+
 def _restriction_digest(profile):
     if (profile is None or profile.status != "deleted" or profile.deleted_at is None
             or not profile.woodchuck_id.startswith("WD-") or not profile.pin_hash.startswith("deleted$")
@@ -261,24 +329,51 @@ def _adult_restriction_digest(verifier):
     })
 
 
-def _apply_deletion(session, case, reference, clock, *, adult):
+def _apply_deletion(session, case, reference, clock, *, adult, prior, original):
     if adult:
         verifier = session.scalar(select(TrustedVerifier).where(
             TrustedVerifier.id == case["verifier_id"]
         ).with_for_update().execution_options(populate_existing=True))
         moment = clock()
-        created_at = _authority(case, reference, moment, adult=True)
+        created_at = _authority(case, reference, moment, adult=True, prior=prior)
+        if prior:
+            restriction = _adult_restriction_digest(verifier)
+            if (original is None or verifier is None or restriction != original["restriction_sha256"]
+                    or _utc(verifier.created_at) != created_at or _utc(verifier.updated_at) != _time(case["deleted_at"])
+                    or not adult_deletion_complete(session, verifier)
+                    or not adult_invitation_cutoff_complete(session, original["invitation_key"], verifier.updated_at, moment)):
+                raise SupportDenied("support_prior_deletion_mismatch_or_unavailable")
+            clear_adult_spent_invitations(session, verifier.id)
+            if not adult_spent_invitations_complete(session, verifier.id):
+                raise SupportDenied("support_prior_cleanup_postcondition_failed")
+            return _utc(verifier.updated_at), restriction
         if (verifier is None or normalize_email(verifier.email) != case["email"]
                 or _utc(verifier.created_at) != created_at):
             raise SupportDenied("support_adult_mismatch_or_unavailable")
         delete_adult_account(session, verifier, now=moment)
-        if _utc(verifier.updated_at) != _utc(moment) or not adult_deletion_complete(session, verifier):
+        if (_utc(verifier.updated_at) != _utc(moment) or not adult_deletion_complete(session, verifier)
+                or not adult_spent_invitations_complete(session, verifier.id)):
             raise SupportDenied("support_deletion_postcondition_failed")
         return moment, _adult_restriction_digest(verifier)
 
     profile, _ = lock_account_for_deletion(session, case["profile_id"])
     moment = clock()
-    created_at = _authority(case, reference, moment, adult=False)
+    created_at = _authority(case, reference, moment, adult=False, prior=prior)
+    if prior:
+        restriction = _restriction_digest(profile)
+        if (restriction is None or (original is not None and original["restriction_sha256"] != restriction)
+                or _utc(profile.created_at) != created_at
+                or _utc(profile.deleted_at) != _time(case["deleted_at"])
+                or profile.session_version < 1 or profile.display_name != DELETED_PUBLIC_NAME
+                or re.fullmatch(r"WD-[A-F0-9]{12}", profile.woodchuck_id) is None
+                or re.fullmatch(r"deleted\$[a-f0-9]{64}", profile.pin_hash) is None
+                or not compare_digest(profile.retired_woodchuck_id_hash, retired_identifier_hash(case["woodchuck_id"]))):
+            raise SupportDenied("support_prior_deletion_mismatch_or_unavailable")
+        clear_student_ordinary_data(session, profile, now=moment)
+        session.flush()
+        if not ordinary_deletion_complete(session, profile) or _restriction_digest(profile) != restriction:
+            raise SupportDenied("support_prior_cleanup_postcondition_failed")
+        return _utc(profile.deleted_at), restriction
     if (profile is None or profile.status != "active" or profile.woodchuck_id != case["woodchuck_id"]
             or _utc(profile.created_at) != created_at):
         raise SupportDenied("support_child_mismatch_or_unavailable")
@@ -299,7 +394,7 @@ def _check_register(directory):
 
 
 def fulfill(factory, *, target, approval_directory, approval_uid, register, reference,
-            status_only=False, adult=False, clock=lambda: datetime.now(timezone.utc)):
+            status_only=False, adult=False, prior=False, clock=lambda: datetime.now(timezone.utc)):
     """Execute only the exact authorized account; reconcile a known case without mutating it."""
     if not _reference(reference):
         raise SupportDenied("support_case_invalid")
@@ -313,7 +408,7 @@ def fulfill(factory, *, target, approval_directory, approval_uid, register, refe
         if intent_path.exists():
             with _protected_file(intent_path, os.geteuid()) as stream:
                 intent = _read_json(stream)
-            return _reconcile(factory, target, reference, intent, result_path, adult=adult, clock=clock)
+            return _reconcile(factory, target, reference, intent, result_path, adult=adult, prior=prior, clock=clock)
         with factory() as session:
             target.require(session)
             if status_only:
@@ -323,45 +418,59 @@ def fulfill(factory, *, target, approval_directory, approval_uid, register, refe
                 approval_path = approval_directory / (reference + ".json")
                 with _protected_file(approval_path, approval_uid) as stream:
                     case = _read_json(stream)
-                _authority(case, reference, clock(), adult=adult)
-                moment, restriction = _apply_deletion(session, case, reference, clock, adult=adult)
+                _authority(case, reference, clock(), adult=adult, prior=prior)
+                original = _original_intent(register, case, target, adult=adult) if prior else None
+                moment, restriction = _apply_deletion(session, case, reference, clock, adult=adult, prior=prior,
+                                                      original=original)
                 subject_id = "verifier_id" if adult else "profile_id"
                 intent = {
                     "case": reference, subject_id: case[subject_id], "role": target.role,
                     "database": target.database, "database_oid": target.database_oid,
                     "approval_sha256": _digest(case), "restriction_sha256": restriction,
-                    "deleted_at": _utc(moment).isoformat(),
+                    "deleted_at": _utc(moment).isoformat(), "retention_scope": RETENTION_SCOPE,
                 }
+                if prior:
+                    intent["cleanup_action"] = PRIOR_ADULT_ACTION if adult else PRIOR_ACTION
+                    intent["cleanup_at"] = _utc(clock()).isoformat()
                 if adult:
-                    key = invitation_key(case["email"])
-                    if not adult_invitation_cutoff_complete(session, key, moment, moment):
+                    key = original["invitation_key"] if prior else invitation_key(case["email"])
+                    if not adult_invitation_cutoff_complete(session, key, moment, clock()):
                         raise SupportDenied("support_deletion_postcondition_failed")
                     intent["invitation_key"] = key
                 _write_new(intent_path, intent)
                 with _protected_file(approval_path, approval_uid) as stream:
                     if _digest(_read_json(stream)) != intent["approval_sha256"]:
                         raise SupportDenied("support_approval_changed")
-                _authority(case, reference, clock(), adult=adult)
+                _authority(case, reference, clock(), adult=adult, prior=prior)
                 session.commit()
-        return _reconcile(factory, target, reference, intent, result_path, adult=adult, clock=clock)
+        return _reconcile(factory, target, reference, intent, result_path, adult=adult, prior=prior, clock=clock)
 
 
-def _reconcile(factory, target, reference, intent, result_path, *, adult, clock):
+def _reconcile(factory, target, reference, intent, result_path, *, adult, prior, clock):
     subject_id = "verifier_id" if adult else "profile_id"
     fields = {
         "case", subject_id, "role", "database", "database_oid",
         "approval_sha256", "restriction_sha256", "deleted_at",
     }
     hashes = {"approval_sha256", "restriction_sha256"}
+    if prior:
+        fields.update(("cleanup_action", "cleanup_at"))
     if adult:
         fields.add("invitation_key")
         hashes.add("invitation_key")
+    current_scope = isinstance(intent, dict) and "retention_scope" in intent
+    if current_scope:
+        fields.add("retention_scope")
     if (type(intent) is not dict or set(intent) != fields or intent["case"] != reference
+            or (prior and not current_scope) or (current_scope and intent["retention_scope"] != RETENTION_SCOPE)
             or (intent["database"], intent["database_oid"], intent["role"])
             != (target.database, target.database_oid, target.role)
             or type(intent[subject_id]) is not int or intent[subject_id] <= 0
             or any(not isinstance(intent[key], str) or re.fullmatch(r"[0-9a-f]{64}", intent[key]) is None
                    for key in hashes)):
+        raise SupportDenied("support_record_mismatch")
+    if prior and (intent["cleanup_action"] != (PRIOR_ADULT_ACTION if adult else PRIOR_ACTION)
+                  or not _time(intent["deleted_at"]) <= _time(intent["cleanup_at"]) <= clock()):
         raise SupportDenied("support_record_mismatch")
     with factory() as session:
         # Read both the tombstone and ordinary cleanup from one committed snapshot.
@@ -372,14 +481,21 @@ def _reconcile(factory, target, reference, intent, result_path, *, adult, clock)
         if (digest != intent["restriction_sha256"]
                 or _utc(subject.updated_at if adult else subject.deleted_at) != _time(intent["deleted_at"])):
             raise SupportDenied("support_execution_unreconciled")
-        complete = adult_deletion_complete if adult else ordinary_deletion_complete
-        if not complete(session, subject):
+        if adult:
+            complete = adult_deletion_complete(session, subject) and (
+                not current_scope or adult_spent_invitations_complete(session, subject.id))
+        else:
+            complete = ordinary_deletion_complete(session, subject, current_scope=current_scope)
+        if not complete:
             raise SupportDenied("support_ordinary_cleanup_incomplete")
         if adult and not adult_invitation_cutoff_complete(session, intent["invitation_key"],
                                                          subject.updated_at, clock()):
             raise SupportDenied("support_ordinary_cleanup_incomplete")
     result = {"case": reference, "status": "adult_deletion_applied" if adult else "deletion_applied",
               "deleted_at": intent["deleted_at"]}
+    if prior:
+        result.update(status="prior_adult_spent_invitations_verified" if adult else "prior_ordinary_cleanup_verified",
+                      cleanup_at=intent["cleanup_at"])
     receipt = {**result, "intent_sha256": _digest(intent)}
     if result_path.exists():
         with _protected_file(result_path, os.geteuid()) as stream:
@@ -392,14 +508,16 @@ def _reconcile(factory, target, reference, intent, result_path, *, adult, clock)
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("execute", "status", "execute-adult", "status-adult"))
+    parser.add_argument("action", choices=("execute", "status", "execute-adult", "status-adult",
+                                         "cleanup-prior", "status-prior", "cleanup-prior-adult", "status-prior-adult"))
     parser.add_argument("case", help="Opaque Support case reference")
     args = parser.parse_args(argv)
     engine = None
     try:
         if os.geteuid() == 0:
             raise SupportDenied("support_named_executor_required")
-        adult = args.action in {"execute-adult", "status-adult"}
+        adult = args.action.endswith("-adult")
+        prior = args.action in {"cleanup-prior", "status-prior", "cleanup-prior-adult", "status-prior-adult"}
         config_directory = ADULT_CONFIG_DIR if adult else CONFIG_DIR
         with _protected_file(config_directory / (str(os.geteuid()) + ".json"), 0) as stream:
             config = _read_json(stream)
@@ -421,7 +539,7 @@ def main(argv=None):
         result = fulfill(sessionmaker(engine, autoflush=False), target=target,
                          approval_directory=Path(config["approval_directory"]), approval_uid=approval_uid,
                          register=Path(config["register"]), reference=args.case,
-                         status_only=args.action in {"status", "status-adult"}, adult=adult)
+                         status_only=args.action.startswith("status"), adult=adult, prior=prior)
         print(json.dumps(result, sort_keys=True))
         return 0
     except SupportDenied as error:

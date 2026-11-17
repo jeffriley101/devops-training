@@ -363,8 +363,9 @@ async def revoke_director(request:Request,permission_id:int):
     if data.get('confirm')!='yes':raise HTTPException(400,'Confirm revocation.')
     with SessionLocal() as s:
         evidence,_,_=parent(s,request);p=s.get(DirectorPermission,permission_id)
-        if not p or p.consent_id!=evidence.id:raise HTTPException(404,'Permission not found.')
-        p.revoked_at=service.clock();p.link_hash=None;p.session_hash=None;s.commit()
+        if not p or p.consent_id!=evidence.id or p.profile_id!=evidence.profile_id:raise HTTPException(404,'Permission not found.')
+        service.revoke_director_permission(s, p)
+        s.commit()
     return RedirectResponse('/family/parent',303)
 
 @router.get('/family/withdraw/{token}')
@@ -429,10 +430,12 @@ async def disconnect(request:Request):
         c=s.get(StudentVerifierConnection,cid)
         if not c or c.profile_id!=p.id:raise HTTPException(404,'Connection not found.')
         # Serialize with private review before retiring the shared connection.
-        for consent_id in s.scalars(select(DirectorPermission.consent_id).where(DirectorPermission.connection_id==cid).order_by(DirectorPermission.consent_id)):
-            s.scalar(select(ConsentEvidence).where(ConsentEvidence.id==consent_id).with_for_update())
+        permissions = select(DirectorPermission).join(ConsentEvidence).where(
+            DirectorPermission.connection_id == cid, DirectorPermission.profile_id == p.id,
+            ConsentEvidence.profile_id == p.id,
+        ).order_by(DirectorPermission.consent_id, DirectorPermission.id)
+        for permission in s.scalars(permissions):
+            service.revoke_director_permission(s, permission)
         c.status='disconnected'
-        for permission in s.scalars(select(DirectorPermission).where(DirectorPermission.connection_id==cid)):
-            permission.revoked_at=service.clock();permission.link_hash=None;permission.session_hash=None
         s.commit()
     return RedirectResponse('/family/practice',303)

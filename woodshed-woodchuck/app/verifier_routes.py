@@ -360,11 +360,13 @@ def disconnect_student_verifier(
             )
 
         from .child_models import DirectorPermission, ConsentEvidence
-        from .child_authorization import clock
-        permissions=session.scalars(select(DirectorPermission).where(DirectorPermission.connection_id==connection.id).order_by(DirectorPermission.consent_id)).all()
-        for permission in permissions:
-            session.scalar(select(ConsentEvidence).where(ConsentEvidence.id==permission.consent_id).with_for_update())
-            permission.revoked_at=clock();permission.link_hash=None;permission.session_hash=None
+        from .child_authorization import revoke_director_permission
+        permissions = select(DirectorPermission).join(ConsentEvidence).where(
+            DirectorPermission.connection_id == connection.id, DirectorPermission.profile_id == profile.id,
+            ConsentEvidence.profile_id == profile.id,
+        ).order_by(DirectorPermission.consent_id, DirectorPermission.id)
+        for permission in session.scalars(permissions):
+            revoke_director_permission(session, permission)
         connection.status = "disconnected"
         session.commit()
         session.refresh(connection)

@@ -114,9 +114,12 @@ def test_clears_ordinary_data_while_preserving_provenance_and_shared_records(pla
             ])
         session.commit()
 
-    expected_history = {
-        row.id: {**invitation_fields(row), 'last_email_error_code': None} for row in protected_invitations
-    }
+    expected_history = {}
+    for row in protected_invitations:
+        expected = {**invitation_fields(row), 'last_email_error_code': None}
+        if row.status in ('accepted', 'expired', 'revoked'):
+            expected.update(email='deleted@invalid.local', token_hash=f'retired:{row.id}')
+        expected_history[row.id] = expected
     with play_pg() as stale:
         stale_invite = stale.get(TrustedVerifierInvitation, invite.id)
         stale_verification = stale.get(PracticeChartVerification, verification.id)

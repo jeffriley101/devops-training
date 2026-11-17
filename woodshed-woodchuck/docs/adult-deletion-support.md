@@ -17,3 +17,16 @@ Use this procedure for a verified adult asking to delete their own Woodshed sign
 ## Disposal of invitation revocations
 
 Old Program invitations can create a new sign-in for the same mailbox. Deletion records a keyed digest of the former sign-in email in the existing session-revocation table for the seven-day invitation lifetime. The maintenance owner must run `app.session_revocations.purge_expired(session)` in a committed transaction against the qualified target at least daily and record the last successful run. Assign a named maintenance owner before use. A daily run removes an expired marker within the next 24 hours. The repository provides the expiry index and purge helper. Operation of a scheduled purge requires separate evidence. Restrict the separate case intent, including its keyed lookup value, to the existing Support retention period of 90 days after closure.
+
+## Previously deleted adults
+
+Use `cleanup-prior-adult` for accepted invitation tokens still linked to an already-deleted verifier. Open a new case under the same adult approval and register custody. Require the original adult deletion intent and receipt in that register. The executor checks the recorded database and role against its configuration, then verifies the receipt digest, account creation and deletion times, committed tombstone and any still-required invitation cutoff. Leave cases with a missing original record open.
+
+The independent approver publishes `case`, `status` (`approved`), `action` (`CLEAN UP PREVIOUS ADULT DELETION`), `verifier_id`, `verifier_created_at`, original `deleted_at`, `evidence_kind` (`support_receipt`), `deletion_evidence_ref` (the original case reference), `verified_by` and timezone-aware `verified_at`. Verify the original record within 24 hours of executing cleanup. The individual executor runs:
+
+```bash
+python -m app.parent_deletion_support cleanup-prior-adult <new-case-reference>
+python -m app.parent_deletion_support status-prior-adult <new-case-reference>
+```
+
+A separate `prior_adult_spent_invitations_verified` receipt records the original deletion date and the later cleanup time. Original receipts remain tied to the cleanup scope their intent recorded. Keep any remaining contact, school, provider or other retention issues open.

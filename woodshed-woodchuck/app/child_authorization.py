@@ -5,9 +5,9 @@ provider-suitability approval is implied.
 """
 from datetime import datetime, timedelta, timezone
 import hashlib, hmac, html, os, re
-from sqlalchemy import select, func
+from sqlalchemy import select, func, update
 from .age_models import AccountPrivacy
-from .child_models import PendingConsent, ConsentEvidence, DirectorPermission
+from .child_models import PendingConsent, ConsentEvidence, DirectorPermission, ParentAccess
 from .security import generate_invitation_token, hash_invitation_token
 from .email_service import EmailService, build_message, public_link
 from .session_config import session_secret
@@ -309,12 +309,27 @@ def permitted_director(session,profile_id,verifier_id,*,review=False):
             if c.verifier_id==verifier_id and (not review or p.review_allowed):return p
     return None
 
+def revoke_director_permission(session, permission):
+    permission = _lock_director_permission(session, permission)
+    if permission.revoked_at is None:
+        permission.revoked_at = clock()
+    permission.link_hash = permission.link_expires_at = None
+    permission.session_hash = permission.session_expires_at = None
+
+
 def withdraw_evidence(session,evidence):
     from .models import WoodchuckProfile
+    evidence = session.scalar(select(ConsentEvidence).where(ConsentEvidence.id == evidence.id)
+                              .with_for_update().execution_options(populate_existing=True))
     if not evidence.withdrawn_at:
         evidence.withdrawn_at=clock()
         profile=session.get(WoodchuckProfile,evidence.profile_id)
         if profile and profile.status=='active':profile.session_version+=1
+    credentials = dict(link_hash=None, link_expires_at=None, session_hash=None, session_expires_at=None)
+    session.execute(update(ParentAccess).where(ParentAccess.consent_id == evidence.id).values(**credentials))
+    session.execute(update(DirectorPermission).where(
+        DirectorPermission.consent_id == evidence.id, DirectorPermission.profile_id == evidence.profile_id,
+    ).values(**credentials))
     session.flush();return evidence
 
 if __name__=='__main__':

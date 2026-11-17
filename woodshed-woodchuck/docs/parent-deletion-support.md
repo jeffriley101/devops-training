@@ -44,3 +44,16 @@ After operational authorization, a trusted host administrator provisions a root-
 Qualify the individual nonowner role for the shared deletion statements, row locks, readback and existing security logging before use. PostgreSQL needs a column-level update privilege for each relation locked with `FOR UPDATE`. Limit lock-only grants to the required ID column, including protected consent. Grant updates to other columns only where the shared operation changes them. A recent C001 creation can cause one existing `quick_deletion` security event. Include its required insert columns and sequence usage when qualifying the role.
 
 Keep the intent and result outside the database. Give the independent reviewer restricted access to the case evidence and observed results. Operational host identities, database grants and custody still require provisioning and qualification.
+
+## Cleanup of a previously deleted student account
+
+A named executor can finish ordinary cleanup for one existing deletion using the same approval directory, target database, application secret, restricted database role and private register. Use a **new** case reference. Preserve the original request or deletion clock, any older receipt and any missed deadline. The approver checks an original, attributable deletion record against the subject’s original Woodchuck ID, profile number, creation time and actual deletion time. Never derive a date from a backup, retention deadline, last update or current time. Leave the case open if the original record or its authority cannot be verified.
+
+The independent approver publishes a fresh case under the same file lock. Include exactly `case`, `status` (`approved`), `action` (`CLEAN UP PREVIOUS STUDENT DELETION`), `profile_id`, `woodchuck_id` (original), `profile_created_at`, `deleted_at` (original), `deletion_evidence_ref`, `evidence_kind`, `verified_by` and `verified_at`. Use `support_receipt` and the original case reference for a prior deletion receipt held in this register. The executor checks the receipt, matching intent, recorded target and restriction digest. For an original deletion documented separately, use `verified_deletion_record` only after the custodian has inspected the original source and its authority in the restricted evidence channel. A date or reference supplied by the requester alone is insufficient. Verification of the source must be current within 24 hours of cleanup.
+
+```bash
+python -m app.parent_deletion_support cleanup-prior <new-case-reference>
+python -m app.parent_deletion_support status-prior <new-case-reference>
+```
+
+The database must also match the original, keyed ID reservation, tombstone, unusable credential, session restriction, creation time and deletion time. `prior_ordinary_cleanup_verified` records the original deletion time and this later cleanup check after a fresh database read. It covers only the implemented ordinary cleanup. Use `status-prior` after an interruption. A mismatch, incomplete result or unavailable source remains open for review. Apply the same restricted case custody and retention schedule as other Support deletion cases.

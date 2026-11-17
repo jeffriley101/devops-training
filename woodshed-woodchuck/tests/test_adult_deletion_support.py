@@ -167,8 +167,8 @@ def test_verified_verifier_and_director_preserves_student_history_and_revokes_ol
                         accepted_verifier_id=case.adult.id, accepted_at=case.now - timedelta(days=2),
                         expires_at=case.now - timedelta(days=1))
         session.add(invitation)
-    preserved = records(play_pg, WoodchuckProfile, WoodchuckState, PracticeChart, PracticeChartVerification,
-                        TrustedVerifierInvitation)
+    preserved = records(play_pg, WoodchuckProfile, WoodchuckState, PracticeChart, PracticeChartVerification)
+    before_invite = dict(records(play_pg, TrustedVerifierInvitation)[TrustedVerifierInvitation][0]._mapping)
     original = login(case.adult, "1357")
     colleague = login(case.colleague, "2468")
     signed_cookie = original.cookies.get("session")
@@ -195,6 +195,8 @@ def test_verified_verifier_and_director_preserves_student_history_and_revokes_ol
             StudentVerifierConnection.verifier_id == deleted.id))) == {"disconnected"}
         assert session.get(StudentVerifierConnection, shared.id).status == "accepted"
     assert records(play_pg, *preserved) == preserved
+    after_invite = dict(records(play_pg, TrustedVerifierInvitation)[TrustedVerifierInvitation][0]._mapping)
+    assert after_invite == before_invite | {"token_hash": f"retired:{invitation.id}"}
     for entry in case.register.glob("*.json"):
         for private in (case.adult.email, case.adult.display_name, "requester-01", "identity-01", "mailbox-01",
                         "decision-01", case.adult.pin_hash):
