@@ -101,13 +101,18 @@ def test_categories_summary_and_repeated_attempts(database):
     assert by_id["WC-REPORT-repeat"]["kws_state"] == "delivery_unknown"
 
 
-def test_sensitive_fields_absent_and_database_unchanged(database, capsys):
+def test_sensitive_fields_absent_and_database_unchanged(database, capsys, monkeypatch):
     engine, path = database
     with Session(engine) as session, session.begin():
         profile = student(session, "private")
         attempt(session, profile, "private", state="delivery_unknown")
     before = hashlib.sha256(path.read_bytes()).digest()
     url = f"sqlite:///{path}"
+    original_report = inventory.report
+    monkeypatch.setattr(
+        inventory, "report",
+        lambda db_url: original_report(db_url, now=NOW),
+    )
     assert inventory.main(["--database-url", url]) == 0
     output = capsys.readouterr().out
     assert "kws_delivery_unknown" in output

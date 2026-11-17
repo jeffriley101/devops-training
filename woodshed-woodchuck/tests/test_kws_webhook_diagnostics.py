@@ -134,9 +134,15 @@ def test_rejected_webhook_logs_only_safe_stage(production_db, monkeypatch, caplo
     assert result.status_code == 400
     assert result.json() == {'detail': 'Invalid KWS result.'}
     records = rejection_records(caplog)
-    assert len(records) == 1
-    assert records[0].levelno == logging.WARNING
-    assert records[0].getMessage() == stage
+    messages = [record.getMessage() for record in records]
+    if stage == 'invalid_timestamp':
+        assert messages == [
+            'kws_webhook_timestamp_shape count=1 length=10 ascii_digits=True',
+            stage,
+        ]
+    else:
+        assert messages == [stage]
+    assert all(record.levelno == logging.WARNING for record in records)
     transaction_hash = hashlib.sha256(json.dumps(
         [cfg.environment, cfg.org_id, cfg.product_id, TRANSACTION_MARKER],
         separators=(',', ':')).encode()).hexdigest()
