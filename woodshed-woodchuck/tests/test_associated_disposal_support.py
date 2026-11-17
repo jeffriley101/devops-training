@@ -1,5 +1,6 @@
 """Qualify the actual Support operation with and without narrowly scoped local database rights."""
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -17,47 +18,21 @@ from tests.test_historical_deletion_cleanup import prior_deletion
 from tests.test_parent_deletion_support import support_case
 
 
+def apply_disposal_acl(session, kind, role):
+    # Only the role's GRANT statements enter the fixture owner's transaction.
+    marker = {"guardian": ':"guardian_role"', "adult": ':"adult_role"'}[kind]
+    manifest = Path(__file__).parent / "fixtures" / "support_deletion_acl_delta.sql"
+    quoted_role = session.get_bind().dialect.identifier_preparer.quote_identifier(role)
+    statements = [line for line in manifest.read_text().splitlines()
+                  if line.startswith("GRANT ") and line.endswith(f" TO {marker};")]
+    assert statements, f"No disposal grants for {kind}"
+    for statement in statements:
+        session.execute(text(statement.replace(marker, quoted_role)))
+
+
 def qualify_student_disposal(play_pg, engine):
-    # These database objects and roles exist only in the fixture's private cluster.
-    read = {
-        "arcade_start_requests": "profile_id, play_id",
-        "arcade_play_sessions": "id, profile_id, pack_id",
-        "arcade_attempt_packs": "id, profile_id",
-        "weekly_wheel_plays": "id, profile_id",
-        "reward_inventory_placements": "profile_id, crown_award_id, reward_grant_id",
-        "crown_awards": "id, profile_id", "reward_grants": "id, profile_id, source_key",
-        "camp_point_awards": "profile_id, duplicate_key",
-        "classroom_chart_shares": "chart_id", "classroom_chart_director_shares": "chart_id",
-        "classroom_reporting_periods": "profile_id, starts_at, ended_at",
-        "classroom_progress_authorizations": "profile_id, accepted_at, withdrawn_at",
-        "classroom_guardian_authorizations": "profile_id, purpose, accepted_at, expires_at, withdrawn_at",
-        "weekly_plans": "profile_id, issued_at",
-        "account_privacy_rules": "profile_id, consent_id, private_plunge_best",
-    }
-    private_tables = (
-        "arcade_high_scores", "plunge_point_awards", "daily_trivia_attempts", "quest_completions",
-        "weekly_newsletter_presentations", "owned_item_copies", "traveling_cup_placements", "login_streaks",
-    )
-    for table in (*private_tables, "account_age_corrections", "child_parent_age_declarations",
-                  "classroom_student_memberships", "classroom_student_invitations", "classroom_enrollment_invitations",
-                  "team_week_membership_snapshots"):
-        read[table] = "profile_id"
-    deletable = (*private_tables, "arcade_start_requests", "arcade_play_sessions", "arcade_attempt_packs",
-                 "weekly_wheel_plays", "reward_inventory_placements", "practice_charts", "weekly_plans",
-                 "account_privacy_rules")
-    writable = {
-        "woodchuck_profiles": "plunge_best_score", "account_privacy_rules": "private_plunge_best",
-        "practice_charts": "ordinary_email_attempted_at, ordinary_email_sent_at",
-        "practice_chart_verifications": "last_email_attempt_at, last_email_sent_at, email_attempt_count",
-        "trusted_verifier_invitations": "last_email_attempt_at, last_email_sent_at, email_attempt_count",
-    }
-    role = engine.url.username
     with play_pg.begin() as session:
-        for table, columns in read.items():
-            session.execute(text(f"GRANT SELECT ({columns}) ON {table} TO {role}"))
-        for table, columns in writable.items():
-            session.execute(text(f"GRANT UPDATE ({columns}) ON {table} TO {role}"))
-        session.execute(text(f"GRANT DELETE ON {', '.join(deletable)} TO {role}"))
+        apply_disposal_acl(session, "guardian", engine.url.username)
 
 
 def private_rows(session, sid, tag):

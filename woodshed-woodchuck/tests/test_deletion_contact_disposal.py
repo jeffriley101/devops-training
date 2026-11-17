@@ -9,6 +9,7 @@ from app.security import hash_invitation_token
 from app.verifier_invitation_disposal import REMOVED_INVITATION_EMAIL, unverified_adult_invitation_contact_count
 from tests.test_account_deletion import profile
 from tests.test_adult_deletion_support import adult_case
+from tests.test_associated_disposal_support import apply_disposal_acl
 from tests.test_historical_deletion_cleanup import prior_deletion
 from tests.test_parent_deletion_support import support_case
 from tests.test_prior_adult_retention import previous_adult
@@ -26,7 +27,7 @@ def test_adult_contact_requires_matching_mailbox_actor_and_acceptance(play_pg, a
     c = adult_case
     with play_pg.begin() as db:
         if qualified_role:
-            db.execute(text(f"GRANT UPDATE (email) ON trusted_verifier_invitations TO {c.target.role}"))
+            apply_disposal_acl(db, "adult", c.target.role)
         child = profile(db, 1)
         verified = invitation(child.id, c.adult.id, "  " + c.adult.email.upper(), c.now, "verified")
         wrong_mailbox = invitation(child.id, c.adult.id, c.colleague.email, c.now, "other-address")
@@ -57,7 +58,7 @@ def test_historical_adult_contact_checks_original_mailbox_key(play_pg, previous_
     original = c.register / (c.case["case"] + ".result.json")
     original_receipt = original.read_bytes()
     with play_pg.begin() as db:
-        db.execute(text(f"GRANT UPDATE (email) ON trusted_verifier_invitations TO {c.target.role}"))
+        apply_disposal_acl(db, "adult", c.target.role)
         child = profile(db, 73)
         row = invitation(child.id, c.adult.id, c.adult.email, c.now, "old-contact")
         db.add(row)
