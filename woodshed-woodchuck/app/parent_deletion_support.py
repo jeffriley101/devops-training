@@ -100,6 +100,26 @@ class ApplicationDeletionTarget(SupportTarget):
     """The service-held application login may own its data. Operators receive no database login."""
 
 
+@dataclass(frozen=True)
+class RenderInternalDeletionTarget(ApplicationDeletionTarget):
+    """One owner-qualified, direct Render Postgres hostname on the private network."""
+
+    host: str
+
+    def __post_init__(self):
+        if (not isinstance(self.host, str) or len(self.host) > 63
+                or not re.fullmatch(r"dpg-[a-z0-9]+(?:-[a-z0-9]+)*", self.host)):
+            raise SupportDenied("support_application_configuration_invalid")
+
+    def require(self, session):
+        # Check the actual client transport for both execution and fresh readback.
+        connection = session.connection().connection.driver_connection.pgconn
+        if (not connection.ssl_in_use or connection.host != self.host.encode("ascii")
+                or connection.port != b"5432"):
+            raise SupportDenied("support_connection_unqualified")
+        super().require(session)
+
+
 OWNER_ACTOR = "woodshed-owner"
 
 
@@ -456,11 +476,19 @@ def _reconcile(factory, target, reference, intent, result_path, *, adult, prior,
 
 def _require_connection(url, target):
     if (url.drivername != "postgresql+psycopg" or url.database != target.database
-            or url.username != target.role or any(name.startswith("PG") for name in os.environ)
-            or set(url.query) - {"host", "port", "sslmode", "sslrootcert"}
+            or url.username != target.role or any(name.startswith("PG") for name in os.environ)):
+        raise SupportDenied("support_connection_unqualified")
+    if isinstance(target, RenderInternalDeletionTarget):
+        if (not url.database or not url.username or url.host != target.host or url.port not in (None, 5432)
+                or url.query != {"sslmode": "require"} or "HOSTALIASES" in os.environ or "LOCALDOMAIN" in os.environ):
+            raise SupportDenied("support_connection_unqualified")
+        return
+    socket_host = url.query.get("host", "")
+    if (set(url.query) - {"host", "port", "sslmode", "sslrootcert"}
             or (url.host and (url.query.get("sslmode") != "verify-full"
                              or not Path(url.query.get("sslrootcert", "")).is_absolute()))
-            or (not url.host and not Path(url.query.get("host", "")).is_absolute())
+            or (not url.host and (not isinstance(socket_host, str)
+                                  or not all(Path(host).is_absolute() for host in socket_host.split(","))))
             or (url.host and "host" in url.query)):
         raise SupportDenied("support_connection_unqualified")
 

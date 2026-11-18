@@ -12,8 +12,8 @@ from .adult_account_deletion import AdultDeletionHold
 from .db import SessionLocal
 from .deletion_disposal import DeletionDataConflict
 from .parent_deletion_support import (
-    ApplicationDeletionTarget, OwnerShellApproval, _check_register, _require_application_secret,
-    _require_connection, fulfill,
+    ApplicationDeletionTarget, OwnerShellApproval, RenderInternalDeletionTarget, _check_register,
+    _require_application_secret, _require_connection, fulfill,
 )
 from .support_case_files import (
     ADULT_CONFIG_DIR, CONFIG_DIR, SupportDenied, _digest, _protected_file, _read_json, _reference,
@@ -42,7 +42,11 @@ class OperatorRequest:
 
 def _application_target(config):
     _require_application_secret(config["session_secret_sha256"])
-    target = ApplicationDeletionTarget(config["database"], config["database_oid"], config["role"])
+    pins = (config["database"], config["database_oid"], config["role"])
+    if "render_internal_host" in config:
+        target = RenderInternalDeletionTarget(*pins, host=config["render_internal_host"])
+    else:
+        target = ApplicationDeletionTarget(*pins)
     _require_connection(SessionLocal.kw["bind"].url, target)
     return target
 
@@ -62,7 +66,8 @@ def _owner_case(action, reference, directory):
     uid = os.geteuid()
     with _protected_file(directory / ".target.json", uid) as stream:
         config = _read_json(stream)
-    if (not isinstance(config, dict) or set(config) != {"database", "database_oid", "role", "session_secret_sha256"}
+    fields = {"database", "database_oid", "role", "session_secret_sha256"}
+    if (not isinstance(config, dict) or set(config) not in (fields, fields | {"render_internal_host"})
             or type(config["database_oid"]) is not int or config["database_oid"] <= 0):
         raise SupportDenied("support_application_configuration_invalid")
     target = _application_target(config)
