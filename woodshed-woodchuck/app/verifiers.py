@@ -20,6 +20,8 @@ from .security import (
     hash_invitation_token,
     hash_pin,
     is_valid_pin,
+    normalize_email,
+    validate_email,
     verify_pin,
 )
 
@@ -122,10 +124,6 @@ def lock_mailbox_adult(session, email, *, for_login=False):
     return adult
 
 
-def normalize_email(email: str) -> str:
-    return email.strip().lower()
-
-
 def normalize_role(role: str) -> str:
     return (
         role.strip()
@@ -133,28 +131,6 @@ def normalize_role(role: str) -> str:
         .replace("-", "_")
         .replace(" ", "_")
     )
-
-
-def validate_email(email: str) -> str:
-    normalized = normalize_email(email)
-
-    if not normalized or len(normalized) > 320:
-        raise ValueError("A valid verifier email is required.")
-
-    if any(character.isspace() for character in normalized):
-        raise ValueError("A valid verifier email is required.")
-
-    local_part, separator, domain = normalized.partition("@")
-
-    if (
-        separator != "@"
-        or not local_part
-        or not domain
-        or "@" in domain
-    ):
-        raise ValueError("A valid verifier email is required.")
-
-    return normalized
 
 
 def validate_role(role: str) -> str:

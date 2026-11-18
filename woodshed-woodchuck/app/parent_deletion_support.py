@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 import fcntl
 from hashlib import sha256
 from hmac import compare_digest
@@ -41,67 +41,17 @@ from .adult_account_deletion import (
 )
 from .models import TrustedVerifier, WoodchuckProfile
 from .session_config import DEVELOPMENT_SECRET, session_secret
-from .verifiers import normalize_email, validate_email
+from .support_case_files import (
+    ACTION, ADULT_ACTION, PRIOR_ACTION, PRIOR_ADULT_ACTION, CONFIG_DIR, ADULT_CONFIG_DIR,
+    SupportDenied, _authority, _check_parent_directories, _digest, _protected_file,
+    _read_json, _reference, _time, _utc, _write_new,
+)
+from .verifiers import normalize_email
 
 
-CONFIG_DIR = Path("/etc/woodshed/parent-deletion-support")
-ADULT_CONFIG_DIR = Path("/etc/woodshed/adult-deletion-support")
 REVISION = "c36choice001"
-AUTHORITY_WINDOW = timedelta(hours=24)
-CONFIRMATION_WINDOW = timedelta(minutes=30)
-ACTION = "DELETE THIS ACCOUNT"
-ADULT_ACTION = "DELETE MY ADULT ACCOUNT"
-PRIOR_ACTION = "CLEAN UP PREVIOUS STUDENT DELETION"
-PRIOR_ADULT_ACTION = "CLEAN UP PREVIOUS ADULT DELETION"
 INVITATION_SCOPE = "ordinary-invitation-disposal-v2"
 RETENTION_SCOPE = "associated-data-disposal-v3"
-PRIOR_CASE_FIELDS = {
-    "case", "status", "action", "profile_id", "woodchuck_id", "profile_created_at", "deleted_at",
-    "deletion_evidence_ref", "evidence_kind", "verified_by", "verified_at",
-}
-PRIOR_ADULT_FIELDS = (PRIOR_CASE_FIELDS - {"profile_id", "profile_created_at", "woodchuck_id"}) | {
-    "verifier_id", "verifier_created_at",
-}
-REFERENCE = re.compile(r"[A-Za-z0-9_-]{8,64}")
-CASE_FIELDS = {
-    "case", "status", "profile_id", "woodchuck_id", "profile_created_at",
-    "requester_ref", "identity_ref", "authority_ref", "verified_by", "verified_at",
-    "confirmation", "disputed", "reviewed_by",
-}
-ADULT_CASE_FIELDS = ((CASE_FIELDS - {"profile_id", "woodchuck_id", "profile_created_at"})
-                     | {"verifier_id", "email", "verifier_created_at"})
-
-
-class SupportDenied(ValueError):
-    """Stable diagnostic without case evidence, credentials or SQL."""
-
-
-def _utc(value):
-    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
-
-
-def _time(value):
-    if not isinstance(value, str):
-        raise SupportDenied("support_case_invalid")
-    try:
-        result = datetime.fromisoformat(value)
-    except ValueError:
-        raise SupportDenied("support_case_invalid") from None
-    if result.tzinfo is None:
-        raise SupportDenied("support_case_invalid")
-    return _utc(result)
-
-
-def _reference(value):
-    return isinstance(value, str) and REFERENCE.fullmatch(value) is not None
-
-
-def _encode(value):
-    return json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
-
-
-def _digest(value):
-    return sha256(_encode(value)).hexdigest()
 
 
 def _require_application_secret(expected_digest):
@@ -111,65 +61,6 @@ def _require_application_secret(expected_digest):
     if (not isinstance(expected_digest, str) or re.fullmatch(r"[0-9a-f]{64}", expected_digest) is None
             or not compare_digest(sha256(secret.encode("utf-8")).hexdigest(), expected_digest)):
         raise SupportDenied("support_application_session_secret_mismatch")
-
-
-def _read_json(stream):
-    def unique_keys(pairs):
-        result = dict(pairs)
-        if len(result) != len(pairs):
-            raise SupportDenied("support_record_invalid")
-        return result
-
-    raw = stream.read(16385)
-    if len(raw) > 16384:
-        raise SupportDenied("support_record_invalid")
-    try:
-        return json.loads(raw, object_pairs_hook=unique_keys)
-    except (ValueError, UnicodeError):
-        raise SupportDenied("support_record_invalid") from None
-
-
-def _check_parent_directories(path, owner):
-    if not path.is_absolute():
-        raise SupportDenied("support_private_path_required")
-    for directory in path.parents:
-        info = directory.lstat()
-        if (not stat.S_ISDIR(info.st_mode) or info.st_uid not in {0, owner}
-                or (info.st_mode & 0o022 and not (info.st_uid == 0 and info.st_mode & stat.S_ISVTX))):
-            raise SupportDenied("support_private_path_required")
-
-
-@contextmanager
-def _protected_file(path, owner):
-    """Read a regular file whose custody is controlled by the configured owner."""
-    _check_parent_directories(path, owner)
-    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
-    with os.fdopen(fd, "rb") as stream:
-        info = os.fstat(stream.fileno())
-        if (not stat.S_ISREG(info.st_mode) or info.st_uid != owner
-                or info.st_mode & 0o027 or info.st_nlink != 1):
-            raise SupportDenied("support_private_file_required")
-        yield stream
-
-
-def _write_new(path, value):
-    """Publish a complete record without overwriting earlier evidence."""
-    import tempfile
-
-    fd, temporary = tempfile.mkstemp(dir=path.parent, prefix=".support-")
-    try:
-        with os.fdopen(fd, "wb") as stream:
-            stream.write(_encode(value))
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.link(temporary, path, follow_symlinks=False)
-    finally:
-        os.unlink(temporary)
-    directory_fd = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
-    try:
-        os.fsync(directory_fd)
-    finally:
-        os.close(directory_fd)
 
 
 @dataclass(frozen=True)
@@ -191,12 +82,12 @@ class SupportTarget:
         administrative = session.scalar(text(
             "SELECT EXISTS (SELECT FROM pg_catalog.pg_roles "
             "WHERE (rolsuper OR rolcreaterole OR rolcreatedb OR rolreplication OR rolbypassrls) "
-            "AND pg_has_role(oid, 'MEMBER')) OR EXISTS (SELECT FROM pg_catalog.pg_database "
+            "AND pg_has_role(oid, 'MEMBER')) OR (:human_login AND (EXISTS (SELECT FROM pg_catalog.pg_database "
             "WHERE datname = current_database() AND pg_has_role(datdba, 'MEMBER')) OR EXISTS "
             "(SELECT FROM pg_catalog.pg_class WHERE oid IN "
             "('public.woodchuck_profiles'::regclass, 'public.trusted_verifiers'::regclass) "
-            "AND pg_has_role(relowner, 'MEMBER'))"
-        ))
+            "AND pg_has_role(relowner, 'MEMBER'))))"
+        ), {"human_login": not isinstance(self, ApplicationDeletionTarget)})
         if administrative:
             raise SupportDenied("support_nonadministrative_role_required")
         revisions = session.execute(text("SELECT version_num FROM public.alembic_version")).scalars().all()
@@ -205,70 +96,8 @@ class SupportTarget:
         session.execute(text("SET LOCAL search_path TO public, pg_catalog, pg_temp"))
 
 
-def _authority(case, reference, now, *, adult, prior=False):
-    subject_id = "verifier_id" if adult else "profile_id"
-    if prior:
-        # The independent custodian verifies the original deletion record and its date.
-        if (type(case) is not dict or set(case) != (PRIOR_ADULT_FIELDS if adult else PRIOR_CASE_FIELDS)
-                or case["case"] != reference
-                or case["status"] != "approved" or case["action"] != (PRIOR_ADULT_ACTION if adult else PRIOR_ACTION)
-                or type(case[subject_id]) is not int or case[subject_id] <= 0
-                or (not adult and (not isinstance(case["woodchuck_id"], str)
-                    or re.fullmatch(r"WC-[A-Z0-9-]{1,29}", case["woodchuck_id"]) is None))
-                or (adult and case["evidence_kind"] != "support_receipt")
-                or case["evidence_kind"] not in ("support_receipt", "verified_deletion_record")
-                or not _reference(case["deletion_evidence_ref"]) or not _reference(case["verified_by"])
-                or case["deletion_evidence_ref"] in (reference, case["verified_by"])):
-            raise SupportDenied("support_prior_case_invalid")
-        created_at, deleted_at, verified_at = (_time(case[key]) for key in (
-            "verifier_created_at" if adult else "profile_created_at", "deleted_at", "verified_at",
-        ))
-        if not created_at <= deleted_at <= verified_at <= now or now - verified_at >= AUTHORITY_WINDOW:
-            raise SupportDenied("support_prior_case_dates_invalid")
-        return created_at
-    if (type(case) is not dict or set(case) != (ADULT_CASE_FIELDS if adult else CASE_FIELDS)
-            or case["case"] != reference
-            or case["status"] != "approved"
-            or type(case[subject_id]) is not int or case[subject_id] <= 0
-            or type(case["disputed"]) is not bool):
-        raise SupportDenied("support_case_invalid")
-    if adult:
-        if not isinstance(case["email"], str):
-            raise SupportDenied("support_case_invalid")
-        try:
-            email = validate_email(case["email"])
-        except ValueError:
-            raise SupportDenied("support_case_invalid") from None
-        if email != case["email"]:
-            raise SupportDenied("support_case_invalid")
-    elif (not isinstance(case["woodchuck_id"], str)
-          or re.fullmatch(r"WC-[A-Z0-9-]{1,29}", case["woodchuck_id"]) is None):
-        raise SupportDenied("support_case_invalid")
-    confirmation = case["confirmation"]
-    if (type(confirmation) is not dict
-            or set(confirmation) != {"case", subject_id, "requester_ref", "action", "reference", "at"}
-            or confirmation["case"] != reference or type(confirmation[subject_id]) is not int
-            or confirmation[subject_id] != case[subject_id]
-            or confirmation["action"] != (ADULT_ACTION if adult else ACTION)
-            or confirmation["requester_ref"] != case["requester_ref"]):
-        raise SupportDenied("support_confirmation_mismatch")
-    references = [case[key] for key in ("requester_ref", "identity_ref", "authority_ref")] + [confirmation["reference"]]
-    if not all(_reference(value) for value in references) or len(set(references)) != len(references):
-        raise SupportDenied("support_distinct_evidence_required")
-    if (not _reference(case["verified_by"])
-            or (adult and case["requester_ref"] in (case["verified_by"], case["reviewed_by"]))
-            or case["reviewed_by"] is not None and (
-                not _reference(case["reviewed_by"]) or case["reviewed_by"] == case["verified_by"])
-            or case["disputed"] and case["reviewed_by"] is None):
-        raise SupportDenied("support_independent_review_required")
-    created_at = _time(case["verifier_created_at"] if adult else case["profile_created_at"])
-    verified_at = _time(case["verified_at"])
-    confirmed_at = _time(confirmation["at"])
-    if (not created_at <= verified_at <= confirmed_at <= now
-            or now - verified_at >= AUTHORITY_WINDOW
-            or now - confirmed_at >= CONFIRMATION_WINDOW):
-        raise SupportDenied("support_case_expired")
-    return created_at
+class ApplicationDeletionTarget(SupportTarget):
+    """The service-held application login may own its data. Operators receive no database login."""
 
 
 def _original_intent(register, case, target, *, adult):
@@ -403,11 +232,41 @@ def _check_register(directory):
         raise SupportDenied("support_private_register_required")
 
 
+@contextmanager
+def _locked_approval(directory, owner, reference):
+    with _protected_file(directory / (reference + ".lock"), owner) as lock:
+        fcntl.flock(lock, fcntl.LOCK_SH)
+        path = directory / (reference + ".json")
+        with _protected_file(path, owner) as stream:
+            approval = _read_json(stream)
+        yield path, approval
+
+
+def _case_for_operator(approval, reference, operator_request, *, adult, approval_uid):
+    if operator_request is None:
+        return approval, None
+    if type(approval) is not dict:
+        raise SupportDenied("support_case_invalid")
+    assigned = approval.get("executor_uid")
+    if type(assigned) is not int or assigned <= 0 or assigned in (approval_uid, os.geteuid()):
+        raise SupportDenied("support_independent_executor_required")
+    actor = operator_request.verify(approval, reference, adult=adult)
+    if type(actor) is not int or actor != assigned:
+        raise SupportDenied("support_operator_mismatch")
+    return {key: value for key, value in approval.items() if key != "executor_uid"}, actor
+
+
 def fulfill(factory, *, target, approval_directory, approval_uid, register, reference,
-            status_only=False, adult=False, prior=False, clock=lambda: datetime.now(timezone.utc)):
+            status_only=False, adult=False, prior=False, clock=lambda: datetime.now(timezone.utc),
+            operator_request=None):
     """Execute only the exact authorized account; reconcile a known case without mutating it."""
     if not _reference(reference):
         raise SupportDenied("support_case_invalid")
+    mediated = isinstance(target, ApplicationDeletionTarget)
+    if mediated != (operator_request is not None) or (mediated and prior):
+        raise SupportDenied("support_execution_mode_mismatch")
+    if mediated and approval_uid == os.geteuid():
+        raise SupportDenied("support_independent_approval_custody_required")
     _check_register(register)
     intent_path = register / (reference + ".intent.json")
     result_path = register / (reference + ".result.json")
@@ -418,17 +277,26 @@ def fulfill(factory, *, target, approval_directory, approval_uid, register, refe
         if intent_path.exists():
             with _protected_file(intent_path, os.geteuid()) as stream:
                 intent = _read_json(stream)
+            if mediated:
+                with _locked_approval(approval_directory, approval_uid, reference) as (_, approval):
+                    _, actor = _case_for_operator(approval, reference, operator_request, adult=adult,
+                                                  approval_uid=approval_uid)
+                    if not isinstance(intent, dict) or _digest(approval) != intent.get("approval_sha256"):
+                        raise SupportDenied("support_approval_changed")
+                    # An immutable, authenticated approval may be read after its execution window.
+                    return _reconcile(factory, target, reference, intent, result_path, adult=adult,
+                                      prior=False, clock=clock, executor_uid=actor)
             return _reconcile(factory, target, reference, intent, result_path, adult=adult, prior=prior, clock=clock)
         with factory() as session:
             target.require(session)
-            if status_only:
+            if status_only and not mediated:
                 return {"case": reference, "status": "no_recorded_execution"}
-            with _protected_file(approval_directory / (reference + ".lock"), approval_uid) as approval_lock:
-                fcntl.flock(approval_lock, fcntl.LOCK_SH)
-                approval_path = approval_directory / (reference + ".json")
-                with _protected_file(approval_path, approval_uid) as stream:
-                    case = _read_json(stream)
+            with _locked_approval(approval_directory, approval_uid, reference) as (approval_path, approval):
+                case, actor = _case_for_operator(approval, reference, operator_request, adult=adult,
+                                                 approval_uid=approval_uid)
                 _authority(case, reference, clock(), adult=adult, prior=prior)
+                if status_only:
+                    return {"case": reference, "status": "no_recorded_execution"}
                 original = _original_intent(register, case, target, adult=adult) if prior else None
                 moment, restriction, coverage = _apply_deletion(session, case, reference, clock, adult=adult,
                                                                 prior=prior, original=original)
@@ -436,9 +304,11 @@ def fulfill(factory, *, target, approval_directory, approval_uid, register, refe
                 intent = {
                     "case": reference, subject_id: case[subject_id], "role": target.role,
                     "database": target.database, "database_oid": target.database_oid,
-                    "approval_sha256": _digest(case), "restriction_sha256": restriction,
+                    "approval_sha256": _digest(approval), "restriction_sha256": restriction,
                     "deleted_at": _utc(moment).isoformat(), "retention_scope": RETENTION_SCOPE, "disposal": coverage,
                 }
+                if mediated:
+                    intent["executor_uid"] = actor
                 if prior:
                     intent["cleanup_action"] = PRIOR_ADULT_ACTION if adult else PRIOR_ACTION
                     intent["cleanup_at"] = _utc(clock()).isoformat()
@@ -449,20 +319,28 @@ def fulfill(factory, *, target, approval_directory, approval_uid, register, refe
                     intent["invitation_key"] = key
                 _write_new(intent_path, intent)
                 with _protected_file(approval_path, approval_uid) as stream:
-                    if _digest(_read_json(stream)) != intent["approval_sha256"]:
+                    latest = _read_json(stream)
+                    if _digest(latest) != intent["approval_sha256"]:
                         raise SupportDenied("support_approval_changed")
+                case, current_actor = _case_for_operator(latest, reference, operator_request, adult=adult,
+                                                         approval_uid=approval_uid)
+                if current_actor != actor:
+                    raise SupportDenied("support_operator_mismatch")
                 _authority(case, reference, clock(), adult=adult, prior=prior)
                 session.commit()
-        return _reconcile(factory, target, reference, intent, result_path, adult=adult, prior=prior, clock=clock)
+        return _reconcile(factory, target, reference, intent, result_path, adult=adult, prior=prior, clock=clock,
+                          executor_uid=actor)
 
 
-def _reconcile(factory, target, reference, intent, result_path, *, adult, prior, clock):
+def _reconcile(factory, target, reference, intent, result_path, *, adult, prior, clock, executor_uid=None):
     subject_id = "verifier_id" if adult else "profile_id"
     fields = {
         "case", subject_id, "role", "database", "database_oid",
         "approval_sha256", "restriction_sha256", "deleted_at",
     }
     hashes = {"approval_sha256", "restriction_sha256"}
+    if executor_uid is not None:
+        fields.add("executor_uid")
     if prior:
         fields.update(("cleanup_action", "cleanup_at"))
     if adult:
@@ -478,6 +356,8 @@ def _reconcile(factory, target, reference, intent, result_path, *, adult, prior,
             or (prior and not current_scope)
             or (current_scope and intent["retention_scope"] not in (INVITATION_SCOPE, RETENTION_SCOPE))
             or (extended and not valid_disposal_record(intent["disposal"], adult=adult))
+            or (executor_uid is not None and (not extended or type(intent["executor_uid"]) is not int
+                                               or intent["executor_uid"] != executor_uid))
             or (intent["database"], intent["database_oid"], intent["role"])
             != (target.database, target.database_oid, target.role)
             or type(intent[subject_id]) is not int or intent[subject_id] <= 0
@@ -514,6 +394,8 @@ def _reconcile(factory, target, reference, intent, result_path, *, adult, prior,
             raise SupportDenied("support_ordinary_cleanup_incomplete")
     result = {"case": reference, "status": "adult_deletion_applied" if adult else "deletion_applied",
               "deleted_at": intent["deleted_at"]}
+    if executor_uid is not None:
+        result["executor_uid"] = executor_uid
     if extended:
         result["disposal"] = intent["disposal"]
     if prior:
@@ -527,6 +409,17 @@ def _reconcile(factory, target, reference, intent, result_path, *, adult, prior,
     else:
         _write_new(result_path, receipt)
     return result
+
+
+def _require_connection(url, target):
+    if (url.drivername != "postgresql+psycopg" or url.database != target.database
+            or url.username != target.role or any(name.startswith("PG") for name in os.environ)
+            or set(url.query) - {"host", "port", "sslmode", "sslrootcert"}
+            or (url.host and (url.query.get("sslmode") != "verify-full"
+                             or not Path(url.query.get("sslrootcert", "")).is_absolute()))
+            or (not url.host and not Path(url.query.get("host", "")).is_absolute())
+            or (url.host and "host" in url.query)):
+        raise SupportDenied("support_connection_unqualified")
 
 
 def main(argv=None):
@@ -550,14 +443,7 @@ def main(argv=None):
             raise SupportDenied("support_independent_approval_custody_required")
         target = SupportTarget(config["database"], config["database_oid"], config["role"])
         url = make_url(config["database_url"])
-        if (url.drivername != "postgresql+psycopg" or url.database != target.database
-                or url.username != target.role or any(name.startswith("PG") for name in os.environ)
-                or set(url.query) - {"host", "port", "sslmode", "sslrootcert"}
-                or (url.host and (url.query.get("sslmode") != "verify-full"
-                                 or not Path(url.query.get("sslrootcert", "")).is_absolute()))
-                or (not url.host and not Path(url.query.get("host", "")).is_absolute())
-                or (url.host and "host" in url.query)):
-            raise SupportDenied("support_connection_unqualified")
+        _require_connection(url, target)
         engine = create_engine(url, hide_parameters=True)
         result = fulfill(sessionmaker(engine, autoflush=False), target=target,
                          approval_directory=Path(config["approval_directory"]), approval_uid=approval_uid,

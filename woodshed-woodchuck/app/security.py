@@ -88,3 +88,29 @@ def generate_invitation_token() -> str:
 def hash_invitation_token(token: str) -> str:
     """Create the deterministic hash stored in the database."""
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def normalize_email(email: str) -> str:
+    return email.strip().lower()
+
+
+def validate_email(email: str) -> str:
+    normalized = normalize_email(email)
+
+    if not normalized or len(normalized) > 320:
+        raise ValueError("A valid verifier email is required.")
+
+    if any(character.isspace() for character in normalized):
+        raise ValueError("A valid verifier email is required.")
+
+    local_part, separator, domain = normalized.partition("@")
+
+    if (
+        separator != "@"
+        or not local_part
+        or not domain
+        or "@" in domain
+    ):
+        raise ValueError("A valid verifier email is required.")
+
+    return normalized

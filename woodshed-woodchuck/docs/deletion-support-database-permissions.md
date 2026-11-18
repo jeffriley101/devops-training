@@ -1,5 +1,7 @@
 # Support deletion database permissions
 
+The local candidate now supports fresh parent and adult deletions through its existing application database identity. Support supplies a case-specific, OS-authenticated request. The grant decision below still applies to direct SQL access by Support. [Application-mediated procedure](parent-deletion-support.md#application-mediated-fulfillment)
+
 **Production decision — BLOCKED. Safe grant set — empty.** On the candidate at `cd6d615866d9`, the restricted logins can run the approved cleanup with the additional privileges below. Those same privileges let the logins access records outside the approved case. Support verifies the case in a restricted file. The database sees a login and ordinary SQL statements. [Exact grant statements for local qualification](../tests/fixtures/support_deletion_acl_delta.sql) · [Case and database checks](../app/parent_deletion_support.py)
 
 | Path | Actual database identity | Additional privileges required by the candidate |

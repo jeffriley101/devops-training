@@ -1,6 +1,6 @@
 # Google Play deletion release readiness
 
-**Submission is blocked.** The local candidate clears additional associated data for current and previously deleted accounts using the existing schema and Support roles. A cleanup receipt covers only the fields that the executor verified.
+**Submission is blocked.** The local candidate can use the application identity for a new verified parent or adult case. Earlier deletion evidence and receipts remain bound to their original procedures. A cleanup receipt covers only the fields the executor verified.
 
 | Release gate | Result | Smallest remaining correction |
 | --- | --- | --- |
@@ -20,6 +20,10 @@
 The restricted Support roles in the starting candidate lack the additional private-table deletes and delivery-column updates. The adult role lacks `UPDATE (email)` on `trusted_verifier_invitations`. Each new receipt records `access_required` where the actual role cannot complete a category and `contact_review_required` for outstanding adult address attribution. Qualification used both those original permissions and narrowly scoped nonowner roles in disposable PostgreSQL. No grants are installed by the application. [Permission and readback tests](../tests/test_associated_disposal_support.py) · [Standings test](../tests/test_deletion_shared_standings.py) · [School authority test](../tests/test_play_classroom_retention.py)
 
 The minimum additional privileges passed fulfillment tests but failed database isolation between accounts for both Support roles. Applying those grants in Production remains blocked. [Exact grants, isolation evidence and DBA procedure](deletion-support-database-permissions.md)
+
+Fresh verified parent and adult cases have a local application-mediated execution path. Support submits an individually authenticated request and receives no application credential. Operational qualification still requires separate named OS accounts, protected case and request directories, a service-private register and an existing application identity capable of the approved disposal. Older receipts remain bound to their original executor and evidence. [Fulfillment procedure](parent-deletion-support.md#application-mediated-fulfillment)
+
+Disposable PostgreSQL qualification used the existing `c36choice001` schema, separate OS identities and a nonadministrative application login. Both deletion paths passed fresh readback and preserved bystanders. An incorrect subject, unassigned operator, pending or revoked approval, missing operator request at commit and expired confirmation all prevented deletion. [PostgreSQL cases](../tests/test_mediated_support_deletion.py) · [Command checks](../tests/test_support_deletion_commands.py)
 
 In the historical qualification, `fdd2fc6d38f2` performed three synthetic deletions. A custodian witnessed a signed-in student request and verified the committed deletion. The original Support procedure produced the guardian and adult receipts. Separate cleanup cases used those sources, preserved the original deletion times and left the receipts intact. Missing or contradictory evidence blocked execution. The database remains at `c36choice001`. [Approved deadlines](deletion-retention-decisions.md) · [Student and guardian procedure](parent-deletion-support.md) · [Adult procedure](adult-deletion-support.md)
 
