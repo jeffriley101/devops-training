@@ -5,7 +5,7 @@
 | Release gate | Result | Smallest remaining correction |
 | --- | --- | --- |
 | Associated-data deletion | **BLOCKED** | Complete the restricted disposals below and reconcile earlier accounts against original evidence. Record the owner, deadline and disposition for each open case. |
-| Operational fulfillment | **BLOCKED** | Demonstrate live mailbox coverage, separate named approvers and executors, and verified fulfillment for credentialless students. Complete Program ownership transfer before confirmation where possible. An already-confirmed sole owner needs an authorized handoff that permits immediate personal revocation. Resolve ambiguous private grants and unsettled benefits with their owners. |
+| Operational fulfillment | **BLOCKED** | Demonstrate live mailbox coverage, owner-operated fulfillment on the serving web service, and verified fulfillment for credentialless students. Complete Program ownership transfer before confirmation where possible. An already-confirmed sole owner needs an authorized handoff that permits immediate personal revocation. Resolve ambiguous private grants and unsettled benefits with their owners. |
 | Release evidence and disclosures | **BLOCKED** | Verify the signed-out URL and submitted Android request path, reconcile the public notice and Play Data safety answers, and obtain dated provider, purge, log, mailbox and backup-expiry evidence. Local restore tests demonstrated quarantine. The serving environment still needs independently verified containment. |
 
 | Approved category | Implemented or preserved | Remaining disposal dependency |
@@ -21,7 +21,7 @@ The restricted Support roles in the starting candidate lack the additional priva
 
 The minimum additional privileges passed fulfillment tests but failed database isolation between accounts for both Support roles. Applying those grants in Production remains blocked. [Exact grants, isolation evidence and DBA procedure](deletion-support-database-permissions.md)
 
-Fresh verified parent and adult cases have a local application-mediated execution path. Support submits an individually authenticated request and receives no application credential. Operational qualification still requires separate named OS accounts, protected case and request directories, a service-private register and an existing application identity capable of the approved disposal. Older receipts remain bound to their original executor and evidence. [Fulfillment procedure](parent-deletion-support.md#application-mediated-fulfillment)
+For fresh, undisputed parent and adult cases the owner can record the verification performed in the authenticated Support mailbox and run the existing deletion through the Woodshed service shell. The command rechecks the case before commit and issues a receipt after database readback. Live use requires the qualified application connection and custody of the case and receipts. Previously delegated cases and receipts keep their original verification procedure. [Owner-operated fulfillment](parent-deletion-support.md#owner-operated-render-shell)
 
 Disposable PostgreSQL qualification used the existing `c36choice001` schema, separate OS identities and a nonadministrative application login. Both deletion paths passed fresh readback and preserved bystanders. An incorrect subject, unassigned operator, pending or revoked approval, missing operator request at commit and expired confirmation all prevented deletion. [PostgreSQL cases](../tests/test_mediated_support_deletion.py) · [Command checks](../tests/test_support_deletion_commands.py)
 

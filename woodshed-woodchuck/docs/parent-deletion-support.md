@@ -14,7 +14,31 @@ Parents and legal guardians can email `support@woodshedwoodchuck.com` with the s
 
 ## Execute and verify
 
-For new verified parent and adult requests, use the [application-mediated procedure](#application-mediated-fulfillment). The operator needs only the assigned case and a named OS account. The original direct executor below uses its separately restricted login for existing cases and receipts.
+For a new, undisputed parent or adult request, the Woodshed owner can use the following procedure. Existing delegated cases and receipts keep their original execution procedure.
+
+### Owner-operated Render shell
+
+1. In the authenticated Support mailbox, personally complete the identity, exact-account authority and confirmation checks above or in the [adult procedure](adult-deletion-support.md). Check the latest conversation for a withdrawal or dispute immediately before execution. Keep the original evidence in the restricted case.
+2. Stage a private working copy on the Woodshed web service. The commands below use `/tmp/woodshed-owner` (owner-only directory, mode `0700`). Transfer the files privately from the restricted case, with mode `0600`. Use the opaque case reference as the filename, for example `CASE-0001.json`. The working copy contains the following fields.
+
+   | Fields | Required value |
+   | --- | --- |
+   | `case`, `status`, `verified_by`, `verified_at` | The same case reference as the command, `approved`, `woodshed-owner`, and the original timezone-aware verification time within 24 hours. |
+   | `gmail_thread_id`, `verification_method` | Original Gmail thread ID (8–64 letters, digits, underscores or hyphens) and a brief description of the checks actually performed (up to 160 characters). |
+   | `requester_ref`, `identity_ref`, `authority_ref` | Distinct opaque references to the requester, identity check and authority check in the restricted case. Keep message contents and identity documents in that case. |
+   | Exact subject | For a guardian, `profile_id`, `woodchuck_id`, `profile_created_at`. For an adult, `verifier_id`, canonical `email`, `verifier_created_at`. Numeric IDs are positive integers. Use the original creation timestamp with timezone. |
+   | `confirmation` | An object containing the same `case`, numeric `profile_id` or `verifier_id`, and `requester_ref`, plus a distinct `reference` to the explicit response, its timezone-aware `at` within 30 minutes and its `action`. Use `DELETE THIS ACCOUNT` for a child or `DELETE MY ADULT ACCOUNT` for an adult. |
+   | `disputed`, `reviewed_by` | Use `false` and `null` for an undisputed case. Hold a dispute or withdrawal. Use the stable case lock described below when publishing an amendment. |
+
+3. Place the qualified application target's existing `database`, numeric `database_oid`, `role` and `session_secret_sha256` values in the private `.target.json` file in that directory. The last value is the SHA-256 digest of the active application's signing secret. Confirm these pins against the trusted service configuration. The command uses the application login and requires the existing revision and role checks, plus a private socket or verified TLS (`sslmode=verify-full` with an absolute `sslrootcert` path for TCP). Render's internal PostgreSQL hostname cannot satisfy `verify-full`. If the web process uses it, supply the already-authorized external URL for the same database and login, with verified TLS, through the CLI process's private `DATABASE_URL`. Keep credentials out of the case and shell history. Hold execution if a qualified connection is unavailable. [Render connection options](https://render.com/docs/postgresql-creating-connecting#internal-connections)
+4. Open the owner's authenticated interactive Render shell for `woodshed-woodchuck`. From the application directory, run the applicable command with the actual case reference and enter the existing Woodshed site-admin credential at the hidden prompt.
+
+   ```bash
+   python -m app.support_deletion_service execute CASE-0001 --owner-dir /tmp/woodshed-owner
+   python -m app.support_deletion_service execute-adult CASE-0001 --owner-dir /tmp/woodshed-owner
+   ```
+
+5. The command locks and rereads the case before commit. A fresh read-only PostgreSQL transaction checks the result before the command writes `receipts/CASE-0001.result.json`. Save that receipt and its matching `.intent.json` privately with the original case and Gmail conversation. Render's temporary directory can disappear on restart or deploy. While the originals are available, `status` or `status-adult` with the same arguments rechecks committed state without applying deletion again. If execution is uncertain and the original intent is unavailable, keep the case open. Reply through the verified channel with the observed result. A disposal marked `access_required` or `contact_review_required`, or an outstanding provider action, keeps the case open. Apply the Support case retention deadline.
 
 ### Existing direct executor and receipts
 

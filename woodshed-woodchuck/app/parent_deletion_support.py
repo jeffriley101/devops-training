@@ -100,6 +100,36 @@ class ApplicationDeletionTarget(SupportTarget):
     """The service-held application login may own its data. Operators receive no database login."""
 
 
+OWNER_ACTOR = "woodshed-owner"
+
+
+@dataclass(frozen=True, repr=False)
+class OwnerShellApproval:
+    """Render authenticates shell access. Recheck the owner's entered admin credential."""
+
+    credential: str
+
+    def require(self):
+        if not sys.stdin.isatty():
+            raise SupportDenied("support_interactive_owner_shell_required")
+        configured = os.getenv("SITE_ADMIN_TOKEN", "")
+        if (os.getenv("RENDER") != "true" or os.getenv("RENDER_SERVICE_TYPE") != "web"
+                or os.getenv("RENDER_EXTERNAL_HOSTNAME") != "woodshed-woodchuck.onrender.com"
+                or not configured.strip() or not compare_digest(self.credential.encode(), configured.encode())):
+            raise SupportDenied("support_owner_admin_required")
+
+    def case(self, approval):
+        self.require()
+        if (not isinstance(approval, dict) or approval.get("verified_by") != OWNER_ACTOR
+                or not _reference(approval.get("gmail_thread_id"))
+                or not isinstance(approval.get("verification_method"), str)
+                or not 1 <= len(approval["verification_method"].strip()) <= 160):
+            raise SupportDenied("support_owner_verification_required")
+        if approval.get("disputed") is not False:
+            raise SupportDenied("support_disputed_case")
+        return {key: value for key, value in approval.items() if key not in ("gmail_thread_id", "verification_method")}
+
+
 def _original_intent(register, case, target, *, adult):
     """Check the original Support receipt and target before certifying later cleanup."""
     source = case["deletion_evidence_ref"]
@@ -245,6 +275,8 @@ def _locked_approval(directory, owner, reference):
 def _case_for_operator(approval, reference, operator_request, *, adult, approval_uid):
     if operator_request is None:
         return approval, None
+    if isinstance(operator_request, OwnerShellApproval):
+        return operator_request.case(approval), OWNER_ACTOR
     if type(approval) is not dict:
         raise SupportDenied("support_case_invalid")
     assigned = approval.get("executor_uid")
@@ -265,7 +297,11 @@ def fulfill(factory, *, target, approval_directory, approval_uid, register, refe
     mediated = isinstance(target, ApplicationDeletionTarget)
     if mediated != (operator_request is not None) or (mediated and prior):
         raise SupportDenied("support_execution_mode_mismatch")
-    if mediated and approval_uid == os.geteuid():
+    if isinstance(operator_request, OwnerShellApproval):
+        operator_request.require()
+        if approval_uid != os.geteuid():
+            raise SupportDenied("support_owner_case_custody_required")
+    elif mediated and approval_uid == os.geteuid():
         raise SupportDenied("support_independent_approval_custody_required")
     _check_register(register)
     intent_path = register / (reference + ".intent.json")
@@ -279,14 +315,18 @@ def fulfill(factory, *, target, approval_directory, approval_uid, register, refe
                 intent = _read_json(stream)
             if mediated:
                 with _locked_approval(approval_directory, approval_uid, reference) as (_, approval):
-                    _, actor = _case_for_operator(approval, reference, operator_request, adult=adult,
-                                                  approval_uid=approval_uid)
-                    if not isinstance(intent, dict) or _digest(approval) != intent.get("approval_sha256"):
+                    case, actor = _case_for_operator(approval, reference, operator_request, adult=adult,
+                                                     approval_uid=approval_uid)
+                    subject_id = "verifier_id" if adult else "profile_id"
+                    if (not isinstance(intent, dict) or _digest(approval) != intent.get("approval_sha256")
+                            or intent.get(subject_id) != case.get(subject_id)):
                         raise SupportDenied("support_approval_changed")
                     # An immutable, authenticated approval may be read after its execution window.
                     return _reconcile(factory, target, reference, intent, result_path, adult=adult,
-                                      prior=False, clock=clock, executor_uid=actor)
+                                      prior=False, clock=clock, actor=actor)
             return _reconcile(factory, target, reference, intent, result_path, adult=adult, prior=prior, clock=clock)
+        if isinstance(operator_request, OwnerShellApproval) and result_path.exists():
+            raise SupportDenied("support_execution_unreconciled")
         with factory() as session:
             target.require(session)
             if status_only and not mediated:
@@ -307,7 +347,9 @@ def fulfill(factory, *, target, approval_directory, approval_uid, register, refe
                     "approval_sha256": _digest(approval), "restriction_sha256": restriction,
                     "deleted_at": _utc(moment).isoformat(), "retention_scope": RETENTION_SCOPE, "disposal": coverage,
                 }
-                if mediated:
+                if actor == OWNER_ACTOR:
+                    intent["executed_by"] = OWNER_ACTOR
+                elif mediated:
                     intent["executor_uid"] = actor
                 if prior:
                     intent["cleanup_action"] = PRIOR_ADULT_ACTION if adult else PRIOR_ACTION
@@ -329,18 +371,19 @@ def fulfill(factory, *, target, approval_directory, approval_uid, register, refe
                 _authority(case, reference, clock(), adult=adult, prior=prior)
                 session.commit()
         return _reconcile(factory, target, reference, intent, result_path, adult=adult, prior=prior, clock=clock,
-                          executor_uid=actor)
+                          actor=actor)
 
 
-def _reconcile(factory, target, reference, intent, result_path, *, adult, prior, clock, executor_uid=None):
+def _reconcile(factory, target, reference, intent, result_path, *, adult, prior, clock, actor=None):
     subject_id = "verifier_id" if adult else "profile_id"
     fields = {
         "case", subject_id, "role", "database", "database_oid",
         "approval_sha256", "restriction_sha256", "deleted_at",
     }
     hashes = {"approval_sha256", "restriction_sha256"}
-    if executor_uid is not None:
-        fields.add("executor_uid")
+    actor_key = "executed_by" if actor == OWNER_ACTOR else "executor_uid"
+    if actor is not None:
+        fields.add(actor_key)
     if prior:
         fields.update(("cleanup_action", "cleanup_at"))
     if adult:
@@ -356,8 +399,8 @@ def _reconcile(factory, target, reference, intent, result_path, *, adult, prior,
             or (prior and not current_scope)
             or (current_scope and intent["retention_scope"] not in (INVITATION_SCOPE, RETENTION_SCOPE))
             or (extended and not valid_disposal_record(intent["disposal"], adult=adult))
-            or (executor_uid is not None and (not extended or type(intent["executor_uid"]) is not int
-                                               or intent["executor_uid"] != executor_uid))
+            or (actor is not None and (not extended or type(intent[actor_key]) is not type(actor)
+                                        or intent[actor_key] != actor))
             or (intent["database"], intent["database_oid"], intent["role"])
             != (target.database, target.database_oid, target.role)
             or type(intent[subject_id]) is not int or intent[subject_id] <= 0
@@ -394,8 +437,8 @@ def _reconcile(factory, target, reference, intent, result_path, *, adult, prior,
             raise SupportDenied("support_ordinary_cleanup_incomplete")
     result = {"case": reference, "status": "adult_deletion_applied" if adult else "deletion_applied",
               "deleted_at": intent["deleted_at"]}
-    if executor_uid is not None:
-        result["executor_uid"] = executor_uid
+    if actor is not None:
+        result[actor_key] = actor
     if extended:
         result["disposal"] = intent["disposal"]
     if prior:
