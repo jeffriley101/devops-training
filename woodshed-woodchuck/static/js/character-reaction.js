@@ -89,7 +89,7 @@
       root.document.body.appendChild(reaction);
       activeReaction = reaction;
       root.requestAnimationFrame(function () { reaction.classList.add("is-visible"); });
-      playCharacterWhistle();
+      if (settings.characterName === "Coach Whistler") playCharacterWhistle();
       return true;
     } catch (_error) {
       return false;

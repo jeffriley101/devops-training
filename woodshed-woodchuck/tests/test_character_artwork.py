@@ -92,6 +92,7 @@ def test_shared_reaction_persists_until_card_or_close_button_dismissal() -> None
     assert "durationMs" not in REACTION
     assert "localStorage" not in REACTION and "sessionStorage" not in REACTION
     assert 'audio.play("characterWhistle")' in REACTION
+    assert 'if (settings.characterName === "Coach Whistler") playCharacterWhistle();' in REACTION
     assert 'getElementById("authenticated-player-name")' in REACTION
     assert 'quote.textContent = `: “${personalizedMessage(settings.message)}”`' in REACTION
     assert "innerHTML" not in REACTION
@@ -157,7 +158,7 @@ assert.equal(
   john.children[0].children[1].textContent,
   ': “Ah geez, I\'ve been trying to play that all day, Alex "Amp" <script>&!”'
 );
-assert.equal(whistleCalls, 2);
+assert.equal(whistleCalls, 1);
 assert.notEqual(john.removed, true);
 let propagationStopped = false;
 john.children[2].listeners.click({ stopPropagation() { propagationStopped = true; } });
@@ -208,7 +209,7 @@ console.log(JSON.stringify({
         "visibleAfterAudioFailure": True,
         "escapeDismissed": True,
         "genericJohnVisible": True,
-        "whistleCalls": 2,
+        "whistleCalls": 1,
     }
 
 

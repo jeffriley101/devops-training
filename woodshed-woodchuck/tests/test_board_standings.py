@@ -143,7 +143,7 @@ def test_board_contains_loading_and_empty_states() -> None:
     markup = board_template()
 
     assert 'id="contest-standings-loading"' in markup
-    assert "Loading {{ board_season.title }} standings" in markup
+    assert "Loading {{ board_display_title }} standings" in markup
     assert "No P-Charts have been submitted this week yet." in markup
     assert "No verified P-Charts have been approved this week yet." in markup
     assert 'id="contest-standings-error"' in markup
@@ -155,7 +155,7 @@ def test_board_authentication_behavior_is_unchanged() -> None:
 
     assert response.status_code == 200
     assert 'id="band-camp-standings-title"' in response.text
-    assert f'{response.context["board_season"].title} Standings' in response.text
+    assert f'{("Board Activity" if response.context["board_season"].title in ("Band Camp", "Holiday") else response.context["board_season"].title)} Standings' in response.text
 
 
 def test_board_template_contains_no_private_account_fields() -> None:
