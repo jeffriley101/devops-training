@@ -148,3 +148,16 @@ def test_hotspot_rectangles_keep_twenty_actions_clear_of_each_other_and_characte
                 assert not intersects(rect, character), (room, cell, 'character', vw, vh)
                 assert not any(intersects(rect, prior) for prior in rectangles), (room, cell, vw, vh)
                 rectangles.append(rect)
+
+
+def test_shop_v3_back_to_shed_target_is_visible_and_landscape_safe():
+    shop = (ROOT / 'templates/store.html').read_text()
+    css = (ROOT / 'static/css/scene-hotspots.css').read_text()
+    assert 'href="/home" aria-label="Back to SHED"' in shop
+    assert '<span class="room-destination-label">← SHED</span>' in shop
+    assert '--hotspot-x: 3%; --hotspot-y: 1%; --hotspot-width: 31%; --hotspot-height: 8.3%;' in css
+    assert '@media (min-height: 400px)' in css
+    assert '#shop-hotspots > a[data-scene-cell="L1"] { --hotspot-y: 4%; }' in css
+    assert '#shop-hotspots > a[data-scene-cell="L1"] > .room-destination-label {' in css
+    assert 'display: inline-flex !important' in css
+    # The existing rectangle test above exercises all ten controls at five screen sizes.
