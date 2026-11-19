@@ -79,15 +79,20 @@ class SupportTarget:
         )).one()
         if tuple(found) != (self.database, self.database_oid, self.role, self.role):
             raise SupportDenied("support_target_mismatch")
+        # Render may give the managed app login CREATEDB and CREATEROLE.
+        # Only the owner-authenticated, internal-TLS-pinned path may use it.
+        render_owner = isinstance(self, RenderInternalDeletionTarget)
         administrative = session.scalar(text(
             "SELECT EXISTS (SELECT FROM pg_catalog.pg_roles "
-            "WHERE (rolsuper OR rolcreaterole OR rolcreatedb OR rolreplication OR rolbypassrls) "
+            "WHERE (rolsuper OR rolreplication OR rolbypassrls "
+            "OR (NOT :render_owner AND (rolcreaterole OR rolcreatedb))) "
             "AND pg_has_role(oid, 'MEMBER')) OR (:human_login AND (EXISTS (SELECT FROM pg_catalog.pg_database "
             "WHERE datname = current_database() AND pg_has_role(datdba, 'MEMBER')) OR EXISTS "
             "(SELECT FROM pg_catalog.pg_class WHERE oid IN "
             "('public.woodchuck_profiles'::regclass, 'public.trusted_verifiers'::regclass) "
             "AND pg_has_role(relowner, 'MEMBER'))))"
-        ), {"human_login": not isinstance(self, ApplicationDeletionTarget)})
+        ), {"human_login": not isinstance(self, ApplicationDeletionTarget),
+            "render_owner": render_owner})
         if administrative:
             raise SupportDenied("support_nonadministrative_role_required")
         revisions = session.execute(text("SELECT version_num FROM public.alembic_version")).scalars().all()
