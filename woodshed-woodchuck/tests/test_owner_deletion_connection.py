@@ -125,6 +125,35 @@ def test_actual_transport_and_database_identity(tcp):
         plain.dispose()
 
 
+def test_render_owner_role_flags_do_not_weaken_other_paths(tcp, app_template):
+    # Render's managed app role can be CREATEDB + CREATEROLE without BYPASSRLS.
+    def set_flags(flags):
+        pg_tool("psql", "-X", "-v", "ON_ERROR_STOP=1", "-h", app_template.query["host"],
+                "-U", app_template.username, "-d", "postgres",
+                input=f"ALTER ROLE {APP_ROLE} {flags}")
+
+    set_flags("CREATEDB CREATEROLE")
+    try:
+        factory = sessionmaker(tcp)
+        with factory() as db:
+            name, oid = db.execute(text(
+                "SELECT current_database(), oid FROM pg_database WHERE datname=current_database()"
+            )).one()
+            owner = support.RenderInternalDeletionTarget(name, oid, APP_ROLE, HOST)
+            owner.require(db)
+            for other in (support.ApplicationDeletionTarget, support.SupportTarget):
+                with pytest.raises(support.SupportDenied, match="support_nonadministrative_role_required"):
+                    other(name, oid, APP_ROLE).require(db)
+
+        # RLS bypass must remain prohibited even in the owner shell.
+        set_flags("BYPASSRLS")
+        with factory() as db:
+            with pytest.raises(support.SupportDenied, match="support_nonadministrative_role_required"):
+                owner.require(db)
+    finally:
+        set_flags("NOCREATEDB NOCREATEROLE NOBYPASSRLS")
+
+
 @pytest.mark.parametrize("change", [
     {"host": "dpg-other-a"}, {"host": HOST + ".oregon-postgres.render.com"},
     {"host": "127.0.0.1"}, {"port": 5433}, {"database": "another_db"}, {"username": "another_role"},
