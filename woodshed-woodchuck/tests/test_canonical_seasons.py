@@ -272,8 +272,8 @@ def test_all_consumers_agree_and_board_has_no_calendar(roster_db, monkeypatch):
     monkeypatch.setattr(main, "datetime", Clock)
     response = signed_client().get("/quest")
     assert response.status_code == 200
-    assert response.text.count('aria-label="Band Camp"') == 1
-    assert 'Band Camp Standings' in response.text
+    assert response.text.count('aria-label="Board Activity"') == 1
+    assert 'Board Activity Standings' in response.text
     assert set(f.name for f in fields(BoardSeason)) == {"key", "title"}
     # Presentation follows the DB even when it differs from bootstrap metadata.
     with roster_db() as session:
