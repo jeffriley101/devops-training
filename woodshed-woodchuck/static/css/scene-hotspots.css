@@ -92,7 +92,7 @@
 #woodshed-hotspots > [data-scene-cell="L5"] { --hotspot-x: 1.5%; --hotspot-y: 75.2%; --hotspot-width: 29%; --hotspot-height: 22%; }
 #woodshed-hotspots > [data-scene-cell="R5"] { --hotspot-x: 70%; --hotspot-y: 80.6%; --hotspot-width: 27%; --hotspot-height: 17.3%; }
 /* SHOP: the return arrow beside Crowns leads back to SHED. */
-#shop-hotspots > [data-scene-cell="L1"] { --hotspot-x: 28.5%; --hotspot-y: 23%; --hotspot-width: 10%; --hotspot-height: 8.3%; }
+#shop-hotspots > [data-scene-cell="L1"] { --hotspot-x: 3%; --hotspot-y: 1%; --hotspot-width: 31%; --hotspot-height: 8.3%; }
 #shop-hotspots > [data-scene-cell="R1"] { --hotspot-x: 73%; --hotspot-y: 4.5%; --hotspot-width: 23%; --hotspot-height: 16.3%; }
 #shop-hotspots > [data-scene-cell="L2"] { --hotspot-x: 1.7%; --hotspot-y: 15.5%; --hotspot-width: 25%; --hotspot-height: 22%; }
 #shop-hotspots > [data-scene-cell="R2"] { --hotspot-x: 72%; --hotspot-y: 21.8%; --hotspot-width: 25%; --hotspot-height: 10%; }
@@ -301,3 +301,28 @@ body.artwork-room-page.stickerbook-open {
 /* Character pointer hits are alpha-tested by the scene before a hotspot runs. */
 .artwork-scene > [data-presentation-only].ww-motion-ready { pointer-events: none; }
 .combined-panel-section { margin-top: 1.25rem; }
+
+/* D7 V3 SHOP: visible return sign anchored above Crowns, without changing the other nine hotspot rectangles.
+   The 1% fallback leaves the required 44px target clear of Crowns on small landscape phones. */
+@media (min-height: 400px) {
+  #shop-hotspots > a[data-scene-cell="L1"] { --hotspot-y: 4%; }
+}
+#shop-hotspots > a[data-scene-cell="L1"] > .room-destination-label {
+  display: inline-flex !important;
+  pointer-events: none;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  max-width: 100%;
+  padding: .2rem .35rem;
+  color: #fff9de;
+  background: rgba(20, 66, 47, .93);
+  border: 2px solid #f4d16d;
+  border-radius: .45rem;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, .5);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .75);
+  font-size: clamp(.8rem, 1.5vw, 1.1rem);
+  font-weight: 900;
+  line-height: 1.05;
+  white-space: nowrap;
+}
