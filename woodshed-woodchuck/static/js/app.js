@@ -1886,7 +1886,7 @@
     const dailyGreetings = [
       `Sit for a moment, ${name}. Have you eaten and had some water?`,
       `Welcome back, ${name}. Check your shoulders and take one slow breath.`,
-      "Band camp takes energy. Make sure the musician is cared for too.",
+      "Board activity takes energy. Make sure the musician is cared for too.",
       "Before the next challenge: water, food, music, pencil, and instrument.",
       "You do not have to practice tired and uncomfortable. Sit down a minute.",
     ];
@@ -5539,7 +5539,7 @@
       if (!confirmationApproved && finalDialog) {
         confirmValuesEl.replaceChildren();
         [
-          `Band Camp contest: ${includeContests ? "Included" : "Not included"}`,
+          `Board Activity contest: ${includeContests ? "Included" : "Not included"}`,
           `Team Competition: ${includeTeamContests && currentTeam ? `${currentTeam.emblem.value} ${currentTeam.name}` : "Not included"}`,
           `Validation request: ${verifierId ? verifierName : "Not requested"}`,
           ...(classroomAssignmentIds.length ? [`Classroom sharing: ${shareChoice.selectedOptions[0].textContent}`] : []),
