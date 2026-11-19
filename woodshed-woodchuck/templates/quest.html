@@ -5,6 +5,7 @@
 {% endblock %}
 
 {% block content %}
+{% set board_display_title = "Board Activity" if board_season.title in ["Band Camp", "Holiday"] else board_season.title %}
 <a class="room-return" href="/store">← Back to SHOP</a>
 <p class="notice-card">Tell us when you complete a BOARD activity. Rehearsal, instrument care, and readiness each earn +1 Board Activity Point and +1 dandelion once daily. Today’s Bonus Challenge earns +5 Dandelions once daily and no Activity when you click “I Played It.” The server tracks these daily rewards. Trivia earns +1 point and +1 dandelion for a correct answer. These check-ins do not create verified practice minutes.</p>
 <section class="card board-page"{% if board_season.artwork_theme %} data-season-theme="{{ board_season.artwork_theme }}"{% endif %}>
@@ -16,14 +17,16 @@
     {% for index in range(9) %}<span></span>{% endfor %}
   </div>
   {% endif %}
+  {% if board_season.title != "Holiday" %}
   <div class="section-head">
-    <h2 class="board-season-title" aria-label="{{ board_season.title }}">
-      {% for word in board_season.title_words %}
+    <h2 class="board-season-title" aria-label="{{ board_display_title }}">
+      {% for word in board_display_title.split() %}
       {% if not loop.first %}<span class="letter-gap" aria-hidden="true"></span>{% endif %}
       {% for letter in word %}<span>{{ letter }}</span>{% endfor %}
       {% endfor %}
     </h2>
   </div>
+  {% endif %}
 
   <section class="board-banner{% if board_season.polaroid_url %} board-banner--season-art{% endif %}">
     <div>
@@ -55,20 +58,20 @@
     </div>
     {% if board_season.polaroid_url %}
     <figure class="season-polaroid">
-      <a class="season-polaroid-link" href="{{ board_season.master_url }}" data-season-art-open aria-label="Open {{ board_season.title }} illustration">
+      <a class="season-polaroid-link" href="{{ board_season.master_url }}" data-season-art-open aria-label="Open {{ board_display_title }} illustration">
         <span class="season-photo-pin" aria-hidden="true"></span>
         <object class="season-polaroid-image" data="{{ board_season.polaroid_url }}" type="image/jpeg" width="1200" height="900" tabindex="-1" aria-label="Woodshed musicians with pumpkins and autumn leaves; the photo is captioned Late Fall / Harvest">
           <span class="season-image-fallback">Halloween artwork is unavailable. Open the full illustration to try again.</span>
         </object>
         <span class="season-polaroid-action">Open full illustration</span>
       </a>
-      <figcaption>{{ board_season.title }} at the Woodshed</figcaption>
+      <figcaption>{{ board_display_title }} at the Woodshed</figcaption>
     </figure>
     {% endif %}
   </section>
 
   <div class="board-layout">
-    <section class="board-contests" aria-label="{{ board_season.title }} activities">
+    <section class="board-contests" aria-label="{{ board_display_title }} activities">
       <details id="camp-hours-activity" class="board-contest-card board-activity board-locker">
         <summary>
           <span>Rehearsal / Lesson</span>
@@ -175,7 +178,7 @@
       >
         <header class="scoreboard-header">
           <p class="scoreboard-kicker">Live competition board</p>
-          <h3 id="band-camp-standings-title">{{ board_season.title }} Standings</h3>
+          <h3 id="band-camp-standings-title">{{ board_display_title }} Standings</h3>
           <p class="board-standings-week">
             <span id="contest-week-range">Current week</span>
             <span id="contest-week-status" class="scoreboard-status">Loading</span>
@@ -183,7 +186,7 @@
         </header>
 
         <p id="contest-standings-loading" class="scoreboard-notice" role="status">
-          Loading {{ board_season.title }} standings…
+          Loading {{ board_display_title }} standings…
         </p>
         <div
           id="contest-standings-error"
@@ -467,7 +470,7 @@
 {% if board_season.master_url %}
 <dialog id="season-art-dialog" class="season-art-dialog" aria-labelledby="season-art-title" hidden>
   <div class="season-art-dialog-head">
-    <h2 id="season-art-title">{{ board_season.title }} at the Woodshed</h2>
+    <h2 id="season-art-title">{{ board_display_title }} at the Woodshed</h2>
     <form method="dialog"><button class="btn btn-secondary" type="submit" autofocus>Close image</button></form>
   </div>
   <object class="season-master-image" data="{{ board_season.master_url }}" type="image/png" width="1800" height="900" tabindex="-1" aria-label="The Viking Sax and Woodshed musicians among pumpkins, autumn leaves and a barn">
