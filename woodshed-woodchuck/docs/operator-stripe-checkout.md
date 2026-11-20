@@ -5,7 +5,7 @@ This command supports one Finance approval per Woodshed database. It runs in the
 ## Before the first purchase
 
 1. Obtain the adult’s agreement to the recurring amount and interval. Record Finance’s approval reference, the adult’s stable Woodshed **verifier ID**, the configured plan code and the operator’s internal handle. Supported plans are `full_monthly_7` (USD 7/month) and `full_annual_49` (USD 49/year). Select the single plan Finance approved. Confirm the verifier’s identity in site administration.
-2. Assign the person who will handle a cancellation or refund, give the adult a support contact, and verify the operator can cancel subscriptions and refund payments in the correct live Stripe Dashboard. Agree how to handle already-paid access if a refund is issued. Woodshed derives access from verified paid invoices. A Dashboard cancellation or refund does not shorten the recorded paid-through date. If immediate removal is required, settle that support requirement before taking payment.
+2. Assign a support contact for the adult. Verify the operator can cancel subscriptions and refund payments in the correct live Stripe Dashboard and that a Woodshed site administrator can inspect the membership. Ordinary cancellation keeps Full Access through the paid period. After a confirmed full refund, the site administrator ends the corresponding paid membership using the procedure below.
 3. After a separately approved release, use the Woodshed web service’s authenticated shell, in its `woodshed-woodchuck` application directory. Confirm the intended service and database, `STRIPE_MODE=live`, `STRIPE_BILLING_ENABLED=true`, `PUBLIC_SUBSCRIPTIONS_ENABLED=false` and the configured live price. The live webhook destination must deliver `invoice.paid` to `/membership/webhooks/stripe` using the adapter’s pinned API version. Keep the operator shell private.
 
 ## Authorize and issue
@@ -42,7 +42,8 @@ SELECT a.id AS authorization_id, b.verifier_id, c.id AS attempt_id, c.plan_code,
        s.external_customer_id, s.external_subscription_id,
        e.external_event_id, e.status AS event_status, p.payment_reference AS invoice_id,
        f.facts -> 'stripe_invoice' ->> 'payment_intent_id' AS payment_intent_id,
-       m.id AS membership_id, m.source, p.paid_through, m.access_until
+       m.id AS membership_id, m.source, m.status AS membership_status, m.revoked_at,
+       p.paid_through, m.access_until, r.details ->> 'refund_id' AS confirmed_refund_id
 FROM membership_audit_events a
 JOIN checkout_attempts c ON c.id = a.checkout_attempt_id
 JOIN billing_accounts b ON b.id = c.billing_account_id
@@ -51,6 +52,8 @@ LEFT JOIN memberships m ON m.id = s.membership_id AND m.billing_account_id = b.i
 LEFT JOIN billing_payment_effects p ON p.subscription_id = s.id
 LEFT JOIN billing_provider_events e ON e.id = p.event_id
 LEFT JOIN billing_event_applications f ON f.event_id = e.id
+LEFT JOIN membership_audit_events r ON r.billing_event_id = p.event_id AND r.membership_id = m.id
+                                  AND r.action = 'stripe_full_refund_access_ended'
 WHERE a.id = :'authorization_id'::integer AND a.action = 'operator_stripe_checkout_authorized';
 ```
 
@@ -58,4 +61,6 @@ WHERE a.id = :'authorization_id'::integer AND a.action = 'operator_stripe_checko
 
 - **Stop renewal.** In the live Stripe Dashboard, open **Billing → Subscriptions**, find the reconciled `sub_…`, verify the customer, and choose **⋯ → Cancel subscription**. To retain the purchased period, select its end and no refund. Confirm the effective date shown by Stripe. [Stripe cancellation instructions](https://docs.stripe.com/billing/subscriptions/cancel)
 - **Return money when authorized.** Check the matched invoice and original payment for prior or pending refunds. For an approved immediate cancellation and full reversal of that first payment, select immediate cancellation and a full refund of the last payment in the same dialog. If the subscription was already canceled without a refund, open the matched original payment under **Payments → ⋯ → Refund payment**, enter the approved amount and reason, and submit once. Verify cancellation separately when refunding from Payments. [Stripe refund instructions](https://docs.stripe.com/refunds#issue-refunds)
-- **Close the record.** Record the operator, UTC time, `sub_…`, `in_…`, `pi_…`, effective cancellation date, and any refund ID, amount, currency and status. Follow a pending refund to success or resolve a failure. Record the Woodshed membership’s paid-through date and the agreed access disposition. Preserve the original invoice, payment effect and audit history.
+- **Confirm the full refund.** In the correct Stripe account and mode, match the customer, subscription, invoice and original payment to the Woodshed purchase record. Check that the refund (`re_…`) is **succeeded** and the entire payment has been refunded in its original currency. Ordinary cancellation, a partial refund, or a pending or failed refund leaves local paid access in place.
+- **End the matched paid access.** Sign in at `/admin/login`, open **Site Admin → Memberships**, and inspect the reconciled membership ID. Match the owner, `cus_…` and `sub_…`. Under **End paid access after a full Stripe refund**, enter the matched `in_…` and `re_…`, check the confirmation, and submit. If another paid invoice has extended coverage beyond the refunded period, leave that coverage in place and reconcile the later payment before taking further action.
+- **Close the record.** Verify the selected membership shows **revoked**, the end time, and the refund and invoice IDs in its audit history. An identical submission is safe to repeat. Record the operator, membership ID, UTC time, Stripe references, original paid-through date, refund amount/currency/status and any effective cancellation date in the support record. Complimentary and lifetime access continue independently.

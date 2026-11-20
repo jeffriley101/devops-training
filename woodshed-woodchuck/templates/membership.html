@@ -27,7 +27,8 @@
 {% for item in memberships %}{% set member = item.membership %}
 <section class="card"><h2>Manage membership</h2><p>{{ item.plan_label }} · {{ member.status|title }}</p>
 {% if not item.active %}<p>This membership is not currently providing Full Access.</p>{% endif %}
-{% if member.access_until %}<p>Access until {{ member.access_until.strftime('%b %d, %Y') }} (UTC)</p>{% endif %}
+{% if member.source == 'stripe' and member.revoked_at %}<p>Paid access ended {{ member.revoked_at.strftime('%b %d, %Y') }} (UTC)</p>
+{% elif member.access_until %}<p>Access until {{ member.access_until.strftime('%b %d, %Y') }} (UTC)</p>{% endif %}
 <h3>Members: {{ item.seats|length }} of 5</h3>
 {% for seat, name in item.seats %}<div class="membership-line"><span>{{ name }}{% if actor.kind == 'student' and actor.id == item.owner_profile_id and seat.profile_id == actor.id %} — You{% endif %}</span>
 {% if not (actor.kind == 'student' and actor.id == item.owner_profile_id and seat.profile_id == actor.id) %}<form method="post" action="/membership/actions">{{ fields(member, 'remove') }}<input type="hidden" name="seat_id" value="{{ seat.id }}"><button class="btn btn-secondary">Remove</button></form>{% endif %}</div>{% endfor %}

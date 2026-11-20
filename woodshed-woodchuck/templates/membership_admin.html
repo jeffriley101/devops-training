@@ -25,9 +25,21 @@
 <h2>Membership {{ member.id }}</h2><p>Billing account {{ account.id }} · {{ selected.plan_label }} · {{ member.source }} · {{ member.status }}</p>
 <p>Owner: {{ 'student' if account.profile_id else 'adult' }} {{ account.profile_id or account.verifier_id }}</p>
 <p>{{ selected.seats|length }} of 5 student spots used</p>
-{% if member.access_until %}<p>Access until {{ member.access_until }}</p>{% endif %}
+{% if member.revoked_at %}<p>Access ended {{ member.revoked_at }}</p>{% endif %}
+{% if member.access_until %}<p>{{ 'Original paid-through date' if member.source == 'stripe' and member.revoked_at else 'Access until' }} {{ member.access_until }}</p>{% endif %}
 {% for seat, name in selected.seats %}<div class="membership-line"><span>{{ name }}</span><form method="post">{{ fields('remove', member.id) }}<input type="hidden" name="seat_id" value="{{ seat.id }}"><button class="btn btn-secondary">Remove student</button></form></div>{% endfor %}
-{% if subscription %}<p>{{ subscription.provider }} · {{ subscription.external_subscription_id }} · {{ subscription.provider_status }}</p>{% endif %}
-<h3>Audit history</h3>{% for event in history %}<p>{{ event.created_at }} · {{ event.action }} · {{ event.actor_type }} {{ event.actor_id or '' }}</p>{% endfor %}
+{% if subscription %}<p>{{ subscription.provider }} · {{ subscription.external_subscription_id }}{% if subscription.external_customer_id %} · {{ subscription.external_customer_id }}{% endif %} · {{ subscription.provider_status }}</p>{% endif %}
+<h3>Audit history</h3>{% for event in history %}<p>{{ event.created_at }} · {% if event.action == 'stripe_full_refund_access_ended' %}Paid access ended after full Stripe refund · {{ event.details.refund_id }} · {{ event.details.invoice_id }}{% else %}{{ event.action }}{% endif %} · {{ event.actor_type }} {{ event.actor_id or '' }}</p>{% endfor %}
+{% if member.source == 'stripe' and member.status == 'active' and not member.revoked_at and subscription and subscription.provider == 'stripe' %}
+<section class="account-danger-zone" aria-labelledby="stripe-refund-title">
+<h2 id="stripe-refund-title">End paid access after a full Stripe refund</h2>
+<form method="post" class="stack-form">{{ fields('end_refunded_stripe', member.id) }}
+<label for="refund-invoice">Refunded Stripe invoice ID (in_…)</label>
+<input id="refund-invoice" name="invoice_id" required maxlength="255" autocomplete="off">
+<label for="stripe-refund">Stripe refund ID (re_…)</label>
+<input id="stripe-refund" name="refund_id" required maxlength="255" autocomplete="off">
+<label><input type="checkbox" name="full_refund_confirmed" value="yes" required> I verified in Stripe that this refund succeeded and this payment was refunded in full in its original currency.</label>
+<button class="btn btn-red" type="submit">End paid access for membership {{ member.id }}</button>
+</form></section>{% endif %}
 {% if member.source == 'manual' and member.status != 'revoked' %}<section class="account-danger-zone" aria-labelledby="membership-danger-title"><h2 id="membership-danger-title">End Subscription</h2><p>Ending this subscription will immediately remove Full Access from every student on this membership.</p><form method="post" onsubmit="return window.confirm('End this subscription? All students on this membership will immediately lose Full Access.');">{{ fields('revoke', member.id) }}<button class="btn btn-red" type="submit">End Subscription</button></form></section>{% endif %}
 </section>{% endif %}{% endblock %}

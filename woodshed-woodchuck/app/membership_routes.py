@@ -333,6 +333,10 @@ async def admin_action(request: Request):
                 membership_id = integer(form, "membership_id")
                 if action == "revoke":
                     service.revoke_complimentary_membership(session, membership_id, actor)
+                elif action == "end_refunded_stripe":
+                    service.end_refunded_stripe_membership(session, membership_id, actor,
+                        invoice_id=str(form.get("invoice_id", "")).strip(), refund_id=str(form.get("refund_id", "")).strip(),
+                        confirmed=form.get("full_refund_confirmed") == "yes")
                 elif action == "add":
                     service.add_seat(session, membership_id, integer(form, "profile_id"), actor)
                 elif action == "remove":

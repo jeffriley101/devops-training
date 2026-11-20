@@ -6,13 +6,18 @@ serializes writers. Partial unique slot/student indexes are the final backstop.
 """
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from sqlalchemy import select, update
+import re
+
+from sqlalchemy import select, text, update
 from .models import (BillingAccount, Membership, MembershipSeat, MembershipSeatInvitation,
-                     MembershipAuditEvent, WoodchuckProfile, TrustedVerifier)
+                     MembershipAuditEvent, ProviderSubscription, BillingPaymentEffect, WoodchuckProfile, TrustedVerifier)
 from .security import generate_invitation_token, hash_invitation_token
 from .accounts import normalize_woodchuck_id
 from .adult_account_deletion import active_verifier
 from .verifiers import accepted_active_verifier_students, band_director_students, normalize_email, validate_email
+
+
+STRIPE_FULL_REFUND_ACCESS_ENDED = "stripe_full_refund_access_ended"
 
 
 def utc(value):
@@ -238,6 +243,13 @@ def create_complimentary_membership(session, owner, actor, *, access_until=None,
     return membership
 
 
+def _revoke_membership_access(session, membership, actor, at):
+    membership.status, membership.revoked_at = "revoked", at
+    for seat in active_seats(session, membership.id):
+        seat.removed_at = at
+        audit(session, membership, actor, "seat_removed", seat_id=seat.id, reason="membership_revoked")
+
+
 def revoke_complimentary_membership(session, membership_id, actor, at=None):
     if actor.kind != "admin":
         raise PermissionError("Site administrator required.")
@@ -246,12 +258,59 @@ def revoke_complimentary_membership(session, membership_id, actor, at=None):
         raise ValueError("Only complimentary memberships can be revoked here.")
     if membership.status == "revoked":
         return
-    at = utc(at or clock())
-    membership.status, membership.revoked_at = "revoked", at
-    for seat in active_seats(session, membership_id):
-        seat.removed_at = at
-        audit(session, membership, actor, "seat_removed", seat_id=seat.id, reason="membership_revoked")
+    _revoke_membership_access(session, membership, actor, utc(at or clock()))
     audit(session, membership, actor, "membership_revoked")
+    session.flush()
+
+
+def end_refunded_stripe_membership(session, membership_id, actor, *, invoice_id, refund_id, confirmed):
+    """Record a site admin's Dashboard confirmation and end only the matched membership."""
+    if actor.kind != "admin":
+        raise PermissionError("Site administrator required.")
+    if confirmed is not True:
+        raise ValueError("Confirm that the full payment refund succeeded in Stripe.")
+    if not isinstance(invoice_id, str) or not re.fullmatch(r"in_[A-Za-z0-9][A-Za-z0-9_-]{0,251}", invoice_id):
+        raise ValueError("Enter the Stripe invoice ID beginning with in_.")
+    if not isinstance(refund_id, str) or not re.fullmatch(r"re_[A-Za-z0-9][A-Za-z0-9_-]{0,251}", refund_id):
+        raise ValueError("Enter the Stripe refund ID beginning with re_.")
+
+    if session.get_bind().dialect.name == "postgresql":
+        # The receipt may be submitted for different accounts concurrently. Read the
+        # winner's audit after the lock, then follow billing's account -> member order.
+        session.execute(text("SET TRANSACTION ISOLATION LEVEL READ COMMITTED"))
+        session.execute(text("SELECT pg_advisory_xact_lock(hashtext('woodshed.stripe_refund'), hashtext(:refund))"),
+                        {"refund": refund_id})
+        account_id = session.scalar(select(Membership.billing_account_id).where(Membership.id == membership_id))
+        if account_id is not None:
+            lock_billing_account(session, account_id)
+    # The membership write is the first SQLite statement and serializes writers there.
+    member = owned_membership(session, membership_id, actor, lock=True)
+    if member.source != "stripe":
+        raise ValueError("Choose the paid Stripe membership for this refund.")
+    prior = session.scalar(select(MembershipAuditEvent).where(
+        MembershipAuditEvent.action == STRIPE_FULL_REFUND_ACCESS_ENDED,
+        MembershipAuditEvent.details["refund_id"].as_string() == refund_id))
+    if prior:
+        if prior.membership_id == member.id and prior.details["invoice_id"] == invoice_id:
+            return
+        raise ValueError("This refund is already recorded against a different membership or invoice.")
+
+    payment = session.execute(select(BillingPaymentEffect, ProviderSubscription.external_subscription_id)
+        .join(ProviderSubscription, ProviderSubscription.id == BillingPaymentEffect.subscription_id)
+        .where(ProviderSubscription.membership_id == member.id, ProviderSubscription.provider == "stripe",
+               BillingPaymentEffect.payment_reference == invoice_id)).one_or_none()
+    if payment is None:
+        raise ValueError("No verified payment for this invoice belongs to the selected membership.")
+    effect, subscription_id = payment
+    if member.status != "active" or member.revoked_at is not None:
+        raise ValueError("This membership has already ended. Check its audit history.")
+    if member.access_until is None or utc(effect.paid_through) != utc(member.access_until):
+        raise ValueError("This invoice does not cover the membership’s recorded paid-through date.")
+
+    _revoke_membership_access(session, member, actor, utc(clock()))
+    session.add(MembershipAuditEvent(membership_id=member.id, billing_event_id=effect.event_id,
+        actor_type=actor.kind, actor_id=actor.id, action=STRIPE_FULL_REFUND_ACCESS_ENDED,
+        details={"refund_id": refund_id, "invoice_id": invoice_id, "subscription_id": subscription_id}))
     session.flush()
 
 
