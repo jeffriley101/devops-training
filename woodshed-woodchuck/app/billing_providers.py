@@ -1,7 +1,7 @@
 """Durable authorization and explicit retry of adapter-verified payment facts.
 
 Transport/verification runs outside transactions. Commit received facts before
-application. Browser redirects never grant access. Live adapters remain disabled.
+application. Browser redirects never grant access.
 """
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
@@ -166,20 +166,29 @@ def authorize_checkout(session, actor, provider, plan_code, *, config=None, refe
         attempt = session.scalar(select(CheckoutAttempt).where(
             CheckoutAttempt.reference == reference, CheckoutAttempt.billing_account_id == account.id,
             CheckoutAttempt.provider == provider, CheckoutAttempt.plan_code == plan_code))
-        if attempt is None:
-            raise ValueError("Checkout attempt not found.")
-        if attempt.status != "pending" or utc(attempt.expires_at) <= at:
-            raise ValueError("This checkout attempt cannot be started again.")
-        require_new_purchase(session, account.id, at, actor, attempt_id=attempt.id)
-        return attempt
+        return reuse_checkout_attempt(session, account, actor, attempt, at)
     if not new_attempt:
         attempt = session.scalar(select(CheckoutAttempt).where(
             CheckoutAttempt.billing_account_id == account.id, CheckoutAttempt.provider == provider,
             CheckoutAttempt.plan_code == plan_code, CheckoutAttempt.status == "pending",
             CheckoutAttempt.expires_at > at).order_by(CheckoutAttempt.id.desc()))
         if attempt is not None:
-            require_new_purchase(session, account.id, at, actor, attempt_id=attempt.id)
-            return attempt
+            return reuse_checkout_attempt(session, account, actor, attempt, at)
+    return new_checkout_attempt(session, account, actor, provider, plan, config, at)
+
+
+def reuse_checkout_attempt(session, account, actor, attempt, at):
+    """Both entry points hold the owner's billing lock before checking eligibility."""
+    if attempt is None or attempt.billing_account_id != account.id:
+        raise ValueError("Checkout attempt not found.")
+    if attempt.status != "pending" or utc(attempt.expires_at) <= at:
+        raise ValueError("This checkout attempt cannot be started again.")
+    require_new_purchase(session, account.id, at, actor, attempt_id=attempt.id)
+    return attempt
+
+
+def new_checkout_attempt(session, account, actor, provider, plan, config, at):
+    """Snapshot a server-selected plan under the owner's billing lock."""
     require_new_purchase(session, account.id, at, actor)
     validity = config.checkout_validity_seconds
     if not isinstance(validity, int) or isinstance(validity, bool) or not 0 < validity < 1_000_000_000:
@@ -195,9 +204,19 @@ def authorize_checkout(session, actor, provider, plan_code, *, config=None, refe
 
 def checkout(session_factory, actor, provider, plan_code, *, config=None, reference=None, new_attempt=False):
     config = config or BillingConfig.from_environment()
+
+    def authorize(session):
+        return authorize_checkout(session, actor, provider, plan_code, config=config,
+                                  reference=reference, new_attempt=new_attempt)
+
+    return start_authorized_checkout(session_factory, config, authorize)
+
+
+def start_authorized_checkout(session_factory, config, authorize):
+    """Commit the authorized attempt before contacting its provider."""
     with session_factory() as session:
-        attempt = authorize_checkout(session, actor, provider, plan_code, config=config,
-                                     reference=reference, new_attempt=new_attempt)
+        attempt = authorize(session)
+        provider = attempt.provider
         attempt_id, opaque = attempt.id, attempt.reference
         plan = Plan(attempt.plan_code, "Full Access", attempt.amount_cents, attempt.interval, attempt.currency)
         expires = utc(attempt.expires_at)

@@ -1,11 +1,12 @@
 """Real Stripe SDK + signed webhooks, entirely fake HTTP and disposable databases."""
 from copy import deepcopy
 from dataclasses import replace
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 import hashlib
 import hmac
 import json
 import time
+from unittest.mock import patch
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
@@ -621,15 +622,16 @@ def test_webhooks_continue_when_new_purchases_disabled(db, adapter):
     assert deliver(db, event, config=replace(CONFIG, public_subscriptions_enabled=False))[0].status == "processed"
 
 
-def test_checkout_reconciliation_and_later_webhook_use_one_payment(db, adapter, monkeypatch):
+def test_checkout_reconciliation_and_later_webhook_use_one_payment(db, adapter):
     _, http = adapter
     b.checkout(db, m.Actor("student", 1), "stripe", "full_monthly_7", config=CONFIG)
     with db() as session:
         attempt = session.scalar(select(CheckoutAttempt))
     event = http.paid_event(attempt.reference)
-    # Fixture billing clock is historical; inspection observations use wall time.
-    monkeypatch.setattr(b, "clock", lambda: datetime.now(timezone.utc))
-    result_id = reconciliation.inspect(db, "checkout", attempt.id, m.Actor("admin"), config=CONFIG)
+    # Observe the provider during the fixture's paid period on the same clock as billing.
+    with patch("app.stripe_billing.datetime", wraps=datetime) as provider_clock:
+        provider_clock.now.return_value = NOW
+        result_id = reconciliation.inspect(db, "checkout", attempt.id, m.Actor("admin"), config=CONFIG)
     with db() as session:
         assert session.get(MembershipAuditEvent, result_id).details["classification"] == "applied"
     assert deliver(db, event)[0].status == "processed"
