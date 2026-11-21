@@ -13,11 +13,13 @@ class BillingConfig:
     stripe_billing_enabled: bool = False
     launch_sale_enabled: bool = False
     checkout_validity_seconds: int | None = DEFAULT_CHECKOUT_VALIDITY_SECONDS
+    public_subscription_refund_policy: str = ""
 
     @classmethod
     def from_environment(cls):
         flags = {key: os.getenv(key.upper(), "false").strip().lower() in {"true", "1", "yes"}
-                 for key in cls.__dataclass_fields__ if key != "checkout_validity_seconds"}
+                 for key in ("public_subscriptions_enabled", "paypal_billing_enabled",
+                             "stripe_billing_enabled", "launch_sale_enabled")}
         value = os.getenv("CHECKOUT_VALIDITY_SECONDS")
         # Missing/blank uses the product default. A malformed explicit override
         # fails closed rather than silently changing the authorization window.
@@ -26,7 +28,8 @@ class BillingConfig:
         else:
             value = value.strip()
             validity = int(value) if value.isascii() and value.isdigit() and len(value) < 10 else None
-        return cls(**flags, checkout_validity_seconds=validity if validity and validity > 0 else None)
+        return cls(**flags, checkout_validity_seconds=validity if validity and validity > 0 else None,
+                   public_subscription_refund_policy=os.getenv("PUBLIC_SUBSCRIPTION_REFUND_POLICY", "").strip())
 
     def provider_enabled(self, provider):
         return {"paypal": self.paypal_billing_enabled, "stripe": self.stripe_billing_enabled}.get(provider, False)

@@ -38,7 +38,8 @@ def db(tmp_path, monkeypatch):
     monkeypatch.setattr(routes, "SessionLocal", factory)
     monkeypatch.setattr(m, "clock", lambda: NOW)
     monkeypatch.setattr(providers, "clock", lambda: NOW)
-    for key in ("PUBLIC_SUBSCRIPTIONS_ENABLED", "PAYPAL_BILLING_ENABLED", "STRIPE_BILLING_ENABLED", "LAUNCH_SALE_ENABLED", "CHECKOUT_VALIDITY_SECONDS"):
+    for key in ("PUBLIC_SUBSCRIPTIONS_ENABLED", "PUBLIC_SUBSCRIPTION_REFUND_POLICY", "PAYPAL_BILLING_ENABLED",
+                "STRIPE_BILLING_ENABLED", "LAUNCH_SALE_ENABLED", "CHECKOUT_VALIDITY_SECONDS"):
         monkeypatch.delenv(key, raising=False)
     monkeypatch.setenv("SITE_ADMIN_TOKEN", "test-site-admin")
     with factory() as session:

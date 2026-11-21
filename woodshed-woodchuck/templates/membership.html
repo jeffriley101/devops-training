@@ -37,8 +37,35 @@
 <label for="woodchuck-id-{{ member.id }}">Woodchuck ID</label><input id="woodchuck-id-{{ member.id }}" type="text" name="woodchuck_id" maxlength="32" required autocomplete="off">
 <button class="btn btn-primary">Add student</button></form>{% endif %}
 </section>{% endfor %}
-{% if not memberships %}<section class="card"><h2>Full Access for up to five students</h2>
-{% for plan in plans %}<p>{{ plan.label }}</p>{% endfor %}
-<p>Purchasing is not available yet.</p></section>{% endif %}
+{% if checkout_plans and request.query_params.get('checkout') == 'returned' %}
+<section class="card">
+  <p>If you completed payment, your membership will appear here after confirmation.</p>
+  <a href="/membership?as_account=adult">Refresh membership</a>
+</section>
+{% elif checkout_plans %}
+<section class="card membership-purchase" aria-labelledby="purchase-heading">
+  <h2 id="purchase-heading">Full Access for up to five students</h2>
+  <form method="post" action="/membership/checkout">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="as_account" value="{{ actor.kind }}">
+    <input type="hidden" name="provider" value="stripe">
+    <fieldset>
+      <legend>Choose a plan (USD)</legend>
+      <div class="membership-plan-options">
+        {% for plan in checkout_plans %}
+        <label><input type="radio" name="plan_code" value="{{ plan.code }}" required{% if loop.first %} checked{% endif %}> {{ plan.label }}</label>
+        {% endfor %}
+      </div>
+    </fieldset>
+    <p>Your subscription renews automatically at the selected price and interval until canceled.
+      To stop renewal, email <a href="mailto:support@woodshedwoodchuck.com">Woodshed Support</a>.
+      You keep Full Access through the paid period when you cancel renewal.</p>
+    <p><strong>Refund policy</strong> · {{ refund_policy }}</p>
+    <button class="btn btn-primary" type="submit">Get Full Access</button>
+  </form>
+</section>
+{% elif not memberships %}
+<section class="card"><p>You have no memberships to manage.</p></section>
+{% endif %}
 {% endif %}
 {% endblock %}

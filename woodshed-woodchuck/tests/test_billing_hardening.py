@@ -209,8 +209,10 @@ def test_checkout_route_no_csrf_transport_and_no_open_transaction(db, monkeypatc
             return super().create_checkout(**kwargs)
     fake = CheckingProvider()
     monkeypatch.setitem(b.PROVIDERS, "stripe", fake)
-    monkeypatch.setattr(BillingConfig, "from_environment", classmethod(lambda cls: CONFIG))
-    user = client("student")
+    from tests.test_stripe_billing import configure
+    configure(monkeypatch)
+    monkeypatch.setenv("PUBLIC_SUBSCRIPTION_REFUND_POLICY", "Refund conditions from the test fixture.")
+    user = client("adult")
     csrf = page_csrf(user)
     fields = {"csrf": csrf, "provider": "stripe", "plan_code": "full_monthly_7"}
     assert user.post("/membership/checkout", data=fields, follow_redirects=False).status_code == 303

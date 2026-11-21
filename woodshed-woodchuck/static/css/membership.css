@@ -4,3 +4,27 @@
 .membership-shell input, .membership-shell select { max-width: 100%; min-width: 0; }
 .membership-line { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; }
 .membership-shell button { min-height: 44px; white-space: normal; }
+
+.membership-purchase h2 { margin: 0 0 1rem; }
+.membership-purchase form { display: grid; gap: .85rem; margin: 0; }
+.membership-purchase fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
+.membership-purchase legend { padding: 0; font-weight: 700; }
+.membership-plan-options { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .5rem; }
+.membership-plan-options label {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  min-height: 44px;
+  padding: .5rem .75rem;
+  border: 1px solid var(--accent-forest);
+  background: var(--panel-parchment);
+  cursor: pointer;
+}
+.membership-plan-options input { margin: 0; accent-color: var(--accent-forest-dark); }
+.membership-purchase p { margin: 0; line-height: 1.5; }
+.membership-purchase .btn { justify-self: start; border-radius: 0; font-family: inherit; font-size: 1rem; }
+.membership-purchase :focus-visible { outline: 3px solid var(--accent-forest-dark); outline-offset: 3px; }
+@media (max-width: 480px) {
+  .membership-plan-options { flex-direction: column; }
+  .membership-purchase .btn { justify-self: stretch; }
+}

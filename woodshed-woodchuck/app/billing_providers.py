@@ -10,11 +10,11 @@ from secrets import token_urlsafe
 from typing import Protocol
 from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
-from .billing_config import BillingConfig, Plan, new_subscription_plan
+from .billing_config import BillingConfig, Plan, PLANS, new_subscription_plan
 from .models import (BillingAccount, ProviderSubscription, BillingProviderEvent, Membership,
-                     CheckoutAttempt, BillingEventApplication, BillingPaymentEffect)
+                     CheckoutAttempt, BillingEventApplication, BillingPaymentEffect, MembershipAuditEvent)
 from .memberships import Actor, audit, clock, utc, billing_account, lock_billing_account
-from .billing_replacement import require_new_purchase
+from .billing_replacement import purchase_decision, require_new_purchase
 
 
 class BillingUnavailable(ValueError):
@@ -209,6 +209,114 @@ def checkout(session_factory, actor, provider, plan_code, *, config=None, refere
         return authorize_checkout(session, actor, provider, plan_code, config=config,
                                   reference=reference, new_attempt=new_attempt)
 
+    return start_authorized_checkout(session_factory, config, authorize)
+
+
+def _website_plans(config):
+    from .stripe_billing import StripeSettings
+    if not config.public_subscriptions_enabled:
+        raise BillingUnavailable("Public purchasing is not available yet.")
+    if (not config.stripe_billing_enabled or not config.public_subscription_refund_policy.strip()
+            or config.checkout_validity_seconds is None):
+        raise BillingUnavailable("Website purchasing is currently unavailable.")
+    settings = StripeSettings.from_environment()
+    if settings is None:
+        raise BillingUnavailable("Website purchasing is currently unavailable.")
+    return [PLANS[code] for code in settings.prices]
+
+
+def _website_pending_attempt(session, account_id, at):
+    from .operator_checkout import AUTHORIZATION
+    rows = session.scalars(select(CheckoutAttempt).where(
+        CheckoutAttempt.billing_account_id == account_id, CheckoutAttempt.status == "pending",
+        CheckoutAttempt.expires_at > at).limit(2)).all()
+    if not rows:
+        return None
+    attempt = rows[0]
+    if len(rows) > 1 or attempt.provider != "stripe" or session.scalar(select(MembershipAuditEvent.id).where(
+            MembershipAuditEvent.checkout_attempt_id == attempt.id, MembershipAuditEvent.action == AUTHORIZATION)):
+        raise ValueError("An existing checkout needs to be resolved before starting another subscription.")
+    return attempt
+
+
+def website_purchase_plans(session, actor, *, config=None):
+    """An offer is read-only. Checkout rechecks eligibility under the owner's lock."""
+    if actor.kind != "adult":
+        return []
+    try:
+        plans = _website_plans(config or BillingConfig.from_environment())
+        account = billing_account(session, actor)
+        if account is None:
+            return plans
+        at = utc(clock())
+        attempt = _website_pending_attempt(session, account.id, at)
+    except ValueError:
+        return []
+    if not purchase_decision(session, account.id, at, attempt_id=attempt.id if attempt else None).allowed:
+        return []
+    return [plan for plan in plans if attempt is None or plan.code == attempt.plan_code]
+
+
+class _VerifyExpiry(Exception):
+    """Release the owner lock before consulting Stripe about an expired local attempt."""
+
+
+def website_checkout(session_factory, actor, plan_code, *, config=None, reference=None, new_attempt=False):
+    from .stripe_billing import PLAN_ENV
+    config = config or BillingConfig.from_environment()
+    if plan_code not in PLAN_ENV:
+        raise ValueError("This plan is not available for a new subscription.")
+    if PLANS[plan_code] not in _website_plans(config):
+        raise ValueError("This plan is not available for a new subscription.")
+    if actor.kind != "adult":
+        raise PermissionError("An adult verifier account is required.")
+    checked = None
+
+    def authorize(session):
+        account = billing_account(session, actor, create=True)
+        at = utc(clock())
+        expire_pending_checkouts(session, account.id, at)
+        attempt = _website_pending_attempt(session, account.id, at)
+        if reference is not None and (not attempt or reference != attempt.reference):
+            raise ValueError("Checkout attempt not found.")
+        if attempt:
+            if new_attempt or attempt.plan_code != plan_code:
+                raise ValueError("A checkout is already in progress. Retry the same plan.")
+            attempt = reuse_checkout_attempt(session, account, actor, attempt, at)
+        else:
+            attempt = new_checkout_attempt(session, account, actor, "stripe", PLANS[plan_code], config, at)
+
+        # An expired local clock alone cannot rule out a successful payment
+        # whose webhook is still in transit. Remember confirmed unpaid expiries.
+        action = "stripe_unpaid_checkout_expiry_confirmed"
+        verified = select(MembershipAuditEvent.id).where(
+            MembershipAuditEvent.checkout_attempt_id == CheckoutAttempt.id,
+            MembershipAuditEvent.action == action).exists()
+        expired = session.scalars(select(CheckoutAttempt).where(
+                CheckoutAttempt.billing_account_id == account.id,
+                CheckoutAttempt.status == "expired", ~verified)).all()
+        identities = []
+        for prior in expired:
+            if prior.provider != "stripe" or not prior.provider_checkout_id:
+                raise ValueError("Contact Support to confirm your previous checkout before purchasing again.")
+            identities.append((prior.id, prior.provider_checkout_id, prior.reference, prior.plan_code))
+        if identities and checked is None:
+            raise _VerifyExpiry(identities)
+        for identity in identities:
+            if identity not in checked:
+                raise BillingUnavailable("Your checkout changed during confirmation. Please try again.")
+            session.add(MembershipAuditEvent(checkout_attempt_id=identity[0], action=action, actor_type="provider"))
+        return attempt
+
+    try:
+        return start_authorized_checkout(session_factory, config, authorize)
+    except _VerifyExpiry as error:
+        identities, = error.args
+        provider = enabled_provider("stripe", config)
+        for _, checkout_id, checkout_reference, prior_plan in identities:
+            if not provider.confirm_unpaid_expiry(checkout_id, checkout_reference, prior_plan):
+                raise ValueError("Your previous checkout needs confirmation before another purchase.") from None
+        checked = set(identities)
     return start_authorized_checkout(session_factory, config, authorize)
 
 

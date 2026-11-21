@@ -54,7 +54,7 @@ students never resolve to Full Access.
 
 `app/billing_config.py` owns the immutable code catalog (integer USD cents):
 
-| Code | Public label | Amount | Interval |
+| Code | Catalog label | Amount | Interval |
 | --- | --- | ---: | --- |
 | full_monthly_7 | Full Monthly | 700 | month |
 | full_annual_49 | Full Annual | 4900 | year |
@@ -68,10 +68,25 @@ system exists. Terminated subscriptions cannot be reactivated by the event
 processor; a later subscription must undergo new plan eligibility checks.
 Cancellation can retain Full Access until its paid-through date.
 
-PayPal and Stripe adapters deliberately raise `BillingUnavailable` even if flags
-are enabled. They make no network calls and require no credentials or SDKs.
-The test adapter exists only in tests. Checkout derives pricing on the server,
-and never grants access or treats a browser return as payment proof.
+Standalone website purchases use the deployed Stripe Checkout adapter. The
+Membership page offers configured monthly and annual plans to eligible signed-in
+adult Verifier accounts. The server checks the owner and plan again on POST.
+The Play WebView appends `WoodshedAndroid/` to its user agent. Membership omits
+the purchase form for that client and rejects its checkout POSTs. Account and
+payment authorization apply independently of this client-supplied marker.
+
+Public sales require separate approval of the USD prices and customer terms.
+The form and endpoint require both `PUBLIC_SUBSCRIPTIONS_ENABLED` and
+`STRIPE_BILLING_ENABLED`, configured Stripe billing, and approved plain-text
+refund terms in `PUBLIC_SUBSCRIPTION_REFUND_POLICY`. An empty policy closes
+public checkout. Woodshed Support handles cancellation requests. The private
+operator authorization and signed invoice processing use their existing paths
+while public sales are off. Browser returns grant no access.
+
+Website retries reuse the same pending plan and Stripe idempotency key. After
+expiry, a replacement requires confirmation that the old Checkout Session
+expired unpaid. If issuance lost its response and the session ID is still
+unknown at expiry, the account needs Support review before another purchase.
 
 The event processor accepts only adapter-verified normalized events. Event IDs
 are unique per provider, payloads are hashed, and duplicate effects are applied
@@ -79,10 +94,8 @@ once. Unknown subscriptions retain verified facts for explicit retry; they can
 provision only with a valid durable checkout and confirmed paid entitlement.
 Provider details and audit history are visible only to site administration.
 
-Real adapter integration must implement provider signature validation, customer/plan mapping,
-network retry/idempotency behavior, cancellation/portal UX and reconciliation.
-It must test actual provider event ordering and cancellation semantics before
-enabling purchasing. Test callbacks are not production payment support.
+The operator runbook describes cancellation, reconciliation and the access
+adjustment after a confirmed full refund. [Operator Stripe checkout](operator-stripe-checkout.md)
 
 ## Phase A1 checkout and entitlement contract
 

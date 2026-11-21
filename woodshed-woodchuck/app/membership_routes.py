@@ -14,8 +14,8 @@ from .verifier_routes import current_verifier
 from .models import (WoodchuckProfile, TrustedVerifier, BillingAccount, Membership, MembershipSeat,
                      MembershipSeatInvitation, ProviderSubscription, MembershipAuditEvent)
 from . import memberships as service
-from .billing_config import BillingConfig, PLANS, available_plans
-from .billing_providers import BillingUnavailable, checkout, process_webhook
+from .billing_config import BillingConfig, PLANS
+from .billing_providers import BillingUnavailable, website_checkout, website_purchase_plans, process_webhook
 from .site_admin import csrf_token, check_csrf, sign_in_site_admin, require_site_admin
 from .login_limits import enforce_login_limit, protection_status
 from . import billing_recovery, billing_reconciliation
@@ -89,6 +89,12 @@ def detail(session, membership):
             "plan_label": PLANS[membership.plan_code].label if membership.plan_code in PLANS else "Complimentary Full membership"}
 
 
+def android_app_request(request: Request) -> bool:
+    # The Play WebView appends this marker to its normal UA. Billing authorization
+    # is enforced independently since a client controls its request headers.
+    return "woodshedandroid/" in request.headers.get("user-agent", "").lower()
+
+
 @router.get("/membership")
 def membership_page(request: Request, as_account: str | None = None):
     with SessionLocal() as session:
@@ -102,10 +108,12 @@ def membership_page(request: Request, as_account: str | None = None):
         memberships = list(session.scalars(select(Membership).where(Membership.billing_account_id == account.id)
                                            .order_by(Membership.created_at.desc()))) if account else []
         full = actor.kind == "student" and service.student_has_full_access(session, actor.id)
+        config = BillingConfig.from_environment()
+        plans = [] if android_app_request(request) else website_purchase_plans(session, actor, config=config)
         return render(request, "membership.html", actor=actor, choices=choices,
                       full=full, memberships=[detail(session, row) for row in memberships],
                       connected=service.connected_students(session, actor),
-                      plans=available_plans(BillingConfig.from_environment()))
+                      checkout_plans=plans, refund_policy=config.public_subscription_refund_policy)
 
 
 def integer(form, key):
@@ -171,18 +179,24 @@ async def invitation_claim(request: Request, token: str):
 
 @router.post("/membership/checkout")
 async def membership_checkout(request: Request):
+    if android_app_request(request):
+        raise HTTPException(403, "Purchasing is unavailable in this app.")
     form = await request.form()
     check_csrf(request, form.get("csrf"))
-    # Reject unexpected fields, including client-supplied prices.
-    if set(form) - {"csrf", "as_account", "plan_code", "provider", "checkout_reference", "new_attempt"}:
+    if (set(form) - {"csrf", "as_account", "plan_code", "provider", "checkout_reference", "new_attempt"}
+            or len(form.multi_items()) != len(form) or any(not isinstance(value, str) for value in form.values())):
         raise HTTPException(400, "Only a plan and provider may be selected.")
     with SessionLocal() as session:
         actor = actor_for(request, session, form.get("as_account"))
     if form.get("new_attempt", "false") not in {"true", "false"}:
         raise HTTPException(400, "Invalid checkout selection.")
+    if form.get("provider") != "stripe":
+        raise HTTPException(503, "Billing provider is unavailable.")
     try:
-        url = await run_in_threadpool(checkout, SessionLocal, actor, form.get("provider"), form.get("plan_code"),
+        url = await run_in_threadpool(website_checkout, SessionLocal, actor, form.get("plan_code"),
                                      reference=form.get("checkout_reference"), new_attempt=form.get("new_attempt") == "true")
+    except PermissionError as error:
+        raise HTTPException(403, str(error)) from error
     except (BillingUnavailable, ValueError) as error:
         raise HTTPException(503 if isinstance(error, BillingUnavailable) else 400, str(error)) from error
     return RedirectResponse(url, 303)

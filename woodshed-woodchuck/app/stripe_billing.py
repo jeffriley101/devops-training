@@ -148,6 +148,18 @@ class StripeProvider(DisabledProvider):
         require(url.scheme == "https" and url.hostname == "checkout.stripe.com" and not url.username)
         return CheckoutResult(result["url"], identifier(result.get("id"), self.settings.checkout_id_prefix))
 
+    def confirm_unpaid_expiry(self, checkout_id, reference, plan_code):
+        """Only a definitively expired, unused session can precede a replacement."""
+        self._account()
+        checkout = self._call(self.client.v1.checkout.sessions.retrieve,
+                              identifier(checkout_id, self.settings.checkout_id_prefix))
+        metadata = checkout.get("metadata") or {}
+        return (checkout.get("object") == "checkout.session" and checkout.get("id") == checkout_id
+                and checkout.get("livemode") is self.settings.livemode and checkout.get("mode") == "subscription"
+                and checkout.get("client_reference_id") == reference and metadata.get("woodshed_plan_code") == plan_code
+                and checkout.get("status") == "expired" and checkout.get("payment_status") == "unpaid"
+                and checkout.get("subscription") is None and checkout.get("invoice") is None)
+
     def _event(self, event):
         require(event.get("livemode") is self.settings.livemode and not event.get("account")
                 and event.get("api_version") == API_VERSION)

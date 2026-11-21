@@ -69,7 +69,8 @@ class StripeHTTP(stripe.HTTPClient):
             result = self.prices[path.rsplit("/", 1)[1]]
         elif path == "/v1/checkout/sessions" and method.lower() == "post":
             self.checkout["client_reference_id"] = params["client_reference_id"][0]
-            self.checkout["metadata"] = {"woodshed_plan_code": params["metadata[woodshed_plan_code]"][0]}
+            self.checkout["metadata"] = {name: params[f"metadata[{name}]"][0] for name in
+                                         ("woodshed_checkout_reference", "woodshed_plan_code")}
             result = self.checkout
         elif path == "/v1/checkout/sessions":
             assert params["subscription"] == ["sub_woodshed"]
@@ -525,13 +526,11 @@ def test_single_configured_price_only(db, monkeypatch):
     monkeypatch.delenv("STRIPE_PRICE_FULL_ANNUAL_49")
     settings = StripeSettings.from_environment()
     assert settings.prices == {"full_monthly_7": SETTINGS.monthly_price}
-    with db() as session:
-        declare_age(session, 1, "adult")
-        session.commit()
-    response = client("student").get("/membership")
+    monkeypatch.setenv("PUBLIC_SUBSCRIPTION_REFUND_POLICY", "Refund conditions from the test fixture.")
+    response = client("adult").get("/membership")
     assert response.status_code == 200
-    assert "Purchasing is not available yet." in response.text
-    assert 'action="/membership/checkout"' not in response.text
+    assert 'value="full_monthly_7"' in response.text
+    assert 'value="full_annual_49"' not in response.text
     monkeypatch.delenv("STRIPE_PRICE_FULL_MONTHLY_7")
     assert StripeSettings.from_environment() is None
 
@@ -567,26 +566,53 @@ def test_annual_checkout_requires_annual_price_before_transport(adapter, monkeyp
     assert http.calls == []
 
 
-def test_routes_checkout_csrf_and_return_never_grants_access(db, adapter, monkeypatch):
+@pytest.mark.parametrize("code,user_agent", [
+    ("full_monthly_7", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/130.0 Safari/537.36"),
+    ("full_annual_49", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/130.0 Mobile Safari/537.36"),
+])
+def test_website_checkout_and_signed_paid_invoice(db, adapter, monkeypatch, code, user_agent):
     _, http = adapter
     configure(monkeypatch, http.mode)
-    # The shared PostgreSQL fixture creates profiles without an age declaration.
-    with db() as session:
-        declare_age(session, 1, "adult")
-        session.commit()
-    c = client("student")
-    csrf = page_csrf(c)
-    assert "Purchasing is not available yet." in c.get("/membership").text
-    data = {"as_account": "student", "provider": "stripe", "plan_code": "full_monthly_7"}
+    policy = "Refund conditions from the test fixture."
+    monkeypatch.setenv("PUBLIC_SUBSCRIPTION_REFUND_POLICY", policy)
+    monkeypatch.setenv("LAUNCH_SALE_ENABLED", "true")
+    c = client("adult")
+    c.headers["User-Agent"] = user_agent
+    page = c.get("/membership")
+    assert page.status_code == 200 and page.headers["cache-control"] == "no-store"
+    for part in ('method="post" action="/membership/checkout"', 'name="as_account" value="adult"',
+                 'name="provider" value="stripe"', 'name="plan_code" value="full_monthly_7"',
+                 'name="plan_code" value="full_annual_49"', "USD", "$7/month", "$49/year",
+                 "renews automatically", "cancel", "mailto:support@woodshedwoodchuck.com",
+                 policy, "Get Full Access"):
+        assert part in page.text
+    assert f'name="csrf" value="{page.context["csrf"]}"' in page.text
+    assert "friendship_annual_30" not in page.text and "$30" not in page.text
+    data = {"as_account": "adult", "provider": "stripe", "plan_code": code}
     assert c.post("/membership/checkout", data=data).status_code == 403
-    response = c.post("/membership/checkout", data={**data, "csrf": csrf}, follow_redirects=False)
-    assert response.status_code == 303 and response.headers["location"].startswith("https://checkout.stripe.com/")
+    data["csrf"] = page.context["csrf"]
+    response = c.post("/membership/checkout", data=data, follow_redirects=False)
+    assert response.status_code == 303 and response.headers["location"] == http.checkout["url"]
+    posts = [call for call in http.calls if call[0].lower() == "post"]
+    assert len(posts) == 1 and posts[0][2]["line_items[0][price]"] == [SETTINGS.prices[code]]
     for query in ("checkout=returned", "checkout=success&payment_status=paid&session_id=" + http.checkout["id"]):
-        response = c.get("/membership?" + query)
-        assert response.status_code == 200 and "Open Access" in response.text
+        returned = c.get("/membership?" + query)
+        assert returned.status_code == 200
+        if query == "checkout=returned":
+            assert "Refresh membership" in returned.text and "Get Full Access" not in returned.text
         assert count(db, Membership) == count(db, BillingPaymentEffect) == 0
-        with db() as session:
-            assert not m.student_has_full_access(session, 1)
+    with db() as session:
+        attempt = session.scalars(select(CheckoutAttempt)).one()
+        assert (attempt.plan_code, attempt.amount_cents) == (code, PLANS[code].amount_cents)
+    body, headers = signed(http.paid_event(attempt.reference, code))
+    webhook = "/membership/webhooks/stripe"
+    assert c.post(webhook, content=body, headers=headers).json()["processed"] is True
+    assert c.post(webhook, content=body, headers=headers).json()["duplicate"] is True
+    assert count(db, Membership) == count(db, BillingPaymentEffect) == 1
+    management = c.get("/membership")
+    assert "Manage membership" in management.text and "Get Full Access" not in management.text
+    assert 400 <= c.post("/membership/checkout", data=data, follow_redirects=False).status_code < 500
+    assert len([call for call in http.calls if call[0].lower() == "post"]) == 1
 
 
 def test_transport_error_sanitized_and_retry_reference_preserved(db, adapter):
