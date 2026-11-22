@@ -9,8 +9,9 @@ No existing product feature is paywalled by this foundation.
 
 `BillingAccount` identifies exactly one existing student or adult account, using
 two nullable foreign keys and an exclusive-owner constraint. An adult's Verifier
-or Band Director relationship role does not affect ownership. If both account
-sessions exist, `/membership` requires choosing which account to manage.
+or Band Director relationship role does not affect ownership. If both signed-in
+accounts are available, `/membership` asks which account to manage. A separate
+student age screen still allows the signed-in adult to manage their own website billing.
 
 One active membership per billing account is supported. Each membership has five
 numbered student spots. Partial unique indexes prevent two occupied copies of a
@@ -77,11 +78,12 @@ payment authorization apply independently of this client-supplied marker.
 
 Public sales require separate approval of the USD prices and customer terms.
 The form and endpoint require both `PUBLIC_SUBSCRIPTIONS_ENABLED` and
-`STRIPE_BILLING_ENABLED`, configured Stripe billing, and approved plain-text
-refund terms in `PUBLIC_SUBSCRIPTION_REFUND_POLICY`. An empty policy closes
-public checkout. Woodshed Support handles cancellation requests. The private
-operator authorization and signed invoice processing use their existing paths
-while public sales are off. Browser returns grant no access.
+`STRIPE_BILLING_ENABLED`, configured Stripe billing, and the existing nonblank
+`PUBLIC_SUBSCRIPTION_REFUND_POLICY` release gate. The reviewed Membership template
+supplies the purchaser-facing terms for both public and operator-issued checkouts.
+The purchaser checks the recurring-charge agreement before Woodshed opens Stripe.
+Owners can stop renewal in Membership even with public sales closed. Support handles
+refunds and assisted cancellations. Browser returns grant no access.
 
 Website retries reuse the same pending plan and Stripe idempotency key. After
 expiry, a replacement requires confirmation that the old Checkout Session

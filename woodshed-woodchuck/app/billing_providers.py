@@ -10,15 +10,18 @@ from secrets import token_urlsafe
 from typing import Protocol
 from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
-from .billing_config import BillingConfig, Plan, PLANS, new_subscription_plan
+from .billing_config import BillingConfig, Plan, PLANS, SUBSCRIPTION_TERMS_VERSION, new_subscription_plan
 from .models import (BillingAccount, ProviderSubscription, BillingProviderEvent, Membership,
                      CheckoutAttempt, BillingEventApplication, BillingPaymentEffect, MembershipAuditEvent)
-from .memberships import Actor, audit, clock, utc, billing_account, lock_billing_account
+from .memberships import Actor, audit, clock, utc, billing_account, lock_billing_account, owned_membership
 from .billing_replacement import purchase_decision, require_new_purchase
 
 
 class BillingUnavailable(ValueError):
     pass
+
+
+RENEWAL_STOPPED = "stripe_renewal_stop_confirmed"
 
 
 class RecoverableApplication(ValueError):
@@ -86,7 +89,8 @@ class ProviderEvidence:
 
 class BillingProvider(Protocol):
     def create_checkout(self, *, plan: Plan, idempotency_key: str, expires_at: datetime) -> CheckoutResult: ...
-    def cancel_subscription(self, *, external_subscription_id: str) -> None: ...
+    def issued_checkout_url(self, checkout_id: str, reference: str, plan_code: str) -> str: ...
+    def cancel_subscription(self, *, external_subscription_id: str, external_customer_id: str) -> datetime: ...
     def create_portal_session(self, *, external_customer_id: str) -> str: ...
     def verify_and_parse_webhook(self, body: bytes, headers: dict) -> SubscriptionEvent | None: ...
     def inspect_evidence(self, request: EvidenceRequest) -> ProviderEvidence: ...
@@ -99,7 +103,7 @@ class DisabledProvider:
     def _unavailable(self, **kwargs):
         raise BillingUnavailable(f"{self.name.title()} billing is not configured.")
 
-    create_checkout = cancel_subscription = create_portal_session = _unavailable
+    create_checkout = cancel_subscription = create_portal_session = issued_checkout_url = _unavailable
 
     def verify_and_parse_webhook(self, body, headers):
         return self._unavailable()
@@ -261,7 +265,21 @@ class _VerifyExpiry(Exception):
     """Release the owner lock before consulting Stripe about an expired local attempt."""
 
 
-def website_checkout(session_factory, actor, plan_code, *, config=None, reference=None, new_attempt=False):
+def record_checkout_consent(session, attempt, actor, version):
+    """Both purchaser paths hold the owner's billing lock. Retries keep the first assent."""
+    if version != SUBSCRIPTION_TERMS_VERSION:
+        raise ValueError("Review the subscription terms and agree to automatic renewal to continue.")
+    action = "subscription_terms_accepted"
+    if not session.scalar(select(MembershipAuditEvent.id).where(
+        MembershipAuditEvent.checkout_attempt_id == attempt.id, MembershipAuditEvent.action == action,
+        MembershipAuditEvent.details["version"].as_string() == version,
+    )):
+        session.add(MembershipAuditEvent(checkout_attempt_id=attempt.id, actor_type=actor.kind,
+            actor_id=actor.id, action=action, details={"version": version, "plan_code": attempt.plan_code,
+            "amount_cents": attempt.amount_cents, "currency": attempt.currency, "interval": attempt.interval}))
+
+
+def website_checkout(session_factory, actor, plan_code, *, terms_version=None, config=None, reference=None, new_attempt=False):
     from .stripe_billing import PLAN_ENV
     config = config or BillingConfig.from_environment()
     if plan_code not in PLAN_ENV:
@@ -286,6 +304,7 @@ def website_checkout(session_factory, actor, plan_code, *, config=None, referenc
         else:
             attempt = new_checkout_attempt(session, account, actor, "stripe", PLANS[plan_code], config, at)
 
+        record_checkout_consent(session, attempt, actor, terms_version)
         # An expired local clock alone cannot rule out a successful payment
         # whose webhook is still in transit. Remember confirmed unpaid expiries.
         action = "stripe_unpaid_checkout_expiry_confirmed"
@@ -341,6 +360,32 @@ def start_authorized_checkout(session_factory, config, authorize):
         attempt.provider_checkout_id = result.external_checkout_id
         session.commit()
     return result.url
+
+
+def cancel_website_renewal(session_factory, actor, membership_id):
+    with session_factory() as session:
+        member = owned_membership(session, membership_id, actor)
+        if member.source != "stripe":
+            raise LookupError("Website subscription unavailable.")
+        sub = session.scalar(select(ProviderSubscription).where(
+            ProviderSubscription.membership_id == member.id, ProviderSubscription.provider == "stripe"))
+        if sub is None or not sub.external_customer_id:
+            raise BillingUnavailable("The Stripe subscription could not be matched.")
+        subscription_id, customer_id = sub.external_subscription_id, sub.external_customer_id
+
+    # The update sets a desired state. A retry after a lost response reads Stripe first.
+    provider = enabled_provider("stripe", BillingConfig.from_environment())
+    effective = provider.cancel_subscription(external_subscription_id=subscription_id,
+                                             external_customer_id=customer_id)
+    with session_factory.begin() as session:
+        member = owned_membership(session, membership_id, actor, lock=True)
+        details = {"effective_at": effective.isoformat(), "subscription_id": subscription_id}
+        prior = session.scalar(select(MembershipAuditEvent.id).where(
+            MembershipAuditEvent.membership_id == member.id, MembershipAuditEvent.action == RENEWAL_STOPPED,
+            MembershipAuditEvent.details["effective_at"].as_string() == details["effective_at"]))
+        if prior is None:
+            audit(session, member, actor, RENEWAL_STOPPED, **details)
+    return effective
 
 
 def _facts(event):

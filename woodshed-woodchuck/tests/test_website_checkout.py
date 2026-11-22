@@ -7,6 +7,7 @@ from sqlalchemy import select
 
 from app import billing_providers, memberships, operator_checkout
 from app.age_models import AccountPrivacy
+from app.billing_config import SUBSCRIPTION_TERMS_VERSION
 from app.models import BillingAccount, CheckoutAttempt, Membership, TrustedVerifier
 from tests.test_memberships import client, db, grant, page_csrf
 from tests.test_stripe_billing import adapter, configure, count
@@ -28,7 +29,8 @@ def stripe_http(db, adapter, monkeypatch):
 
 
 def fields(csrf, plan=MONTHLY):
-    return {"csrf": csrf, "as_account": "adult", "plan_code": plan, "provider": "stripe"}
+    return {"csrf": csrf, "as_account": "adult", "plan_code": plan, "provider": "stripe",
+            "terms_version": SUBSCRIPTION_TERMS_VERSION}
 
 
 def checkout(browser, data):
@@ -36,7 +38,7 @@ def checkout(browser, data):
 
 
 def assert_no_offer(page):
-    for text in ("Get Full Access", "/membership/checkout", "checkout.stripe.com", "$7/month", "$49/year", POLICY):
+    for text in ("Continue to Stripe Checkout", "/membership/checkout", "checkout.stripe.com", "$7/month", "$49/year", POLICY):
         assert text not in page.text
 
 

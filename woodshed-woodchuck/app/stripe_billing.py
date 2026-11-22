@@ -38,6 +38,12 @@ def timestamp(value):
     return datetime.fromtimestamp(value, timezone.utc)
 
 
+def hosted_url(checkout):
+    url = urlsplit(checkout.get("url") or "")
+    require(url.scheme == "https" and url.netloc == "checkout.stripe.com")
+    return checkout["url"]
+
+
 @dataclass(frozen=True)
 class StripeSettings:
     secret_key: str = field(repr=False)
@@ -144,9 +150,45 @@ class StripeProvider(DisabledProvider):
             "cancel_url": self.settings.base_url + "/membership",
         }, options={"idempotency_key": idempotency_key})
         require(result.get("livemode") is self.settings.livemode)
-        url = urlsplit(result.get("url") or "")
-        require(url.scheme == "https" and url.hostname == "checkout.stripe.com" and not url.username)
-        return CheckoutResult(result["url"], identifier(result.get("id"), self.settings.checkout_id_prefix))
+        return CheckoutResult(hosted_url(result), identifier(result.get("id"), self.settings.checkout_id_prefix))
+
+    def issued_checkout_url(self, checkout_id, reference, plan_code):
+        """Open only the session the private operator already issued."""
+        self._account()
+        checkout = self._call(self.client.v1.checkout.sessions.retrieve,
+                              identifier(checkout_id, self.settings.checkout_id_prefix))
+        metadata = checkout.get("metadata") or {}
+        require(checkout.get("object") == "checkout.session" and checkout.get("id") == checkout_id
+                and checkout.get("livemode") is self.settings.livemode and checkout.get("mode") == "subscription"
+                and checkout.get("client_reference_id") == reference and metadata.get("woodshed_plan_code") == plan_code
+                and checkout.get("status") == "open" and checkout.get("payment_status") == "unpaid")
+        return hosted_url(checkout)
+
+    def cancel_subscription(self, *, external_subscription_id, external_customer_id):
+        subscription_id = identifier(external_subscription_id, "sub_")
+        customer_id = identifier(external_customer_id, "cus_")
+        self._account()
+
+        def renewal_stop_date(subscription):
+            require(subscription.get("object") == "subscription" and subscription.get("id") == subscription_id
+                    and subscription.get("customer") == customer_id and subscription.get("livemode") is self.settings.livemode)
+            if subscription.get("status") == "canceled":
+                return timestamp(subscription.get("ended_at"))
+            items = subscription.get("items") or {}
+            require(items.get("has_more") is False and len(items.get("data", [])) == 1)
+            end = timestamp(items["data"][0].get("current_period_end"))
+            if subscription.get("cancel_at") is not None:
+                scheduled = timestamp(subscription["cancel_at"])
+                return scheduled if scheduled <= end else None
+            return end if subscription.get("cancel_at_period_end") is True else None
+
+        subscriptions = self.client.v1.subscriptions
+        effective = renewal_stop_date(self._call(subscriptions.retrieve, subscription_id))
+        if effective is None:
+            effective = renewal_stop_date(self._call(subscriptions.update, subscription_id,
+                params={"cancel_at_period_end": True, "proration_behavior": "none"}))
+        require(effective is not None)
+        return effective
 
     def confirm_unpaid_expiry(self, checkout_id, reference, plan_code):
         """Only a definitively expired, unused session can precede a replacement."""

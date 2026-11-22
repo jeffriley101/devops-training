@@ -46,7 +46,7 @@ def test_issue_paid_invoice_and_replay(db, http, plan, days):
             "mode": http.mode, "stripe_account_id": http.account,
             "price_id": "price_month" if days == 31 else "price_year"}
         assert session.get(BillingAccount, attempt.billing_account_id).verifier_id == 1
-    assert operator.issue(db, audit_id) == http.checkout["url"]
+    assert operator.issue(db, audit_id) == f"{operator.StripeSettings.from_environment().base_url}/membership/private/{audit_id}"
     assert count(db, Membership) == count(db, BillingPaymentEffect) == 0
     body, headers = signed(http.paid_event(ref, plan))
     with pytest.raises(ValueError, match="signature"):
@@ -155,7 +155,7 @@ def test_unknown_provider_outcome_reuses_reference_and_expiry(db, http, adapter,
         lost.setattr(provider, "create_checkout", lose_response)
         with pytest.raises(billing.BillingUnavailable):
             operator.issue(db, audit_id)
-    assert operator.issue(db, audit_id) == http.checkout["url"]
+    assert operator.issue(db, audit_id).endswith(f"/membership/private/{audit_id}")
     posts = [call for call in http.calls if call[0].lower() == "post"]
     with db() as session:
         attempt = session.get(CheckoutAttempt, attempt_id)
@@ -216,7 +216,7 @@ def test_concurrent_issuance_uses_one_stripe_idempotency_key(db, http, adapter, 
     monkeypatch.setattr(provider, "create_checkout", issue_together)
     with ThreadPoolExecutor(2) as pool:
         urls = list(pool.map(lambda _: operator.issue(db, audit_id), (1, 2)))
-    assert urls == [http.checkout["url"]] * 2
+    assert len(set(urls)) == 1 and urls[0].endswith(f"/membership/private/{audit_id}")
     posts = [call for call in http.calls if call[0].lower() == "post"]
     with db() as session:
         attempt = session.get(CheckoutAttempt, attempt_id)
@@ -266,6 +266,6 @@ def test_operator_command(db, http, monkeypatch, capsys):
         audit_id = session.scalar(select(MembershipAuditEvent.id))
     assert f"Authorization {audit_id}," in capsys.readouterr().out and not http.calls
     assert operator.main(["issue", "--authorization-id", str(audit_id)]) == 0
-    assert capsys.readouterr().out.strip() == http.checkout["url"]
+    assert capsys.readouterr().out.strip() == f"{operator.StripeSettings.from_environment().base_url}/membership/private/{audit_id}"
     assert operator.main(["issue", "--authorization-id", "0"]) == 1
     assert count(db, BillingProviderEvent) == count(db, Membership) == 0

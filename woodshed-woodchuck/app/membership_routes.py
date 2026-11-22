@@ -10,15 +10,17 @@ from sqlalchemy import select, or_
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from .db import SessionLocal
 from .account_routes import current_profile
+from .age_privacy import AgeScreenRequired
 from .verifier_routes import current_verifier
 from .models import (WoodchuckProfile, TrustedVerifier, BillingAccount, Membership, MembershipSeat,
                      MembershipSeatInvitation, ProviderSubscription, MembershipAuditEvent)
 from . import memberships as service
-from .billing_config import BillingConfig, PLANS
-from .billing_providers import BillingUnavailable, website_checkout, website_purchase_plans, process_webhook
+from .billing_config import BillingConfig, PLANS, SUBSCRIPTION_TERMS_VERSION
+from .billing_providers import (BillingUnavailable, RENEWAL_STOPPED, cancel_website_renewal,
+                                website_checkout, website_purchase_plans, process_webhook)
 from .site_admin import csrf_token, check_csrf, sign_in_site_admin, require_site_admin
 from .login_limits import enforce_login_limit, protection_status
-from . import billing_recovery, billing_reconciliation
+from . import billing_recovery, billing_reconciliation, operator_checkout
 
 
 class PrivateRoute(APIRoute):
@@ -40,10 +42,16 @@ router = APIRouter(route_class=PrivateRoute)
 templates = Jinja2Templates(directory=str(Path(__file__).resolve().parent.parent / "templates"))
 
 
-def identities(request, session):
+def identities(request, session, *, adult_billing=False):
     result = []
-    student = current_profile(request, session)
     adult = current_verifier(request, session)
+    try:
+        student = current_profile(request, session)
+    except AgeScreenRequired:
+        if not adult_billing or adult is None:
+            raise
+        # A separate, age-blocked student session cannot manage or block the adult's billing.
+        student = None
     if student:
         result.append((service.Actor("student", student.id), student.display_name))
     if adult:
@@ -51,8 +59,7 @@ def identities(request, session):
     return result
 
 
-def actor_for(request, session, kind=None):
-    choices = identities(request, session)
+def actor_for(choices, kind=None):
     if not choices:
         raise HTTPException(401, "Student or Verifier sign-in is required.")
     if kind:
@@ -71,7 +78,7 @@ def render(request, template, **context):
         "message": request.session.pop("membership_message", None), **context})
 
 
-def detail(session, membership):
+def detail(session, membership, *, website_billing=False):
     seats = session.execute(select(MembershipSeat, WoodchuckProfile.display_name).join(
         WoodchuckProfile, WoodchuckProfile.id == MembershipSeat.profile_id).where(
         MembershipSeat.membership_id == membership.id, MembershipSeat.removed_at.is_(None)
@@ -84,7 +91,16 @@ def detail(session, membership):
     from .age_privacy import sharing_allowed as eligible
     seats=[({"id":seat.id,"slot_number":seat.slot_number,"profile_id":seat.profile_id if eligible(session,seat.profile_id) else None},
             name if eligible(session,seat.profile_id) else "Private member") for seat,name in seats]
+    manages_renewal = website_billing and membership.source == "stripe"
+    confirmed_end = None
+    if manages_renewal:
+        receipt = session.scalar(select(MembershipAuditEvent).where(
+            MembershipAuditEvent.membership_id == membership.id, MembershipAuditEvent.action == RENEWAL_STOPPED
+        ).order_by(MembershipAuditEvent.id.desc()).limit(1))
+        if receipt:
+            confirmed_end = datetime.fromisoformat(receipt.details["effective_at"])
     return {"membership": membership, "seats": seats, "owner_profile_id": owner_profile_id, "invitations": invitations,
+            "manages_renewal": manages_renewal, "confirmed_end": confirmed_end,
             "active": service.membership_is_active(membership),
             "plan_label": PLANS[membership.plan_code].label if membership.plan_code in PLANS else "Complimentary Full membership"}
 
@@ -96,24 +112,49 @@ def android_app_request(request: Request) -> bool:
 
 
 @router.get("/membership")
+@router.get("/membership/private/{authorization_id:int}")
 def membership_page(request: Request, as_account: str | None = None):
+    private_id = request.path_params.get("authorization_id")
+    website = not android_app_request(request)
+    if private_id is not None and not website:
+        raise HTTPException(403, "Purchasing is unavailable in this app.")
     with SessionLocal() as session:
-        choices = identities(request, session)
+        if private_id is not None:
+            adult = current_verifier(request, session)
+            if adult is None:
+                return render(request, "membership.html", signed_out=True, private_checkout=True)
+            as_account = "adult"
+            choices = [(service.Actor("adult", adult.id), adult.display_name)]
+        else:
+            choices = identities(request, session, adult_billing=website and as_account != "student")
         if not choices:
             return RedirectResponse("/login", status_code=303)
         if len(choices) > 1 and not as_account:
             return render(request, "membership.html", choices=choices, choose_account=True)
-        actor = actor_for(request, session, as_account)
+        actor = actor_for(choices, as_account)
         account = service.billing_account(session, actor)
         memberships = list(session.scalars(select(Membership).where(Membership.billing_account_id == account.id)
                                            .order_by(Membership.created_at.desc()))) if account else []
         full = actor.kind == "student" and service.student_has_full_access(session, actor.id)
         config = BillingConfig.from_environment()
-        plans = [] if android_app_request(request) else website_purchase_plans(session, actor, config=config)
+        if private_id is not None:
+            try:
+                attempt = operator_checkout.issued_attempt(session, actor, private_id, config)
+                plans = [PLANS[attempt.plan_code]]
+            except LookupError as error:
+                raise HTTPException(404, "Private checkout unavailable.") from error
+            except ValueError as error:
+                raise HTTPException(409, "This private checkout is unavailable or has expired.") from error
+        else:
+            plans = website_purchase_plans(session, actor, config=config) if website else []
+        checkout_returned = (private_id is None and website and actor.kind == "adult"
+                             and request.query_params.get("checkout") == "returned")
         return render(request, "membership.html", actor=actor, choices=choices,
-                      full=full, memberships=[detail(session, row) for row in memberships],
+                      full=full, memberships=[detail(session, row, website_billing=website) for row in memberships],
                       connected=service.connected_students(session, actor),
-                      checkout_plans=plans, refund_policy=config.public_subscription_refund_policy)
+                      checkout_plans=plans, terms_version=SUBSCRIPTION_TERMS_VERSION,
+                      checkout_returned=checkout_returned,
+                      checkout_action=f"/membership/private/{private_id}" if private_id is not None else "/membership/checkout")
 
 
 def integer(form, key):
@@ -131,7 +172,7 @@ async def membership_action(request: Request):
     form = await request.form()
     check_csrf(request, form.get("csrf"))
     with SessionLocal() as session:
-        actor = actor_for(request, session, form.get("as_account"))
+        actor = actor_for(identities(request, session), form.get("as_account"))
         try:
             membership_id = integer(form, "membership_id")
             action = form.get("action")
@@ -167,7 +208,7 @@ async def invitation_claim(request: Request, token: str):
     form = await request.form()
     check_csrf(request, form.get("csrf"))
     with SessionLocal() as session:
-        actor = actor_for(request, session, "student")
+        actor = actor_for(identities(request, session), "student")
         try:
             service.claim_invitation(session, token, actor)
             session.commit()
@@ -178,28 +219,63 @@ async def invitation_claim(request: Request, token: str):
 
 
 @router.post("/membership/checkout")
+@router.post("/membership/private/{authorization_id:int}")
 async def membership_checkout(request: Request):
     if android_app_request(request):
         raise HTTPException(403, "Purchasing is unavailable in this app.")
     form = await request.form()
     check_csrf(request, form.get("csrf"))
-    if (set(form) - {"csrf", "as_account", "plan_code", "provider", "checkout_reference", "new_attempt"}
+    private_id = request.path_params.get("authorization_id")
+    allowed = {"csrf", "as_account", "plan_code", "provider", "terms_version"}
+    if private_id is None:
+        allowed.update(("checkout_reference", "new_attempt"))
+    if (set(form) - allowed
             or len(form.multi_items()) != len(form) or any(not isinstance(value, str) for value in form.values())):
         raise HTTPException(400, "Only a plan and provider may be selected.")
+    kind = form.get("as_account")
     with SessionLocal() as session:
-        actor = actor_for(request, session, form.get("as_account"))
+        actor = actor_for(identities(request, session, adult_billing=kind == "adult"), kind)
     if form.get("new_attempt", "false") not in {"true", "false"}:
         raise HTTPException(400, "Invalid checkout selection.")
     if form.get("provider") != "stripe":
         raise HTTPException(503, "Billing provider is unavailable.")
     try:
-        url = await run_in_threadpool(website_checkout, SessionLocal, actor, form.get("plan_code"),
-                                     reference=form.get("checkout_reference"), new_attempt=form.get("new_attempt") == "true")
+        if private_id is not None:
+            url = await run_in_threadpool(operator_checkout.continue_checkout, SessionLocal, actor, private_id,
+                                          form.get("plan_code"), form.get("terms_version"))
+        else:
+            url = await run_in_threadpool(website_checkout, SessionLocal, actor, form.get("plan_code"),
+                                          terms_version=form.get("terms_version"), reference=form.get("checkout_reference"),
+                                          new_attempt=form.get("new_attempt") == "true")
+    except LookupError as error:
+        raise HTTPException(404, "Private checkout unavailable.") from error
     except PermissionError as error:
         raise HTTPException(403, str(error)) from error
     except (BillingUnavailable, ValueError) as error:
         raise HTTPException(503 if isinstance(error, BillingUnavailable) else 400, str(error)) from error
     return RedirectResponse(url, 303)
+
+
+@router.post("/membership/{membership_id:int}/cancel-renewal")
+async def cancel_renewal(request: Request, membership_id: int):
+    if android_app_request(request):
+        raise HTTPException(403, "Website billing is unavailable in this app.")
+    form = await request.form()
+    check_csrf(request, form.get("csrf"))
+    if set(form) != {"csrf", "as_account"} or len(form.multi_items()) != 2:
+        raise HTTPException(400, "Invalid cancellation request.")
+    kind = form.get("as_account")
+    with SessionLocal() as session:
+        actor = actor_for(identities(request, session, adult_billing=kind == "adult"), kind)
+    try:
+        await run_in_threadpool(cancel_website_renewal, SessionLocal, actor, membership_id)
+        request.session["membership_message"] = "Stripe confirmed your cancellation. See the effective date below."
+    except LookupError as error:
+        raise HTTPException(404, "Website subscription unavailable.") from error
+    except (ValueError, SQLAlchemyError):
+        request.session["membership_message"] = (
+            "We could not confirm cancellation. Please retry or contact support@woodshedwoodchuck.com for help.")
+    return RedirectResponse(f"/membership?as_account={actor.kind}", 303)
 
 
 @router.post("/membership/webhooks/{provider}")

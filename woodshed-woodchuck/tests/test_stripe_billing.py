@@ -46,8 +46,12 @@ class StripeHTTP(stripe.HTTPClient):
         } for code, price_id in SETTINGS.prices.items()}
         self.checkout = {"object": "checkout.session", "id": f"cs_{mode}_woodshed", "livemode": self.livemode,
                          "mode": "subscription", "url": f"https://checkout.stripe.com/c/pay/cs_{mode}_woodshed",
+                         "status": "open", "payment_status": "unpaid",
                          "subscription": "sub_woodshed", "customer": "cus_woodshed",
                          "payment_method_types": ["card"], "invoice": "in_first"}
+        self.subscription = {"object": "subscription", "id": "sub_woodshed", "customer": "cus_woodshed",
+                             "livemode": self.livemode, "status": "active", "cancel_at_period_end": False,
+                             "cancel_at": None, "items": {"data": [], "has_more": False}}
         self.invoice = None
         self.intent = {"id": "pi_first", "object": "payment_intent", "livemode": self.livemode,
                        "status": "succeeded", "customer": "cus_woodshed", "currency": "usd",
@@ -77,6 +81,12 @@ class StripeHTTP(stripe.HTTPClient):
             result = {"object": "list", "data": [self.checkout], "has_more": False}
         elif path.startswith("/v1/checkout/sessions/"):
             result = self.checkout
+        elif path == "/v1/subscriptions/sub_woodshed":
+            if method.lower() == "post":
+                assert params == {"cancel_at_period_end": ["true"], "proration_behavior": ["none"]}
+                self.subscription["cancel_at_period_end"] = True
+                self.subscription["cancel_at"] = self.subscription["items"]["data"][0]["current_period_end"]
+            result = self.subscription
         elif path.startswith("/v1/events/"):
             result = self.events[path.rsplit("/", 1)[1]]
         elif path == "/v1/invoice_payments":
@@ -94,9 +104,12 @@ class StripeHTTP(stripe.HTTPClient):
 
     def paid_event(self, reference, code="full_monthly_7", *, event_id="evt_first", renewal=False):
         plan = PLANS[code]
-        start = NOW + timedelta(days=31 if renewal else 0)
-        end = start + timedelta(days=31 if plan.interval == "month" else 365)
-        self.checkout.update(client_reference_id=reference, metadata={"woodshed_plan_code": code})
+        term = timedelta(days=31 if plan.interval == "month" else 365)
+        start = NOW + term if renewal else NOW
+        end = start + term
+        self.subscription["items"]["data"] = [{"current_period_end": int(end.timestamp())}]
+        self.checkout.update(client_reference_id=reference, metadata={"woodshed_plan_code": code},
+                             status="complete", payment_status="paid")
         self.intent["amount_received"] = plan.amount_cents
         self.intent["id"] = "pi_renewal" if renewal else "pi_first"
         self.invoice = {
@@ -584,11 +597,12 @@ def test_website_checkout_and_signed_paid_invoice(db, adapter, monkeypatch, code
                  'name="provider" value="stripe"', 'name="plan_code" value="full_monthly_7"',
                  'name="plan_code" value="full_annual_49"', "USD", "$7/month", "$49/year",
                  "renews automatically", "cancel", "mailto:support@woodshedwoodchuck.com",
-                 policy, "Get Full Access"):
+                 "Woodshed Practice Promise", "Continue to Stripe Checkout"):
         assert part in page.text
+    assert policy not in page.text
     assert f'name="csrf" value="{page.context["csrf"]}"' in page.text
     assert "friendship_annual_30" not in page.text and "$30" not in page.text
-    data = {"as_account": "adult", "provider": "stripe", "plan_code": code}
+    data = {"as_account": "adult", "provider": "stripe", "plan_code": code, "terms_version": page.context["terms_version"]}
     assert c.post("/membership/checkout", data=data).status_code == 403
     data["csrf"] = page.context["csrf"]
     response = c.post("/membership/checkout", data=data, follow_redirects=False)
@@ -599,7 +613,7 @@ def test_website_checkout_and_signed_paid_invoice(db, adapter, monkeypatch, code
         returned = c.get("/membership?" + query)
         assert returned.status_code == 200
         if query == "checkout=returned":
-            assert "Refresh membership" in returned.text and "Get Full Access" not in returned.text
+            assert "Refresh membership" in returned.text and "Continue to Stripe Checkout" not in returned.text
         assert count(db, Membership) == count(db, BillingPaymentEffect) == 0
     with db() as session:
         attempt = session.scalars(select(CheckoutAttempt)).one()
@@ -610,7 +624,7 @@ def test_website_checkout_and_signed_paid_invoice(db, adapter, monkeypatch, code
     assert c.post(webhook, content=body, headers=headers).json()["duplicate"] is True
     assert count(db, Membership) == count(db, BillingPaymentEffect) == 1
     management = c.get("/membership")
-    assert "Manage membership" in management.text and "Get Full Access" not in management.text
+    assert "Manage membership" in management.text and "Continue to Stripe Checkout" not in management.text
     assert 400 <= c.post("/membership/checkout", data=data, follow_redirects=False).status_code < 500
     assert len([call for call in http.calls if call[0].lower() == "post"]) == 1
 

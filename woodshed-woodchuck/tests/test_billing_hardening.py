@@ -214,7 +214,9 @@ def test_checkout_route_no_csrf_transport_and_no_open_transaction(db, monkeypatc
     monkeypatch.setenv("PUBLIC_SUBSCRIPTION_REFUND_POLICY", "Refund conditions from the test fixture.")
     user = client("adult")
     csrf = page_csrf(user)
-    fields = {"csrf": csrf, "provider": "stripe", "plan_code": "full_monthly_7"}
+    from app.billing_config import SUBSCRIPTION_TERMS_VERSION
+    fields = {"csrf": csrf, "provider": "stripe", "plan_code": "full_monthly_7",
+              "terms_version": SUBSCRIPTION_TERMS_VERSION}
     assert user.post("/membership/checkout", data=fields, follow_redirects=False).status_code == 303
     assert user.post("/membership/checkout", data=fields, follow_redirects=False).status_code == 303
     assert fake.checkouts[0]["idempotency_key"] == fake.checkouts[1]["idempotency_key"]

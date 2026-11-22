@@ -4,6 +4,8 @@ import os
 from types import MappingProxyType
 
 DEFAULT_CHECKOUT_VALIDITY_SECONDS = 60 * 60
+# Update alongside material changes to the agreement in templates/membership.html.
+SUBSCRIPTION_TERMS_VERSION = "2026-11-22"
 
 
 @dataclass(frozen=True)

@@ -7,6 +7,7 @@ import pytest
 from sqlalchemy import select
 
 from app import billing_providers as billing
+from app.billing_config import SUBSCRIPTION_TERMS_VERSION
 from app.memberships import Actor
 from app.models import CheckoutAttempt
 from tests.test_billing_replacement import db, sqlite_db
@@ -40,7 +41,7 @@ def test_simultaneous_plans_open_only_one_checkout(db, website):
     def buy(plan):
         start.wait(timeout=10)
         try:
-            return billing.website_checkout(db, Actor("adult", 1), plan)
+            return billing.website_checkout(db, Actor("adult", 1), plan, terms_version=SUBSCRIPTION_TERMS_VERSION)
         except ValueError as error:
             assert "already in progress" in str(error)
             return None
@@ -64,8 +65,8 @@ def test_lost_checkout_response_retries_same_reservation(db, website, monkeypatc
     with monkeypatch.context() as lost:
         lost.setattr(provider, "create_checkout", lose_response)
         with pytest.raises(billing.BillingUnavailable, match="Response lost"):
-            billing.website_checkout(db, adult, "full_monthly_7")
-    assert billing.website_checkout(db, adult, "full_monthly_7") == http.checkout["url"]
+            billing.website_checkout(db, adult, "full_monthly_7", terms_version=SUBSCRIPTION_TERMS_VERSION)
+    assert billing.website_checkout(db, adult, "full_monthly_7", terms_version=SUBSCRIPTION_TERMS_VERSION) == http.checkout["url"]
     creates = [call for call in http.calls if call[0].lower() == "post"]
     with db() as session:
         attempt = session.scalars(select(CheckoutAttempt)).one()
@@ -78,19 +79,19 @@ def test_lost_checkout_response_retries_same_reservation(db, website, monkeypatc
 def test_unpaid_expiry_must_match_owner_reference_before_replacement(db, website, monkeypatch):
     _, http = website
     adult = Actor("adult", 1)
-    billing.website_checkout(db, adult, "full_monthly_7")
+    billing.website_checkout(db, adult, "full_monthly_7", terms_version=SUBSCRIPTION_TERMS_VERSION)
     with db() as session:
         reference = session.scalar(select(CheckoutAttempt.reference))
     monkeypatch.setattr(billing, "clock", lambda: NOW + timedelta(hours=2))
     http.checkout.update(status="expired", payment_status="unpaid", subscription=None,
                          invoice=None, client_reference_id="another-owner-reference")
     with pytest.raises(ValueError, match="needs confirmation"):
-        billing.website_checkout(db, adult, "full_annual_49")
+        billing.website_checkout(db, adult, "full_annual_49", terms_version=SUBSCRIPTION_TERMS_VERSION)
     assert count(db, CheckoutAttempt) == 1
     http.checkout["client_reference_id"] = reference
-    billing.website_checkout(db, adult, "full_annual_49")
+    billing.website_checkout(db, adult, "full_annual_49", terms_version=SUBSCRIPTION_TERMS_VERSION)
     reads = len([call for call in http.calls if call[1].startswith("/v1/checkout/sessions/")])
     assert reads == 2
-    billing.website_checkout(db, adult, "full_annual_49")
+    billing.website_checkout(db, adult, "full_annual_49", terms_version=SUBSCRIPTION_TERMS_VERSION)
     assert len([call for call in http.calls if call[1].startswith("/v1/checkout/sessions/")]) == reads
     assert count(db, CheckoutAttempt) == 2

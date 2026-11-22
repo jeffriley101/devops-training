@@ -4,6 +4,18 @@
 <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="as_account" value="{{ actor.kind }}">
 <input type="hidden" name="membership_id" value="{{ member.id }}"><input type="hidden" name="action" value="{{ action }}">
 {% endmacro %}
+{% macro refund_terms() %}
+<p><strong>Monthly refunds.</strong> Monthly subscriptions have no voluntary satisfaction refunds. The under-13 exception and refunds required by law apply.</p>
+<p><strong>Woodshed Practice Promise.</strong> For your initial annual purchase only, you may request a full refund within 14 days of purchase if the subscription is unused. If used, you may request a full refund within 30 days of purchase when you complete all three requirements during those first 30 days.</p>
+<ul>
+  <li>Submit 3 distinct Practice Charts (P-Charts).</li>
+  <li>Record 20 total minutes of instrumental practice.</li>
+  <li>Complete 1 Bonus Challenge.</li>
+</ul>
+<p>The Practice Promise never resets at annual renewal. Practice on a free account before purchase does not disqualify you.</p>
+<p><strong>Under-13 subscriptions.</strong> The purchasing parent or guardian may request an unconditional full refund of the current paid monthly or annual term anytime during that term. No practice or explanation is required. Earlier terms are not automatically refundable.</p>
+<p>Refunds required by law remain available. To request a refund or get billing help, email <a href="mailto:support@woodshedwoodchuck.com">support@woodshedwoodchuck.com</a>. Cancellation and refund requests are separate.</p>
+{% endmacro %}
 {% block content %}
 {% set account_name %}{% if not signed_out and not choose_account %}{% for choice, name in choices if choice.kind == actor.kind %}{{ name }}{% endfor %}{% endif %}{% endset %}
 {% call dashboard_header('Access', 'Membership', account_name) %}
@@ -12,7 +24,9 @@
     {% if choices|length > 1 %}<a href="/membership">Switch account</a>{% endif %}
   {% endif %}
 {% endcall %}
-{% if signed_out %}
+{% if signed_out and private_checkout %}
+<section class="card"><p><a href="/trusted-verifiers/login">Sign in to your purchasing adult account</a>, then reopen your private checkout link to review your plan.</p></section>
+{% elif signed_out %}
 <section class="card"><p>Sign in to view your membership.</p><a href="/login">Student sign-in</a> · <a href="/trusted-verifiers/login">Verifier / Band Director sign-in</a></section>
 {% elif choose_account %}
 <section class="card"><h2>Which account would you like to use?</h2>
@@ -25,10 +39,23 @@
 <p>Your Practice Book, raw history, current-week totals, streak, and core practice tools remain available with Open Access.</p>
 </section>{% endif %}
 {% for item in memberships %}{% set member = item.membership %}
-<section class="card"><h2>Manage membership</h2><p>{{ item.plan_label }} · {{ member.status|title }}</p>
+{% set status = member.status|title %}
+{% if item.manages_renewal and member.status == 'active' %}{% set status = 'Paid access active' if item.active else 'Paid access inactive' %}{% endif %}
+<section class="card"><h2>Manage membership</h2><p>{{ item.plan_label }} · {{ status }}</p>
 {% if not item.active %}<p>This membership is not currently providing Full Access.</p>{% endif %}
 {% if member.source == 'stripe' and member.revoked_at %}<p>Paid access ended {{ member.revoked_at.strftime('%b %d, %Y') }} (UTC)</p>
 {% elif member.access_until %}<p>Access until {{ member.access_until.strftime('%b %d, %Y') }} (UTC)</p>{% endif %}
+{% if item.manages_renewal %}
+<h3>Automatic renewal</h3>
+{% if item.confirmed_end %}<p>Stripe confirmed cancellation effective {{ item.confirmed_end.strftime('%b %d, %Y at %H:%M UTC') }}.</p>{% endif %}
+<p>You can cancel future renewals anytime without a reason. Ordinary cancellation keeps Full Access through your paid period.</p>
+<form method="post" action="/membership/{{ member.id }}/cancel-renewal">
+  <input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="as_account" value="{{ actor.kind }}">
+  <button class="btn btn-secondary" type="submit">{{ 'Reconfirm cancellation' if item.confirmed_end else 'Cancel automatic renewal' }}</button>
+</form>
+<p><a href="mailto:support@woodshedwoodchuck.com?subject=Membership%20refund%20request">Request a refund</a> or email <a href="mailto:support@woodshedwoodchuck.com">support@woodshedwoodchuck.com</a> for assistance.</p>
+<details><summary>Refund policy and Woodshed Practice Promise</summary>{{ refund_terms() }}</details>
+{% endif %}
 <h3>Members: {{ item.seats|length }} of 5</h3>
 {% for seat, name in item.seats %}<div class="membership-line"><span>{{ name }}{% if actor.kind == 'student' and actor.id == item.owner_profile_id and seat.profile_id == actor.id %} — You{% endif %}</span>
 {% if not (actor.kind == 'student' and actor.id == item.owner_profile_id and seat.profile_id == actor.id) %}<form method="post" action="/membership/actions">{{ fields(member, 'remove') }}<input type="hidden" name="seat_id" value="{{ seat.id }}"><button class="btn btn-secondary">Remove</button></form>{% endif %}</div>{% endfor %}
@@ -37,15 +64,17 @@
 <label for="woodchuck-id-{{ member.id }}">Woodchuck ID</label><input id="woodchuck-id-{{ member.id }}" type="text" name="woodchuck_id" maxlength="32" required autocomplete="off">
 <button class="btn btn-primary">Add student</button></form>{% endif %}
 </section>{% endfor %}
-{% if checkout_plans and request.query_params.get('checkout') == 'returned' %}
+{% if checkout_returned %}
 <section class="card">
   <p>If you completed payment, your membership will appear here after confirmation.</p>
   <a href="/membership?as_account=adult">Refresh membership</a>
+  <p>If your paid subscription is missing or you need help stopping renewal, email <a href="mailto:support@woodshedwoodchuck.com">support@woodshedwoodchuck.com</a>.</p>
 </section>
 {% elif checkout_plans %}
 <section class="card membership-purchase" aria-labelledby="purchase-heading">
   <h2 id="purchase-heading">Full Access for up to five students</h2>
-  <form method="post" action="/membership/checkout">
+  <p>You can create a free account. Paid subscriptions are purchased separately. Your first payment is due when you subscribe.</p>
+  <form method="post" action="{{ checkout_action }}">
     <input type="hidden" name="csrf" value="{{ csrf }}">
     <input type="hidden" name="as_account" value="{{ actor.kind }}">
     <input type="hidden" name="provider" value="stripe">
@@ -53,15 +82,14 @@
       <legend>Choose a plan (USD)</legend>
       <div class="membership-plan-options">
         {% for plan in checkout_plans %}
-        <label><input type="radio" name="plan_code" value="{{ plan.code }}" required{% if loop.first %} checked{% endif %}> {{ plan.label }}</label>
+        <label><input type="radio" name="plan_code" value="{{ plan.code }}" required{% if checkout_plans|length == 1 %} checked{% endif %}> {{ plan.label }}</label>
         {% endfor %}
       </div>
     </fieldset>
-    <p>Your subscription renews automatically at the selected price and interval until canceled.
-      To stop renewal, email <a href="mailto:support@woodshedwoodchuck.com">Woodshed Support</a>.
-      You keep Full Access through the paid period when you cancel renewal.</p>
-    <p><strong>Refund policy</strong> · {{ refund_policy }}</p>
-    <button class="btn btn-primary" type="submit">Get Full Access</button>
+    <p>Your subscription renews automatically at the selected price and interval until canceled. To stop future charges anytime without a reason, sign in on the website, open Membership and select <strong>Cancel automatic renewal</strong>. You keep Full Access through your paid period.</p>
+    {{ refund_terms() }}
+    <label><input type="checkbox" name="terms_version" value="{{ terms_version }}" required> I agree to pay the selected USD price now and at each automatic renewal until I cancel, under the refund terms above.</label>
+    <button class="btn btn-primary" type="submit">Continue to Stripe Checkout</button>
   </form>
 </section>
 {% elif not memberships %}
