@@ -136,7 +136,7 @@ def classify(session, request, evidence, target):
                 (evidence.plan_code, evidence.amount_cents, evidence.currency, evidence.interval) !=
                 (price.plan_code, price.amount_cents, price.currency, price.interval)):
             return Decision("reconciliation_required")
-    if member and (member.status != "active" or member.revoked_at):
+    if member and (member.status != "active" or member.revoked_at) and event.stripe_termination is None:
         return Decision("financial_decision_required" if event.paid_through else "reconciliation_required")
     if sub and event.paid_through:
         effect = session.scalar(select(BillingPaymentEffect).where(BillingPaymentEffect.subscription_id == sub.id,

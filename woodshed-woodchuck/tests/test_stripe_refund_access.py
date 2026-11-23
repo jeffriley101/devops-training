@@ -160,7 +160,7 @@ def test_cancellation_or_refund_notifications_leave_paid_period_intact(db, http,
     member_id, _, _ = paid
     with db.begin() as session:
         m.add_seat(session, member_id, 1, ADMIN)
-    for event_type in ("customer.subscription.deleted", "customer.subscription.updated", "charge.refunded", "refund.updated"):
+    for event_type in ("customer.subscription.updated", "charge.refunded", "refund.updated"):
         notice = {"id": "evt_notice", "object": "event", "type": event_type, "livemode": http.livemode}
         assert billing.process_webhook(db, "stripe", *signed(notice)) == (None, False)
     with db() as session:

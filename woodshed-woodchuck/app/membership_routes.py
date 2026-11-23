@@ -13,7 +13,7 @@ from .account_routes import current_profile
 from .age_privacy import AgeScreenRequired
 from .verifier_routes import current_verifier
 from .models import (WoodchuckProfile, TrustedVerifier, BillingAccount, Membership, MembershipSeat,
-                     MembershipSeatInvitation, ProviderSubscription, MembershipAuditEvent)
+                     MembershipSeatInvitation, ProviderSubscription, MembershipAuditEvent, CheckoutAttempt)
 from . import memberships as service
 from .billing_config import BillingConfig, PLANS, SUBSCRIPTION_TERMS_VERSION
 from .billing_providers import (BillingUnavailable, RENEWAL_STOPPED, cancel_website_renewal,
@@ -353,11 +353,16 @@ def admin_page(request: Request, q: str = "", membership_id: int | None = None):
                 billing = service.billing_account(session, service.Actor(kind, owner.id))
                 found_memberships[(kind, owner.id)] = list(session.scalars(select(Membership.id).where(
                     Membership.billing_account_id == billing.id))) if billing else []
+        subscription = session.scalar(select(ProviderSubscription).where(
+            ProviderSubscription.membership_id == selected.id)) if selected else None
+        stripe_checkout_id = session.scalar(select(CheckoutAttempt.id).where(
+            CheckoutAttempt.subscription_id == subscription.id, CheckoutAttempt.provider == "stripe",
+            CheckoutAttempt.status == "completed")) if subscription and subscription.provider == "stripe" else None
         return render(request, "membership_admin.html", q=q, students=students, adults=adults, rows=rows,
             found_memberships=found_memberships,
             selected=detail(session, selected) if selected else None,
             account=session.get(BillingAccount, selected.billing_account_id) if selected else None,
-            subscription=session.scalar(select(ProviderSubscription).where(ProviderSubscription.membership_id == selected.id)) if selected else None,
+            subscription=subscription, stripe_checkout_id=stripe_checkout_id,
             history=session.scalars(select(MembershipAuditEvent).where(MembershipAuditEvent.membership_id == selected.id)
                 .order_by(MembershipAuditEvent.id.desc()).limit(50)).all() if selected else [])
 

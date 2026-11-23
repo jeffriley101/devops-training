@@ -1,11 +1,12 @@
-"""Small Checkout/invoice adapter. No transport inside DB transactions.
+"""Stripe Checkout, paid invoice and final subscription lifecycle evidence.
 
 Checkout creates its Customer. Existing columns retain cs_/cus_/sub_/in_ IDs;
 the existing verified-facts JSON retains Price and PaymentIntent correlation.
-Only paid subscription invoices grant access. No lifecycle is inferred from them.
+Only paid subscription invoices grant access. Final cancellation is recorded separately.
 """
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from hashlib import sha256
 import os
 from urllib.parse import urlsplit
 
@@ -35,7 +36,10 @@ def identifier(value, prefix):
 
 def timestamp(value):
     require(type(value) is int and value > 0)
-    return datetime.fromtimestamp(value, timezone.utc)
+    try:
+        return datetime.fromtimestamp(value, timezone.utc)
+    except (OverflowError, OSError):
+        raise ValueError("Invalid Stripe timestamp.") from None
 
 
 def hosted_url(checkout):
@@ -205,9 +209,19 @@ class StripeProvider(DisabledProvider):
     def _event(self, event):
         require(event.get("livemode") is self.settings.livemode and not event.get("account")
                 and event.get("api_version") == API_VERSION)
+        if event.get("type") == "customer.subscription.deleted":
+            data = event.get("data")
+            require(isinstance(data, dict))
+            return self._termination(data.get("object"), identifier(event.get("id"), "evt_"),
+                                     timestamp(event.get("created")))
         if event.get("type") != "invoice.paid":
             return None
         return self._invoice(event["data"]["object"], identifier(event.get("id"), "evt_"))
+
+    def _retrieve_event(self, event_id, expected_type=None):
+        canonical = self._call(self.client.v1.events.retrieve, identifier(event_id, "evt_"))
+        require(canonical.get("id") == event_id and (expected_type is None or canonical.get("type") == expected_type))
+        return self._event(canonical)
 
     def verify_and_parse_webhook(self, body, headers):
         try:
@@ -217,14 +231,52 @@ class StripeProvider(DisabledProvider):
             raise ValueError("Invalid Stripe webhook signature or payload.") from None
         event = event.to_dict()
         require(event.get("livemode") is self.settings.livemode and not event.get("account"))
-        if event.get("type") != "invoice.paid":
+        if event.get("type") not in ("invoice.paid", "customer.subscription.deleted"):
             return None
         self._account()
         # Direct-account webhooks lack an account ID. Retrieval with the verified
         # account's configured key binds the event to that account (no Connect support).
-        canonical = self._call(self.client.v1.events.retrieve, identifier(event.get("id"), "evt_"))
-        require(canonical.get("id") == event.get("id"))
-        return self._event(canonical)
+        return self._retrieve_event(event.get("id"), event["type"])
+
+    def _checkout_id(self, subscription, customer, reference, plan_code):
+        sessions = self._call(self.client.v1.checkout.sessions.list, params={"subscription": subscription, "limit": 2})
+        data = sessions.get("data")
+        require(sessions.get("has_more") is False and isinstance(data, list) and len(data) == 1)
+        checkout = data[0]
+        require(isinstance(checkout, dict) and checkout.get("object") == "checkout.session"
+                and checkout.get("livemode") is self.settings.livemode and checkout.get("mode") == "subscription"
+                and checkout.get("subscription") == subscription and checkout.get("customer") == customer
+                and checkout.get("client_reference_id") == reference and isinstance(checkout.get("metadata"), dict)
+                and checkout["metadata"].get("woodshed_plan_code") == plan_code
+                and checkout.get("payment_method_types") == ["card"])
+        return identifier(checkout.get("id"), self.settings.checkout_id_prefix)
+
+    def _termination(self, subscription, event_id, observed_at):
+        """An ended subscription supplies lifecycle evidence only, including on replay."""
+        require(isinstance(subscription, dict) and subscription.get("object") == "subscription"
+                and subscription.get("livemode") is self.settings.livemode and subscription.get("status") == "canceled")
+        sub_id = identifier(subscription.get("id"), "sub_")
+        customer = identifier(subscription.get("customer"), "cus_")
+        # A period-end request can set canceled_at while the subscription is
+        # still active. ended_at dates the completed cancellation.
+        ended_at = timestamp(subscription.get("ended_at"))
+        require(ended_at <= observed_at)
+        items = subscription.get("items")
+        require(isinstance(items, dict) and items.get("has_more") is False and isinstance(items.get("data"), list)
+                and len(items["data"]) == 1 and isinstance(items["data"][0], dict))
+        item = items["data"][0]
+        start, end = timestamp(item.get("current_period_start")), timestamp(item.get("current_period_end"))
+        require(start < end and start <= ended_at)
+        metadata = subscription.get("metadata")
+        require(isinstance(metadata, dict))
+        reference = metadata.get("woodshed_checkout_reference")
+        code = metadata.get("woodshed_plan_code")
+        require(isinstance(reference, str) and 1 <= len(reference) <= 64 and isinstance(code, str) and code in PLAN_ENV)
+        checkout_id = self._checkout_id(sub_id, customer, reference, code)
+        return SubscriptionEvent(external_event_id=event_id, external_subscription_id=sub_id,
+            occurred_at=ended_at, provider_status="canceled", period_start=start, period_end=end,
+            terminal=True, checkout_reference=reference, stripe_termination={
+                "account_id": self.settings.account_id, "customer_id": customer, "checkout_id": checkout_id, "plan_code": code})
 
     def _invoice(self, invoice, event_id):
         """Normalize immutable paid-invoice facts, never today's subscription state."""
@@ -258,16 +310,7 @@ class StripeProvider(DisabledProvider):
                 and line.get("amount") == plan.amount_cents
                 and all(invoice.get(key) == plan.amount_cents for key in ("amount_paid", "amount_due", "total"))
                 and invoice.get("amount_remaining") == 0)
-        sessions = self._call(self.client.v1.checkout.sessions.list,
-                              params={"subscription": subscription, "limit": 2})
-        require(not sessions.get("has_more") and len(sessions.get("data", [])) == 1)
-        checkout = sessions["data"][0]
-        require(checkout.get("livemode") is self.settings.livemode and checkout.get("mode") == "subscription"
-                and checkout.get("subscription") == subscription and checkout.get("customer") == customer
-                and checkout.get("client_reference_id") == reference
-                and (checkout.get("metadata") or {}).get("woodshed_plan_code") == plan.code
-                and checkout.get("payment_method_types") == ["card"])
-        checkout_id = identifier(checkout.get("id"), self.settings.checkout_id_prefix)
+        checkout_id = self._checkout_id(subscription, customer, reference, plan.code)
         # invoice.paid also covers out-of-band settlement. Require an actual,
         # fully successful card PaymentIntent linked through InvoicePayment.
         payments = self._call(self.client.v1.invoice_payments.list,
@@ -303,8 +346,19 @@ class StripeProvider(DisabledProvider):
         self._account()
         require(request.provider == "stripe")
         if request.external_event_id and request.external_event_id.startswith("evt_"):
-            event = self._event(self._call(self.client.v1.events.retrieve, request.external_event_id))
-        elif request.provider_checkout_id:
+            return self._evidence(request, self._retrieve_event(request.external_event_id))
+        if request.external_subscription_id:
+            sub_id = identifier(request.external_subscription_id, "sub_")
+            lookup_id = "stripe_subscription_ended_" + sha256(sub_id.encode()).hexdigest()
+            if request.external_event_id in (None, lookup_id):
+                sub = self._call(self.client.v1.subscriptions.retrieve, sub_id)
+                require(sub.get("object") == "subscription" and sub.get("id") == sub_id
+                        and sub.get("livemode") is self.settings.livemode)
+                if sub.get("status") == "canceled":
+                    return self._evidence(request, self._termination(sub, lookup_id, datetime.now(timezone.utc)))
+                if request.external_event_id == lookup_id:
+                    return self._evidence(request, None)
+        if request.provider_checkout_id:
             checkout_id = identifier(request.provider_checkout_id, self.settings.checkout_id_prefix)
             checkout = self._call(self.client.v1.checkout.sessions.retrieve, checkout_id)
             require(checkout.get("livemode") is self.settings.livemode
@@ -315,14 +369,15 @@ class StripeProvider(DisabledProvider):
             invoice = self._call(self.client.v1.invoices.retrieve, identifier(checkout["invoice"], "in_"))
             # Stable synthetic receipt for operator recovery of an undelivered
             # first invoice. Invoice ID deduplication also covers later webhooks.
-            event = self._invoice(invoice, "stripe_invoice_paid_" + invoice["id"])
-        else:
-            return ProviderEvidence(request, datetime.now(timezone.utc), "unsupported")
+            return self._evidence(request, self._invoice(invoice, "stripe_invoice_paid_" + invoice["id"]))
+        return self._evidence(request, None)
+
+    def _evidence(self, request, event):
         if event is None:
             return ProviderEvidence(request, datetime.now(timezone.utc), "unsupported")
-        facts = event.stripe_invoice
+        facts = event.stripe_invoice or event.stripe_termination
         return ProviderEvidence(request, datetime.now(timezone.utc), "found",
             external_subscription_id=event.external_subscription_id, checkout_reference=event.checkout_reference,
             provider_checkout_id=facts["checkout_id"], event=event,
-            plan_code=facts["plan_code"], amount_cents=facts["amount_cents"],
-            currency=facts["currency"], interval=facts["interval"])
+            plan_code=facts["plan_code"], amount_cents=facts.get("amount_cents"),
+            currency=facts.get("currency"), interval=facts.get("interval"))

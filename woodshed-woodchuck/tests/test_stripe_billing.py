@@ -77,11 +77,11 @@ class StripeHTTP(stripe.HTTPClient):
                                          ("woodshed_checkout_reference", "woodshed_plan_code")}
             result = self.checkout
         elif path == "/v1/checkout/sessions":
-            assert params["subscription"] == ["sub_woodshed"]
+            assert params["subscription"] == [self.subscription["id"]]
             result = {"object": "list", "data": [self.checkout], "has_more": False}
         elif path.startswith("/v1/checkout/sessions/"):
             result = self.checkout
-        elif path == "/v1/subscriptions/sub_woodshed":
+        elif path == f"/v1/subscriptions/{self.subscription['id']}":
             if method.lower() == "post":
                 assert params == {"cancel_at_period_end": ["true"], "proration_behavior": ["none"]}
                 self.subscription["cancel_at_period_end"] = True
@@ -102,36 +102,49 @@ class StripeHTTP(stripe.HTTPClient):
             raise AssertionError(f"Unexpected Stripe request: {method} {path}")
         return json.dumps(result), 200, {}
 
-    def paid_event(self, reference, code="full_monthly_7", *, event_id="evt_first", renewal=False):
+    def paid_event(self, reference, code="full_monthly_7", *, event_id="evt_first", renewal=False,
+                   purchased_at=NOW, invoice_id=None, intent_id=None):
         plan = PLANS[code]
         term = timedelta(days=31 if plan.interval == "month" else 365)
-        start = NOW + term if renewal else NOW
+        start = purchased_at + term if renewal else purchased_at
         end = start + term
-        self.subscription["items"]["data"] = [{"current_period_end": int(end.timestamp())}]
+        subscription_id = self.subscription["id"]
+        self.subscription["metadata"] = {"woodshed_checkout_reference": reference, "woodshed_plan_code": code}
+        self.subscription["items"]["data"] = [{"current_period_start": int(start.timestamp()),
+                                               "current_period_end": int(end.timestamp())}]
         self.checkout.update(client_reference_id=reference, metadata={"woodshed_plan_code": code},
                              status="complete", payment_status="paid")
         self.intent["amount_received"] = plan.amount_cents
-        self.intent["id"] = "pi_renewal" if renewal else "pi_first"
+        self.intent["id"] = intent_id or ("pi_renewal" if renewal else "pi_first")
         self.invoice = {
-            "id": "in_renewal" if renewal else "in_first", "object": "invoice", "livemode": self.livemode,
+            "id": invoice_id or ("in_renewal" if renewal else "in_first"), "object": "invoice", "livemode": self.livemode,
             "status": "paid", "collection_method": "charge_automatically", "customer": "cus_woodshed",
             "billing_reason": "subscription_cycle" if renewal else "subscription_create",
             "currency": "usd", "amount_paid": plan.amount_cents, "amount_due": plan.amount_cents,
             "total": plan.amount_cents, "amount_remaining": 0, "automatic_tax": {"enabled": False},
             "status_transitions": {"paid_at": int(start.timestamp())},
             "parent": {"type": "subscription_details", "subscription_details": {
-                "subscription": "sub_woodshed", "metadata": {
+                "subscription": subscription_id, "metadata": {
                     "woodshed_checkout_reference": reference, "woodshed_plan_code": code}}},
             "lines": {"has_more": False, "data": [{
                 "id": "il_first", "object": "line_item", "quantity": 1, "amount": plan.amount_cents,
                 "currency": "usd", "period": {"start": int(start.timestamp()), "end": int(end.timestamp())},
-                "parent": {"subscription_item_details": {"subscription": "sub_woodshed", "proration": False}},
+                "parent": {"subscription_item_details": {"subscription": subscription_id, "proration": False}},
                 "pricing": {"price_details": {"price": SETTINGS.prices[code]}},
             }]},
         }
         event = {"id": event_id, "object": "event", "type": "invoice.paid", "api_version": API_VERSION,
                  "livemode": self.livemode, "created": int(start.timestamp()), "data": {"object": deepcopy(self.invoice)}}
         self.events[event_id] = event
+        return event
+
+    def ended_event(self, ended_at, *, event_id="evt_ended"):
+        self.subscription.update(status="canceled", ended_at=int(ended_at.timestamp()),
+                                 cancel_at_period_end=False, cancel_at=None)
+        event = {"id": event_id, "object": "event", "type": "customer.subscription.deleted",
+                 "api_version": API_VERSION, "livemode": self.livemode, "created": int(ended_at.timestamp()),
+                 "data": {"object": deepcopy(self.subscription)}}
+        self.events[event_id] = deepcopy(event)
         return event
 
 
@@ -338,9 +351,9 @@ def test_prebeta_access_survives_paid_expiry(db, adapter, monkeypatch):
 @pytest.mark.parametrize("event_type", [
     "checkout.session.completed", "checkout.session.async_payment_succeeded",
     "invoice.payment_succeeded", "invoice.payment_failed", "payment_intent.succeeded",
-    "customer.subscription.updated", "customer.subscription.deleted",
+    "customer.subscription.created", "customer.subscription.updated",
 ])
-def test_only_invoice_paid_is_processed(db, adapter, event_type):
+def test_unhandled_webhooks_do_not_provision_access(db, adapter, event_type):
     _, http = adapter
     event = {"id": "evt_other", "object": "event", "type": event_type, "livemode": http.livemode}
     assert deliver(db, event) == (None, False)

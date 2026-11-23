@@ -20,6 +20,7 @@ RECONCILIATION = {
     "payment_after_termination": "Payment was recorded after termination. Reconciliation is required.",
     "missing_paid_through_baseline": "Confirmed entitlement baseline is missing.",
     "equal_time_lifecycle_conflict": "Provider lifecycle facts conflict at the same timestamp.",
+    "termination_date_conflict": "Stripe's termination date conflicts with the recorded end of this subscription.",
     "subscription_terminated": "The historical subscription cannot be reactivated by local retry.",
     "membership_ended": "The membership has ended. Local retry cannot reactivate it.",
 }
@@ -68,7 +69,7 @@ def retryability(session, record, app):
     if code in RECONCILIATION or code not in LOCAL_CODES:
         return RecoveryDecision(False, "reconciliation", RECONCILIATION.get(code, "Unrecognized state requires reconciliation."))
     sub, attempt, member = context(session, record, app)
-    if member and (member.status != "active" or member.revoked_at):
+    if member and (member.status != "active" or member.revoked_at) and not app.facts.get("stripe_termination"):
         return RecoveryDecision(False, "blocked", "The membership has ended; local retry cannot restore it.")
     if not sub:
         if not attempt:

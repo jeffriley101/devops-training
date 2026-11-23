@@ -47,6 +47,7 @@ class SubscriptionEvent:
     # Optional adapter evidence, retained in the existing JSON inbox. Omitted
     # for older adapters/events so their durable normalized facts stay unchanged.
     stripe_invoice: dict | None = None
+    stripe_termination: dict | None = None
 
 
 @dataclass(frozen=True)
@@ -406,6 +407,13 @@ def _facts(event):
         raise ValueError("Invalid checkout reference.")
     if (event.paid_through is None) != (event.payment_reference is None):
         raise ValueError("Confirmed entitlement requires a payment reference and paid-through date.")
+    if event.stripe_termination is not None:
+        binding = event.stripe_termination
+        if (not isinstance(binding, dict) or not all(isinstance(binding.get(key), str) and binding[key]
+                for key in ("account_id", "customer_id", "checkout_id", "plan_code"))
+                or not event.terminal or event.provider_status != "canceled" or not event.checkout_reference
+                or event.stripe_invoice is not None or event.paid_through is not None):
+            raise ValueError("Invalid Stripe termination evidence.")
     if event.paid_through is not None:
         if (not isinstance(event.paid_through, datetime) or event.paid_through.utcoffset() is None
                 or event.paid_through <= event.period_start or not isinstance(event.payment_reference, str)
@@ -414,6 +422,8 @@ def _facts(event):
     facts = {key: value.isoformat() if isinstance(value, datetime) else value for key, value in asdict(event).items()}
     if event.stripe_invoice is None:
         facts.pop("stripe_invoice")
+    if event.stripe_termination is None:
+        facts.pop("stripe_termination")
     return facts
 
 
@@ -481,7 +491,7 @@ def _provision(session, record, application, event):
     if attempt is None:
         raise RecoverableApplication("unknown_checkout")
     attempt = _lock(session, CheckoutAttempt, attempt.id)
-    _check_stripe_invoice(record, event, attempt=attempt)
+    _check_stripe_binding(record, event, attempt=attempt)
     # Adapter-verified payment occurrence controls authorization. Webhook receipt
     # and local processing may arrive later; an expired state preserves history
     # and prevents browser reuse without erasing a payment completed in time.
@@ -519,16 +529,19 @@ def _provision(session, record, application, event):
     return sub
 
 
-def _check_stripe_invoice(record, event, *, attempt=None, sub=None):
+def _check_stripe_binding(record, event, *, attempt=None, sub=None):
     """Compare authenticated Stripe facts with local authorization under locks."""
-    facts = event.stripe_invoice
+    facts = event.stripe_invoice if event.stripe_invoice is not None else event.stripe_termination
     if facts is None:
         return
     price = sub or attempt
-    if (record.provider != "stripe" or price is None or
-            tuple(facts.get(key) for key in ("plan_code", "amount_cents", "currency", "interval")) !=
-            (price.plan_code, price.amount_cents, price.currency, price.interval)):
+    if record.provider != "stripe" or price is None or facts.get("plan_code") != price.plan_code:
         raise RecoverableApplication("stripe_price_conflict")
+    if event.stripe_invoice is not None and (facts.get("amount_cents"), facts.get("currency"), facts.get("interval")) != (
+            price.amount_cents, price.currency, price.interval):
+        raise RecoverableApplication("stripe_price_conflict")
+    if event.stripe_termination is not None and (not attempt or attempt.provider_checkout_id != facts["checkout_id"]):
+        raise RecoverableApplication("stripe_checkout_conflict")
     if attempt and attempt.provider_checkout_id not in (None, facts.get("checkout_id")):
         raise RecoverableApplication("stripe_checkout_conflict")
     if sub and sub.external_customer_id != facts.get("customer_id"):
@@ -589,11 +602,15 @@ def apply_locked_event(session, record, application, locked_accounts):
                 raise RecoverableApplication("unknown_checkout")
             sub = _lock(session, ProviderSubscription, sub.id)
             member = _lock(session, Membership, sub.membership_id)
-            _check_stripe_invoice(record, event, attempt=attempt, sub=sub)
+            _check_stripe_binding(record, event, attempt=attempt, sub=sub)
             if attempt and (attempt.subscription_id != sub.id or attempt.billing_account_id != member.billing_account_id):
                 raise RecoverableApplication("subscription_correlation_conflict")
-            if member.status != "active" or member.revoked_at:
+            # A terminal-only receipt may complete the history of a retired or
+            # refunded membership. It can never carry a payment or grant access.
+            if (member.status != "active" or member.revoked_at) and event.stripe_termination is None:
                 raise RecoverableApplication("membership_ended")
+            if event.stripe_termination and sub.terminated_at and utc(sub.terminated_at) != event.occurred_at:
+                raise RecoverableApplication("termination_date_conflict")
             if event.paid_through is not None:
                 effect = session.scalar(select(BillingPaymentEffect).where(
                     BillingPaymentEffect.subscription_id == sub.id,

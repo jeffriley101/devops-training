@@ -29,6 +29,7 @@
 {% if member.access_until %}<p>{{ 'Original paid-through date' if member.source == 'stripe' and member.revoked_at else 'Access until' }} {{ member.access_until }}</p>{% endif %}
 {% for seat, name in selected.seats %}<div class="membership-line"><span>{{ name }}</span><form method="post">{{ fields('remove', member.id) }}<input type="hidden" name="seat_id" value="{{ seat.id }}"><button class="btn btn-secondary">Remove student</button></form></div>{% endfor %}
 {% if subscription %}<p>{{ subscription.provider }} · {{ subscription.external_subscription_id }}{% if subscription.external_customer_id %} · {{ subscription.external_customer_id }}{% endif %} · {{ subscription.provider_status }}</p>{% endif %}
+{% if stripe_checkout_id %}<form method="post" action="/admin/billing-recovery/checkout/{{ stripe_checkout_id }}/inspect"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="btn btn-secondary">Reconcile Stripe subscription</button></form>{% endif %}
 <h3>Audit history</h3>{% for event in history %}<p>{{ event.created_at }} · {% if event.action == 'stripe_full_refund_access_ended' %}Paid access ended after full Stripe refund · {{ event.details.refund_id }} · {{ event.details.invoice_id }}{% else %}{{ event.action }}{% endif %} · {{ event.actor_type }} {{ event.actor_id or '' }}</p>{% endfor %}
 {% if member.source == 'stripe' and member.status == 'active' and not member.revoked_at and subscription and subscription.provider == 'stripe' %}
 <section class="account-danger-zone" aria-labelledby="stripe-refund-title">
