@@ -203,6 +203,8 @@ def respond(session, *, student, invitation_id, choice):
             _resolve(session, row, 'expired', profile=profile.id)
         else:
             anchor = s2._enroll_student(session, profile=profile, program_id=row.program_id, class_id=row.class_id)
+            # The history query must see a newly opened period even with autoflush disabled.
+            session.flush()
             period = next(p for p in s2._validated_periods(session, anchor.id) if p.ended_at is None)
             # Retain both transitions in the same savepoint/outer transaction.
             _resolve(session, row, 'accepted', profile=profile.id, period=period.id)
