@@ -96,7 +96,7 @@ class SupportTarget:
         if administrative:
             raise SupportDenied("support_nonadministrative_role_required")
         revisions = session.execute(text("SELECT version_num FROM public.alembic_version")).scalars().all()
-        if revisions != [REVISION]:
+        if revisions not in ([REVISION], ["c37hold001"], ["c38disp001"]):
             raise SupportDenied("support_revision_mismatch")
         session.execute(text("SET LOCAL search_path TO public, pg_catalog, pg_temp"))
 

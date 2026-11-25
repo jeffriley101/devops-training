@@ -199,7 +199,8 @@ def roster(session, *, current, class_id, before=None):
         for anchor in sorted(anchors, key=lambda item: item.profile_id):
             if current['manage'] or members[anchor.id]['active']:
                 try:
-                    profiles[anchor.profile_id] = s2._eligible_profile(session, anchor.profile_id, require_eligibility=False)
+                    profiles[anchor.profile_id] = s2._eligible_profile(session, anchor.profile_id,
+                        require_eligibility=False, roster_scope=(program_id, class_id, anchor.id))
                 except s1.ClassroomDenied:
                     profiles[anchor.profile_id] = None
         # A lock wait may cross the entitlement's ending instant.

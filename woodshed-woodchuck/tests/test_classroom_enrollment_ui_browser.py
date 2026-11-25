@@ -120,7 +120,7 @@ def test_complete_student_director_manual_qr_inbox_flows(enrollment_site, monkey
         director.locator('#qr-pin').fill('2468')
         director.get_by_role('button', name='Make QR', exact=True).click()
         qr_link = director.locator('[data-enrollment-join-link]').get_attribute('href')
-        assert '#program=1&code=BAND2026' in qr_link
+        assert '#qr=' in qr_link
         assert director.locator('.enrollment-qr img').evaluate('image => image.complete && image.naturalWidth > 0')
         snapshot(director, tmp_path / f'qr-{engine}-{width}.png')
 
@@ -149,7 +149,7 @@ def test_complete_student_director_manual_qr_inbox_flows(enrollment_site, monkey
         assert 'Membership: Member' in student.locator('main').inner_text()
         assert protected_counts(refs) == before
 
-        # Scan handoff: the fragment survives normal sign-in, fills the same form,
+        # Scan handoff: the signed fragment survives normal sign-in, opens a review form,
         # is removed from the URL, and cannot enroll through navigation alone.
         second_context = context(browser, origin, width)
         second = second_context.new_page()
@@ -158,12 +158,12 @@ def test_complete_student_director_manual_qr_inbox_flows(enrollment_site, monkey
         second.on('request', lambda request: requests.append(request.url))
         second.goto(qr_link)
         student_login(second, 2)
-        expect(second.get_by_label('Music Program number')).to_have_value('1')
-        expect(second.get_by_label('Class code', exact=True)).to_have_value('BAND2026')
+        expect(second.get_by_label('Music Program number')).to_have_value('')
+        expect(second.get_by_label('Class code', exact=True)).to_have_value('')
         assert '#' not in second.url
         with refs.factory() as session:
             assert count(session, ClassroomStudentMembership) == 1
-        second.get_by_role('button', name='Review Class', exact=True).click()
+        second.get_by_role('button', name='Review scanned Class', exact=True).click()
         expect(second.get_by_role('heading', name='Is this your Class?', exact=True)).to_be_visible()
         second.goto(PATH + '/invitations')
         second.get_by_role('button', name='Not Now', exact=True).click()
@@ -172,16 +172,15 @@ def test_complete_student_director_manual_qr_inbox_flows(enrollment_site, monkey
         second.get_by_role('button', name='Accept', exact=True).click()
         expect(second.locator('[data-state=accepted]')).to_be_visible()
         second.goto(qr_link)
-        second.get_by_role('button', name='Review Class', exact=True).click()
+        second.get_by_role('button', name='Review scanned Class', exact=True).click()
         second.get_by_role('button', name='Join and Share', exact=True).click()
         expect(second.get_by_role('status').filter(has_text='Class joined.')).to_be_visible()
         with refs.factory() as session:
             assert count(session, ClassroomStudentMembership) == count(session, ClassroomMembershipPeriod) == 2
         assert protected_counts(refs) == before
-        # A QR arriving while this same page is already open also fills the
-        # form. Unsupported payloads are cleared and cannot become grant fields.
+        # Legacy fragments cannot fill either entry form.
         second.evaluate('location.hash = "program=1&code=BAND2026"')
-        expect(second.get_by_label('Class code', exact=True)).to_have_value('BAND2026')
+        expect(second.locator('#enrollment-qr-status')).to_contain_text('not a supported Class entry')
         assert '#' not in second.url
         second.evaluate('location.hash = "program=1&code=BAND2026&assignment_ids=1"')
         expect(second.locator('#enrollment-qr-status')).to_contain_text('not a supported Class entry')
@@ -279,6 +278,9 @@ def test_account_authorization_handoff_and_parent_fail_closed(enrollment_site, m
         page.on('pageerror', lambda error: errors.append(str(error)))
         page.goto(PATH + '#program=1&code=BAND2026')
         student_login(page)
+        expect(page.locator('#enrollment-qr-status')).to_contain_text('not a supported Class entry')
+        page.get_by_label('Music Program number').fill('1')
+        page.get_by_label('Class code', exact=True).fill('BAND2026')
         page.get_by_role('button', name='Review Class', exact=True).click()
         expect(page.get_by_role('heading', name='Account authorization needed')).to_be_visible()
         snapshot(page, tmp_path / f'authorization-{age_band}-{engine}-{width}.png')

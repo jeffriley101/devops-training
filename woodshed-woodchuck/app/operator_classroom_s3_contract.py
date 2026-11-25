@@ -204,7 +204,7 @@ SQLITE_REPORTING_UPDATE = "CREATE TRIGGER classroom_reporting_no_overlap_update\
 POSTGRES_REPORTING_FUNCTION = "CREATE FUNCTION classroom_reporting_no_overlap() RETURNS trigger\nLANGUAGE plpgsql AS $$\nBEGIN\n    IF TG_OP = 'UPDATE' THEN\n        -- PostgreSQL locks an UPDATE target tuple before BEFORE ROW triggers.\n        -- Never wait for its parents in that state: supported writers already\n        -- hold these locks; uncoordinated DML must fail instead of deadlocking.\n        PERFORM organization_id FROM classroom_programs\n        WHERE organization_id = NEW.program_id FOR UPDATE NOWAIT;\n        PERFORM id FROM classroom_classes\n        WHERE id = NEW.class_id AND program_id = NEW.program_id FOR UPDATE NOWAIT;\n        PERFORM id FROM classroom_student_memberships\n        WHERE id = NEW.membership_id FOR UPDATE NOWAIT;\n    ELSE\n        PERFORM organization_id FROM classroom_programs\n        WHERE organization_id = NEW.program_id FOR UPDATE;\n        PERFORM id FROM classroom_classes\n        WHERE id = NEW.class_id AND program_id = NEW.program_id FOR UPDATE;\n        PERFORM id FROM classroom_student_memberships\n        WHERE id = NEW.membership_id FOR UPDATE;\n    END IF;\n    IF EXISTS (\n        SELECT 1 FROM classroom_reporting_periods p\n        WHERE p.membership_id = NEW.membership_id AND p.id <> NEW.id\n          AND (NEW.ended_at IS NULL OR p.starts_at < NEW.ended_at)\n          AND (p.ended_at IS NULL OR NEW.starts_at < p.ended_at)\n    ) THEN\n        RAISE EXCEPTION 'classroom_reporting_period_overlap' USING ERRCODE = '23514';\n    END IF;\n    RETURN NEW;\nEND;\n$$"
 
 
-def validate_s3_guards(connection, error):
+def validate_s3_guards(connection, error, *, c38_residual=False):
     """Enforcement state and trigger bodies form part of the reviewed schema."""
     reason = "classroom_schema_missing_or_changed: reporting_interval_guard"
     if connection.dialect.name == "postgresql":
@@ -228,7 +228,10 @@ def validate_s3_guards(connection, error):
             JOIN pg_namespace n ON n.oid=r.relnamespace
             WHERE n.nspname=current_schema() AND r.relname=ANY(:tables) AND NOT t.tgisinternal
         """), {"tables": list(C24)}))
-        if triggers != [("classroom_reporting_periods", "classroom_reporting_no_overlap")]:
+        expected = {("classroom_reporting_periods", "classroom_reporting_no_overlap")}
+        if c38_residual:
+            expected.add(("classroom_reporting_periods", "c38_witnessed_delete"))
+        if set(triggers) != expected:
             raise error(reason)
         rows = connection.execute(text("""
             SELECT p.prosrc, p.prosecdef, p.provolatile, p.proconfig,

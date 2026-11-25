@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import pwd
 import re
+import secrets
 import shutil
 import subprocess
 import sys
@@ -53,18 +54,39 @@ def private_postgres(*, quarantine=False):
 
 
 @pytest.fixture(scope="session")
-def play_template():
+def play_management_password():
+    return secrets.token_urlsafe(32)
+
+
+@pytest.fixture(scope="session")
+def play_template(play_management_password):
     with private_postgres() as url:
         pg_tool("createdb", "-h", url.query["host"], "-U", url.username, "play_template")
         template = url.set(database="play_template")
         subprocess.run([sys.executable, "-m", "alembic", "upgrade", "head"], check=True, cwd=ROOT,
                        env={"PATH": os.defpath, "DATABASE_URL": template.render_as_string(),
                             "SESSION_SECRET": "play-synthetic-template-only"})
-        yield url
+        # Migrated Classroom lifecycle writes require their independent login.
+        # Provision it only inside the newly initialized non-quarantine fixture.
+        socket = Path(url.query["host"])
+        admin = create_engine(url, hide_parameters=True)
+        try:
+            with admin.begin() as conn:
+                assert conn.exec_driver_sql("SELECT inet_server_addr() IS NULL AND current_setting('listen_addresses')=''").scalar_one()
+                assert Path(conn.exec_driver_sql("SHOW data_directory").scalar_one()) == socket / "data"
+                conn.exec_driver_sql("CREATE ROLE c37_management_witness LOGIN NOINHERIT")
+                conn.connection.driver_connection.pgconn.change_password(
+                    b"c37_management_witness", play_management_password.encode())
+            hba = socket / "data" / "pg_hba.conf"
+            hba.write_text("local all c37_management_witness scram-sha-256\n" + hba.read_text())
+            pg_tool("pg_ctl", "-D", socket / "data", "reload")
+            yield url
+        finally:
+            admin.dispose()
 
 
 @pytest.fixture
-def play_pg(play_template, monkeypatch):
+def play_pg(play_template, play_management_password, monkeypatch):
     """Give each test an independent clone of the migrated synthetic schema."""
     name = "play_test_" + uuid4().hex
     pg_tool("createdb", "-h", play_template.query["host"], "-U", play_template.username,
@@ -72,6 +94,7 @@ def play_pg(play_template, monkeypatch):
     url = play_template.set(database=name)
     engine = create_engine(url)
     factory = sessionmaker(bind=engine, expire_on_commit=False, autoflush=False)
+    monkeypatch.setenv("C37_MANAGEMENT_WITNESS_PASSWORD", play_management_password)
     monkeypatch.setenv("DATABASE_URL", url.render_as_string())
     for key, module in tuple(sys.modules.items()):
         if key.startswith("app.") and hasattr(module, "SessionLocal"):

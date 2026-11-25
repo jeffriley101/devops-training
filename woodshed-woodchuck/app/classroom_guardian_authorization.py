@@ -84,11 +84,11 @@ def required(session, profile_id):
     return bool(rule and (rule.age_band == 'under13' or rule.consent_id))
 
 
-def _qualified_account(session, profile_id, now, *, lock=True):
+def _qualified_account(session, profile_id, now, *, lock=True, roster_scope=None):
     """Read original server-accepted activation evidence, never email/role assertions."""
     from . import kws_verification as kws, kws_client
     if lock:
-        profile = s2._eligible_profile(session, profile_id)
+        profile = s2._eligible_profile(session, profile_id, roster_scope=roster_scope)
     else:
         from .age_privacy import eligible
         from .models import WoodchuckProfile
@@ -180,7 +180,8 @@ def _context(session, program_id, class_id, profile_id):
     boundary._exact_ids(program_id, class_id, profile_id)
     s1._lock_program(session, program_id)
     state = s2._active(session, program_id, class_id)
-    _, rule, evidence, verification = _qualified_account(session, profile_id, boundary._now())
+    _, rule, evidence, verification = _qualified_account(session, profile_id, boundary._now(),
+                                                        roster_scope=(program_id, class_id, None))
     anchor = s2._anchor(session, class_id, profile_id)
     if anchor is None or s2._held(session, anchor.id):
         raise s1.ClassroomDenied(UNAVAILABLE)

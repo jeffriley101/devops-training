@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import (
     Boolean, CheckConstraint, DateTime, ForeignKey, ForeignKeyConstraint, Index, Integer,
-    String, UniqueConstraint, func, text,
+    String, UniqueConstraint, event, func, inspect, text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -408,10 +408,22 @@ class ClassroomMembershipHold(Base):
     membership_id: Mapped[int] = mapped_column(ForeignKey("classroom_student_memberships.id", ondelete="RESTRICT"), primary_key=True)
     state: Mapped[str] = mapped_column(String(12), nullable=False)
     reason: Mapped[str] = mapped_column(String(20), nullable=False)
-    held_by_verifier_id: Mapped[int] = mapped_column(ForeignKey("trusted_verifiers.id", ondelete="RESTRICT"), nullable=False)
+    held_by_verifier_id: Mapped[int | None] = mapped_column(ForeignKey("trusted_verifiers.id", ondelete="RESTRICT"))
     held_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     released_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     released_by_verifier_id: Mapped[int | None] = mapped_column(ForeignKey("trusted_verifiers.id", ondelete="RESTRICT"))
+
+
+@event.listens_for(ClassroomMembershipHold, "before_insert")
+def _require_hold_actor(mapper, connection, hold):
+    if hold.held_by_verifier_id is None:
+        raise ValueError("New membership holds require the issuing verifier.")
+
+
+@event.listens_for(ClassroomMembershipHold, "before_update")
+def _protect_hold_actor(mapper, connection, hold):
+    if hold.held_by_verifier_id is None and inspect(hold).attrs.held_by_verifier_id.history.has_changes():
+        raise ValueError("Historical hold attribution requires approved disposition.")
 
 
 class ClassroomS2AuditEvent(Base):

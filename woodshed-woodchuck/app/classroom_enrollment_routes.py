@@ -146,13 +146,15 @@ def home(request: Request):
 @router.post(PATH + '/review')
 async def review(request: Request):
     form = await _form(request)
-    _exact(form, {'account', 'program_id', 'code'})
+    printed = 'printed' in form
+    _exact(form, {'account', 'printed'} if printed else {'account', 'program_id', 'code'})
     with SessionLocal() as session:
         proof = _student(request, session, form['account'])
         enforce_login_limit(request, 'student', form['account'])
         try:
-            result = views.code_review(session, student=proof,
-                program_id=_number(form['program_id']), code=form['code'])
+            entry = {'printed': form['printed']} if printed else {
+                'program_id': _number(form['program_id']), 'code': form['code']}
+            result = views.code_review(session, student=proof, **entry)
         except s1.ClassroomDenied:
             result = None
     if result is None:
@@ -314,12 +316,12 @@ def director_entry(request: Request, program_id: int, class_id: int):
     return _page(request, mode='director-class', director=identity, detail=None)
 
 
-def _qr(request, program_id, code):
+def _qr(request, row, code):
     origin = (os.getenv('PUBLIC_BASE_URL') or str(request.base_url)).rstrip('/')
     parsed = urlsplit(origin)
     if parsed.scheme not in {'http', 'https'} or not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment or parsed.path:
         raise HTTPException(503, 'The Class QR link is unavailable.')
-    url = origin + PATH + '#' + urlencode({'program': str(program_id), 'code': code})
+    url = origin + PATH + '#' + urlencode({'qr': s2.printed_entry(row)})
     image = qrcode.make(url, image_factory=qrcode.image.svg.SvgPathImage, border=4)
     buffer = io.BytesIO(); image.save(buffer)
     return {'url': url, 'code': code, 'image': 'data:image/svg+xml;base64,' + base64.b64encode(buffer.getvalue()).decode()}
@@ -360,7 +362,7 @@ async def director_action(request: Request, program_id: int, class_id: int):
                 row = s2._entry(session, program_id, code=form['code'])
                 if row.class_id != class_id:
                     raise s1.ClassroomDenied(service.UNAVAILABLE)
-                qr = _qr(request, program_id, s2.normalize_code(form['code']))
+                qr = _qr(request, row, s2.normalize_code(form['code']))
             detail = views.director_class(session, actor=actor, program_id=program_id, class_id=class_id,
                 before=_number(form.get('before'), optional=True))
             session.commit()

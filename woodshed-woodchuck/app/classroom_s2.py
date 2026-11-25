@@ -238,8 +238,11 @@ def create_class(session, *, actor, program_id, display_name):
     session.add(row)
     session.flush()
     now = _now()
-    session.add(ClassroomClassState(class_id=row.id, program_id=program_id, state="active",
-        enrollment_open=True, changed_by_verifier_id=actor_id, created_at=now, updated_at=now))
+    state = ClassroomClassState(class_id=row.id, program_id=program_id, state="active",
+        enrollment_open=True, changed_by_verifier_id=actor_id, created_at=now, updated_at=now)
+    session.add(state)
+    from .classroom_residual import flush_lifecycle
+    flush_lifecycle(session, state)
     _audit(session, program_id, "class_activated", actor=actor_id, class_id=row.id,
            entitlement_id=decision.entitlement_id)
     return row
@@ -276,6 +279,8 @@ def set_class_state(session, *, actor, program_id, class_id, state):
         session.add(row)
     row.state, row.enrollment_open = state, False
     row.updated_at, row.changed_by_verifier_id = now, actor_id
+    from .classroom_residual import flush_lifecycle
+    flush_lifecycle(session, row)
     # Reactivation starts closed and without a code. A separate deliberate code
     # issuance is fresh authority; neither old code nor held membership revives.
     _revoke_code(session, program_id, class_id, actor_id)
@@ -296,6 +301,8 @@ def set_enrollment(session, *, actor, program_id, class_id, open):
         _paid(session, program_id)
     if row.enrollment_open != open:
         row.enrollment_open, row.updated_at, row.changed_by_verifier_id = open, _now(), actor_id
+        from .classroom_residual import flush_lifecycle
+        flush_lifecycle(session, row)
         _audit(session, program_id, "enrollment_opened" if open else "enrollment_closed",
                actor=actor_id, class_id=class_id,
                entitlement_id=_paid(session, program_id).entitlement_id if open else None)
@@ -348,8 +355,12 @@ def issue_code(session, *, actor, program_id, class_id, preferred=None):
             raise ClassroomDenied(INVALID_CODE)
     else:
         raise ClassroomDenied(INVALID_CODE)
-    generation = (session.scalar(select(func.max(ClassroomEntryCode.generation)).where(
-        ClassroomEntryCode.class_id == class_id)) or 0) + 1
+    from . import classroom_residual
+    if classroom_residual.enabled(session):
+        generation = classroom_residual.next_code_generation(session, program_id, class_id)
+    else:
+        generation = (session.scalar(select(func.max(ClassroomEntryCode.generation)).where(
+            ClassroomEntryCode.class_id == class_id)) or 0) + 1
     _revoke_code(session, program_id, class_id, actor_id)
     row = ClassroomEntryCode(program_id=program_id, class_id=class_id, generation=generation,
         digest=digest, is_current=True, issued_by_verifier_id=actor_id, issued_at=_now())
@@ -413,7 +424,7 @@ def _student(session, student, *, require_eligibility=True):
     return profile
 
 
-def _eligible_profile(session, profile_id, *, require_eligibility=True):
+def _eligible_profile(session, profile_id, *, require_eligibility=True, roster_scope=None):
     from .age_models import AccountPrivacy
     from .child_models import ConsentEvidence
     rule = session.get(AccountPrivacy, profile_id, populate_existing=True)
@@ -421,7 +432,9 @@ def _eligible_profile(session, profile_id, *, require_eligibility=True):
     # Existing withdrawal locks consent then profile; follow that order, never
     # acquire PTA/season locks here (S2 has no Team mutation).
     if consent_id:
-        s1._fresh(session, ConsentEvidence, ConsentEvidence.id == consent_id)
+        from .classroom_hold_writer import lock_scoped_consent
+        if not lock_scoped_consent(session, roster_scope, profile_id, consent_id):
+            s1._fresh(session, ConsentEvidence, ConsentEvidence.id == consent_id)
     profile = s1._fresh(session, WoodchuckProfile, WoodchuckProfile.id == profile_id)
     rule = session.get(AccountPrivacy, profile_id, populate_existing=True)
     if (profile is None or profile.status != "active"
@@ -473,6 +486,36 @@ def _encode(payload):
     return base64.urlsafe_b64encode(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).rstrip(b"=").decode()
 
 
+def printed_entry(row):
+    body = _encode({"program": row.program_id, "class": row.class_id,
+                    "code": row.id, "generation": row.generation})
+    return body + "." + hmac.new(_key("classroom-printed-entry:v1"), body.encode(), hashlib.sha256).hexdigest()
+
+
+def _printed_entry(session, token):
+    try:
+        if not isinstance(token, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,256}\.[0-9a-f]{64}", token):
+            raise ValueError()
+        body, signature = token.split(".")
+        expected = hmac.new(_key("classroom-printed-entry:v1"), body.encode(), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(signature, expected):
+            raise ValueError()
+        payload = json.loads(base64.urlsafe_b64decode(body + "=" * (-len(body) % 4)))
+        if (not isinstance(payload, dict) or set(payload) != {"program", "class", "code", "generation"}
+                or any(type(value) is not int or value < 1 for value in payload.values())):
+            raise ValueError()
+    except (TypeError, ValueError) as error:
+        raise ClassroomDenied(INVALID_CODE) from error
+    program = payload["program"]
+    s1._lock_program(session, program)
+    _paid(session, program)
+    row = session.get(ClassroomEntryCode, payload["code"], populate_existing=True)
+    if row is None or not row.is_current or not hmac.compare_digest(printed_entry(row), token):
+        raise ClassroomDenied(INVALID_CODE)
+    _active(session, program, row.class_id, enrollment=True)
+    return row
+
+
 def _parse_intent(token):
     try:
         if not isinstance(token, str) or len(token) > 1500 or not re.fullmatch(r"[A-Za-z0-9_-]+\.[0-9a-f]{64}", token):
@@ -494,6 +537,11 @@ def _parse_intent(token):
 @_mutation
 def prepare_entry(session, *, student, program_id, code):
     row = _entry(session, program_id, code=code)
+    return _review_intent(session, student, row)
+
+
+def _review_intent(session, student, row):
+    program_id = row.program_id
     profile = _student(session, student, require_eligibility=False)
     now = int(_now().timestamp())
     body = _encode({"program": program_id, "class": row.class_id, "code": row.id,
@@ -622,6 +670,8 @@ def _managed_member(session, actor, program_id, class_id, membership_id):
 def suspend_member(session, *, actor, program_id, class_id, membership_id, reason="conduct", remove=False):
     if reason not in {"conduct", "admin_removal"} or type(remove) is not bool:
         raise ClassroomDenied("Choose an explicit administrative reason.")
+    from .classroom_hold_writer import management_guarded, witness
+    guarded = management_guarded(session)
     actor_id, anchor = _managed_member(session, actor, program_id, class_id, membership_id)
     now = _now()
     _close_period(session, anchor, now, "changed")
@@ -632,6 +682,9 @@ def suspend_member(session, *, actor, program_id, class_id, membership_id, reaso
     hold.state, hold.reason = "removed" if remove else "suspended", reason
     hold.held_by_verifier_id, hold.held_at = actor_id, now
     hold.released_at, hold.released_by_verifier_id = None, None
+    if guarded:
+        with witness(session, "issue", program_id, class_id, hold):
+            session.flush([hold])
     _audit(session, program_id, "student_removed" if remove else "student_suspended", actor=actor_id,
            profile_id=anchor.profile_id, class_id=class_id, membership_id=anchor.id, reason=reason)
     return anchor
@@ -639,10 +692,13 @@ def suspend_member(session, *, actor, program_id, class_id, membership_id, reaso
 
 @_mutation
 def reinstate_member(session, *, actor, program_id, class_id, membership_id):
+    from .classroom_hold_writer import management_guarded, witness
+    guarded = management_guarded(session)
     actor_id, anchor = _managed_member(session, actor, program_id, class_id, membership_id)
     _paid(session, program_id)
     _active(session, program_id, class_id)
-    _eligible_profile(session, anchor.profile_id)
+    _eligible_profile(session, anchor.profile_id,
+                      roster_scope=(program_id, class_id, membership_id) if guarded else None)
     from .classroom_school_authorization import require_disclosure
     require_disclosure(session, program_id)
     _paid(session, program_id)
@@ -654,6 +710,9 @@ def reinstate_member(session, *, actor, program_id, class_id, membership_id):
     _close_period(session, anchor, now, "changed")
     if hold:
         hold.released_at, hold.released_by_verifier_id = now, actor_id
+        if guarded:
+            with witness(session, "release", program_id, class_id, hold):
+                session.flush([hold])
     _open_period(session, anchor, now)
     _audit(session, program_id, "student_reinstated", actor=actor_id, profile_id=anchor.profile_id,
            class_id=class_id, membership_id=anchor.id, reason="explicit_reinstatement",

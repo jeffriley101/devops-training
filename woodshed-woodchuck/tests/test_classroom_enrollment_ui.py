@@ -157,7 +157,21 @@ def test_qr_requires_exact_class_authority_and_uses_fragment(enrollment_web):
     qr = page.context['qr']
     parsed = urlsplit(qr['url'])
     assert parsed.query == '' and parsed.path == PATH and parsed.netloc == 'testserver'
-    assert parse_qs(parsed.fragment) == {'program': ['1'], 'code': ['BAND2026']}
+    printed = parse_qs(parsed.fragment)
+    assert set(printed) == {'qr'}
+    student = student_client()
+    def scan(token):
+        return student.post(PATH + '/review', data=form(student, account='WC-TEST0001', printed=token))
+    assert scan(printed['qr'][0]).status_code == 200
+    assert scan('').status_code == 409
+    assert scan(printed['qr'][0] + '0').status_code == 409
+    with refs.factory.begin() as session:
+        code(session, refs.class_id, 'NEXT2026')
+        code(session, refs.class_id, 'BAND2026')
+    assert scan(printed['qr'][0]).status_code == 409
+    new_link = direct(director, refs, 'qr', code='BAND2026').context['qr']['url']
+    assert scan(parse_qs(urlsplit(new_link).fragment)['qr'][0]).status_code == 200
+    assert review(student).status_code == 200
     assert qr['image'].startswith('data:image/svg+xml;base64,')
     assert 'student=' not in qr['url'] and 'intent=' not in qr['url']
     assert direct(director, refs, 'qr', code='OTHER2026').status_code == 409

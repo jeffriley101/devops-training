@@ -112,6 +112,8 @@ def test_actual_management_release_workflow(management_site, tmp_path, engine, w
         assert 'BROWSER26' not in owner.content()
         owner.locator('#preferred-code').fill('BROWSER27')
         submit_change(owner, 'code-pin')
+        entry = owner.get_by_role('link', name='Open student enrollment link').get_attribute('href')
+        assert '#qr=' in entry
         owner.locator('#teacher-email').fill('adult2@example.test')
         submit_change(owner, 'assign-teacher-pin')
         teacher_context, teacher = adult_context(browser, origin, width, 2, errors)
@@ -142,13 +144,12 @@ def test_actual_management_release_workflow(management_site, tmp_path, engine, w
         assert student_context.request.post('/account/login', form={'woodchuck_id': 'WC-TEST0001', 'pin': '2468'}, headers={'Origin': origin}).status == 200
         student = student_context.new_page(); student.set_default_timeout(12000)
         student.on('pageerror', lambda error: errors.append(str(error)))
-        entry = '/classroom/enrollment#program=1&code=BROWSER27'
         student.goto(entry)
-        student.get_by_role('button', name='Review Class', exact=True).click()
+        student.get_by_role('button', name='Review scanned Class', exact=True).click()
         expect(student.get_by_role('alert')).to_contain_text('Class entry is unavailable')
         submit_change(owner, 'open-pin')
         student.goto(entry)
-        student.get_by_role('button', name='Review Class', exact=True).click()
+        student.get_by_role('button', name='Review scanned Class', exact=True).click()
         student.get_by_role('button', name='Join and Share', exact=True).click()
         expect(student.get_by_role('status').filter(has_text='Class joined.')).to_be_visible()
         with refs.factory() as session:

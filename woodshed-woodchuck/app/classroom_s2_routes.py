@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 
 from . import classroom, classroom_s2 as service
 from .db import SessionLocal
+from .classroom_writer_sessions import operation_session
 from .login_limits import enforce_login_limit
 from .membership_routes import PrivateRoute
 from .session_origin import same_origin_mutation
@@ -118,7 +119,7 @@ async def manage(request: Request, action: str):
     email, pin = str(form.get("email", "")), str(form.get("pin", ""))
     enforce_login_limit(request, "verifier", email)
     program_id = _integer(form, "program_id")
-    with SessionLocal() as session:
+    with operation_session(action, SessionLocal) as session:
         try:
             actor = classroom.authenticate_adult(session, email=email, pin=pin)
             args = {"actor": actor, "program_id": program_id}

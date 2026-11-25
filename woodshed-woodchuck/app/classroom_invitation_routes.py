@@ -14,6 +14,7 @@ from .classroom import ClassroomDenied, accept_program_invitation
 from .classroom_invitation import create_program_invitation, parse_program_invitation
 from .classroom_models import ClassroomProgram
 from .db import SessionLocal
+from .classroom_writer_sessions import operation_session
 from .email_service import DeliveryResult, EmailService, public_link
 from .login_limits import enforce_login_limit
 from .membership_routes import PrivateRoute
@@ -124,7 +125,7 @@ async def accept_program_invitation_route(request: Request, token: str):
     except ValueError as error:
         raise HTTPException(410, "This Program invitation is invalid or expired.") from error
     enforce_login_limit(request, "verifier", invitation.email)
-    with SessionLocal() as session:
+    with operation_session("accept-program-invitation", SessionLocal) as session:
         try:
             program = accept_program_invitation(
                 session, token=token, pin=str(form["pin"]),

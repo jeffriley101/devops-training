@@ -79,14 +79,16 @@ def issued_c35(tmp_path_factory):
 
 def test_c36_exact_lineage_and_verify_only_scope():
     scripts = ScriptDirectory.from_config(config())
-    assert scripts.get_heads() == ['c36choice001']
+    assert scripts.get_heads() == ['c38disp001']
+    assert scripts.get_revision('c38disp001').down_revision == 'c37hold001'
+    assert scripts.get_revision('c37hold001').down_revision == 'c36choice001'
     revision = scripts.get_revision('c36choice001')
     assert revision.down_revision == 'c35school001'
     assert not revision.dependencies and not revision.branch_labels
     assert cutover._REVIEWED_REVISIONS[-1] == 'c33identity001'
-    assert cutover._REVIEWED_RECEIPT_REVISIONS[-3:] == ('c34guardian001', 'c35school001', 'c36choice001')
+    assert cutover._REVIEWED_RECEIPT_REVISIONS[-5:] == ('c34guardian001', 'c35school001', 'c36choice001', 'c37hold001', 'c38disp001')
     assert cutover._REVIEWED_ISSUANCE_REVISIONS == (
-        'p31pta001', 'c32enroll001', 'c33identity001', 'c34guardian001', 'c35school001', 'c36choice001')
+        'p31pta001', 'c32enroll001', 'c33identity001', 'c34guardian001', 'c35school001', 'c36choice001', 'c37hold001', 'c38disp001')
     for original, current in [('c36choice001', 'c35school001'), ('p31pta001', 'c37unreviewed001')]:
         with pytest.raises(cutover.CutoverError, match='plan_schema_revision_changed'):
             cutover._plan_schema_guard({'revision': original}, current, verifying_receipt=True)

@@ -1,27 +1,25 @@
-/* QR supplies the same form values; it never submits or authorizes a join. */
+/* Printed credentials go to server review before student confirmation. */
 (function () {
   "use strict";
   const signedIn = document.body.dataset.enrollmentSignedIn === "true";
-  const form = document.getElementById("enrollment-code-form");
+  const form = document.getElementById("enrollment-printed-form");
   const status = document.getElementById("enrollment-qr-status");
   function readQR() {
-    if (!signedIn || !form || !location.hash) return;
+    if (!signedIn || !form) return;
+    form.hidden = true;
+    form.elements.printed.value = "";
+    if (!location.hash) return;
     const fragment = location.hash.slice(1);
     history.replaceState(null, "", location.pathname);
     let valid = false;
     try {
+      if (fragment.length > 325) throw new Error();
       const values = new URLSearchParams(fragment);
-      const entries = [...values.entries()];
-      const program = values.get("program") || "";
-      const code = values.get("code") || "";
-      valid = fragment.length <= 256 && entries.length === 2 &&
-        entries.every(([key]) => key === "program" || key === "code") &&
-        values.getAll("program").length === 1 && values.getAll("code").length === 1 &&
-        /^[1-9][0-9]{0,9}$/.test(program) && Number(program) <= 2147483647 &&
-        /^[A-Za-z0-9]{6,24}$/.test(code);
+      const token = values.get("qr") || "";
+      valid = [...values].length === 1 && /^[A-Za-z0-9_-]{1,256}\.[0-9a-f]{64}$/.test(token);
+      form.hidden = !valid;
+      form.elements.printed.value = valid ? token : "";
       if (valid) {
-        form.elements.program_id.value = program;
-        form.elements.code.value = code;
         status.textContent = "Class QR loaded. Review the Class before confirming enrollment.";
         form.querySelector("button").focus();
       }

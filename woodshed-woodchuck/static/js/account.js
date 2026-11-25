@@ -247,7 +247,7 @@
       // Only this fixed, server-rendered enrollment destination is permitted.
       // A QR fragment remains browser-only and is never an HTTP query/credential.
       if (form.dataset.enrollmentReturn !== "/classroom/enrollment") return false;
-      const fragment = window.location.hash.length <= 257 ? window.location.hash : "";
+      const fragment = window.location.hash.length <= 326 ? window.location.hash : "";
       // Replacing an identical URL with a fragment is only a same-document
       // navigation. Refetch the signed-in page so QR entry cannot leave the
       // student looking at the old signed-out form after successful login.

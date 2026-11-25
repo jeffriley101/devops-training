@@ -225,14 +225,15 @@ def _grant(session, *, student, program_id, class_id, scope_version, notice_vers
     context = _context(session, program_id, class_id, student.profile_id, student=student)
     anchor, member, entitlement, rule, activation, now = context
     periods = _periods(session, anchor.id)
-    if bool(periods) != reauthorize:
-        raise s1.ClassroomDenied(UNAVAILABLE)
     opened = next((row for row in periods if row.ended_at is None), None)
     if opened is not None:
         end = _source_end(session, opened, now)
-        if _same_source(opened, context) and end > now:
-            raise s1.ClassroomDenied(UNAVAILABLE)  # no duplicate grants
+        if not reauthorize or (_same_source(opened, context) and end > now):
+            raise s1.ClassroomDenied(UNAVAILABLE)
         _close(session, opened, now=now, reason="source_changed", effective_end=end)
+    # Both explicit entry points require a current transaction-bound student
+    # proof and current scope. A disposed, closed period is never evidence
+    # either for or against new authorization.
     if periods and periods[-1].ended_at and utc(periods[-1].ended_at) > now:
         raise s1.ClassroomDenied(UNAVAILABLE)
     row = ClassroomReportingPeriod(program_id=program_id, class_id=class_id,

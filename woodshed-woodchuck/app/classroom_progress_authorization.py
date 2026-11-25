@@ -114,8 +114,8 @@ def _capacity_revision(session, entitlement):
     program_id = entitlement.program_id
     classes = session.scalar(select(func.count()).select_from(ClassroomClassState).where(
         ClassroomClassState.program_id == program_id))
-    teachers = session.scalar(select(func.count(func.distinct(ClassroomTeachingAssignment.verifier_id))).where(
-        ClassroomTeachingAssignment.program_id == program_id))
+    from .classroom_residual import historical_teacher_count
+    teachers = historical_teacher_count(session, program_id)
     teacher_history_needed = teachers > entitlement.teacher_limit
     assignments = session.scalar(select(func.max(ClassroomAuditEvent.id)).where(
         ClassroomAuditEvent.program_id == program_id,
@@ -129,6 +129,20 @@ def _capacity_revision(session, entitlement):
                                         "teacher_activated", "teacher_deactivated")))) \
         if teacher_history_needed or classes > entitlement.class_limit else 0
     return assignments or 0, activity or 0
+
+
+def _source_event_watermark(session, program_id, class_id, profile_id):
+    return session.scalar(select(func.max(ClassroomS2AuditEvent.id)).where(
+        ClassroomS2AuditEvent.program_id == program_id,
+        ClassroomS2AuditEvent.action.in_(("trial_started", "institutional_created",
+            "institutional_changed", "institutional_ended"))
+        | ((ClassroomS2AuditEvent.class_id == class_id)
+           & ClassroomS2AuditEvent.action.in_(("class_activated", "class_archived", "class_reactivated",
+                                              "teacher_activated", "teacher_deactivated")))
+        | ((ClassroomS2AuditEvent.class_id == class_id)
+           & (ClassroomS2AuditEvent.profile_id == profile_id)
+           & ClassroomS2AuditEvent.action.in_(("student_joined", "student_left", "student_suspended",
+                                              "student_removed", "student_reinstated"))))) or 0
 
 
 def _source_revision_base(session, context):
@@ -146,17 +160,7 @@ def _source_revision_base(session, context):
         ClassroomAuditEvent.program_id == entitlement.program_id,
         ClassroomAuditEvent.class_id == anchor.class_id,
         ClassroomAuditEvent.action.in_(("teacher_assigned", "teacher_revoked", "teacher_departed")))) or 0
-    sources = session.scalar(select(func.max(ClassroomS2AuditEvent.id)).where(
-        ClassroomS2AuditEvent.program_id == entitlement.program_id,
-        ClassroomS2AuditEvent.action.in_(("trial_started", "institutional_created",
-            "institutional_changed", "institutional_ended"))
-        | ((ClassroomS2AuditEvent.class_id == anchor.class_id)
-           & ClassroomS2AuditEvent.action.in_(("class_activated", "class_archived", "class_reactivated",
-                                              "teacher_activated", "teacher_deactivated")))
-        | ((ClassroomS2AuditEvent.class_id == anchor.class_id)
-           & (ClassroomS2AuditEvent.profile_id == anchor.profile_id)
-           & ClassroomS2AuditEvent.action.in_(("student_joined", "student_left", "student_suspended",
-                                              "student_removed", "student_reinstated"))))) or 0
+    sources = _source_event_watermark(session, entitlement.program_id, anchor.class_id, anchor.profile_id)
     # v1/v2 cannot prove absence of scheduled/shared-capacity interruptions.
     # Retain their evidence; require a freshly reviewed v3 form and acceptance.
     snapshot = ("classroom-progress-source-v3", entitlement.program_id, anchor.class_id, anchor.profile_id,
@@ -177,6 +181,19 @@ def _source_revision(session, context):
             [(grant.id, grant.consent_id, grant.notice_digest) for grant in grants]),
             separators=(',', ':')).encode()).hexdigest()
     return base
+
+
+def _form_revision(session, context, source):
+    # Physical disposal changes the review form's predecessor. It does not
+    # withdraw other independently accepted authorizations.
+    from .classroom_residual import enabled
+    if enabled(session):
+        from sqlalchemy import text
+        epoch = session.scalar(text("SELECT reporting_form_revision FROM public.classroom_student_memberships WHERE id=:id"),
+                               {"id": context[0].id})
+        if epoch:
+            return hashlib.sha256(f"review-v1:{source}:{epoch}".encode()).hexdigest()
+    return source
 
 
 def _current(session, row, context, teachers):
@@ -212,7 +229,8 @@ def accept(session, *, student, program_id, class_id, notice_version, opted_in, 
     anchor, member, entitlement, rule, activation, now = context
     # Check before idempotency: a stale form may never be used as new consent,
     # even when current source values or the recipient set have returned.
-    if not isinstance(source_revision, str) or source_revision != _source_revision(session, context):
+    current_source = _source_revision(session, context)
+    if not isinstance(source_revision, str) or source_revision != _form_revision(session, context, current_source):
         raise s1.ClassroomDenied(UNAVAILABLE)
     teachers = _teachers(session, program_id, class_id, now)
     if (not teachers or type(assignment_ids) is not tuple
@@ -237,7 +255,7 @@ def accept(session, *, student, program_id, class_id, notice_version, opted_in, 
             ClassroomS2AuditEvent.program_id == program_id)),
         scope_version=SCOPE_VERSION, notice_version=NOTICE_VERSION, notice_digest=NOTICE_DIGEST,
         accepted_at=now, accepted_by_profile_id=anchor.profile_id,
-        acceptance_session_version=student.session_version, source_revision=source_revision)
+        acceptance_session_version=student.session_version, source_revision=current_source)
     session.add(row)
     session.flush()
     session.add_all([Recipient(authorization_id=row.id, assignment_id=t.id,
@@ -283,7 +301,7 @@ def choice(session, *, student, program_id, class_id):
     except s1.ClassroomDenied:
         return Choice(False, False, row is not None, revision=revision)
     return Choice(bool(teachers), _current(session, row, context, teachers), row is not None,
-                  tuple(t.id for t in teachers), revision, _source_revision(session, context))
+                  tuple(t.id for t in teachers), revision, _form_revision(session, context, _source_revision(session, context)))
 
 
 @_operation

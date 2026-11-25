@@ -404,7 +404,7 @@ END;
 $$"""
 
 
-def validate_s2_guards(connection, error):
+def validate_s2_guards(connection, error, *, c37_holds=False, c38_residual=False):
     """Reject altered S2 behavior as well as reflected constraint definitions."""
     tables = list(C23)
     if connection.dialect.name == "postgresql":
@@ -425,23 +425,28 @@ def validate_s2_guards(connection, error):
                     OR bool_or(NOT t.tgisinternal OR t.tgenabled <> 'O'))
         """), {"tables": tables}):
             raise error("classroom_schema_missing_or_changed: s2_foreign_key_enforcement")
+        from .classroom_residual import TRIGGERS
+        approved = [f"{table}.{trigger}" for table, trigger in TRIGGERS] if c38_residual else []
         unexpected = connection.scalar(text("""
             SELECT EXISTS (
                 SELECT 1 FROM pg_trigger t JOIN pg_class r ON r.oid = t.tgrelid
                 JOIN pg_namespace n ON n.oid = r.relnamespace
                 WHERE n.nspname = current_schema() AND r.relname = ANY(:tables)
-                  AND NOT t.tgisinternal)
-        """), {"tables": tables})
+                  AND NOT t.tgisinternal AND NOT
+                    ((:c37 AND r.relname='classroom_membership_holds'
+                      AND t.tgname IN ('c37_hold_change','c37_hold_truncate'))
+                     OR r.relname || '.' || t.tgname = ANY(CAST(:approved AS text[]))))
+        """), {"tables": tables, "c37": c37_holds, "approved": approved})
     else:
         unexpected = set(connection.scalars(text(
             "SELECT tbl_name FROM sqlite_master WHERE type = 'trigger'"))) & set(tables)
     # No user triggers are part of the five new S2 tables' reviewed contract.
     if unexpected:
         raise error("classroom_schema_missing_or_changed: s2_trigger_inventory")
-    validate_period_guards(connection, error)
+    validate_period_guards(connection, error, c38_residual=c38_residual)
 
 
-def validate_period_guards(connection, error):
+def validate_period_guards(connection, error, *, c38_residual=False):
     """The installed revision must enforce the reviewed interval definition."""
     reason = "classroom_schema_missing_or_changed: membership_interval_guard"
     if connection.dialect.name == "postgresql":
@@ -449,7 +454,10 @@ def validate_period_guards(connection, error):
             SELECT tgname FROM pg_trigger
             WHERE tgrelid = 'classroom_membership_periods'::regclass AND NOT tgisinternal
         """)))
-        if triggers != ["classroom_period_no_overlap"]:
+        expected = {"classroom_period_no_overlap"}
+        if c38_residual:
+            expected.add("c38_witnessed_delete")
+        if set(triggers) != expected:
             raise error(reason)
         rows = connection.execute(text("""
             SELECT p.prosrc, p.prosecdef, p.provolatile, p.proconfig,

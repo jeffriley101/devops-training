@@ -36,8 +36,12 @@ def _class_names(session, program_id, class_id):
 
 
 @enrollment._operation
-def code_review(session, *, student, program_id, code=None, intent=None):
-    if code is not None:
+def code_review(session, *, student, program_id=None, code=None, intent=None, printed=None):
+    if printed is not None:
+        row = s2._printed_entry(session, printed)
+        program_id = row.program_id
+        intent = s2._review_intent(session, student, row)
+    elif code is not None:
         intent = s2.prepare_entry(session, student=student, program_id=program_id, code=code)
     row = s2._entry(session, program_id, intent=intent, student=student)
     profile = s2._student(session, student, require_eligibility=False)

@@ -12,6 +12,7 @@ from .classroom_enrollment_routes import _form as enrollment_form, _adult, _numb
 from .classroom_models import (ClassroomRoleGrant, ClassroomTeachingAssignment,
     ClassroomStudentMembership)
 from .db import SessionLocal
+from .classroom_writer_sessions import operation_session
 from .membership_routes import PrivateRoute
 from .models import TrustedVerifier
 from .site_admin import csrf_token
@@ -227,7 +228,7 @@ def _apply(session, *, request, actor, program_id, class_id, action, payload, ad
         room_id = class_id if class_id is not None else payload['class_id']
         row, visible = s2.issue_code(session, actor=actor, program_id=program_id, class_id=room_id,
             preferred=payload['preferred'] or None)
-        code_result = {**_qr(request, program_id, visible), 'class_id': row.class_id, 'generation': row.generation}
+        code_result = {**_qr(request, row, visible), 'class_id': row.class_id, 'generation': row.generation}
     elif action in {'suspend', 'remove'}:
         s2.suspend_member(session, **args, membership_id=payload['membership_id'],
             reason='admin_removal' if action == 'remove' else 'conduct', remove=action == 'remove')
@@ -258,7 +259,7 @@ async def control(request: Request, program_id: int, class_id: int | None = None
         if form['stage'] == 'apply' and form['confirm_change'] != 'yes':
             raise HTTPException(400, 'Confirm this exact change.')
     result = confirmation = code_result = detail = None
-    with SessionLocal() as session:
+    with operation_session(action, SessionLocal) as session:
         _, actor = _adult(request, session, form)
         try:
             if action == 'view':

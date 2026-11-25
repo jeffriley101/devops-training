@@ -10,7 +10,7 @@ import re
 
 from sqlalchemy import INTEGER, JSON, Boolean, Date, DateTime, Integer, MetaData, String, Table, inspect, select, text
 
-SUPPORTED_REVISIONS = ("p21team001", "c22class001", "c23class001", "c24class001", "w25weekly005", "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001", "c36choice001")
+SUPPORTED_REVISIONS = ("p21team001", "c22class001", "c23class001", "c24class001", "w25weekly005", "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001", "c36choice001", "c37hold001", "c38disp001")
 
 # Frozen migration contract: sharing preferences are not reporting authority.
 _C25 = {
@@ -625,7 +625,16 @@ def installed_revision(connection, error):
                  if "alembic_version" in tables else [])
     if len(revisions) != 1 or revisions[0] not in SUPPORTED_REVISIONS:
         raise error("revision_not_approved: require exactly one of " + ", ".join(SUPPORTED_REVISIONS))
-    revision = revisions[0]
+    installed = revisions[0]
+    hold_guard = installed in {"c37hold001", "c38disp001"}
+    residual = installed == "c38disp001" and connection.dialect.name == "postgresql"
+    if hold_guard:
+        from .classroom_hold_guard import validate
+        validate(connection, error)
+    if residual:
+        from .classroom_residual import validate as validate_residual
+        validate_residual(connection, error)
+    revision = "c36choice001" if hold_guard else installed
     if revision not in {"p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001", "c36choice001"} and "persistent_team_receipt_issuances" in tables:
         raise error("revision_not_approved: receipt_schema_revision_mismatch")
     from .operator_classroom_enrollment_contract import C32
@@ -686,6 +695,29 @@ def installed_revision(connection, error):
         expected_tables.update(CHART_C35)
     if revision == "c36choice001":
         expected_tables.update(C36)
+    if residual:
+        for table, new_columns, checks in (
+            ("classroom_student_memberships", {"reporting_form_revision": ("Integer", None, False)},
+             {"ck_c38_form_revision": "reporting_form_revision >= 0"}),
+            ("classroom_programs", {"retired_teaching_units": ("Integer", None, False),
+                                     "retired_allocation_bound": ("Integer", None, False)},
+             {"ck_c38_retired_allocation_bound": "retired_allocation_bound >= 0",
+              "ck_c38_retired_teaching_units": "retired_teaching_units >= 0"}),
+            ("classroom_class_states", {"entry_generation": ("Integer", None, False),
+                                        "changed_by_verifier_id": ("Integer", None, True)},
+             {"ck_c38_entry_generation": "entry_generation >= 0",
+              "ck_c38_class_attribution": "state::text = 'archived'::text OR changed_by_verifier_id IS NOT NULL"}),
+            ("classroom_audit_events", {"actor_verifier_id": ("Integer", None, True)},
+             {"ck_classroom_audit_provision_evidence": "actor_verifier_id IS NULL OR action::text <> 'program_provisioned'::text OR new_owner_id IS NOT NULL AND target_verifier_id IS NOT NULL",
+              "ck_classroom_audit_role_evidence": "actor_verifier_id IS NULL OR (action::text <> ALL (ARRAY['role_granted'::character varying, 'role_revoked'::character varying]::text[])) OR role_grant_id IS NOT NULL AND target_verifier_id IS NOT NULL",
+              # SQLAlchemy strips the outermost parentheses from this reflected expression.
+              "ck_classroom_audit_teacher_evidence": "action::text <> ALL (ARRAY['teacher_assigned'::character varying, 'teacher_revoked'::character varying, 'teacher_departed'::character varying]::text[])) OR class_id IS NOT NULL AND (actor_verifier_id IS NULL OR assignment_id IS NOT NULL AND target_verifier_id IS NOT NULL"}),
+            ("classroom_s2_audit_events", {},
+             {"ck_classroom_s2_audit_actor": "num_nonnulls(actor_verifier_id, actor_profile_id, actor_admin) <= 1"}),
+        ):
+            contract = expected_tables[table]
+            expected_tables[table] = dict(contract, columns=contract["columns"] | new_columns,
+                                          pg_checks=contract["pg_checks"] | checks)
     dialect = connection.dialect.name
     if dialect not in {"sqlite", "postgresql"}:
         raise error("classroom_schema_backend_not_supported")
@@ -720,6 +752,8 @@ def installed_revision(connection, error):
             "SELECT name, type FROM pragma_table_xinfo(:table, 'main')"
         ), {"table": name}).all()) if dialect == "sqlite" else {}
         for column, (kind, length, nullable) in expected["columns"].items():
+            if hold_guard and (name, column) == ("classroom_membership_holds", "held_by_verifier_id"):
+                nullable = True
             actual = columns.get(column)
             types = {"Integer": Integer, "String": String, "DateTime": DateTime,
                      "Boolean": Boolean, "Date": Date, "JSON": JSON}
@@ -744,6 +778,8 @@ def installed_revision(connection, error):
                     quoted_schema = '"' + schema.replace('"', '""') + '"'
                     allowed_defaults = {"nextval('" + ref + "'::regclass)" for ref in (
                         sequence, schema + "." + sequence, quoted_schema + "." + sequence)}
+                elif residual and column in {"retired_teaching_units", "entry_generation", "reporting_form_revision", "retired_allocation_bound"}:
+                    allowed_defaults = {"0"}
                 else:
                     allowed_defaults = {None}
                 if default not in allowed_defaults or actual.get("computed") or actual.get("identity"):
@@ -846,10 +882,10 @@ def installed_revision(connection, error):
                 refuse("indexes")
     if revision in {"c23class001", "c24class001", "w25weekly005", "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001", "c36choice001"}:
         from .operator_classroom_s2_contract import validate_s2_guards
-        validate_s2_guards(connection, error)
+        validate_s2_guards(connection, error, c37_holds=hold_guard, c38_residual=residual)
     if revision in {"c24class001", "w25weekly005", "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001", "c36choice001"}:
         from .operator_classroom_s3_contract import validate_s3_guards
-        validate_s3_guards(connection, error)
+        validate_s3_guards(connection, error, c38_residual=residual)
     if revision in {"w25weekly005", "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001", "c36choice001"}:
         from .operator_weekly_contract import validate_profile_and_triggers
         validate_profile_and_triggers(connection, error, lambda value: _check_sql(
@@ -860,11 +896,13 @@ def installed_revision(connection, error):
     if revision == "c36choice001":
         from .classroom_choice_guards import validate_guards
         validate_guards(connection, error)
-    return revision
+    return installed
 
 
 def classroom_snapshot(connection, revision):
     """Preserve extensions, profile/economy rows and issuance independently of receipts."""
+    if revision in {"c37hold001", "c38disp001"}:
+        revision = "c36choice001"  # Snapshot the same tables, including residual structural columns when installed.
     if revision not in {"c22class001", "c23class001", "c24class001", "w25weekly005", "c25class001", "c26class001", "c27class001", "c28class001", "c29class001", "c30class001", "p31pta001", "c32enroll001", "c33identity001", "c34guardian001", "c35school001", "c36choice001"}:
         return {}
     names = CLASSROOM_TABLES
