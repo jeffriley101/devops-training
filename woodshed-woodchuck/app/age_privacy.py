@@ -1,7 +1,8 @@
 """Shared server eligibility and conservative historical publication boundaries."""
 from datetime import datetime, timezone, time
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import object_session
+from sqlalchemy.exc import DBAPIError
 from fastapi import HTTPException
 from .age_models import AccountPrivacy
 
@@ -24,17 +25,53 @@ def eligible(session, profile_id):
 def require_eligible(session, profile_id):
     if not eligible(session,profile_id):raise AgeScreenRequired()
 
-def declare_age(session, profile_id, age_band, *, at=None):
+def record_guarded_transition(session, profile_id, band, *, login_version=None,
+                              consent_id=None, parent_proof=None, wording=None):
+    # Keep parent proof out of the web cookie and out of the attestation row.
+    if consent_id is not None:
+        session.execute(text("SELECT set_config('woodshed.parent_age_proof', :proof, true), "
+                             "set_config('woodshed.parent_age_wording', :wording, true)"),
+                        {'proof': parent_proof, 'wording': wording})
+    try:
+        cutoff = session.scalar(text("""
+            UPDATE public.account_privacy_rules r SET age_band=:band
+            FROM public.woodchuck_profiles p
+            WHERE p.id=r.profile_id AND r.profile_id=:subject AND p.status='active'
+              AND session_user='disposition_ordinary' AND current_user=session_user
+              AND ((r.age_band='unknown' AND r.consent_id IS NULL AND CAST(:consent AS integer) IS NULL
+                    AND p.session_version=:version)
+                OR (r.age_band='under13' AND r.consent_id=:consent AND :band='13to17'))
+              AND r.public_from IS NULL
+            RETURNING r.public_from
+        """), dict(subject=profile_id, band=band, version=login_version, consent=consent_id))
+    except DBAPIError as error:
+        if getattr(error.orig, 'sqlstate', None) == 'P3801':
+            raise ValueError('The age record or authorization changed. Reload before confirming.') from None
+        raise
+    if cutoff is None:
+        raise ValueError('The age record or authorization changed. Reload before confirming.')
+    return session.get(AccountPrivacy, profile_id, populate_existing=True)
+
+
+def declare_age(session, profile_id, age_band, *, at=None, login_version=None):
     from .models import WoodchuckProfile
     if age_band not in ('under13','13to17','adult','unknown'):raise ValueError('Choose an age band.')
     # Serialize two conflicting declarations, without touching saved account data.
     profile=session.scalar(select(WoodchuckProfile).where(WoodchuckProfile.id==profile_id).with_for_update().execution_options(populate_existing=True))
     if not profile or profile.status!='active':raise ValueError('Student sign-in is required.')
+    if login_version is not None and profile.session_version != login_version:
+        raise ValueError('Sign-in changed. Reload this page.')
     rule=session.get(AccountPrivacy,profile_id,populate_existing=True)
     if rule and rule.age_band!='unknown':
         if rule.age_band!=age_band:raise ValueError('A recorded age cannot be changed here. Contact support for a protected correction.')
         return rule
     was_eligible = eligible(session, profile_id)
+    if (rule is not None and login_version is not None and age_band in ('13to17','adult')
+            and session.get_bind().dialect.name == 'postgresql'):
+        rule = record_guarded_transition(session, profile_id, age_band, login_version=login_version)
+        if not was_eligible:
+            _reactivate_tester(session, profile_id)
+        return rule
     instant=utc(at or datetime.now(timezone.utc))
     if rule is None:
         rule=AccountPrivacy(profile_id=profile_id);session.add(rule)

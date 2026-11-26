@@ -412,7 +412,8 @@ async def close_adult(request:Request):
                 from .security import hash_invitation_token
                 keyname='child_parent_secret' if cls is ParentAccess else 'child_director_secret'
                 secret=request.session.get(keyname)
-                if isinstance(secret,str) and row.session_hash==hash_invitation_token(secret):
+                digest = parent_access.parent_session_hash if cls is ParentAccess else hash_invitation_token
+                if isinstance(secret,str) and row.session_hash==digest(secret):
                     row.session_hash=None;row.session_expires_at=None
         s.commit()
     for key in ('child_parent_consent','child_parent_secret','child_director_permission','child_director_secret'):

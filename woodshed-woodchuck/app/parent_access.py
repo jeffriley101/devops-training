@@ -17,6 +17,17 @@ AGE_EXPLANATION=('Future qualifying activity may appear in leaderboards. Earlier
     'Practice recorded for today or earlier remains private; later practice dates may qualify. '
     'This is your declaration, not independent age verification. Your existing private access and withdrawal controls remain in place.')
 
+# New sessions have a distinct proof for the database operation. Its hash is
+# stored in the existing credential field. The proof cannot open the web session.
+def age_proof(secret):
+    return hash_invitation_token('parent-age-v1:' + secret)
+
+def parent_session_hash(secret):
+    if secret.startswith('pa2.'):
+        return hash_invitation_token(age_proof(secret))
+    return hash_invitation_token(secret)
+
+
 def valid_consent(session, consent_id, *, lock=False):
     q=select(ConsentEvidence).where(ConsentEvidence.id==consent_id)
     evidence=session.scalar((q.with_for_update() if lock else q).execution_options(populate_existing=True))
@@ -55,8 +66,11 @@ def consume_link(session,token):
     access=session.scalar(select(ParentAccess).where(ParentAccess.consent_id==evidence.id).with_for_update().execution_options(populate_existing=True))
     if access.link_hash!=hash_invitation_token(token) or not access.link_expires_at or service.utc(access.link_expires_at)<=service.clock():
         raise ValueError('Invalid or expired parent access link.')
-    secret=generate_invitation_token();access.link_hash=None;access.link_expires_at=None
-    access.session_hash=hash_invitation_token(secret);access.session_expires_at=service.clock()+ACCESS_TTL
+    secret = 'pa2.' + generate_invitation_token()
+    access.link_hash = None
+    access.link_expires_at = None
+    access.session_hash = parent_session_hash(secret)
+    access.session_expires_at = service.clock() + ACCESS_TTL
     session.flush();return evidence.id,secret
 
 def authenticated(session,request,*,lock=False):
@@ -64,7 +78,7 @@ def authenticated(session,request,*,lock=False):
     if type(cid) is not int or not isinstance(secret,str):raise ValueError('Verify parent access using the emailed link.')
     evidence,rule,profile=valid_consent(session,cid,lock=lock)
     access=session.get(ParentAccess,cid,populate_existing=True)
-    if not access or not access.session_hash or not access.session_expires_at or service.utc(access.session_expires_at)<=service.clock() or not hmac.compare_digest(access.session_hash,hash_invitation_token(secret)):
+    if not access or not access.session_hash or not access.session_expires_at or service.utc(access.session_expires_at)<=service.clock() or not hmac.compare_digest(access.session_hash,parent_session_hash(secret)):
         raise ValueError('Parent access expired. Request a new link.')
     return evidence,rule,profile
 
@@ -86,10 +100,20 @@ def invitation_allowed(session,profile_id,email,role):
 def confirm_age(session,request,*,explicit,version):
     evidence,rule,profile=authenticated(session,request,lock=True)
     if explicit!='yes' or version!=AGE_WORDING_VERSION:raise ValueError('Check the confirmation and explicitly save it.')
-    if rule.age_band!='under13' or session.get(ParentAgeDeclaration,profile.id):raise ValueError('This age confirmation is already recorded or unavailable.')
+    if rule.age_band!='under13':raise ValueError('This age confirmation is already recorded or unavailable.')
     # No birth date exists in the current schema. Fail closed if a later integration supplies one.
     if getattr(profile,'birth_date',None) is not None or getattr(profile,'date_of_birth',None) is not None:
         raise ValueError('A recorded birth date needs support review before this age declaration can be saved.')
+    if session.get_bind().dialect.name == 'postgresql':
+        secret = request.session['child_parent_secret']
+        if not secret.startswith('pa2.'):
+            raise ValueError('Request a new parent access link before confirming age.')
+        from .age_privacy import record_guarded_transition
+        record_guarded_transition(session, profile.id, '13to17', consent_id=evidence.id,
+                                  parent_proof=age_proof(secret), wording=version)
+        return profile
+    if session.get(ParentAgeDeclaration,profile.id):
+        raise ValueError('This age confirmation is already recorded or unavailable.')
     now=service.clock()
     rule.age_band='13to17';rule.declared_at=now;rule.public_from=now
     rule.private_plunge_best=profile.plunge_best_score or 0

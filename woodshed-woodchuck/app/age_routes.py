@@ -3,7 +3,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
-from .account_routes import current_profile
+from .account_routes import current_profile, SESSION_PROFILE_VERSION
 from .age_models import AccountPrivacy
 from .age_privacy import declare_age,eligible,correct_age,utc
 from .consent_status import student_consent_status
@@ -45,7 +45,10 @@ async def age_submit(request:Request):
         profile=current_profile(request,session)
         if profile is None:raise HTTPException(401,'Student sign-in is required.')
         if data.get('confirm_account')!=profile.woodchuck_id:raise HTTPException(409,'Sign-in changed. Reload this page.')
-        try:declare_age(session,profile.id,data.get('age_band'));session.commit()
+        try:
+            declare_age(session, profile.id, data.get('age_band'),
+                        login_version=request.session.get(SESSION_PROFILE_VERSION, 0))
+            session.commit()
         except ValueError as error:raise HTTPException(409,str(error)) from error
         return RedirectResponse((account_return_path(request,profile) or '/home') if eligible(session,profile.id) else '/account/age',303)
 
